@@ -179,6 +179,22 @@ def analyse(quote: dict) -> dict:
         )
     )
     equity_book = bn(_latest(bq, ba, "Stockholders Equity", "Common Stock Equity"))
+    # cash including short-term investments, and debt split by maturity
+    liquid = bn(
+        _latest(
+            bq, ba, "Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents"
+        )
+    )
+    short_debt = bn(_latest(bq, ba, "Current Debt And Capital Lease Obligation", "Current Debt"))
+    long_debt = bn(_latest(bq, ba, "Long Term Debt And Capital Lease Obligation", "Long Term Debt"))
+    total_known = bn(_latest(bq, ba, "Total Debt"))
+    if not np.isfinite(short_debt) and np.isfinite(long_debt) and np.isfinite(total_known):
+        short_debt = max(total_known - long_debt, 0.0)
+    if not np.isfinite(long_debt) and np.isfinite(short_debt) and np.isfinite(total_known):
+        long_debt = max(total_known - short_debt, 0.0)
+    if not np.isfinite(total_known) or total_known == 0:
+        short_debt = 0.0 if not np.isfinite(short_debt) else short_debt
+        long_debt = 0.0 if not np.isfinite(long_debt) else long_debt
     debt = 0.0 if not np.isfinite(debt) else debt
     cash = 0.0 if not np.isfinite(cash) else cash
     net_debt = debt - cash
@@ -226,6 +242,18 @@ def analyse(quote: dict) -> dict:
         "market_cap": mcap,
         # debt
         "total_debt": debt,
+        "cash": liquid,
+        "short_term_debt": short_debt,
+        "long_term_debt": long_debt,
+        "cash_to_short_term_debt": _div(liquid, short_debt)
+        if short_debt and short_debt > 0
+        else (np.inf if np.isfinite(liquid) else np.nan),
+        "cash_plus_ocf_to_short_term_debt": _div(liquid + max(ocf, 0.0), short_debt)
+        if short_debt and short_debt > 0 and np.isfinite(ocf)
+        else (np.inf if np.isfinite(liquid) else np.nan),
+        "cash_to_long_term_debt": _div(liquid, long_debt)
+        if long_debt and long_debt > 0
+        else (np.inf if np.isfinite(liquid) else np.nan),
         "net_debt": net_debt,
         "net_debt_to_ebitda": leverage,
         "ebitda_to_interest": _div(ebitda, abs(interest) if np.isfinite(interest) else np.nan),
