@@ -34,7 +34,8 @@ uv run python analysis/debt.py CEG                 # CEG leverage history
 uv run python analysis/compare.py CEG VST NRG      # debt and growth vs peers
 uv run python analysis/debt_to_ebitda.py CEG VST   # debt/EBITDA history
 uv run python analysis/valuation.py CEG VST        # valuation snapshot
-uv run python analysis/dcf.py                      # DCF / dividend model and reverse DCF
+uv run python analysis/dcf.py                      # equity DCF / dividend model and reverse DCF
+uv run python analysis/dcf_firm.py                 # enterprise DCF (FCFF at WACC)
 uv run python dashboard/build.py                   # rebuild dashboard/index.html
 ```
 
