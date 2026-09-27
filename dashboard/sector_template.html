@@ -1,0 +1,445 @@
+<title>US Utilities Sector Screen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f2f3f0; --card: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #7a7973;
+  --rule: #e2e2dd; --grid: #ebebe6; --dot: #a9a8a0; --hover: #efefeb; --chip-on: #0b0b0b; --chip-on-ink: #ffffff;
+  --s1: #2a78d6; --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+  --good-ink: #0a6e0a; --crit-ink: #a52a2a;
+  --tip-bg: #1f1f1d; --tip-ink: #ffffff; --tip-ink-2: #c3c2b7;
+  --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --card: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+    --rule: #2d2d2a; --grid: #262624; --dot: #6a6962; --hover: #232321; --chip-on: #ffffff; --chip-on-ink: #0b0b0b;
+    --s1: #3987e5; --good-ink: #5fd35f; --crit-ink: #f07a7a;
+    --tip-bg: #f4f4f1; --tip-ink: #0b0b0b; --tip-ink-2: #52514e;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --card: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+  --rule: #2d2d2a; --grid: #262624; --dot: #6a6962; --hover: #232321; --chip-on: #ffffff; --chip-on-ink: #0b0b0b;
+  --s1: #3987e5; --good-ink: #5fd35f; --crit-ink: #f07a7a;
+  --tip-bg: #f4f4f1; --tip-ink: #0b0b0b; --tip-ink-2: #52514e;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5; padding-inline: 16px; padding-block: 24px 48px; }
+.wrap { max-width: 1280px; margin-inline: auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+header.top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
+.eyebrow { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+.asof { color: var(--ink-2); font-size: 13px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.kpi { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.kpi .label { font-size: 12px; color: var(--ink-2); font-weight: 500; }
+.kpi .value { font-size: 24px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.kpi .sub { font-size: 12.5px; color: var(--ink-2); }
+section.panel { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.panel-head h2 { font-size: 19px; font-weight: 600; }
+.panel-head .dek { color: var(--ink-2); max-width: 78ch; margin-top: 2px; }
+.takeaways { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.takeaways li { border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.takeaways b { font-size: 14px; }
+.takeaways span { color: var(--ink-2); font-size: 13px; }
+.table-wrap { overflow: auto; border: 1px solid var(--rule); border-radius: 8px; }
+.table-wrap.tall { max-height: 72vh; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--rule); background: var(--card); }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; z-index: 1; border-right: 1px solid var(--rule); }
+thead th { position: sticky; top: 0; z-index: 2; font-size: 11.5px; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+thead tr.groups th { top: 0; color: var(--ink-2); border-bottom: 0; text-align: center; font-size: 11px; }
+thead tr.cols th { top: 29px; }
+thead th:first-child { z-index: 3; }
+thead th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+thead th button:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; border-radius: 3px; }
+thead th[aria-sort="ascending"] button::after { content: "▲"; font-size: 9px; }
+thead th[aria-sort="descending"] button::after { content: "▼"; font-size: 9px; }
+th.gstart, td.gstart { border-left: 1px solid var(--rule); }
+tbody tr:hover td { background: var(--hover); }
+tr.focus td { font-weight: 600; }
+tr.all td { font-weight: 600; background: var(--bg); }
+.co { display: flex; flex-direction: column; line-height: 1.25; width: 210px; }
+.co .t { font-family: var(--mono); font-size: 12.5px; font-weight: 500; }
+.co .n { color: var(--ink-2); font-size: 12px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flag { color: var(--ink-3); font-size: 11px; font-weight: 500; }
+.pos { color: var(--crit-ink); } .neg { color: var(--good-ink); }
+.muted { color: var(--ink-3); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { font: inherit; font-size: 13px; font-weight: 500; border: 1px solid var(--rule); background: var(--card); color: var(--ink-2); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.chips button[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on); }
+.chips button:focus-visible, input:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+input[type="search"] { font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--card); color: var(--ink); min-width: 0; width: 220px; max-width: 100%; }
+.count { color: var(--ink-2); font-size: 13px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+@media (max-width: 860px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } }
+.sub-h { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.sub-h h3 { font-size: 14px; font-weight: 600; }
+.sub-h p { color: var(--ink-2); font-size: 13px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--ink-2); font-family: var(--sans); font-size: 12px; }
+.chart .axis-label { fill: var(--ink-3); font-size: 11.5px; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .medline { stroke: var(--ink); stroke-width: 2; }
+.chart .hl { fill: var(--ink); font-weight: 600; font-size: 11.5px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.legend i.bar { width: 2px; height: 12px; border-radius: 1px; }
+.tip { position: absolute; pointer-events: none; background: var(--tip-bg); color: var(--tip-ink); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.4; box-shadow: 0 4px 16px rgb(0 0 0 / .18); z-index: 5; max-width: 260px; }
+.tip .t-title { color: var(--tip-ink-2); font-size: 11.5px; }
+.tip b { font-variant-numeric: tabular-nums; }
+.callout { background: var(--bg); border-radius: 8px; padding: 12px 14px; color: var(--ink-2); font-size: 13px; }
+.callout strong { color: var(--ink); }
+ul.notes { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; display: grid; gap: 4px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Every US-listed utility · <span id="n-co"></span> companies</div>
+      <h1>US Utilities Sector Screen</h1>
+    </div>
+    <div class="asof">Prices and statements as of <span id="asof"></span>. Source: Yahoo Finance.</div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>How the sub-industries compare</h2>
+      <p class="dek">Medians for each group, so a few extreme companies don't distort them. Market value is the group total.</p>
+    </div>
+    <div class="table-wrap"><table id="group-table"></table></div>
+    <ul class="takeaways" id="takeaways"></ul>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Where each company sits</h2>
+      <p class="dek">One dot per company, grouped by sub-industry. The black tick is the group median. Constellation and its three closest peers are highlighted. Values outside the range are pinned to the edge.</p>
+    </div>
+    <div class="legend"><span><i style="--c:var(--s1)"></i>CEG, VST, NRG, TLN</span><span><i style="--c:var(--dot)"></i>Other companies</span><span><i class="bar" style="--c:var(--ink)"></i>Group median</span></div>
+    <div class="grid-2">
+      <div><div class="sub-h"><h3>Forward P/E</h3><p>Price divided by expected earnings for the next 12 months.</p></div><div class="chart" id="strip-pe"></div></div>
+      <div><div class="sub-h"><h3>Net debt / EBITDA</h3><p>Years of operating earnings needed to repay net debt.</p></div><div class="chart" id="strip-lev"></div></div>
+      <div><div class="sub-h"><h3>Price vs DCF fair value</h3><p>Negative means the price is below fair value (cheaper).</p></div><div class="chart" id="strip-dcf"></div></div>
+      <div><div class="sub-h"><h3>Revenue growth, 3-year annual rate</h3><p>Compound annual growth over the last three fiscal years.</p></div><div class="chart" id="strip-growth"></div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>All companies</h2>
+      <p class="dek">Click a column heading to sort. Money figures in US$ billions, last 12 months unless noted. Rows marked "converted" are foreign companies whose figures were converted to US dollars; treat them with care.</p>
+    </div>
+    <div class="controls">
+      <div class="chips" id="chips" role="group" aria-label="Sub-industry filter"></div>
+      <input type="search" id="search" placeholder="Search name or ticker" aria-label="Search companies">
+      <span class="count" id="count"></span>
+    </div>
+    <div class="table-wrap tall"><table id="main-table"></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>How the numbers were made</h2></div>
+    <ul class="notes">
+      <li>The company list is Yahoo Finance's Utilities sector screen for US exchanges. Preferred shares, notes, warrants and duplicate share classes are removed.</li>
+      <li>Last-12-month figures sum the latest four quarters. Where quarterly data is missing, the latest fiscal year is used.</li>
+      <li><strong>DCF fair value (standard):</strong> cash flow before growth investment (operating cash flow minus depreciation plus after-tax interest), growing 2.5% a year forever. It's discounted at a WACC built from the 5.18% 10-year Treasury, a 5% equity premium, adjusted beta and a debt spread by leverage, and net debt is subtracted. Companies with negative cash flow show "–".</li>
+      <li><strong>CEG, VST, NRG and TLN</strong> use the guidance-based enterprise DCF from the earlier analysis (company free cash flow guidance, 4% growth).</li>
+      <li>EBITDA and earnings are reported (GAAP) figures, so hedge accounting and one-off items can swing them. Ratios on negative EBITDA are shown as "–".</li>
+      <li>This is a screen for comparison, not investment advice.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const HL = new Set(["CEG", "VST", "NRG", "TLN"]);
+const NS = "http://www.w3.org/2000/svg";
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const F = {
+  x: (v) => v == null ? "–" : `${v.toFixed(1)}x`,
+  pct: (v) => v == null ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(0)}%`,
+  pct1: (v) => v == null ? "–" : `${(v * 100).toFixed(1)}%`,
+  bn: (v) => v == null ? "–" : `${v < 0 ? "−" : ""}${Math.abs(v) >= 10 ? Math.abs(v).toFixed(0) : Math.abs(v).toFixed(2)}`,
+  usd: (v) => v == null ? "–" : `$${v >= 100 ? v.toFixed(0) : v.toFixed(2)}`,
+  n1: (v) => v == null ? "–" : v.toFixed(1),
+  eps: (v) => v == null ? "–" : v.toFixed(2),
+  txt: (v) => v ?? "–",
+};
+function el(tag, attrs = {}, text) {
+  const n = tag.startsWith("svg:") ? document.createElementNS(NS, tag.slice(4)) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (text != null) n.textContent = text;
+  return n;
+}
+const median = (a) => { const s = a.filter((x) => x != null && isFinite(x)).sort((p, q) => p - q); if (!s.length) return null; const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+
+const ROWS = DATA.rows;
+const GROUP_ORDER = ["Independent Power Producers", "Regulated Electric", "Regulated Gas", "Regulated Water", "Renewable", "Diversified"];
+const industries = GROUP_ORDER.filter((g) => DATA.groups[g]).concat(Object.keys(DATA.groups).filter((g) => !GROUP_ORDER.includes(g) && g !== "All utilities"));
+
+/* KPIs */
+function renderKpis() {
+  const all = DATA.groups["All utilities"];
+  const total = ROWS.reduce((s, r) => s + (r.market_cap || 0), 0);
+  const tiles = [
+    ["Companies", `${ROWS.length}`, `${industries.length} sub-industries`],
+    ["Combined market value", `$${(total / 1000).toFixed(2)}tn`, "Largest: NextEra, Southern, CEG"],
+    ["Median forward P/E", F.x(all.pe_fwd), "Next 12 months' earnings"],
+    ["Median net debt / EBITDA", F.x(all.net_debt_to_ebitda), `EBITDA covers interest ${F.x(all.ebitda_to_interest)}`],
+    ["Negative free cash flow", `${Math.round(all.negative_fcf * 100)}%`, "Capex above operating cash flow"],
+    ["Median price vs fair value", F.pct(all.price_vs_fair_value), "Standard DCF, where meaningful"],
+  ];
+  const root = document.getElementById("kpis");
+  for (const [l, v, s] of tiles) {
+    const k = el("div", { class: "kpi" });
+    k.append(el("span", { class: "label" }, l), el("span", { class: "value" }, v), el("span", { class: "sub" }, s));
+    root.appendChild(k);
+  }
+}
+
+/* group table */
+const GCOLS = [
+  ["Companies", (g) => g.count, (v) => v],
+  ["Market value, $bn", (g) => g.market_cap, (v) => v.toFixed(0)],
+  ["Net debt / EBITDA", (g) => g.net_debt_to_ebitda, F.x],
+  ["EBITDA / interest", (g) => g.ebitda_to_interest, (v) => (v < 0 ? "–" : F.x(v))],
+  ["Revenue growth 3y", (g) => g.revenue_cagr_3y, F.pct1],
+  ["EPS growth 3y", (g) => g.eps_cagr_3y, F.pct1],
+  ["Profitable", (g) => g.profitable, (v) => `${Math.round(v * 100)}%`],
+  ["Net margin", (g) => g.net_margin, F.pct1],
+  ["FCF yield", (g) => g.fcf_yield, F.pct1],
+  ["Negative FCF", (g) => g.negative_fcf, (v) => `${Math.round(v * 100)}%`],
+  ["Forward P/E", (g) => g.pe_fwd, (v) => (v < 0 ? "loss" : F.n1(v))],
+  ["EV / EBITDA", (g) => g.ev_to_ebitda, F.n1],
+  ["Dividend yield", (g) => g.dividend_yield, F.pct1],
+  ["vs 52w high", (g) => g.vs_52w_high, F.pct],
+  ["Analyst upside", (g) => g.analyst_upside, F.pct],
+  ["Price vs fair value", (g) => g.price_vs_fair_value, F.pct],
+];
+function renderGroupTable() {
+  const t = document.getElementById("group-table");
+  const hr = el("tr", { class: "cols" }); hr.appendChild(el("th", {}, "Sub-industry"));
+  GCOLS.forEach(([l]) => hr.appendChild(el("th", {}, l)));
+  const th = el("thead"); th.appendChild(hr); t.appendChild(th);
+  const tb = el("tbody");
+  for (const name of [...industries, "All utilities"]) {
+    const g = DATA.groups[name];
+    const tr = el("tr", name === "All utilities" ? { class: "all" } : {});
+    tr.appendChild(el("td", {}, name));
+    GCOLS.forEach(([l, get, f]) => {
+      const v = get(g);
+      const td = el("td", {}, v == null ? "–" : f(v));
+      if (l === "Price vs fair value" && v != null) td.className = v > 0.1 ? "pos" : v < -0.1 ? "neg" : "";
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+  t.querySelector("thead tr").style.setProperty("top", "0");
+  t.querySelectorAll("thead th").forEach((h) => (h.style.top = "0"));
+
+  const G = DATA.groups;
+  const items = [
+    ["Power producers are the growth and risk end", `Revenue growing ${F.pct1(G["Independent Power Producers"].revenue_cagr_3y)} a year, but only ${Math.round(G["Independent Power Producers"].profitable * 100)}% profitable over the last 12 months (many are early-stage nuclear and power startups). Shares are a median ${F.pct(G["Independent Power Producers"].vs_52w_high)} below their highs.`],
+    ["Regulated electric is the core of the sector", `${G["Regulated Electric"].count} companies worth $${(G["Regulated Electric"].market_cap / 1000).toFixed(2)}tn. Steady ${F.pct1(G["Regulated Electric"].revenue_cagr_3y)} revenue growth, ${F.x(G["Regulated Electric"].net_debt_to_ebitda)} leverage, ${F.pct1(G["Regulated Electric"].dividend_yield)} dividends, and ${Math.round(G["Regulated Electric"].negative_fcf * 100)}% spend more than they earn in cash to build out the grid.`],
+    ["Water utilities are the priciest", `Forward P/E ${F.n1(G["Regulated Water"].pe_fwd)} and a median ${F.pct(G["Regulated Water"].price_vs_fair_value)} above standard DCF value. Investors pay for the most stable, regulated growth.`],
+    ["Renewables are the most stretched", `Median net debt / EBITDA ${F.x(G["Renewable"].net_debt_to_ebitda)}, only ${Math.round(G["Renewable"].profitable * 100)}% profitable, and shares a median ${F.pct(G["Renewable"].vs_52w_high)} below their highs. High rates hit capital-hungry developers hardest.`],
+  ];
+  const ul = document.getElementById("takeaways");
+  for (const [h, s] of items) { const li = el("li"); li.append(el("b", {}, h), el("span", {}, s)); ul.appendChild(li); }
+}
+
+/* strip charts */
+function tooltip(box) {
+  const tip = el("div", { class: "tip" }); tip.hidden = true; box.appendChild(tip);
+  return {
+    show(x, y, r, label, value) {
+      tip.replaceChildren(el("div", { class: "t-title" }, `${r.symbol} · ${r.industry}`), el("div", {}, r.name), el("div", {}, `${label}: `));
+      tip.lastChild.appendChild(el("b", {}, value));
+      tip.hidden = false;
+      const cw = box.clientWidth, tw = tip.offsetWidth;
+      tip.style.left = `${Math.max(0, x + 12 + tw > cw ? x - tw - 12 : x + 12)}px`;
+      tip.style.top = `${Math.max(0, y - tip.offsetHeight - 8)}px`;
+    },
+    hide() { tip.hidden = true; },
+  };
+}
+function renderStrip(id, key, [lo, hi], fmt, ticks) {
+  const box = document.getElementById(id); box.replaceChildren();
+  const W = box.clientWidth || 560, rowH = 40, m = { t: 10, r: 16, b: 24, l: 150 };
+  const H = m.t + m.b + rowH * industries.length;
+  const x = (v) => m.l + ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * (W - m.l - m.r);
+  const svg = el("svg:svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${key} by sub-industry` });
+  for (const t of ticks) {
+    svg.appendChild(el("svg:line", { class: "gridline", x1: x(t), x2: x(t), y1: m.t, y2: H - m.b }));
+    svg.appendChild(el("svg:text", { class: "axis-label", x: x(t), y: H - 6, "text-anchor": "middle" }, fmt(t)));
+  }
+  const tip = tooltip(box);
+  const short = { "Independent Power Producers": "Power producers" };
+  industries.forEach((g, gi) => {
+    const cy = m.t + rowH * gi + rowH / 2;
+    svg.appendChild(el("svg:text", { x: m.l - 12, y: cy + 4, "text-anchor": "end" }, short[g] ?? g));
+    const rows = ROWS.filter((r) => r.industry === g && r[key] != null);
+    const sorted = [...rows].sort((a, b) => (HL.has(a.symbol) ? 1 : 0) - (HL.has(b.symbol) ? 1 : 0));
+    sorted.forEach((r, i) => {
+      const hl = HL.has(r.symbol);
+      const jitter = hl ? 0 : ((i * 37) % 11 - 5) * 1.3;
+      const cx = x(r[key]);
+      const dot = el("svg:circle", { cx, cy: cy + jitter, r: hl ? 5 : 4, fill: hl ? css("--s1") : css("--dot"), stroke: css("--card"), "stroke-width": 1.5, tabindex: 0, "aria-label": `${r.symbol}: ${fmt(r[key])}` });
+      const show = () => { const s = box.clientWidth / W; tip.show(cx * s, (cy + jitter) * s, r, id.replace("strip-", "").toUpperCase(), fmt(r[key])); };
+      dot.addEventListener("pointerenter", show); dot.addEventListener("focus", show);
+      dot.addEventListener("pointerleave", () => tip.hide()); dot.addEventListener("blur", () => tip.hide());
+      svg.appendChild(dot);
+    });
+    const med = median(rows.map((r) => r[key]));
+    if (med != null) svg.appendChild(el("svg:line", { class: "medline", x1: x(med), x2: x(med), y1: cy - 11, y2: cy + 11 }));
+  });
+  // labels for highlighted companies, above their dots
+  // alternate labels above and below when neighbours are close
+  const byRow = {};
+  for (const r of ROWS.filter((r) => HL.has(r.symbol) && r[key] != null)) (byRow[r.industry] ??= []).push(r);
+  for (const [g, list] of Object.entries(byRow)) {
+    const gi = industries.indexOf(g);
+    if (gi < 0) continue;
+    const cy = m.t + rowH * gi + rowH / 2;
+    list.sort((a, b) => a[key] - b[key]);
+    let lastAbove = -Infinity, lastBelow = -Infinity;
+    for (const r of list) {
+      const px = x(r[key]);
+      const above = px - lastAbove >= 30 || px - lastBelow < 30;
+      if (above) lastAbove = px; else lastBelow = px;
+      svg.appendChild(el("svg:text", { class: "hl", x: px, y: above ? cy - 9 : cy + 18, "text-anchor": "middle" }, r.symbol));
+    }
+  }
+  box.appendChild(svg);
+}
+function renderStrips() {
+  renderStrip("strip-pe", "pe_fwd", [0, 40], (v) => `${v.toFixed(0)}x`, [0, 10, 20, 30, 40]);
+  renderStrip("strip-lev", "net_debt_to_ebitda", [0, 12], (v) => `${v.toFixed(0)}x`, [0, 3, 6, 9, 12]);
+  renderStrip("strip-dcf", "price_vs_fair_value", [-1, 2], (v) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(0)}%`, [-1, -0.5, 0, 0.5, 1, 1.5, 2]);
+  renderStrip("strip-growth", "revenue_cagr_3y", [-0.2, 0.4], (v) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(0)}%`, [-0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4]);
+}
+
+/* main table */
+const COLS = [
+  { g: "Price", k: "price", l: "Price", f: F.usd },
+  { g: "Price", k: "market_cap", l: "Mkt value", f: F.bn },
+  { g: "Price", k: "vs_52w_high", l: "vs 52w high", f: F.pct },
+  { g: "Price", k: "analyst_upside", l: "Analyst upside", f: F.pct },
+  { g: "Fair value", k: "dcf_fair_value", l: "DCF value", f: F.usd },
+  { g: "Fair value", k: "price_vs_fair_value", l: "Price vs value", f: F.pct, color: true },
+  { g: "Fair value", k: "wacc", l: "WACC", f: F.pct1 },
+  { g: "Debt", k: "total_debt", l: "Debt", f: F.bn },
+  { g: "Debt", k: "net_debt_to_ebitda", l: "Net debt / EBITDA", f: F.x },
+  { g: "Debt", k: "ebitda_to_interest", l: "EBITDA / interest", f: F.x },
+  { g: "Growth", k: "revenue_cagr_3y", l: "Revenue 3y", f: F.pct1 },
+  { g: "Growth", k: "eps_cagr_3y", l: "EPS 3y", f: F.pct1 },
+  { g: "Growth", k: "revenue_growth_yoy", l: "Revenue yoy", f: F.pct },
+  { g: "Cash flow", k: "operating_cf", l: "Operating CF", f: F.bn },
+  { g: "Cash flow", k: "capex", l: "Capex", f: F.bn },
+  { g: "Cash flow", k: "free_cf", l: "Free CF", f: F.bn },
+  { g: "Cash flow", k: "fcf_yield", l: "FCF yield", f: F.pct1 },
+  { g: "Earnings", k: "revenue", l: "Revenue", f: F.bn },
+  { g: "Earnings", k: "net_income", l: "Net income", f: F.bn },
+  { g: "Earnings", k: "net_margin", l: "Margin", f: F.pct1 },
+  { g: "Earnings", k: "eps_ttm", l: "EPS", f: F.eps },
+  { g: "Earnings", k: "eps_fwd", l: "Fwd EPS", f: F.eps },
+  { g: "Valuation", k: "pe_ttm", l: "P/E", f: (v) => (v < 0 ? "loss" : F.n1(v)) },
+  { g: "Valuation", k: "pe_fwd", l: "Fwd P/E", f: (v) => (v < 0 ? "loss" : F.n1(v)) },
+  { g: "Valuation", k: "ev_to_ebitda", l: "EV / EBITDA", f: F.n1 },
+  { g: "Valuation", k: "price_to_book", l: "P/B", f: F.n1 },
+  { g: "Valuation", k: "dividend_yield", l: "Dividend", f: F.pct1 },
+];
+let state = { sort: "market_cap", dir: -1, industry: "All", q: "" };
+try { const s = JSON.parse(localStorage.getItem("sector-state") || "null"); if (s) state = { ...state, ...s, q: "" }; } catch {}
+
+function renderChips() {
+  const root = document.getElementById("chips");
+  for (const name of ["All", ...industries]) {
+    const b = el("button", { type: "button", "aria-pressed": String(state.industry === name) }, name === "Independent Power Producers" ? "Power producers" : name);
+    b.addEventListener("click", () => {
+      state.industry = name;
+      root.querySelectorAll("button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+      renderTable();
+    });
+    root.appendChild(b);
+  }
+}
+function renderTable() {
+  try { localStorage.setItem("sector-state", JSON.stringify(state)); } catch {}
+  const t = document.getElementById("main-table"); t.replaceChildren();
+  const thead = el("thead");
+  const gr = el("tr", { class: "groups" }); gr.appendChild(el("th", {}, ""));
+  let prev = null, span = 0, cell = null;
+  for (const c of COLS) {
+    if (c.g !== prev) { cell = el("th", { class: "gstart", colspan: 1 }, c.g); gr.appendChild(cell); prev = c.g; span = 1; }
+    else cell.setAttribute("colspan", String(++span));
+  }
+  const cr = el("tr", { class: "cols" });
+  const first = el("th", { "aria-sort": state.sort === "name" ? (state.dir > 0 ? "ascending" : "descending") : "none" });
+  const fb = el("button", { type: "button" }, "Company"); fb.addEventListener("click", () => sortBy("name")); first.appendChild(fb); cr.appendChild(first);
+  prev = null;
+  for (const c of COLS) {
+    const th = el("th", { "aria-sort": state.sort === c.k ? (state.dir > 0 ? "ascending" : "descending") : "none" });
+    if (c.g !== prev) { th.classList.add("gstart"); prev = c.g; }
+    const b = el("button", { type: "button" }, c.l); b.addEventListener("click", () => sortBy(c.k)); th.appendChild(b); cr.appendChild(th);
+  }
+  thead.append(gr, cr); t.appendChild(thead);
+
+  const q = state.q.trim().toLowerCase();
+  let rows = ROWS.filter((r) => (state.industry === "All" || r.industry === state.industry) && (!q || r.symbol.toLowerCase().includes(q) || (r.name || "").toLowerCase().includes(q)));
+  rows = rows.sort((a, b) => {
+    const va = a[state.sort], vb = b[state.sort];
+    if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1;
+    return (typeof va === "string" ? va.localeCompare(vb) : va - vb) * state.dir;
+  });
+  const tb = el("tbody");
+  for (const r of rows) {
+    const tr = el("tr", HL.has(r.symbol) ? { class: "focus" } : {});
+    const td = el("td"); const co = el("div", { class: "co" });
+    const tline = el("span", { class: "t" }, r.symbol);
+    if (r.data_flag) tline.appendChild(el("span", { class: "flag", title: r.data_flag }, "  converted"));
+    const nm = el("span", { class: "n", title: `${r.name} · ${r.industry}` }, r.name); co.append(tline, nm);
+    td.appendChild(co); tr.appendChild(td);
+    let p = null;
+    for (const c of COLS) {
+      const v = r[c.k];
+      const cell = el("td", {}, v == null ? "–" : c.f(v));
+      if (c.g !== p) { cell.classList.add("gstart"); p = c.g; }
+      if (c.color && v != null) cell.classList.add(v > 0.1 ? "pos" : v < -0.1 ? "neg" : "x");
+      tr.appendChild(cell);
+    }
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+  document.getElementById("count").textContent = `${rows.length} of ${ROWS.length} companies`;
+  // stack the second header row under the first
+  requestAnimationFrame(() => { const h = gr.getBoundingClientRect().height; cr.querySelectorAll("th").forEach((th) => (th.style.top = `${h}px`)); });
+}
+function sortBy(k) {
+  if (state.sort === k) state.dir *= -1; else { state.sort = k; state.dir = k === "name" ? 1 : -1; }
+  renderTable();
+}
+
+document.getElementById("asof").textContent = DATA.asOf;
+document.getElementById("n-co").textContent = ROWS.length;
+renderKpis(); renderGroupTable(); renderChips(); renderTable(); renderStrips();
+document.getElementById("search").addEventListener("input", (e) => { state.q = e.target.value; renderTable(); });
+let rt, lastW = 0;
+new ResizeObserver(([e]) => { const w = Math.round(e.contentRect.width); if (w === lastW) return; lastW = w; clearTimeout(rt); rt = setTimeout(renderStrips, 120); }).observe(document.querySelector(".wrap"));
+new MutationObserver(renderStrips).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderStrips);
+</script>

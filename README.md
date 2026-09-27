@@ -37,6 +37,8 @@ uv run python analysis/valuation.py CEG VST        # valuation snapshot
 uv run python analysis/dcf.py                      # equity DCF / dividend model and reverse DCF
 uv run python analysis/dcf_firm.py                 # enterprise DCF (FCFF at WACC)
 uv run python dashboard/build.py                   # rebuild dashboard/index.html
+uv run python analysis/sector.py                   # screen every US-listed utility
+uv run python dashboard/build_sector.py            # rebuild dashboard/sector.html
 ```
 
 ## Development
