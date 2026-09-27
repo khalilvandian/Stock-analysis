@@ -89,11 +89,24 @@ def _score(d: pd.DataFrame, measures: dict[str, int], missing: float) -> pd.Seri
     return pd.concat(parts, axis=1).mean(axis=1)
 
 
-def balanced(debt_weight: float = 0.65, top: int = 10) -> pd.DataFrame:
+GROWTH_RULES = {
+    "revenue growth: average > 0": lambda d: d["revenue_growth_avg"] > 0,
+    "revenue growth: median > 0": lambda d: d["revenue_growth_median"] > 0,
+    "EPS growth: average > 0": lambda d: d["eps_growth_avg"] > 0,
+    "EPS growth: median > 0": lambda d: d["eps_growth_median"] > 0,
+    "at least 2 years of growth data": lambda d: (
+        (d["revenue_growth_years"] >= 2) & (d["eps_growth_years"] >= 2)
+    ),
+}
+
+
+def balanced(debt_weight: float = 0.65, top: int = 10, require_growth: bool = True) -> pd.DataFrame:
     """Blend a debt score and a cheapness score, weighting debt more heavily.
 
     Universe: market value >= $1bn, reliable US-dollar data, profitable, and at least
-    three of the four cheapness measures available. Missing debt
+    three of the four cheapness measures available. With require_growth, revenue and EPS
+    must have grown on average and in the median year (yearly growth, last fiscal years).
+    Scores are percentiles within that final group. Missing debt
     data scores 0 (strict); missing cheapness data scores 50 (neutral).
     """
     d = screen(max_leverage=99, min_cap=0)
@@ -109,6 +122,8 @@ def balanced(debt_weight: float = 0.65, top: int = 10) -> pd.DataFrame:
     u = d[base].copy()
     u["pe_change_expected"] = u["pe_change_expected"].where(u["pe_fwd"] > 1)
     u = u[u[list(CHEAP_MEASURES)].notna().sum(axis=1) >= 3]  # enough data to judge cheapness
+    if require_growth:
+        u = u[pd.DataFrame({k: f(u).fillna(False) for k, f in GROWTH_RULES.items()}).all(axis=1)]
     u["debt_score"] = _score(u, DEBT_MEASURES, missing=0)
     u["cheap_score"] = _score(u, CHEAP_MEASURES, missing=50)
     u["total_score"] = debt_weight * u["debt_score"] + (1 - debt_weight) * u["cheap_score"]

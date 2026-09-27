@@ -103,6 +103,25 @@ def _cagr(s: pd.Series) -> float:
     return (s.iloc[-1] / s.iloc[0]) ** (1 / years) - 1 if years > 0.5 else np.nan
 
 
+def _yearly_growth(s: pd.Series) -> pd.Series:
+    """Year-over-year growth for each fiscal year; undefined when the prior year is <= 0."""
+    s = s.dropna()
+    prev = s.shift(1)
+    g = (s - prev) / prev
+    return g[prev > 0].dropna()
+
+
+def _growth_stats(s: pd.Series, prefix: str) -> dict:
+    g = _yearly_growth(s)
+    return {
+        f"{prefix}_growth_avg": g.mean() if len(g) else np.nan,
+        f"{prefix}_growth_median": g.median() if len(g) else np.nan,
+        f"{prefix}_growth_years": len(g),
+        f"{prefix}_growth_years_positive": int((g > 0).sum()),
+        f"{prefix}_growth_by_year": "; ".join(f"{d.year}: {v:+.1%}" for d, v in g.items()),
+    }
+
+
 def _div(a: float, b: float) -> float:
     return a / b if b and np.isfinite(a) and np.isfinite(b) and b != 0 else np.nan
 
@@ -259,6 +278,8 @@ def analyse(quote: dict) -> dict:
         "ebitda_to_interest": _div(ebitda, abs(interest) if np.isfinite(interest) else np.nan),
         "debt_to_equity": _div(debt, equity_book),
         # growth
+        **_growth_stats(rev_hist, "revenue"),
+        **_growth_stats(eps_hist, "eps"),
         "revenue_cagr_3y": _cagr(rev_hist.iloc[-4:]),
         "ebitda_cagr_3y": _cagr(ebitda_hist.iloc[-4:]),
         "eps_cagr_3y": _cagr(eps_hist.iloc[-4:]),
