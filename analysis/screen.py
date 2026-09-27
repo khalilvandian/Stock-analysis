@@ -39,69 +39,50 @@ def screen(max_leverage: float = 3.5, min_cap: float = 1.0) -> pd.DataFrame:
     return d[d["market_cap"] >= min_cap]
 
 
-MUST_HAVE = 4  # the first four rules are required; the rest measure cheapness
-STRICT_RULES = {
+# Strict debt requirements: cash for near-term debt, and cash plus earnings for long-term debt
+MUST_HAVE = {
     "market value >= $1bn": lambda d: d["market_cap"] >= 1,
     "reliable US-dollar data": lambda d: d["data_flag"].fillna("") == "",
     "profitable (net income and EBITDA > 0)": lambda d: (d["net_income"] > 0) & (d["ebitda"] > 0),
     "cash covers short-term debt": lambda d: d["cash_to_short_term_debt"] >= 1,
-    "price below DCF fair value": lambda d: d["price_vs_fair_value"] < 0,
-    "trailing P/E <= sub-industry median": lambda d: d["pe_rel"] <= 0,
-    "EV / EBITDA <= sub-industry median": lambda d: d["ev_rel"] <= 0,
-    "earnings expected to rise (forward P/E <= trailing)": lambda d: (
-        (d["pe_fwd"] > 1) & (d["pe_change_expected"] <= 0)
-    ),
+    "cash >= 5% of long-term debt": lambda d: d["cash_to_long_term_debt"] >= 0.05,
+    "net debt / EBITDA <= 4.5x": lambda d: d["net_debt_to_ebitda"] <= 4.5,
+    "EBITDA / interest >= 4x": lambda d: d["ebitda_to_interest"] >= 4,
 }
-# 1 = lower is better, -1 = higher is better
-SCORE = {
-    "cash_to_short_term_debt": -1,
-    "price_vs_fair_value": 1,
-    "pe_rel": 1,
-    "ev_rel": 1,
-    "pe_change_expected": 1,
-}
+# Cheapness is ranked, not required: lower is better for each
+CHEAPNESS = ["price_vs_fair_value", "pe_rel", "ev_rel", "pe_change_expected"]
 
 
 def strict(top: int = 5) -> pd.DataFrame:
-    """Rank companies that pass every must-have rule by how many cheapness rules they pass.
-
-    Must-haves: size, reliable data, profitability and cash covering short-term debt.
-    Ties are broken by the average rank across SCORE.
-    """
+    """Companies passing every debt requirement, ranked by average cheapness rank."""
     d = screen(max_leverage=99, min_cap=0)
     med = d.groupby("industry")[["pe_ttm", "ev_to_ebitda"]].transform("median")
     d["pe_rel"] = d["pe_ttm"] / med["pe_ttm"] - 1
     d["ev_rel"] = d["ev_to_ebitda"] / med["ev_to_ebitda"] - 1
-    passed = pd.DataFrame({k: f(d).fillna(False) for k, f in STRICT_RULES.items()})
-    must = passed.iloc[:, :MUST_HAVE].all(axis=1)
-    c = d[must].copy()
-    c["cheap_rules_passed"] = passed[must].iloc[:, MUST_HAVE:].sum(axis=1)
-    c["failed"] = passed[must].apply(lambda r: ", ".join(r.index[~r]), axis=1)
-    c["avg_rank"] = pd.DataFrame({k: (c[k] * s).rank() for k, s in SCORE.items()}).mean(axis=1)
-    return c.sort_values(["cheap_rules_passed", "avg_rank"], ascending=[False, True]).head(top)
+    passed = pd.DataFrame({k: f(d).fillna(False) for k, f in MUST_HAVE.items()}).all(axis=1)
+    c = d[passed].copy()
+    c["cheap_rank"] = c[CHEAPNESS].rank().mean(axis=1)
+    return c.sort_values("cheap_rank").head(top)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-leverage", type=float, default=3.5)
     ap.add_argument("--min-cap", type=float, default=1.0, help="minimum market value, $bn")
-    ap.add_argument("--strict", action="store_true", help="rank the top 5 on the strict rules")
+    ap.add_argument("--strict", action="store_true", help="rank the top 5 with strict debt rules")
     args = ap.parse_args()
     if args.strict:
         pd.set_option("display.width", 220)
         cols = [
             "name",
+            "cash_to_short_term_debt",
+            "cash_to_long_term_debt",
             "net_debt_to_ebitda",
             "ebitda_to_interest",
-            "price_vs_fair_value",
-            "pe_rel",
-            "ev_rel",
-            "pe_change_expected",
-            "cheap_rules_passed",
-            "failed",
-            "avg_rank",
+            *CHEAPNESS,
+            "cheap_rank",
         ]
-        print(strict()[cols].round(3).to_string())
+        print(strict(10)[cols].round(3).to_string())
         raise SystemExit
     pd.set_option("display.width", 220)
     cols = [
