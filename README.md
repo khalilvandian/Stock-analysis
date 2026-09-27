@@ -27,6 +27,16 @@ uv run python -m stock_analysis.fetch CEG      # writes data/CEG/*.csv
 Prices, dividends, income / balance sheet / cash flow (annual and quarterly) and company info
 come from Yahoo Finance via `yfinance`. The FMP free plan only covers a limited set of symbols.
 
+## Analysis and dashboard
+
+```bash
+uv run python analysis/debt.py CEG                 # CEG leverage history
+uv run python analysis/compare.py CEG VST NRG      # debt and growth vs peers
+uv run python analysis/debt_to_ebitda.py CEG VST   # debt/EBITDA history
+uv run python analysis/valuation.py CEG VST        # valuation snapshot
+uv run python dashboard/build.py                   # rebuild dashboard/index.html
+```
+
 ## Development
 
 ```bash

@@ -1,0 +1,817 @@
+<title>Constellation Energy Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f2f3f0;
+  --card: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #7a7973;
+  --rule: #e2e2dd;
+  --grid: #ebebe6;
+  --bar-muted: #bdbcb4;
+  --hover: #efefeb;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+  --good-ink: #0a6e0a; --warn-ink: #8a5a00; --crit-ink: #a52a2a;
+  --tip-bg: #1f1f1d; --tip-ink: #ffffff; --tip-ink-2: #c3c2b7;
+  --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --card: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+    --rule: #2d2d2a; --grid: #262624; --bar-muted: #57564f; --hover: #232321;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --good-ink: #5fd35f; --warn-ink: #fab219; --crit-ink: #f07a7a;
+    --tip-bg: #f4f4f1; --tip-ink: #0b0b0b; --tip-ink-2: #52514e;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --card: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+  --rule: #2d2d2a; --grid: #262624; --bar-muted: #57564f; --hover: #232321;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --good-ink: #5fd35f; --warn-ink: #fab219; --crit-ink: #f07a7a;
+  --tip-bg: #f4f4f1; --tip-ink: #0b0b0b; --tip-ink-2: #52514e;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--sans);
+  font-size: 14px; line-height: 1.5; padding-inline: 16px; padding-block: 24px 48px;
+}
+.wrap { max-width: 1180px; margin-inline: auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); }
+
+/* header */
+header.top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; padding-block: 4px 8px; }
+.eyebrow { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+.ticker { font-family: var(--mono); font-weight: 500; font-size: .6em; color: var(--ink-2); vertical-align: .25em; margin-left: 6px; }
+.asof { color: var(--ink-2); font-size: 13px; text-align: right; }
+@media (max-width: 600px) { .asof { text-align: left; } }
+
+/* nav */
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--rule); }
+nav.tabs a { color: var(--ink-2); text-decoration: none; padding: 8px 12px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav.tabs a:hover { color: var(--ink); }
+nav.tabs a:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; border-radius: 4px; }
+
+/* KPI tiles */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.kpi { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.kpi .label { font-size: 12px; color: var(--ink-2); font-weight: 500; }
+.kpi .value { font-size: 26px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.kpi .sub { font-size: 12.5px; color: var(--ink-2); }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 1px 8px 1px 6px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink); background: var(--card); white-space: nowrap; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--ink-3)); }
+.chip.good { --c: var(--good); } .chip.warn { --c: var(--warn); } .chip.crit { --c: var(--crit); }
+
+/* sections */
+section.panel { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 16px; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 8px 16px; }
+.panel-head h2 { font-size: 19px; font-weight: 600; letter-spacing: -.005em; }
+.panel-head .dek { color: var(--ink-2); max-width: 70ch; margin-top: 2px; }
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; }
+.grid-even { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+@media (max-width: 860px) { .grid-2, .grid-even { grid-template-columns: minmax(0, 1fr); } }
+h3 { font-size: 14px; font-weight: 600; }
+.sub-h { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.sub-h p { color: var(--ink-2); font-size: 13px; }
+
+/* segmented control */
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; padding: 2px; gap: 2px; background: var(--bg); }
+.seg button { font: inherit; font-size: 13px; font-weight: 500; color: var(--ink-2); background: transparent; border: 0; border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.seg button:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
+
+/* legend */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 2px; border-radius: 1px; background: var(--c); display: inline-block; }
+.legend i.box { width: 10px; height: 10px; border-radius: 2px; }
+
+/* charts */
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--ink-2); font-family: var(--sans); font-size: 12px; }
+.chart .axis-label { fill: var(--ink-3); font-size: 11.5px; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .baseline { stroke: var(--rule); stroke-width: 1; }
+.chart .endlabel { fill: var(--ink); font-weight: 600; font-size: 12px; }
+.chart .val { fill: var(--ink); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart .hit { fill: transparent; cursor: default; }
+.chart .hit:focus { outline: none; }
+.chart .hit:focus-visible + .mark, .chart g.bar:hover .mark { filter: brightness(1.12); }
+.tip { position: absolute; pointer-events: none; background: var(--tip-bg); color: var(--tip-ink); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.4; box-shadow: 0 4px 16px rgb(0 0 0 / .18); min-width: 140px; z-index: 5; }
+.tip .t-title { color: var(--tip-ink-2); font-size: 11.5px; margin-bottom: 4px; }
+.tip .row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.tip .row .k { display: inline-flex; align-items: center; gap: 6px; color: var(--tip-ink-2); }
+.tip .row .k i { width: 12px; height: 2px; background: var(--c); display: inline-block; border-radius: 1px; }
+.tip .row b { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--rule); }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
+thead th { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; background: var(--card); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--hover); }
+tr.focus td { font-weight: 600; }
+tr.group td { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; background: var(--bg); }
+td .sw { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 6px; vertical-align: 1px; }
+.muted { color: var(--ink-3); }
+.cell-hi { color: var(--crit-ink); }
+.cell-lo { color: var(--good-ink); }
+
+/* notes */
+.facts { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.facts li { display: grid; grid-template-columns: 88px 1fr; gap: 12px; align-items: baseline; }
+.facts .amt { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.facts .what { color: var(--ink); }
+.facts .what small { display: block; color: var(--ink-2); font-size: 12.5px; }
+.callout { background: var(--bg); border-radius: 8px; padding: 12px 14px; color: var(--ink-2); font-size: 13px; }
+.callout strong { color: var(--ink); }
+.verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.verdict { border: 1px solid var(--rule); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.verdict h3 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.verdict p { color: var(--ink-2); font-size: 13px; }
+.sources { font-size: 12.5px; color: var(--ink-2); display: grid; gap: 4px; padding-left: 18px; margin: 0; }
+.sources a { color: var(--ink-2); }
+footer { color: var(--ink-3); font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) { .seg button { transition: background .12s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow" id="industry">Utilities · Independent Power Producers</div>
+      <h1>Constellation Energy <span class="ticker">NASDAQ: CEG</span></h1>
+    </div>
+    <div class="asof">Prices as of <span id="asof" class="num"></span><br>Source: Yahoo Finance, SEC filings</div>
+  </header>
+
+  <nav class="tabs" aria-label="Sections">
+    <a href="#price">Price</a><a href="#debt">Debt</a><a href="#leverage">Leverage vs peers</a>
+    <a href="#valuation">Valuation</a><a href="#growth">Growth</a><a href="#calpine">Calpine</a><a href="#notes">Notes</a>
+  </nav>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="panel" id="price">
+    <div class="panel-head">
+      <div>
+        <h2>Share price vs peers</h2>
+        <p class="dek">Total return with dividends reinvested, rebased to 100 at the start of the range. Utilities is the average of NextEra, Duke and Southern.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Time range" id="range">
+        <button type="button" data-range="1" aria-pressed="false">1Y</button>
+        <button type="button" data-range="3" aria-pressed="true">3Y</button>
+        <button type="button" data-range="0" aria-pressed="false">Since 2022</button>
+      </div>
+    </div>
+    <div class="legend" id="price-legend"></div>
+    <div class="chart" id="price-chart"></div>
+  </section>
+
+  <section class="panel" id="debt">
+    <div class="panel-head">
+      <div>
+        <h2>CEG debt stepped up with Calpine</h2>
+        <p class="dek">Total debt nearly tripled in the first half of 2026. Leverage went from under 1x to about 3x EBITDA and is still below the utility norm.</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <div class="sub-h"><h3>Total debt, $bn</h3><p>Year-end, then quarter-end. Calpine closed Jan 7, 2026.</p></div>
+        <div class="chart" id="debt-chart"></div>
+        <div class="table-wrap" style="margin-top:12px"><table id="debt-table"></table></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div>
+          <div class="sub-h"><h3>Where the extra $15.7bn came from</h3></div>
+          <ul class="facts">
+            <li><span class="amt">+$12.6bn</span><span class="what">Calpine debt assumed<small>$7.6bn notes and term loans, about $5bn plant-level project loans</small></span></li>
+            <li><span class="amt">−$3.75bn</span><span class="what">Paid off right after closing<small>$2.5bn Calpine term loans (Jan) and $1.25bn 2028 notes (Feb)</small></span></li>
+            <li><span class="amt">+$3.6bn</span><span class="what">More short-term borrowing<small>$1.65bn to $5.2bn. Funded the $2.5bn cash part of the deal, $2.0bn of buybacks and $2.5bn of capex</small></span></li>
+            <li><span class="amt">−$2.9bn</span><span class="what">Cash drawn down<small>$3.6bn to $0.7bn</small></span></li>
+          </ul>
+        </div>
+        <div>
+          <div class="sub-h"><h3>Where the money is going</h3></div>
+          <ul class="facts">
+            <li><span class="amt">$3.9bn</span><span class="what">2026 growth capex<small>About 1 GW of nuclear uprates, Crane restart for Microsoft (835 MW, 2027), Clinton uprate for Meta, Wolf Hollow 2 gas peakers (300 MW)</small></span></li>
+            <li><span class="amt">$5.0bn</span><span class="what">Buyback authorization<small>$2.2bn used so far in 2026. Dividend targeted to grow 10% a year</small></span></li>
+            <li><span class="amt">+$0.86bn</span><span class="what">Plant sales required by regulators<small>Six plants in PA, DE and TX, plus Brazos Valley to LS Power. Proceeds reduce debt</small></span></li>
+          </ul>
+        </div>
+        <div class="callout"><strong>Credit ratings held:</strong> Baa1 (Moody's) and BBB+ (S&amp;P), affirmed after the deal. Moody's lowered the cash flow to debt level that would trigger a downgrade from 30% to 25%.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="leverage">
+    <div class="panel-head">
+      <div>
+        <h2>Leverage vs peers</h2>
+        <p class="dek">Net debt divided by EBITDA for the last 12 months. Lower means less debt relative to earnings. Regulated utilities normally run 5–6x because regulators set their revenue.</p>
+      </div>
+    </div>
+    <div class="grid-even">
+      <div>
+        <div class="sub-h"><h3>Net debt / EBITDA, latest</h3><p>CEG highlighted. Its EBITDA includes only six months of Calpine, so about 2.5x on a full-year basis.</p></div>
+        <div class="chart" id="lev-chart"></div>
+      </div>
+      <div>
+        <div class="sub-h"><h3>History</h3><p>Year-end, then the last 12 months to June 2026. Red above 5x, green below 2x.</p></div>
+        <div class="table-wrap"><table id="lev-table"></table></div>
+        <div class="sub-h" style="margin-top:16px"><h3>Debt quality</h3></div>
+        <div class="table-wrap"><table id="debtq-table"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="valuation">
+    <div class="panel-head">
+      <div>
+        <h2>Is it expensive right now?</h2>
+        <p class="dek">CEG is the priciest of the independent power producers on every measure. The market pays for contracted nuclear earnings. Vistra looks cheapest among the quality names.</p>
+      </div>
+    </div>
+    <div class="grid-even">
+      <div>
+        <div class="sub-h"><h3>Forward P/E</h3><p>Price divided by analysts' expected earnings for the next 12 months. NEE, DUK and SO are regulated utilities.</p></div>
+        <div class="chart" id="pe-chart"></div>
+      </div>
+      <div>
+        <div class="sub-h"><h3>EV / EBITDA, last 12 months</h3><p>Talen (31x) is off the scale because its EBITDA is small. CEG is about 12x with a full year of Calpine.</p></div>
+        <div class="chart" id="ev-chart"></div>
+      </div>
+    </div>
+    <div class="table-wrap"><table id="val-table"></table></div>
+    <div class="verdicts" id="verdicts"></div>
+  </section>
+
+  <section class="panel" id="growth">
+    <div class="panel-head">
+      <div>
+        <h2>Growth and earnings</h2>
+        <p class="dek">Reported (GAAP) earnings swing with hedge accounting, so single-year EPS is noisy. Revenue for power producers follows power prices.</p>
+      </div>
+    </div>
+    <div class="grid-even">
+      <div>
+        <div class="sub-h"><h3>CEG income, $bn</h3><p>Management guides to 20%+ adjusted EPS growth through 2029. 2026 guidance: $11.50–$12.50 adjusted EPS.</p></div>
+        <div class="table-wrap"><table id="inc-table"></table></div>
+      </div>
+      <div>
+        <div class="sub-h"><h3>Peer growth</h3><p>Compound annual growth 2022–25, and latest quarter vs a year earlier.</p></div>
+        <div class="table-wrap"><table id="growth-table"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="calpine">
+    <div class="panel-head">
+      <div>
+        <h2>Calpine</h2>
+        <p class="dek">The largest US natural-gas power generator and largest geothermal producer (The Geysers, CA). About 28 GW, strongest in Texas and California. Bought for about $22bn in equity, $26.6bn including debt.</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <div class="sub-h"><h3>Calpine debt at Dec 31, 2025: about $12.5bn</h3><p>Facility sizes, which don't add up exactly to the total drawn. Status after CEG closed the deal; plant-level loans stay with the plants.</p></div>
+        <div class="table-wrap"><table id="calpine-table"></table></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="kpis" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <div class="kpi"><span class="label">Revenue 2025</span><span class="value">$14.3bn</span></div>
+          <div class="kpi"><span class="label">Net income 2025</span><span class="value">$1.97bn</span></div>
+          <div class="kpi"><span class="label">Operating cash flow</span><span class="value">$2.05bn</span></div>
+          <div class="kpi"><span class="label">Generated 2025</span><span class="value">121 TWh</span></div>
+        </div>
+        <div class="callout"><strong>Why CEG bought it:</strong> gas plants can run whenever needed, which complements the always-on nuclear fleet. Together they have about 55 GW and 2.5 million retail and business customers.</div>
+        <div class="callout"><strong>History:</strong> founded 1984 as a geothermal producer at The Geysers. Expanded into gas in the 1990s, went through Chapter 11 in 2005–2008, and was taken private in 2018 by an Energy Capital Partners-led group.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="notes">
+    <div class="panel-head"><div><h2>Notes and sources</h2></div></div>
+    <div class="callout">
+      <strong>Read with care.</strong> Market data and statements come from Yahoo Finance and are unofficial. EBITDA is GAAP-based and includes hedge gains and losses, so ratios can differ from company-reported adjusted figures by about 0.5x. The Calpine and 2026 debt details come from SEC filings read through a summarizing tool. The Calpine EBITDA estimate of about $3bn a year is not from the data. This dashboard is analysis, not investment advice.
+    </div>
+    <ul class="sources">
+      <li><a href="https://www.sec.gov/Archives/edgar/data/0001868275/000186827526000104/ceg-20260630.htm">CEG Q2 2026 Form 10-Q</a></li>
+      <li><a href="https://www.sec.gov/Archives/edgar/data/0001868275/000110465926045036/tm2611747d1_ex99-1.htm">CEG Form 8-K/A, Calpine FY2025 financial statements</a></li>
+      <li><a href="https://investors.constellationenergy.com/news-releases/news-release-details/constellation-reports-second-quarter-2026-results">Constellation Q2 2026 results</a></li>
+      <li><a href="https://www.stocktitan.net/sec-filings/CEG/8-k-constellation-energy-corp-reports-material-event-7e322ed8cdee.html">CEG capital allocation 8-K (Mar 2026)</a></li>
+      <li><a href="https://www.powermag.com/constellation-completes-acquisition-of-calpine-groups-have-55-gw-of-generation-capacity-2/">POWER Magazine: Constellation completes Calpine acquisition</a></li>
+      <li><a href="https://www.industrialinfo.com/iirenergy/industry-news/article/constellation-energy-announces-capex-plans--355623">Industrial Info: Constellation capex plans</a></li>
+    </ul>
+    <footer>Built from the stock-analysis repo: <span class="mono">uv run python dashboard/build.py</span></footer>
+  </section>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+const PEERS = ["CEG", "VST", "NRG", "TLN", "NEE", "DUK", "SO"];
+const NAMES = { CEG: "Constellation", VST: "Vistra", NRG: "NRG Energy", TLN: "Talen", NEE: "NextEra", DUK: "Duke", SO: "Southern" };
+const IPP = new Set(["CEG", "VST", "NRG", "TLN"]);
+const LINE_SERIES = [
+  { key: "CEG", name: "Constellation (CEG)", color: "--s1" },
+  { key: "VST", name: "Vistra (VST)", color: "--s2" },
+  { key: "NRG", name: "NRG", color: "--s3" },
+  { key: "TLN", name: "Talen (TLN)", color: "--s4" },
+  { key: "UTIL", name: "Utilities avg", color: "--s5" },
+];
+const NS = "http://www.w3.org/2000/svg";
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = {
+  x: (v, d = 1) => v == null ? "–" : `${v.toFixed(d)}x`,
+  pct: (v, d = 0) => v == null ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(d)}%`,
+  pctPlain: (v, d = 1) => v == null ? "–" : `${(v * 100).toFixed(d)}%`,
+  bn: (v, d = 1) => v == null ? "–" : `${v < 0 ? "−" : ""}$${Math.abs(v).toFixed(d)}bn`,
+  usd: (v) => v == null ? "–" : `$${v.toFixed(2)}`,
+  n: (v, d = 1) => v == null ? "–" : v.toFixed(d),
+};
+
+function el(tag, attrs = {}, text) {
+  const node = tag.startsWith("svg:") ? document.createElementNS(NS, tag.slice(4)) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+function tooltip(container) {
+  const tip = el("div", { class: "tip", role: "status" });
+  tip.hidden = true;
+  container.appendChild(tip);
+  return {
+    show(x, y, title, rows) {
+      tip.replaceChildren();
+      tip.appendChild(el("div", { class: "t-title" }, title));
+      for (const r of rows) {
+        const row = el("div", { class: "row" });
+        const k = el("span", { class: "k" });
+        if (r.color) { const i = el("i"); i.style.setProperty("--c", r.color); k.appendChild(i); }
+        k.appendChild(document.createTextNode(r.label));
+        row.append(k, el("b", {}, r.value));
+        tip.appendChild(row);
+      }
+      tip.hidden = false;
+      const cw = container.clientWidth, tw = tip.offsetWidth;
+      let left = x + 14;
+      if (left + tw > cw) left = x - tw - 14;
+      tip.style.left = `${Math.max(0, left)}px`;
+      tip.style.top = `${Math.max(0, y - tip.offsetHeight / 2)}px`;
+    },
+    hide() { tip.hidden = true; },
+  };
+}
+
+function niceTicks(min, max, count = 5) {
+  const span = max - min || 1;
+  const step0 = span / count;
+  const mag = 10 ** Math.floor(Math.log10(step0));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= count) ?? 10 * mag;
+  const ticks = [];
+  for (let t = Math.floor(min / step) * step; t <= max + step * 0.001; t += step) ticks.push(+t.toFixed(10));
+  if (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
+  return ticks;
+}
+
+/* ---------- KPIs ---------- */
+function renderKpis() {
+  const v = DATA.valuation.CEG, c = DATA.compare.CEG;
+  const peerFwd = ["VST", "NRG", "TLN"].map((s) => DATA.valuation[s].forward_pe).filter((x) => x != null).sort((a, b) => a - b);
+  const median = peerFwd[Math.floor(peerFwd.length / 2)];
+  const tiles = [
+    { label: "Share price", value: fmt.usd(v.price), sub: `${fmt.pct(v.vs_52w_high)} from 52-week high` },
+    { label: "Market value", value: `$${c.market_cap.toFixed(0)}bn`, sub: `Total debt ${fmt.bn(c.total_debt)}` },
+    { label: "Forward P/E", value: fmt.x(v.forward_pe), sub: `Peer producers ${fmt.x(median)} median`, chip: ["warn", "Premium"] },
+    { label: "Net debt / EBITDA", value: fmt.x(c["net_debt/ebitda"]), sub: "0.9x at Dec 2025", chip: ["good", "Below peers"] },
+    { label: "Analyst target", value: fmt.pct(v.analyst_upside), sub: `Consensus: ${v.analyst_view}` },
+  ];
+  const root = document.getElementById("kpis");
+  for (const t of tiles) {
+    const k = el("div", { class: "kpi" });
+    const lab = el("span", { class: "label" }, t.label);
+    k.appendChild(lab);
+    const val = el("span", { class: "value" }, t.value);
+    k.appendChild(val);
+    const sub = el("span", { class: "sub" }, t.sub);
+    k.appendChild(sub);
+    if (t.chip) { const ch = el("span", { class: `chip ${t.chip[0]}` }, t.chip[1]); ch.style.alignSelf = "flex-start"; k.appendChild(ch); }
+    root.appendChild(k);
+  }
+}
+
+/* ---------- price line chart ---------- */
+let priceRange = 3;
+function priceSeries() {
+  const { dates, series } = DATA.prices;
+  const end = new Date(dates[dates.length - 1]);
+  let startIdx = 0;
+  if (priceRange) {
+    const start = new Date(end); start.setFullYear(end.getFullYear() - priceRange);
+    startIdx = dates.findIndex((d) => new Date(d) >= start);
+  }
+  const idx = dates.slice(startIdx);
+  const rebase = (arr) => {
+    const slice = arr.slice(startIdx);
+    const base = slice.find((x) => x != null);
+    return slice.map((x) => (x == null || base == null ? null : (x / base) * 100));
+  };
+  const out = {};
+  for (const s of ["CEG", "VST", "NRG", "TLN"]) out[s] = rebase(series[s]);
+  const utils = ["NEE", "DUK", "SO"].map((s) => rebase(series[s]));
+  out.UTIL = idx.map((_, i) => { const vals = utils.map((u) => u[i]).filter((x) => x != null); return vals.length ? vals.reduce((a, b) => a + b) / vals.length : null; });
+  return { dates: idx, out };
+}
+
+function renderPrice() {
+  const box = document.getElementById("price-chart");
+  box.replaceChildren();
+  const W = box.clientWidth || 800, H = Math.max(260, Math.min(380, W * 0.45));
+  const m = { t: 12, r: 118, b: 28, l: 44 };
+  const { dates, out } = priceSeries();
+  const all = Object.values(out).flat().filter((x) => x != null);
+  const ticks = niceTicks(Math.min(...all, 100), Math.max(...all));
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const x = (i) => m.l + (i / (dates.length - 1)) * (W - m.l - m.r);
+  const y = (v) => m.t + (1 - (v - y0) / (y1 - y0)) * (H - m.t - m.b);
+  const svg = el("svg:svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Rebased share price of CEG, peers and utilities" });
+
+  for (const t of ticks) {
+    svg.appendChild(el("svg:line", { class: t === 100 ? "baseline" : "gridline", x1: m.l, x2: W - m.r, y1: y(t), y2: y(t) }));
+    svg.appendChild(el("svg:text", { class: "axis-label", x: m.l - 8, y: y(t) + 4, "text-anchor": "end" }, t));
+  }
+  // year ticks
+  let lastYear = null;
+  dates.forEach((d, i) => {
+    const yr = d.slice(0, 4);
+    if (yr !== lastYear) {
+      if (lastYear !== null || priceRange === 0) {
+        if (i > 0 || priceRange === 0) svg.appendChild(el("svg:text", { class: "axis-label", x: x(i), y: H - 8, "text-anchor": i === 0 ? "start" : "middle" }, yr));
+      }
+      lastYear = yr;
+    }
+  });
+
+  const ends = [];
+  for (const s of LINE_SERIES) {
+    const vals = out[s.key];
+    let d = "";
+    vals.forEach((v, i) => { if (v != null) d += `${d ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; });
+    svg.appendChild(el("svg:path", { d, fill: "none", stroke: css(s.color), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    const li = vals.length - 1;
+    ends.push({ s, v: vals[li], y: y(vals[li]) });
+  }
+  // end labels with collision nudging
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 15) ends[i].y = ends[i - 1].y + 15;
+  for (const e of ends) {
+    const cx = x(dates.length - 1);
+    svg.appendChild(el("svg:circle", { cx, cy: y(e.v), r: 4, fill: css(e.s.color), stroke: css("--card"), "stroke-width": 2 }));
+    svg.appendChild(el("svg:text", { class: "endlabel", x: cx + 10, y: e.y + 4 }, `${e.s.key === "UTIL" ? "Utilities" : e.s.key} ${Math.round(e.v)}`));
+  }
+
+  const cross = el("svg:line", { x1: 0, x2: 0, y1: m.t, y2: H - m.b, stroke: css("--ink-3"), "stroke-width": 1, visibility: "hidden" });
+  svg.appendChild(cross);
+  const hit = el("svg:rect", { class: "hit", x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, tabindex: 0, "aria-label": "Chart area. Use arrow keys to read values." });
+  svg.appendChild(hit);
+  box.appendChild(svg);
+  const tip = tooltip(box);
+  let cur = dates.length - 1;
+  const show = (i) => {
+    cur = Math.max(0, Math.min(dates.length - 1, i));
+    const px = x(cur);
+    cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
+    const rows = LINE_SERIES.map((s) => ({ label: s.key === "UTIL" ? "Utilities" : s.key, value: out[s.key][cur] == null ? "–" : out[s.key][cur].toFixed(0), color: css(s.color), sort: out[s.key][cur] ?? -1 }))
+      .sort((a, b) => b.sort - a.sort);
+    const scale = box.clientWidth / W;
+    tip.show(px * scale, (m.t + (H - m.t - m.b) / 2) * scale, new Date(dates[cur]).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }), rows);
+  };
+  const hide = () => { cross.setAttribute("visibility", "hidden"); tip.hide(); };
+  hit.addEventListener("pointermove", (ev) => {
+    const r = svg.getBoundingClientRect();
+    const px = (ev.clientX - r.left) * (W / r.width);
+    show(Math.round(((px - m.l) / (W - m.l - m.r)) * (dates.length - 1)));
+  });
+  hit.addEventListener("pointerleave", hide);
+  hit.addEventListener("focus", () => show(cur));
+  hit.addEventListener("blur", hide);
+  hit.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowLeft") { show(cur - 1); ev.preventDefault(); }
+    if (ev.key === "ArrowRight") { show(cur + 1); ev.preventDefault(); }
+  });
+}
+
+function renderPriceLegend() {
+  const lg = document.getElementById("price-legend");
+  for (const s of LINE_SERIES) {
+    const span = el("span");
+    const i = el("i"); i.style.setProperty("--c", `var(${s.color})`);
+    span.append(i, document.createTextNode(s.name));
+    lg.appendChild(span);
+  }
+}
+
+/* ---------- column chart (CEG debt) ---------- */
+function renderDebtChart() {
+  const box = document.getElementById("debt-chart");
+  box.replaceChildren();
+  const rows = DATA.cegDebt.rows;
+  const W = box.clientWidth || 600, H = 240;
+  const m = { t: 40, r: 8, b: 28, l: 36 };
+  const ticks = niceTicks(0, Math.max(...rows.map((r) => r.total_debt)), 5);
+  const y1 = ticks[ticks.length - 1];
+  const band = (W - m.l - m.r) / rows.length;
+  const bw = Math.min(24, band * 0.5);
+  const y = (v) => m.t + (1 - v / y1) * (H - m.t - m.b);
+  const svg = el("svg:svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "CEG total debt by period" });
+  for (const t of ticks) {
+    svg.appendChild(el("svg:line", { class: t === 0 ? "baseline" : "gridline", x1: m.l, x2: W - m.r, y1: y(t), y2: y(t) }));
+    svg.appendChild(el("svg:text", { class: "axis-label", x: m.l - 8, y: y(t) + 4, "text-anchor": "end" }, t));
+  }
+  const tip = tooltip(box);
+  const calpineIdx = rows.findIndex((r) => r.label.startsWith("Q1 2026"));
+  if (calpineIdx > 0) {
+    const cx = m.l + band * calpineIdx;
+    svg.appendChild(el("svg:line", { x1: cx, x2: cx, y1: 6, y2: H - m.b, stroke: css("--ink-3"), "stroke-width": 1 }));
+    svg.appendChild(el("svg:text", { class: "axis-label", x: cx - 6, y: 14, "text-anchor": "end" }, "Calpine closes →"));
+  }
+  rows.forEach((r, i) => {
+    const cx = m.l + band * i + band / 2;
+    const top = y(r.total_debt), base = y(0), h = base - top, rad = Math.min(4, h);
+    const g = el("svg:g", { class: "bar" });
+    const hit = el("svg:rect", { class: "hit", x: cx - band / 2, y: m.t, width: band, height: H - m.t - m.b, tabindex: 0, "aria-label": `${r.label}: total debt ${fmt.bn(r.total_debt)}` });
+    const path = `M${cx - bw / 2},${base}V${top + rad}Q${cx - bw / 2},${top} ${cx - bw / 2 + rad},${top}H${cx + bw / 2 - rad}Q${cx + bw / 2},${top} ${cx + bw / 2},${top + rad}V${base}Z`;
+    const mark = el("svg:path", { class: "mark", d: path, fill: css("--s1") });
+    g.append(hit, mark);
+    g.appendChild(el("svg:text", { class: "val", x: cx, y: top - 6, "text-anchor": "middle" }, r.total_debt.toFixed(1)));
+    const short = band < 64 ? r.label.replace("FY", "").replace(/^(Q\d) 20(\d\d)$/, "$1 '$2") : r.label.replace("FY", "");
+    g.appendChild(el("svg:text", { class: "axis-label", x: cx, y: H - 8, "text-anchor": "middle" }, short));
+    const showTip = () => {
+      const scale = box.clientWidth / W;
+      tip.show(cx * scale, top * scale, r.label, [
+        { label: "Total debt", value: fmt.bn(r.total_debt) },
+        { label: "Cash", value: fmt.bn(r.cash) },
+        { label: "Net debt / EBITDA", value: fmt.x(r.net_debt_to_ebitda) },
+        { label: "EBITDA / interest", value: fmt.x(r.interest_coverage) },
+      ]);
+    };
+    hit.addEventListener("pointerenter", showTip); hit.addEventListener("focus", showTip);
+    hit.addEventListener("pointerleave", () => tip.hide()); hit.addEventListener("blur", () => tip.hide());
+    svg.appendChild(g);
+  });
+  box.appendChild(svg);
+
+  const t = document.getElementById("debt-table");
+  t.replaceChildren();
+  const head = el("tr"); head.appendChild(el("th", {}, ""));
+  rows.forEach((r) => head.appendChild(el("th", {}, r.label.replace("FY", ""))));
+  const thead = el("thead"); thead.appendChild(head); t.appendChild(thead);
+  const tb = el("tbody");
+  const lines = [
+    ["Cash, $bn", (r) => fmt.n(r.cash)],
+    ["Net debt / EBITDA", (r) => fmt.x(r.net_debt_to_ebitda)],
+    ["EBITDA / interest", (r) => fmt.x(r.interest_coverage)],
+    ["Due within a year", (r) => fmt.pctPlain(r.current_share_of_debt, 0)],
+  ];
+  for (const [label, f] of lines) {
+    const tr = el("tr"); tr.appendChild(el("td", {}, label));
+    rows.forEach((r) => tr.appendChild(el("td", {}, f(r))));
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+}
+
+/* ---------- horizontal bars ---------- */
+function renderHBars(id, items, format, { max, clipNote } = {}) {
+  const box = document.getElementById(id);
+  box.replaceChildren();
+  const W = box.clientWidth || 500, rowH = 30, m = { t: 4, r: 56, b: 22, l: 104 };
+  const H = m.t + m.b + rowH * items.length;
+  const top = max ?? Math.max(...items.map((d) => d.value ?? 0));
+  const ticks = niceTicks(0, top, 4);
+  const x1 = ticks[ticks.length - 1];
+  const x = (v) => m.l + (Math.min(v, x1) / x1) * (W - m.l - m.r);
+  const svg = el("svg:svg", { viewBox: `0 0 ${W} ${H}`, role: "img" });
+  for (const t of ticks) {
+    svg.appendChild(el("svg:line", { class: t === 0 ? "baseline" : "gridline", x1: x(t), x2: x(t), y1: m.t, y2: H - m.b }));
+    svg.appendChild(el("svg:text", { class: "axis-label", x: x(t), y: H - 6, "text-anchor": "middle" }, t));
+  }
+  const tip = tooltip(box);
+  items.forEach((d, i) => {
+    const cy = m.t + rowH * i + rowH / 2, bh = 16;
+    const g = el("svg:g", { class: "bar" });
+    g.appendChild(el("svg:text", { x: m.l - 10, y: cy + 4, "text-anchor": "end", class: d.focus ? "endlabel" : "" }, d.label));
+    if (d.value == null) {
+      g.appendChild(el("svg:text", { class: "axis-label", x: m.l + 6, y: cy + 4 }, "n/a"));
+    } else {
+      const x0 = x(0), xe = x(d.value), w = Math.max(0, xe - x0), rad = Math.min(4, w);
+      const hit = el("svg:rect", { class: "hit", x: 0, y: cy - rowH / 2, width: W, height: rowH, tabindex: 0, "aria-label": `${d.label}: ${format(d.value)}` });
+      const path = `M${x0},${cy - bh / 2}H${xe - rad}Q${xe},${cy - bh / 2} ${xe},${cy - bh / 2 + rad}V${cy + bh / 2 - rad}Q${xe},${cy + bh / 2} ${xe - rad},${cy + bh / 2}H${x0}Z`;
+      g.append(hit, el("svg:path", { class: "mark", d: path, fill: d.focus ? css("--s1") : css("--bar-muted") }));
+      const clipped = d.value > x1;
+      g.appendChild(el("svg:text", { class: "val", x: xe + 6, y: cy + 4 }, format(d.value) + (clipped ? " ›" : "")));
+      const showTip = () => {
+        const scale = box.clientWidth / W;
+        tip.show(xe * scale, cy * scale, d.name, d.tip ?? [{ label: "Value", value: format(d.value) }]);
+      };
+      hit.addEventListener("pointerenter", showTip); hit.addEventListener("focus", showTip);
+      hit.addEventListener("pointerleave", () => tip.hide()); hit.addEventListener("blur", () => tip.hide());
+    }
+    svg.appendChild(g);
+  });
+  box.appendChild(svg);
+}
+
+function peerItems(getter, fmtTip) {
+  return PEERS.map((s) => ({ label: s, name: `${NAMES[s]} (${s})${IPP.has(s) ? "" : ", regulated utility"}`, value: getter(s), focus: s === "CEG", tip: fmtTip?.(s) }));
+}
+
+function renderLeverage() {
+  const items = peerItems((s) => DATA.compare[s]["net_debt/ebitda"], (s) => [
+    { label: "Net debt / EBITDA", value: fmt.x(DATA.compare[s]["net_debt/ebitda"]) },
+    { label: "Net debt", value: fmt.bn(DATA.compare[s].net_debt) },
+    { label: "EBITDA / interest", value: fmt.x(DATA.compare[s]["ebitda/interest"]) },
+  ]).sort((a, b) => (a.value ?? 99) - (b.value ?? 99));
+  renderHBars("lev-chart", items, (v) => fmt.x(v));
+
+  // history table
+  const t = document.getElementById("lev-table"); t.replaceChildren();
+  const cols = Object.keys(DATA.leverageHistory.CEG);
+  const hr = el("tr"); hr.appendChild(el("th", {}, "")); cols.forEach((c) => hr.appendChild(el("th", {}, c.replace("TTM ", "Latest "))));
+  const th = el("thead"); th.appendChild(hr); t.appendChild(th);
+  const tb = el("tbody");
+  const group = (label) => { const tr = el("tr", { class: "group" }); const td = el("td", { colspan: cols.length + 1 }, label); tr.appendChild(td); tb.appendChild(tr); };
+  group("Independent power producers");
+  PEERS.forEach((s, i) => {
+    if (s === "NEE") group("Regulated utilities");
+    const tr = el("tr", s === "CEG" ? { class: "focus" } : {});
+    tr.appendChild(el("td", {}, s));
+    cols.forEach((c) => {
+      const v = DATA.leverageHistory[s][c];
+      const td = el("td", {}, v == null || v < 0 ? "–" : fmt.x(v));
+      if (v != null && v > 5) td.className = "cell-hi";
+      else if (v != null && v >= 0 && v < 2) td.className = "cell-lo";
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+
+  // debt quality
+  const q = document.getElementById("debtq-table"); q.replaceChildren();
+  const qcols = [["Total debt", (s) => fmt.bn(DATA.compare[s].total_debt, 1)], ["EBITDA / int.", (s) => fmt.x(DATA.compare[s]["ebitda/interest"])], ["Debt, 1y chg", (s) => fmt.pct(DATA.compare[s].debt_growth_1y)], ["FCF 12m", (s) => fmt.bn(DATA.compare[s].fcf_ttm, 2)]];
+  const qh = el("tr"); qh.appendChild(el("th", {}, "")); qcols.forEach(([l]) => qh.appendChild(el("th", {}, l)));
+  const qth = el("thead"); qth.appendChild(qh); q.appendChild(qth);
+  const qb = el("tbody");
+  PEERS.forEach((s) => { const tr = el("tr", s === "CEG" ? { class: "focus" } : {}); tr.appendChild(el("td", {}, s)); qcols.forEach(([, f]) => tr.appendChild(el("td", {}, f(s)))); qb.appendChild(tr); });
+  q.appendChild(qb);
+}
+
+function renderValuation() {
+  const pe = peerItems((s) => DATA.valuation[s].forward_pe).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  renderHBars("pe-chart", pe, (v) => fmt.x(v));
+  const ev = peerItems((s) => DATA.valuation[s]["ev/ebitda_ttm"]).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  renderHBars("ev-chart", ev, (v) => fmt.x(v), { max: 20 });
+
+  const t = document.getElementById("val-table"); t.replaceChildren();
+  const cols = [
+    ["Price", (v) => fmt.usd(v.price)],
+    ["P/E 12m", (v) => fmt.n(v.trailing_pe)],
+    ["Fwd P/E", (v) => fmt.n(v.forward_pe)],
+    ["EV/EBITDA", (v) => fmt.n(v["ev/ebitda_ttm"])],
+    ["P/Sales", (v) => fmt.n(v["price/sales"])],
+    ["FCF yield", (v) => fmt.pctPlain(v.fcf_yield_ttm)],
+    ["Dividend", (v) => v.dividend_yield == null ? "none" : fmt.pctPlain(v.dividend_yield)],
+    ["vs 52w high", (v) => fmt.pct(v.vs_52w_high)],
+    ["Analyst upside", (v) => fmt.pct(v.analyst_upside)],
+    ["Consensus", (v) => (v.analyst_view || "–").replace("_", " ")],
+    ["Beta", (v) => fmt.n(v.beta)],
+  ];
+  const hr = el("tr"); hr.appendChild(el("th", {}, "")); cols.forEach(([l]) => hr.appendChild(el("th", {}, l)));
+  const th = el("thead"); th.appendChild(hr); t.appendChild(th);
+  const tb = el("tbody");
+  PEERS.forEach((s) => {
+    const tr = el("tr", s === "CEG" ? { class: "focus" } : {});
+    const first = el("td"); first.append(document.createTextNode(`${s} `)); const nm = el("span", { class: "muted" }, NAMES[s]); first.appendChild(nm);
+    tr.appendChild(first);
+    cols.forEach(([, f]) => tr.appendChild(el("td", {}, f(DATA.valuation[s]))));
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+
+  const verdicts = [
+    { s: "CEG", chip: ["warn", "Premium"], text: "Highest multiples among the producers and above the utilities. The price reflects contracted nuclear growth, and the stock is 36% below its high." },
+    { s: "VST", chip: ["good", "Cheapest quality"], text: "Forward P/E 13.4, the best free cash flow yield (4.8%) and a strong-buy consensus. Earnings depend more on power prices." },
+    { s: "NRG", chip: ["crit", "Cheap, risky"], text: "Forward P/E about 9 with 6x leverage. Forecasts assume earnings roughly triple after its acquisition." },
+    { s: "TLN", chip: ["crit", "Cheap, risky"], text: "Forward P/E about 10 but 12x leverage and EBITDA covering interest only 1.5 times." },
+    { s: "UTIL", name: "Regulated utilities", chip: ["good", "Fair"], text: "Forward P/E 16–17 with 3–4% dividends and low volatility. The safe benchmark." },
+  ];
+  const vroot = document.getElementById("verdicts"); vroot.replaceChildren();
+  for (const v of verdicts) {
+    const card = el("div", { class: "verdict" });
+    const h = el("h3", {}, v.name ?? `${NAMES[v.s]} (${v.s})`);
+    h.appendChild(el("span", { class: `chip ${v.chip[0]}` }, v.chip[1]));
+    card.append(h, el("p", {}, v.text));
+    vroot.appendChild(card);
+  }
+}
+
+function renderGrowth() {
+  const t = document.getElementById("inc-table"); t.replaceChildren();
+  const rows = DATA.cegIncome;
+  const hr = el("tr"); hr.appendChild(el("th", {}, "")); rows.forEach((r) => hr.appendChild(el("th", {}, r.year)));
+  const th = el("thead"); th.appendChild(hr); t.appendChild(th);
+  const tb = el("tbody");
+  [["Revenue", "revenue", (v) => fmt.n(v)], ["EBITDA", "ebitda", (v) => fmt.n(v)], ["Net income", "net_income", (v) => fmt.n(v, 2)], ["Diluted EPS, $", "eps", (v) => fmt.n(v, 2)]].forEach(([label, key, f]) => {
+    const tr = el("tr"); tr.appendChild(el("td", {}, label)); rows.forEach((r) => tr.appendChild(el("td", {}, f(r[key])))); tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+
+  const g = document.getElementById("growth-table"); g.replaceChildren();
+  const cols = [["Revenue CAGR", (c) => fmt.pct(c.revenue_cagr)], ["EBITDA CAGR", (c) => fmt.pct(c.ebitda_cagr)], ["Latest qtr revenue", (c) => fmt.pct(c.rev_growth_yoy_q)], ["Return 1y", (c) => fmt.pct(c.return_1y)], ["Return 3y", (c) => fmt.pct(c.return_3y)]];
+  const gh = el("tr"); gh.appendChild(el("th", {}, "")); cols.forEach(([l]) => gh.appendChild(el("th", {}, l)));
+  const gth = el("thead"); gth.appendChild(gh); g.appendChild(gth);
+  const gb = el("tbody");
+  PEERS.forEach((s) => { const tr = el("tr", s === "CEG" ? { class: "focus" } : {}); tr.appendChild(el("td", {}, s)); cols.forEach(([, f]) => tr.appendChild(el("td", {}, f(DATA.compare[s])))); gb.appendChild(tr); });
+  g.appendChild(gb);
+}
+
+function renderCalpine() {
+  const rows = [
+    ["First lien term loans", "$2.51bn", "Floating", "2031–32", "Repaid"],
+    ["First lien notes", "$1.25bn", "4.50%", "2028", "Redeemed"],
+    ["First lien notes", "$0.90bn", "3.75%", "2031", "Swapped to CEG"],
+    ["Senior unsecured notes", "$0.65bn", "4.625%", "2029", "Swapped to CEG"],
+    ["Senior unsecured notes", "$0.85bn", "5.00%", "2031", "Swapped to CEG"],
+    ["Senior unsecured notes", "$1.40bn", "5.125%", "2028", "Outstanding?"],
+    ["CCFC project loan", "$2.10bn", "Floating", "2030", "Plant-level"],
+    ["GPC project loan", "$1.77bn", "Floating", "–", "Plant-level"],
+    ["Nova facility", "up to $1.0bn", "–", "–", "Plant-level"],
+    ["Greenfield (Canada)", "C$500m", "–", "–", "Plant-level"],
+    ["Pin Oak Creek (Texas Energy Fund)", "$0.28bn", "–", "–", "Plant-level"],
+  ];
+  const t = document.getElementById("calpine-table"); t.replaceChildren();
+  const hr = el("tr"); ["Debt", "Amount", "Rate", "Due", "Status"].forEach((h) => hr.appendChild(el("th", {}, h)));
+  const th = el("thead"); th.appendChild(hr); t.appendChild(th);
+  const tb = el("tbody");
+  for (const r of rows) {
+    const tr = el("tr");
+    r.forEach((c, i) => {
+      const td = el("td", {}, i === 4 ? "" : c);
+      if (i === 4) {
+        const kind = c === "Repaid" || c === "Redeemed" ? "good" : c === "Outstanding?" ? "warn" : "";
+        const chip = el("span", { class: `chip ${kind}` }, c);
+        td.appendChild(chip);
+      }
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+}
+
+/* ---------- boot ---------- */
+function renderCharts() {
+  renderPrice(); renderDebtChart(); renderLeverage(); renderValuation();
+}
+document.getElementById("asof").textContent = DATA.prices.dates[DATA.prices.dates.length - 1];
+if (DATA.cegInfo?.industry) document.getElementById("industry").textContent = `${DATA.cegInfo.sector} · ${DATA.cegInfo.industry.replace("Utilities - ", "")}`;
+renderKpis(); renderPriceLegend(); renderGrowth(); renderCalpine(); renderCharts();
+
+document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => {
+  priceRange = +b.dataset.range;
+  document.querySelectorAll("#range button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+  try { localStorage.setItem("ceg-range", String(priceRange)); } catch {}
+  renderPrice();
+}));
+try {
+  const saved = localStorage.getItem("ceg-range");
+  if (saved != null) document.querySelector(`#range button[data-range="${saved}"]`)?.click();
+} catch {}
+
+let rt, lastW = 0;
+new ResizeObserver(([e]) => {
+  const w = Math.round(e.contentRect.width);
+  if (w === lastW) return;
+  lastW = w; clearTimeout(rt); rt = setTimeout(renderCharts, 120);
+}).observe(document.querySelector(".wrap"));
+new MutationObserver(renderCharts).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderCharts);
+</script>
