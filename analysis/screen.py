@@ -65,12 +65,70 @@ def strict(top: int = 5) -> pd.DataFrame:
     return c.sort_values("cheap_rank").head(top)
 
 
+# Weighted score: percentile ranks (0-100) within the investable universe.
+# 1 = higher is better, -1 = lower is better
+DEBT_MEASURES = {
+    "cash_to_short_term_debt": 1,
+    "cash_to_long_term_debt": 1,
+    "net_debt_to_ebitda": -1,
+    "ebitda_to_interest": 1,
+}
+CHEAP_MEASURES = {
+    "price_vs_fair_value": -1,
+    "pe_rel": -1,
+    "ev_rel": -1,
+    "pe_change_expected": -1,
+}
+
+
+def _score(d: pd.DataFrame, measures: dict[str, int], missing: float) -> pd.Series:
+    parts = []
+    for col, direction in measures.items():
+        pct = (d[col].replace([np.inf], 1e9) * direction).rank(pct=True) * 100
+        parts.append(pct.fillna(missing))
+    return pd.concat(parts, axis=1).mean(axis=1)
+
+
+def balanced(debt_weight: float = 0.65, top: int = 10) -> pd.DataFrame:
+    """Blend a debt score and a cheapness score, weighting debt more heavily.
+
+    Universe: market value >= $1bn, reliable US-dollar data, profitable, and at least
+    three of the four cheapness measures available. Missing debt
+    data scores 0 (strict); missing cheapness data scores 50 (neutral).
+    """
+    d = screen(max_leverage=99, min_cap=0)
+    med = d.groupby("industry")[["pe_ttm", "ev_to_ebitda"]].transform("median")
+    d["pe_rel"] = d["pe_ttm"] / med["pe_ttm"] - 1
+    d["ev_rel"] = d["ev_to_ebitda"] / med["ev_to_ebitda"] - 1
+    base = (
+        (d["market_cap"] >= 1)
+        & (d["data_flag"].fillna("") == "")
+        & (d["net_income"] > 0)
+        & (d["ebitda"] > 0)
+    )
+    u = d[base].copy()
+    u["pe_change_expected"] = u["pe_change_expected"].where(u["pe_fwd"] > 1)
+    u = u[u[list(CHEAP_MEASURES)].notna().sum(axis=1) >= 3]  # enough data to judge cheapness
+    u["debt_score"] = _score(u, DEBT_MEASURES, missing=0)
+    u["cheap_score"] = _score(u, CHEAP_MEASURES, missing=50)
+    u["total_score"] = debt_weight * u["debt_score"] + (1 - debt_weight) * u["cheap_score"]
+    u["rank"] = u["total_score"].rank(ascending=False).astype(int)
+    return u.sort_values("total_score", ascending=False).head(top)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-leverage", type=float, default=3.5)
     ap.add_argument("--min-cap", type=float, default=1.0, help="minimum market value, $bn")
     ap.add_argument("--strict", action="store_true", help="rank the top 5 with strict debt rules")
+    ap.add_argument("--balanced", action="store_true", help="weighted debt + cheapness score")
+    ap.add_argument("--debt-weight", type=float, default=0.65)
     args = ap.parse_args()
+    if args.balanced:
+        pd.set_option("display.width", 220)
+        cols = ["name", "debt_score", "cheap_score", "total_score", *DEBT_MEASURES, *CHEAP_MEASURES]
+        print(balanced(args.debt_weight)[cols].round(2).to_string())
+        raise SystemExit
     if args.strict:
         pd.set_option("display.width", 220)
         cols = [
