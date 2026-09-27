@@ -19,7 +19,7 @@ MEDIAN_COLS = [
     "eps_cagr_3y",
     "fcf_yield",
     "net_margin",
-    "pe_fwd",
+    "pe_ttm",
     "ev_to_ebitda",
     "dividend_yield",
     "vs_52w_high",

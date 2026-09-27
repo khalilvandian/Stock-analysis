@@ -130,7 +130,7 @@ ul.notes { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; 
     </div>
     <div class="legend"><span><i style="--c:var(--s1)"></i>CEG, VST, NRG, TLN</span><span><i style="--c:var(--dot)"></i>Other companies</span><span><i class="bar" style="--c:var(--ink)"></i>Group median</span></div>
     <div class="grid-2">
-      <div><div class="sub-h"><h3>Forward P/E</h3><p>Price divided by expected earnings for the next 12 months.</p></div><div class="chart" id="strip-pe"></div></div>
+      <div><div class="sub-h"><h3>Trailing P/E</h3><p>Price divided by reported earnings per share over the last 12 months. Loss-making companies have no P/E.</p></div><div class="chart" id="strip-pe"></div></div>
       <div><div class="sub-h"><h3>Net debt / EBITDA</h3><p>Years of operating earnings needed to repay net debt.</p></div><div class="chart" id="strip-lev"></div></div>
       <div><div class="sub-h"><h3>Price vs DCF fair value</h3><p>Negative means the price is below fair value (cheaper).</p></div><div class="chart" id="strip-dcf"></div></div>
       <div><div class="sub-h"><h3>Revenue growth, 3-year annual rate</h3><p>Compound annual growth over the last three fiscal years.</p></div><div class="chart" id="strip-growth"></div></div>
@@ -197,7 +197,7 @@ function renderKpis() {
   const tiles = [
     ["Companies", `${ROWS.length}`, `${industries.length} sub-industries`],
     ["Combined market value", `$${(total / 1000).toFixed(2)}tn`, "Largest: NextEra, Southern, CEG"],
-    ["Median forward P/E", F.x(all.pe_fwd), "Next 12 months' earnings"],
+    ["Median trailing P/E", F.x(all.pe_ttm), "Last 12 months' earnings, profitable companies"],
     ["Median net debt / EBITDA", F.x(all.net_debt_to_ebitda), `EBITDA covers interest ${F.x(all.ebitda_to_interest)}`],
     ["Negative free cash flow", `${Math.round(all.negative_fcf * 100)}%`, "Capex above operating cash flow"],
     ["Median price vs fair value", F.pct(all.price_vs_fair_value), "Standard DCF, where meaningful"],
@@ -222,7 +222,7 @@ const GCOLS = [
   ["Net margin", (g) => g.net_margin, F.pct1],
   ["FCF yield", (g) => g.fcf_yield, F.pct1],
   ["Negative FCF", (g) => g.negative_fcf, (v) => `${Math.round(v * 100)}%`],
-  ["Forward P/E", (g) => g.pe_fwd, (v) => (v < 0 ? "loss" : F.n1(v))],
+  ["Trailing P/E", (g) => g.pe_ttm, (v) => (v < 0 ? "loss" : F.n1(v))],
   ["EV / EBITDA", (g) => g.ev_to_ebitda, F.n1],
   ["Dividend yield", (g) => g.dividend_yield, F.pct1],
   ["vs 52w high", (g) => g.vs_52w_high, F.pct],
@@ -255,7 +255,7 @@ function renderGroupTable() {
   const items = [
     ["Power producers are the growth and risk end", `Revenue growing ${F.pct1(G["Independent Power Producers"].revenue_cagr_3y)} a year, but only ${Math.round(G["Independent Power Producers"].profitable * 100)}% profitable over the last 12 months (many are early-stage nuclear and power startups). Shares are a median ${F.pct(G["Independent Power Producers"].vs_52w_high)} below their highs.`],
     ["Regulated electric is the core of the sector", `${G["Regulated Electric"].count} companies worth $${(G["Regulated Electric"].market_cap / 1000).toFixed(2)}tn. Steady ${F.pct1(G["Regulated Electric"].revenue_cagr_3y)} revenue growth, ${F.x(G["Regulated Electric"].net_debt_to_ebitda)} leverage, ${F.pct1(G["Regulated Electric"].dividend_yield)} dividends, and ${Math.round(G["Regulated Electric"].negative_fcf * 100)}% spend more than they earn in cash to build out the grid.`],
-    ["Water utilities are the priciest", `Forward P/E ${F.n1(G["Regulated Water"].pe_fwd)} and a median ${F.pct(G["Regulated Water"].price_vs_fair_value)} above standard DCF value. Investors pay for the most stable, regulated growth.`],
+    ["Water utilities are the priciest", `Trailing P/E ${F.n1(G["Regulated Water"].pe_ttm)} and a median ${F.pct(G["Regulated Water"].price_vs_fair_value)} above standard DCF value. Investors pay for the most stable, regulated growth.`],
     ["Renewables are the most stretched", `Median net debt / EBITDA ${F.x(G["Renewable"].net_debt_to_ebitda)}, only ${Math.round(G["Renewable"].profitable * 100)}% profitable, and shares a median ${F.pct(G["Renewable"].vs_52w_high)} below their highs. High rates hit capital-hungry developers hardest.`],
   ];
   const ul = document.getElementById("takeaways");
@@ -327,7 +327,7 @@ function renderStrip(id, key, [lo, hi], fmt, ticks) {
   box.appendChild(svg);
 }
 function renderStrips() {
-  renderStrip("strip-pe", "pe_fwd", [0, 40], (v) => `${v.toFixed(0)}x`, [0, 10, 20, 30, 40]);
+  renderStrip("strip-pe", "pe_ttm", [0, 40], (v) => `${v.toFixed(0)}x`, [0, 10, 20, 30, 40]);
   renderStrip("strip-lev", "net_debt_to_ebitda", [0, 12], (v) => `${v.toFixed(0)}x`, [0, 3, 6, 9, 12]);
   renderStrip("strip-dcf", "price_vs_fair_value", [-1, 2], (v) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(0)}%`, [-1, -0.5, 0, 0.5, 1, 1.5, 2]);
   renderStrip("strip-growth", "revenue_cagr_3y", [-0.2, 0.4], (v) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(0)}%`, [-0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4]);
@@ -357,8 +357,7 @@ const COLS = [
   { g: "Earnings", k: "net_margin", l: "Margin", f: F.pct1 },
   { g: "Earnings", k: "eps_ttm", l: "EPS", f: F.eps },
   { g: "Earnings", k: "eps_fwd", l: "Fwd EPS", f: F.eps },
-  { g: "Valuation", k: "pe_ttm", l: "P/E", f: (v) => (v < 0 ? "loss" : F.n1(v)) },
-  { g: "Valuation", k: "pe_fwd", l: "Fwd P/E", f: (v) => (v < 0 ? "loss" : F.n1(v)) },
+  { g: "Valuation", k: "pe_ttm", l: "Trailing P/E", f: (v) => (v < 0 ? "loss" : F.n1(v)) },
   { g: "Valuation", k: "ev_to_ebitda", l: "EV / EBITDA", f: F.n1 },
   { g: "Valuation", k: "price_to_book", l: "P/B", f: F.n1 },
   { g: "Valuation", k: "dividend_yield", l: "Dividend", f: F.pct1 },

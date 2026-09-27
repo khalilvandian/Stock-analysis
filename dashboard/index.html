@@ -244,12 +244,12 @@ footer { color: var(--ink-3); font-size: 12px; }
     <div class="panel-head">
       <div>
         <h2>Is it expensive right now?</h2>
-        <p class="dek">CEG is the priciest of the independent power producers on every measure. The market pays for contracted nuclear earnings. Vistra looks cheapest among the quality names.</p>
+        <p class="dek">On trailing earnings CEG trades at 25.7x, level with NRG (26.1x) and above Vistra (23.3x) and the utilities (17–20x). It has the highest EV/EBITDA of the producers. The market pays for contracted nuclear earnings. Vistra looks cheapest among the quality names.</p>
       </div>
     </div>
     <div class="grid-even">
       <div>
-        <div class="sub-h"><h3>Forward P/E</h3><p>Price divided by analysts' expected earnings for the next 12 months. NEE, DUK and SO are regulated utilities.</p></div>
+        <div class="sub-h"><h3>Trailing P/E</h3><p>Price divided by reported earnings per share over the last 12 months. Talen had a loss, so it has no P/E. NEE, DUK and SO are regulated utilities.</p></div>
         <div class="chart" id="pe-chart"></div>
       </div>
       <div>
@@ -394,12 +394,13 @@ function niceTicks(min, max, count = 5) {
 /* ---------- KPIs ---------- */
 function renderKpis() {
   const v = DATA.valuation.CEG, c = DATA.compare.CEG;
-  const peerFwd = ["VST", "NRG", "TLN"].map((s) => DATA.valuation[s].forward_pe).filter((x) => x != null).sort((a, b) => a - b);
-  const median = peerFwd[Math.floor(peerFwd.length / 2)];
+  const peerPe = ["VST", "NRG", "TLN"].map((s) => DATA.valuation[s].trailing_pe).filter((x) => x != null).sort((a, b) => a - b);
+  const mid = Math.floor(peerPe.length / 2);
+  const median = peerPe.length % 2 ? peerPe[mid] : (peerPe[mid - 1] + peerPe[mid]) / 2;
   const tiles = [
     { label: "Share price", value: fmt.usd(v.price), sub: `${fmt.pct(v.vs_52w_high)} from 52-week high` },
     { label: "Market value", value: `$${c.market_cap.toFixed(0)}bn`, sub: `Total debt ${fmt.bn(c.total_debt)}` },
-    { label: "Forward P/E", value: fmt.x(v.forward_pe), sub: `Peer producers ${fmt.x(median)} median`, chip: ["warn", "Premium"] },
+    { label: "Trailing P/E", value: fmt.x(v.trailing_pe), sub: `Peer producers ${fmt.x(median)} median`, chip: ["warn", "Premium"] },
     { label: "Net debt / EBITDA", value: fmt.x(c["net_debt/ebitda"]), sub: "0.9x at Dec 2025", chip: ["good", "Below peers"] },
     { label: "Analyst target", value: fmt.pct(v.analyst_upside), sub: `Consensus: ${v.analyst_view}` },
   ];
@@ -685,7 +686,7 @@ function renderLeverage() {
 }
 
 function renderValuation() {
-  const pe = peerItems((s) => DATA.valuation[s].forward_pe).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  const pe = peerItems((s) => DATA.valuation[s].trailing_pe).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
   renderHBars("pe-chart", pe, (v) => fmt.x(v));
   const ev = peerItems((s) => DATA.valuation[s]["ev/ebitda_ttm"]).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
   renderHBars("ev-chart", ev, (v) => fmt.x(v), { max: 20 });
@@ -693,8 +694,7 @@ function renderValuation() {
   const t = document.getElementById("val-table"); t.replaceChildren();
   const cols = [
     ["Price", (v) => fmt.usd(v.price)],
-    ["P/E 12m", (v) => fmt.n(v.trailing_pe)],
-    ["Fwd P/E", (v) => fmt.n(v.forward_pe)],
+    ["Trailing P/E", (v) => (v.trailing_pe == null ? "loss" : fmt.n(v.trailing_pe))],
     ["EV/EBITDA", (v) => fmt.n(v["ev/ebitda_ttm"])],
     ["P/Sales", (v) => fmt.n(v["price/sales"])],
     ["FCF yield", (v) => fmt.pctPlain(v.fcf_yield_ttm)],
@@ -717,11 +717,11 @@ function renderValuation() {
   t.appendChild(tb);
 
   const verdicts = [
-    { s: "CEG", chip: ["warn", "Premium"], text: "Highest multiples among the producers and above the utilities. The price reflects contracted nuclear growth, and the stock is 36% below its high." },
-    { s: "VST", chip: ["good", "Cheapest quality"], text: "Forward P/E 13.4, the best free cash flow yield (4.8%) and a strong-buy consensus. Earnings depend more on power prices." },
-    { s: "NRG", chip: ["crit", "Cheap, risky"], text: "Forward P/E about 9 with 6x leverage. Forecasts assume earnings roughly triple after its acquisition." },
-    { s: "TLN", chip: ["crit", "Cheap, risky"], text: "Forward P/E about 10 but 12x leverage and EBITDA covering interest only 1.5 times." },
-    { s: "UTIL", name: "Regulated utilities", chip: ["good", "Fair"], text: "Forward P/E 16–17 with 3–4% dividends and low volatility. The safe benchmark." },
+    { s: "CEG", chip: ["warn", "Premium"], text: "Among the highest multiples of the producers and above the utilities. The price reflects contracted nuclear growth, and the stock is 36% below its high." },
+    { s: "VST", chip: ["good", "Cheapest quality"], text: "Trailing P/E 23.3, the lowest of the producers, plus the best free cash flow yield (4.8%) and a strong-buy consensus. Earnings depend more on power prices." },
+    { s: "NRG", chip: ["crit", "Cheap, risky"], text: "Trailing P/E 26.1 on depressed earnings, with 6x leverage. Cheap only if earnings roughly triple after its acquisition, as forecasts assume." },
+    { s: "TLN", chip: ["crit", "Cheap, risky"], text: "Loss-making over the last 12 months, so no trailing P/E. 12x leverage and EBITDA covering interest only 1.5 times." },
+    { s: "UTIL", name: "Regulated utilities", chip: ["good", "Fair"], text: "Trailing P/E 17–20 with 3–4% dividends and low volatility. The safe benchmark." },
   ];
   const vroot = document.getElementById("verdicts"); vroot.replaceChildren();
   for (const v of verdicts) {
