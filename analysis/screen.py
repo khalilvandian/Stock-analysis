@@ -48,7 +48,9 @@ STRICT_RULES = {
     "price below DCF fair value": lambda d: d["price_vs_fair_value"] < 0,
     "trailing P/E <= sub-industry median": lambda d: d["pe_rel"] <= 0,
     "EV / EBITDA <= sub-industry median": lambda d: d["ev_rel"] <= 0,
-    "earnings expected to rise (forward P/E <= trailing)": lambda d: d["pe_change_expected"] <= 0,
+    "earnings expected to rise (forward P/E <= trailing)": lambda d: (
+        (d["pe_fwd"] > 1) & (d["pe_change_expected"] <= 0)
+    ),
 }
 # lower is better, except interest cover
 SCORE = {
