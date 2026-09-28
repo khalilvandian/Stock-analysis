@@ -2,13 +2,16 @@
 # To add a value: add an entry to the right group. `column` must exist in
 # data/sector/utilities.csv (produced by analysis/sector.py). `unit` controls formatting:
 # "$" = dollars per share, "$bn" = billions of US dollars.
+# `history` names the column in data/sector/history.csv (analysis/history.py) that holds
+# the yearly values; it defaults to `column`. Use history = "" for values that exist only
+# for the current date.
 
 [[group]]
 name = "Price and value"
 values = [
   { column = "price", label = "Share price", unit = "$" },
   { column = "market_cap", label = "Market value", unit = "$bn" },
-  { column = "dcf_fair_value", label = "DCF fair value", unit = "$" },
+  { column = "dcf_fair_value", label = "DCF fair value", unit = "$", history = "" },
   { column = "fcff_before_growth", label = "Cash flow before growth (DCF base)", unit = "$bn" },
 ]
 
@@ -28,8 +31,8 @@ values = [
   { column = "revenue", label = "Revenue (12m)", unit = "$bn" },
   { column = "ebitda", label = "EBITDA (12m)", unit = "$bn" },
   { column = "net_income", label = "Net income (12m)", unit = "$bn" },
-  { column = "eps_ttm", label = "EPS (12m)", unit = "$" },
-  { column = "eps_fwd", label = "Forward EPS", unit = "$" },
+  { column = "eps_ttm", label = "EPS (12m)", unit = "$", history = "eps" },
+  { column = "eps_fwd", label = "Forward EPS", unit = "$", history = "" },
 ]
 
 [[group]]

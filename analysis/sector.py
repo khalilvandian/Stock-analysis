@@ -173,6 +173,63 @@ def apply_guided_dcf(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def annual_history(
+    sym: str, ia: pd.DataFrame, ba: pd.DataFrame, ca: pd.DataFrame, prices: pd.DataFrame, fx: float
+) -> list[dict]:
+    """Absolute values for each fiscal year, in USD (long format: one row per value)."""
+    bn = 1e9 / fx  # divide local-currency amounts by this to get USD billions
+
+    def line(df: pd.DataFrame, *names: str) -> pd.Series:
+        return _get(df, *names) / bn
+
+    series = {
+        "revenue": line(ia, "Total Revenue", "Operating Revenue"),
+        "ebitda": line(ia, "EBITDA", "Normalized EBITDA"),
+        "net_income": line(ia, "Net Income", "Net Income Common Stockholders"),
+        "eps": _get(ia, "Diluted EPS", "Basic EPS") * fx,
+        "total_debt": line(ba, "Total Debt"),
+        "short_term_debt": line(ba, "Current Debt And Capital Lease Obligation", "Current Debt"),
+        "long_term_debt": line(ba, "Long Term Debt And Capital Lease Obligation", "Long Term Debt"),
+        "cash": line(
+            ba, "Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents"
+        ),
+        "operating_cf": line(ca, "Operating Cash Flow"),
+        "capex": line(ca, "Capital Expenditure"),
+    }
+    cce = line(ba, "Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments")
+    series["net_debt"] = series["total_debt"].sub(cce, fill_value=np.nan)
+    series["free_cf"] = series["operating_cf"].add(series["capex"], fill_value=np.nan)
+    da = line(ca, "Depreciation And Amortization", "Depreciation Amortization Depletion")
+    interest = line(ia, "Interest Expense", "Interest Expense Non Operating").abs()
+    series["fcff_before_growth"] = series["operating_cf"] - da + interest.fillna(0) * (1 - TAX)
+
+    # year-end share price and market value
+    shares = _get(ba, "Ordinary Shares Number", "Share Issued")
+    if prices is not None and not prices.empty:
+        close = prices["Close"].copy()
+        close.index = close.index.tz_localize(None)
+        periods = sorted(set().union(*[s.dropna().index for s in series.values()]))
+        year_end = pd.Series(
+            {p: close[close.index <= p].iloc[-1] for p in periods if (close.index <= p).any()},
+            dtype=float,
+        )
+        series["price"] = year_end
+        series["market_cap"] = (year_end * shares).dropna() / 1e9
+
+    rows = []
+    for column, s in series.items():
+        for period, value in s.dropna().items():
+            rows.append(
+                {
+                    "symbol": sym,
+                    "period_end": period.date().isoformat(),
+                    "column": column,
+                    "value": float(value),
+                }
+            )
+    return rows
+
+
 def analyse(quote: dict) -> dict:
     sym = quote["symbol"]
     t = yf.Ticker(sym)
@@ -182,6 +239,7 @@ def analyse(quote: dict) -> dict:
             iq, ia = t.quarterly_income_stmt, t.income_stmt
             bq, ba = t.quarterly_balance_sheet, t.balance_sheet
             cq, ca = t.quarterly_cashflow, t.cashflow
+            prices = t.history(period="6y", auto_adjust=False)
             break
         except Exception:  # noqa: BLE001 - rate limits and transient errors
             time.sleep(2 * (attempt + 1))
@@ -273,6 +331,7 @@ def analyse(quote: dict) -> dict:
     high52 = info.get("fiftyTwoWeekHigh")
     div_yield = info.get("dividendYield")
     return {
+        "_history": annual_history(sym, ia, ba, ca, prices, fx),
         "symbol": sym,
         "name": info.get("longName") or quote.get("shortName"),
         "industry": (info.get("industry") or "Other").replace("Utilities - ", ""),
@@ -348,7 +407,11 @@ def main() -> None:
     print(f"{len(quotes)} companies")
     with ThreadPoolExecutor(max_workers=6) as pool:
         rows = list(pool.map(analyse, quotes))
+    history = [h for r in rows for h in r.pop("_history", [])]
     df = pd.DataFrame(rows).drop_duplicates(subset="name", keep="first").set_index("symbol")
+    hist = pd.DataFrame(history)
+    hist = hist[hist["symbol"].isin(df.index)].sort_values(["symbol", "column", "period_end"])
+    hist.to_csv(OUT / "history_yahoo.csv", index=False)
     df["data_flag"] = np.where(
         df["currency"].fillna("USD") != "USD",
         "Reports in " + df["currency"].fillna("?") + ", converted to USD; check against filings",

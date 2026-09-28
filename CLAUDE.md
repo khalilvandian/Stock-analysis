@@ -20,6 +20,12 @@ Ratios and scores hide important information, so they come after, never instead.
   exist yet). `tests/test_absolute.py` fails if a configured column is missing.
 - Run it with `uv run python analysis/absolute.py [TICKERS]` (refresh data first with
   `uv run python analysis/sector.py`).
+- **Always look at the history, not just the latest year:** `uv run python
+  analysis/absolute.py --history TICKERS` shows every fiscal year on record (at least
+  the last 5; SEC filings back to 2016) next to the latest 12 months. Build or refresh it
+  with `uv run python analysis/history.py` (SEC EDGAR primary, Yahoo fills gaps, each
+  value records its source; raw SEC files cache in `.cache/sec/`). Foreign filers are
+  converted at today's exchange rate, and market value is only shown for US-dollar filers.
 - In answers, present the absolute-values table first, then ratios, scores and conclusions.
 - Other tools, in the usual order after step 1: `analysis/screen.py` (strict and weighted
   screens), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
