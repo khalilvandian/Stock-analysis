@@ -264,7 +264,10 @@ def sec_history(symbol: str, facts: dict) -> pd.DataFrame:
         "revenue": usd(flows["revenue"]),
         "ebitda": usd(ebitda),
         "net_income": usd(flows["net_income"]),
-        "eps": flows["eps"],
+        # a reported EPS of exactly 0 alongside non-zero profit means no public shares yet
+        "eps": flows["eps"].where(
+            (flows["eps"] != 0) | (flows["net_income"].reindex(flows["eps"].index) == 0)
+        ),
         "operating_cf": usd(flows["operating_cf"]),
         "capex": usd(capex),
         "free_cf": usd(flows["operating_cf"] + capex),
