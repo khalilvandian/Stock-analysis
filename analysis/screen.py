@@ -81,12 +81,26 @@ CHEAP_MEASURES = {
 }
 
 
-def _score(d: pd.DataFrame, measures: dict[str, int], missing: float) -> pd.Series:
-    parts = []
-    for col, direction in measures.items():
+# Profitability and cash: (direction, weight within the component)
+QUALITY_MEASURES = {
+    "net_margin": (1, 2.0),  # how much of each dollar of revenue is profit
+    "margin_change_avg": (1, 1.0),  # margin trend, percentage points a year
+    "margin_change_median": (1, 1.0),
+    "ocf_growth_avg": (1, 1.0),  # operating cash flow growth
+    "ocf_growth_median": (1, 1.0),
+    "cash_growth_avg": (1, 0.5),  # cash balances swing a lot, so lower weight
+    "cash_growth_median": (1, 0.5),
+}
+
+
+def _score(d: pd.DataFrame, measures: dict, missing: float) -> pd.Series:
+    parts, weights = [], []
+    for col, spec in measures.items():
+        direction, weight = spec if isinstance(spec, tuple) else (spec, 1.0)
         pct = (d[col].replace([np.inf], 1e9) * direction).rank(pct=True) * 100
-        parts.append(pct.fillna(missing))
-    return pd.concat(parts, axis=1).mean(axis=1)
+        parts.append(pct.fillna(missing) * weight)
+        weights.append(weight)
+    return pd.concat(parts, axis=1).sum(axis=1) / sum(weights)
 
 
 GROWTH_RULES = {
@@ -100,8 +114,13 @@ GROWTH_RULES = {
 }
 
 
-def balanced(debt_weight: float = 0.65, top: int = 10, require_growth: bool = True) -> pd.DataFrame:
-    """Blend a debt score and a cheapness score, weighting debt more heavily.
+def balanced(
+    debt_weight: float = 0.50,
+    quality_weight: float = 0.25,
+    top: int = 10,
+    require_growth: bool = True,
+) -> pd.DataFrame:
+    """Blend debt, profitability-and-cash, and cheapness scores; debt weighted most.
 
     Universe: market value >= $1bn, reliable US-dollar data, profitable, and at least
     three of the four cheapness measures available. With require_growth, revenue and EPS
@@ -126,7 +145,13 @@ def balanced(debt_weight: float = 0.65, top: int = 10, require_growth: bool = Tr
         u = u[pd.DataFrame({k: f(u).fillna(False) for k, f in GROWTH_RULES.items()}).all(axis=1)]
     u["debt_score"] = _score(u, DEBT_MEASURES, missing=0)
     u["cheap_score"] = _score(u, CHEAP_MEASURES, missing=50)
-    u["total_score"] = debt_weight * u["debt_score"] + (1 - debt_weight) * u["cheap_score"]
+    u["quality_score"] = _score(u, QUALITY_MEASURES, missing=50)
+    cheap_weight = 1 - debt_weight - quality_weight
+    u["total_score"] = (
+        debt_weight * u["debt_score"]
+        + quality_weight * u["quality_score"]
+        + cheap_weight * u["cheap_score"]
+    )
     u["rank"] = u["total_score"].rank(ascending=False).astype(int)
     return u.sort_values("total_score", ascending=False).head(top)
 
@@ -137,12 +162,13 @@ if __name__ == "__main__":
     ap.add_argument("--min-cap", type=float, default=1.0, help="minimum market value, $bn")
     ap.add_argument("--strict", action="store_true", help="rank the top 5 with strict debt rules")
     ap.add_argument("--balanced", action="store_true", help="weighted debt + cheapness score")
-    ap.add_argument("--debt-weight", type=float, default=0.65)
+    ap.add_argument("--debt-weight", type=float, default=0.50)
+    ap.add_argument("--quality-weight", type=float, default=0.25)
     args = ap.parse_args()
     if args.balanced:
         pd.set_option("display.width", 220)
-        cols = ["name", "debt_score", "cheap_score", "total_score", *DEBT_MEASURES, *CHEAP_MEASURES]
-        print(balanced(args.debt_weight)[cols].round(2).to_string())
+        cols = ["name", "total_score", "debt_score", "quality_score", "cheap_score"]
+        print(balanced(args.debt_weight, args.quality_weight)[cols].round(1).to_string())
         raise SystemExit
     if args.strict:
         pd.set_option("display.width", 220)

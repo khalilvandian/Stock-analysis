@@ -122,6 +122,21 @@ def _growth_stats(s: pd.Series, prefix: str) -> dict:
     }
 
 
+def _margin_stats(m: pd.Series) -> dict:
+    """Net margin by fiscal year and its year-over-year change in percentage points."""
+    m = m.dropna()
+    chg = m.diff().dropna()
+    return {
+        "net_margin_latest_fy": m.iloc[-1] if len(m) else np.nan,
+        "net_margin_avg": m.mean() if len(m) else np.nan,
+        "margin_change_avg": chg.mean() if len(chg) else np.nan,
+        "margin_change_median": chg.median() if len(chg) else np.nan,
+        "margin_years_up": int((chg > 0).sum()),
+        "margin_change_years": len(chg),
+        "net_margin_by_year": "; ".join(f"{d.year}: {v:.1%}" for d, v in m.items()),
+    }
+
+
 def _div(a: float, b: float) -> float:
     return a / b if b and np.isfinite(a) and np.isfinite(b) and b != 0 else np.nan
 
@@ -221,6 +236,12 @@ def analyse(quote: dict) -> dict:
     rev_hist = _get(ia, "Total Revenue", "Operating Revenue")
     ebitda_hist = _get(ia, "EBITDA", "Normalized EBITDA")
     eps_hist = _get(ia, "Diluted EPS", "Basic EPS")
+    ni_hist = _get(ia, "Net Income", "Net Income Common Stockholders")
+    margin_hist = (ni_hist / rev_hist.where(rev_hist > 0)).dropna()
+    cash_hist = _get(
+        ba, "Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents"
+    )
+    ocf_hist = _get(ca, "Operating Cash Flow")
 
     beta = info.get("beta")
     beta = beta if isinstance(beta, int | float) and np.isfinite(beta) else 0.8
@@ -280,6 +301,9 @@ def analyse(quote: dict) -> dict:
         # growth
         **_growth_stats(rev_hist, "revenue"),
         **_growth_stats(eps_hist, "eps"),
+        **_margin_stats(margin_hist),
+        **_growth_stats(cash_hist, "cash"),
+        **_growth_stats(ocf_hist, "ocf"),
         "revenue_cagr_3y": _cagr(rev_hist.iloc[-4:]),
         "ebitda_cagr_3y": _cagr(ebitda_hist.iloc[-4:]),
         "eps_cagr_3y": _cagr(eps_hist.iloc[-4:]),
