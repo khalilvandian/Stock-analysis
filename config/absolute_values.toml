@@ -1,0 +1,41 @@
+# Absolute values screened first for every company, before any ratio, score or summary.
+# To add a value: add an entry to the right group. `column` must exist in
+# data/sector/utilities.csv (produced by analysis/sector.py). `unit` controls formatting:
+# "$" = dollars per share, "$bn" = billions of US dollars.
+
+[[group]]
+name = "Price and value"
+values = [
+  { column = "price", label = "Share price", unit = "$" },
+  { column = "market_cap", label = "Market value", unit = "$bn" },
+  { column = "dcf_fair_value", label = "DCF fair value", unit = "$" },
+  { column = "fcff_before_growth", label = "Cash flow before growth (DCF base)", unit = "$bn" },
+]
+
+[[group]]
+name = "Debt and cash"
+values = [
+  { column = "total_debt", label = "Total debt", unit = "$bn" },
+  { column = "net_debt", label = "Net debt", unit = "$bn" },
+  { column = "short_term_debt", label = "Short-term debt", unit = "$bn" },
+  { column = "long_term_debt", label = "Long-term debt", unit = "$bn" },
+  { column = "cash", label = "Cash", unit = "$bn" },
+]
+
+[[group]]
+name = "Earnings"
+values = [
+  { column = "revenue", label = "Revenue (12m)", unit = "$bn" },
+  { column = "ebitda", label = "EBITDA (12m)", unit = "$bn" },
+  { column = "net_income", label = "Net income (12m)", unit = "$bn" },
+  { column = "eps_ttm", label = "EPS (12m)", unit = "$" },
+  { column = "eps_fwd", label = "Forward EPS", unit = "$" },
+]
+
+[[group]]
+name = "Cash flow"
+values = [
+  { column = "operating_cf", label = "Operating cash flow", unit = "$bn" },
+  { column = "capex", label = "Capex", unit = "$bn" },
+  { column = "free_cf", label = "Free cash flow", unit = "$bn" },
+]

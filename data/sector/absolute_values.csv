@@ -1,0 +1,4 @@
+symbol,name,industry,price,market_cap,dcf_fair_value,fcff_before_growth,total_debt,net_debt,short_term_debt,long_term_debt,cash,revenue,ebitda,net_income,eps_ttm,eps_fwd,operating_cf,capex,free_cf
+VST,Vistra Corp.,Independent Power Producers,138.46,46.472052736,168.03779918890362,5.08814,19.895,19.46,2.176,17.719,0.435,19.212,6.548,2.219,5.93,10.36561,5.121,-2.866,2.2550000000000003
+CEG,Constellation Energy Corporation,Independent Power Producers,263.27,93.278502912,206.5098966179646,4.81857,24.7,24.003,5.589,19.111,0.697,31.27,8.229,3.465,10.24,13.32016,4.206,-3.897,0.3090000000000006
+UGI,UGI Corporation,Regulated Gas,36.51,7.831210496,43.32421390602313,0.84623,7.049,6.573,0.354,6.695,0.476,7.296,1.761,0.671,3.01,3.22,1.062,-0.875,0.187
