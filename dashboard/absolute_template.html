@@ -1,0 +1,594 @@
+<title>US Utilities Absolute Values</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f2f3f0; --card: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #7a7973;
+  --rule: #e2e2dd; --grid: #ebebe6; --hover: #efefeb; --chip-on: #0b0b0b; --chip-on-ink: #ffffff;
+  --bar: #2a78d6; --bar-neg: #d03b3b; --bar-soft: #b7d3f6;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --good-ink: #0a6e0a; --crit-ink: #a52a2a;
+  --tip-bg: #1f1f1d; --tip-ink: #ffffff; --tip-ink-2: #c3c2b7;
+  --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --card: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+    --rule: #2d2d2a; --grid: #262624; --hover: #232321; --chip-on: #ffffff; --chip-on-ink: #0b0b0b;
+    --bar: #3987e5; --bar-neg: #e66767; --bar-soft: #184f95;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --good-ink: #5fd35f; --crit-ink: #f07a7a;
+    --tip-bg: #f4f4f1; --tip-ink: #0b0b0b; --tip-ink-2: #52514e;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --card: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+  --rule: #2d2d2a; --grid: #262624; --hover: #232321; --chip-on: #ffffff; --chip-on-ink: #0b0b0b;
+  --bar: #3987e5; --bar-neg: #e66767; --bar-soft: #184f95;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --good-ink: #5fd35f; --crit-ink: #f07a7a;
+  --tip-bg: #f4f4f1; --tip-ink: #0b0b0b; --tip-ink-2: #52514e;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5; padding-inline: 16px; padding-block: 24px 48px; }
+.wrap { max-width: 1280px; margin-inline: auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+header.top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
+.eyebrow { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+.asof { color: var(--ink-2); font-size: 13px; max-width: 46ch; }
+section.panel { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 10px 16px; }
+.panel-head h2 { font-size: 19px; font-weight: 600; }
+.panel-head .dek { color: var(--ink-2); max-width: 78ch; margin-top: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; padding: 2px; gap: 2px; background: var(--bg); }
+.seg button { font: inherit; font-size: 13px; font-weight: 500; color: var(--ink-2); background: transparent; border: 0; border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { font: inherit; font-size: 13px; font-weight: 500; border: 1px solid var(--rule); background: var(--card); color: var(--ink-2); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.chips button[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+select, input[type="search"] { font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--card); color: var(--ink); max-width: 100%; }
+label.lbl { font-size: 12.5px; color: var(--ink-2); display: inline-flex; gap: 8px; align-items: center; }
+
+/* tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; background: var(--card); }
+.tile .label { font-size: 12px; color: var(--ink-2); font-weight: 500; }
+.tile .value { font-size: 22px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.tile .sub { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tile svg { display: block; width: 100%; height: 34px; margin-top: 4px; }
+
+/* small multiples */
+.multiples { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px 24px; }
+.mini h3 { font-size: 14px; font-weight: 600; }
+.mini .meta { font-size: 12px; color: var(--ink-3); }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--ink-2); font-family: var(--sans); font-size: 11.5px; }
+.chart .axis { fill: var(--ink-3); font-size: 11px; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .zero { stroke: var(--ink-3); stroke-width: 1; }
+.chart .val { fill: var(--ink); font-weight: 600; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.chart .endlabel { fill: var(--ink); font-weight: 600; font-size: 12px; }
+.chart .hit { fill: transparent; }
+.chart g.bar:hover .mark, .chart g.bar:focus-within .mark { opacity: .8; }
+.tip { position: absolute; pointer-events: none; background: var(--tip-bg); color: var(--tip-ink); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.4; box-shadow: 0 4px 16px rgb(0 0 0 / .18); z-index: 5; min-width: 150px; }
+.tip .t-title { color: var(--tip-ink-2); font-size: 11.5px; margin-bottom: 2px; }
+.tip .row { display: flex; gap: 10px; justify-content: space-between; align-items: center; }
+.tip .row .k { display: inline-flex; gap: 6px; align-items: center; color: var(--tip-ink-2); }
+.tip .row .k i { width: 12px; height: 2px; background: var(--c); display: inline-block; }
+.tip b { font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 2px; background: var(--c); display: inline-block; border-radius: 1px; }
+.picked { display: flex; flex-wrap: wrap; gap: 6px; }
+.picked button { font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--rule); background: var(--card); color: var(--ink); border-radius: 999px; padding: 3px 10px 3px 8px; cursor: pointer; }
+.picked button i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.picked button span.x { color: var(--ink-3); font-size: 12px; }
+
+/* tables */
+.table-wrap { overflow: auto; border: 1px solid var(--rule); border-radius: 8px; }
+.table-wrap.tall { max-height: 72vh; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--rule); background: var(--card); }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; z-index: 1; border-right: 1px solid var(--rule); }
+thead th { position: sticky; top: 0; z-index: 2; font-size: 11.5px; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+thead tr.groups th { color: var(--ink-2); text-align: center; font-size: 11px; border-bottom: 0; }
+thead th:first-child { z-index: 3; }
+thead th button { all: unset; cursor: pointer; }
+thead th button:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+thead th[aria-sort="ascending"] button::after { content: " ▲"; font-size: 9px; }
+thead th[aria-sort="descending"] button::after { content: " ▼"; font-size: 9px; }
+th.gstart, td.gstart { border-left: 1px solid var(--rule); }
+tbody tr:hover td { background: var(--hover); }
+tr.total td { font-weight: 600; background: var(--bg); }
+td.neg { color: var(--crit-ink); }
+.co { display: flex; flex-direction: column; line-height: 1.25; width: 200px; }
+.co .t { font-family: var(--mono); font-size: 12.5px; font-weight: 500; }
+.co .n { color: var(--ink-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flag { color: var(--ink-3); font-size: 11px; }
+td.spark svg { display: block; width: 90px; height: 22px; }
+.count { color: var(--ink-2); font-size: 13px; }
+ul.notes { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; display: grid; gap: 4px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Every US-listed utility · <span id="n-co"></span> companies · absolute values first</div>
+      <h1>US Utilities Absolute Values</h1>
+    </div>
+    <p class="asof">Latest data <span id="asof"></span>. History from SEC annual filings (2016–2025), gaps filled from Yahoo Finance. US$ billions unless marked per share.</p>
+  </header>
+
+  <section class="panel" id="sector">
+    <div class="panel-head">
+      <div>
+        <h2>The sector in dollars, FY2018 to FY2025</h2>
+        <p class="dek">Totals for the companies that reported the value in every year, so the lines compare like with like. Each chart says how many companies that is.</p>
+      </div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Aggregate" id="agg">
+          <button type="button" data-v="sum" aria-pressed="true">Sector total</button>
+          <button type="button" data-v="median" aria-pressed="false">Median company</button>
+        </div>
+        <div class="seg" role="group" aria-label="Companies included" id="scope">
+          <button type="button" data-v="all" aria-pressed="true">All filers</button>
+          <button type="button" data-v="usd" aria-pressed="false">US-dollar filers</button>
+        </div>
+      </div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <p class="count">Headline values above; every value by year below.</p>
+    <div class="multiples" id="multiples"></div>
+  </section>
+
+  <section class="panel" id="groups">
+    <div class="panel-head">
+      <div>
+        <h2>Sub-industries, latest 12 months</h2>
+        <p class="dek">Sum of every company's latest figure in each group. The bottom row is the whole sector.</p>
+      </div>
+    </div>
+    <div class="table-wrap"><table id="group-table"></table></div>
+  </section>
+
+  <section class="panel" id="compare">
+    <div class="panel-head">
+      <div>
+        <h2>Compare companies over time</h2>
+        <p class="dek">Pick a value and up to five companies. Each fiscal year is shown as reported; the table underneath adds the latest 12 months.</p>
+      </div>
+      <div class="controls">
+        <label class="lbl" for="cmp-metric">Value <select id="cmp-metric"></select></label>
+        <label class="lbl" for="cmp-add">Add company <input type="search" id="cmp-add" list="co-list" placeholder="Ticker or name"></label>
+        <datalist id="co-list"></datalist>
+      </div>
+    </div>
+    <div class="picked" id="picked"></div>
+    <div class="legend" id="cmp-legend"></div>
+    <div class="chart" id="cmp-chart"></div>
+    <div class="table-wrap"><table id="cmp-table"></table></div>
+  </section>
+
+  <section class="panel" id="all">
+    <div class="panel-head">
+      <div>
+        <h2>All companies, latest values</h2>
+        <p class="dek">Click a heading to sort. The trend column draws the chosen value for every fiscal year on record. Rows marked "converted" report in another currency and were converted at today's exchange rate.</p>
+      </div>
+      <div class="controls">
+        <label class="lbl" for="trend-metric">Trend <select id="trend-metric"></select></label>
+        <input type="search" id="search" placeholder="Search name or ticker" aria-label="Search companies">
+      </div>
+    </div>
+    <div class="controls">
+      <div class="chips" id="chips" role="group" aria-label="Sub-industry filter"></div>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="table-wrap tall"><table id="main-table"></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>How to read it</h2></div>
+    <ul class="notes">
+      <li>The list of values comes from <code>config/absolute_values.toml</code>. Adding a value there adds it to this page on the next build.</li>
+      <li>Latest 12 months sums the last four quarters; balance-sheet values (debt, cash) are the latest quarter-end.</li>
+      <li>History uses fiscal years. Most utilities end their year in December; a few end in March, June or September.</li>
+      <li>EBITDA in the history is operating income plus depreciation from SEC filings, so it can differ from the latest-12-month EBITDA, which comes from Yahoo.</li>
+      <li>Capex is shown as a negative number because it is cash going out. Free cash flow is operating cash flow plus capex.</li>
+      <li>Foreign filers are converted at today's exchange rate for every year, so their history also moves with the currency. Market value history is shown only for US-dollar filers.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const NS = "http://www.w3.org/2000/svg";
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const SERIES = ["--s1", "--s2", "--s3", "--s4", "--s5"];
+const VALUES = DATA.values;
+const BN = VALUES.filter((v) => v.unit === "$bn");
+const HISTORIC = VALUES.filter((v) => v.history);
+const ROWS = DATA.rows;
+const BY = Object.fromEntries(ROWS.map((r) => [r.symbol, r]));
+const INDUSTRIES = ["Independent Power Producers", "Regulated Electric", "Regulated Gas", "Regulated Water", "Renewable", "Diversified"];
+const SHORT = { "Independent Power Producers": "Power producers" };
+
+function el(tag, attrs = {}, text) {
+  const n = tag.startsWith("svg:") ? document.createElementNS(NS, tag.slice(4)) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (text != null) n.textContent = text;
+  return n;
+}
+function money(v, unit, d) {
+  if (v == null || !isFinite(v)) return "–";
+  const sign = v < 0 ? "−" : "";
+  const a = Math.abs(v);
+  if (unit === "$") return `${sign}$${a >= 1000 ? a.toFixed(0) : a.toFixed(2)}`;
+  if (a >= 1000) return `${sign}$${(a / 1000).toFixed(2)}tn`;
+  const dd = d ?? (a >= 100 ? 0 : a >= 10 ? 1 : 2);
+  return `${sign}$${a.toFixed(dd)}bn`;
+}
+const pct = (v) => (v == null || !isFinite(v) ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(0)}%`);
+function niceTicks(lo, hi, n = 4) {
+  if (lo === hi) { hi = lo + 1; }
+  const span = hi - lo, raw = span / n, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= n) ?? 10 * mag;
+  const out = [];
+  for (let t = Math.floor(lo / step) * step; t <= hi + step * 1e-9; t += step) out.push(+t.toFixed(10));
+  if (out[out.length - 1] < hi) out.push(out[out.length - 1] + step);
+  return out;
+}
+function tooltip(box) {
+  const tip = el("div", { class: "tip", role: "status" }); tip.hidden = true; box.appendChild(tip);
+  return {
+    show(x, y, title, rows) {
+      tip.replaceChildren(el("div", { class: "t-title" }, title));
+      for (const r of rows) {
+        const row = el("div", { class: "row" });
+        const k = el("span", { class: "k" });
+        if (r.color) { const i = el("i"); i.style.setProperty("--c", r.color); k.appendChild(i); }
+        k.appendChild(document.createTextNode(r.label));
+        row.append(k, el("b", {}, r.value));
+        tip.appendChild(row);
+      }
+      tip.hidden = false;
+      const cw = box.clientWidth, tw = tip.offsetWidth;
+      tip.style.left = `${Math.max(0, x + 12 + tw > cw ? x - tw - 12 : x + 12)}px`;
+      tip.style.top = `${Math.max(0, y - tip.offsetHeight - 6)}px`;
+    },
+    hide() { tip.hidden = true; },
+  };
+}
+
+/* ---------------- sector totals ---------------- */
+let agg = "sum", scope = "all";
+function series(col) {
+  const t = DATA.totals[scope][col];
+  return t ? { n: t.companies, vals: DATA.panelYears.map((y) => t[agg][y]) } : null;
+}
+function spark(svgEl, vals, color) {
+  svgEl.replaceChildren();
+  const W = 200, H = 34, ok = vals.filter((v) => v != null);
+  if (ok.length < 2) return;
+  const lo = Math.min(...ok, 0), hi = Math.max(...ok, 0);
+  const x = (i) => 2 + (i / (vals.length - 1)) * (W - 8);
+  const y = (v) => 3 + (1 - (v - lo) / (hi - lo || 1)) * (H - 6);
+  svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svgEl.setAttribute("preserveAspectRatio", "none");
+  if (lo < 0) svgEl.appendChild(el("svg:line", { x1: 0, x2: W, y1: y(0), y2: y(0), stroke: css("--grid"), "stroke-width": 1 }));
+  let d = ""; vals.forEach((v, i) => { if (v != null) d += `${d ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; });
+  svgEl.appendChild(el("svg:path", { d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }));
+}
+function renderTiles() {
+  const root = document.getElementById("tiles"); root.replaceChildren();
+  const last = DATA.panelYears.length - 1;
+  const headline = ["market_cap", "revenue", "net_income", "operating_cf", "capex", "free_cf", "total_debt", "cash"];
+  const tiles = headline.map((h) => BN.find((v) => v.history === h)).filter((v) => v && DATA.totals[scope][v.history]);
+  for (const v of tiles) {
+    const s = series(v.history);
+    const first = s.vals[0], end = s.vals[last];
+    // percentages mislead when values are negative or cross zero, so show the dollar change
+    const change = first > 0 && end > 0
+      ? pct((end - first) / first)
+      : `${end - first >= 0 ? "+" : "−"}${money(Math.abs(end - first), "$bn")}`;
+    const t = el("div", { class: "tile" });
+    t.append(
+      el("span", { class: "label" }, v.label.replace(" (12m)", "")),
+      el("span", { class: "value" }, money(end, "$bn")),
+      el("span", { class: "sub" }, `FY${DATA.panelYears[last]} · ${change} since FY${DATA.panelYears[0]} · ${s.n} cos`),
+    );
+    const sv = el("svg:svg", { "aria-hidden": "true" }); t.appendChild(sv);
+    root.appendChild(t);
+    spark(sv, s.vals, end < 0 ? css("--bar-neg") : css("--bar"));
+  }
+}
+function renderMultiples() {
+  const root = document.getElementById("multiples"); root.replaceChildren();
+  for (const v of BN.filter((v) => v.history && DATA.totals[scope][v.history])) {
+    const s = series(v.history);
+    const wrap = el("div", { class: "mini" });
+    wrap.append(el("h3", {}, v.label.replace(" (12m)", "")), el("div", { class: "meta" }, `${agg === "sum" ? "Sector total" : "Median company"} · ${s.n} companies reporting every year`));
+    const box = el("div", { class: "chart" }); wrap.appendChild(box); root.appendChild(wrap);
+    const W = Math.max(260, box.clientWidth || 300), H = 170, m = { t: 20, r: 6, b: 22, l: 44 };
+    const lo = Math.min(0, ...s.vals), hi = Math.max(0, ...s.vals);
+    const ticks = niceTicks(lo, hi, 3);
+    const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+    const y = (val) => m.t + (1 - (val - y0) / (y1 - y0)) * (H - m.t - m.b);
+    const band = (W - m.l - m.r) / s.vals.length, bw = Math.min(22, band * 0.6);
+    const svg = el("svg:svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${v.label} by fiscal year` });
+    for (const t of ticks) {
+      svg.appendChild(el("svg:line", { class: t === 0 ? "zero" : "gridline", x1: m.l, x2: W - m.r, y1: y(t), y2: y(t) }));
+      svg.appendChild(el("svg:text", { class: "axis", x: m.l - 6, y: y(t) + 4, "text-anchor": "end" }, money(t, "$bn", 0).replace("$", "")));
+    }
+    const tip = tooltip(box);
+    s.vals.forEach((val, i) => {
+      const cx = m.l + band * i + band / 2;
+      const top = y(Math.max(val, 0)), bot = y(Math.min(val, 0)), h = Math.max(1, bot - top), r = Math.min(3, h);
+      const neg = val < 0;
+      const g = el("svg:g", { class: "bar" });
+      const d = neg
+        ? `M${cx - bw / 2},${top}H${cx + bw / 2}V${bot - r}Q${cx + bw / 2},${bot} ${cx + bw / 2 - r},${bot}H${cx - bw / 2 + r}Q${cx - bw / 2},${bot} ${cx - bw / 2},${bot - r}Z`
+        : `M${cx - bw / 2},${bot}V${top + r}Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top}H${cx + bw / 2 - r}Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r}V${bot}Z`;
+      const hit = el("svg:rect", { class: "hit", x: cx - band / 2, y: m.t, width: band, height: H - m.t - m.b, tabindex: 0, "aria-label": `FY${DATA.panelYears[i]}: ${money(val, "$bn")}` });
+      g.append(hit, el("svg:path", { class: "mark", d, fill: css(neg ? "--bar-neg" : "--bar") }));
+      if (i % 2 === 1 || s.vals.length <= 6) g.appendChild(el("svg:text", { class: "axis", x: cx, y: H - 6, "text-anchor": "middle" }, `'${DATA.panelYears[i].slice(2)}`));
+      const show = () => {
+        const k = box.clientWidth / W;
+        const prev = s.vals[i - 1];
+        tip.show(cx * k, top * k, `FY${DATA.panelYears[i]}`, [
+          { label: v.label.replace(" (12m)", ""), value: money(val, "$bn") },
+          ...(prev != null ? [{ label: "vs prior year", value: pct((val - prev) / Math.abs(prev || 1)) }] : []),
+        ]);
+      };
+      hit.addEventListener("pointerenter", show); hit.addEventListener("focus", show);
+      hit.addEventListener("pointerleave", () => tip.hide()); hit.addEventListener("blur", () => tip.hide());
+      svg.appendChild(g);
+    });
+    const li = s.vals.length - 1, lv = s.vals[li];
+    svg.appendChild(el("svg:text", { class: "val", x: m.l + band * li + band / 2, y: (lv < 0 ? y(lv) + 14 : y(lv) - 6), "text-anchor": "end" }, money(lv, "$bn")));
+    box.prepend(svg);
+  }
+}
+
+/* ---------------- sub-industry table ---------------- */
+function renderGroups() {
+  const t = document.getElementById("group-table"); t.replaceChildren();
+  const cols = BN;
+  const hr = el("tr"); hr.appendChild(el("th", {}, "Sub-industry")); hr.appendChild(el("th", {}, "Companies"));
+  cols.forEach((v) => hr.appendChild(el("th", {}, v.label.replace(" (12m)", ""))));
+  const th = el("thead"); th.appendChild(hr); t.appendChild(th);
+  const tb = el("tbody");
+  const addRow = (name, rows, cls) => {
+    const tr = el("tr", cls ? { class: cls } : {});
+    tr.appendChild(el("td", {}, name)); tr.appendChild(el("td", {}, String(rows.length)));
+    for (const v of cols) {
+      const vals = rows.map((r) => r[v.column]).filter((x) => x != null);
+      const sum = vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+      const td = el("td", {}, money(sum, "$bn"));
+      if (sum != null && sum < 0) td.className = "neg";
+      tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+  };
+  for (const g of INDUSTRIES) addRow(SHORT[g] ?? g, ROWS.filter((r) => r.industry === g));
+  const other = ROWS.filter((r) => !INDUSTRIES.includes(r.industry));
+  if (other.length) addRow("Other", other);
+  addRow("All utilities", ROWS, "total");
+  t.appendChild(tb);
+}
+
+/* ---------------- compare ---------------- */
+let picked = ["CEG", "VST", "UGI", "ED", "ATO"].filter((s) => BY[s]);
+let cmpMetric = "revenue";
+try {
+  const saved = JSON.parse(localStorage.getItem("abs-compare") || "null");
+  if (saved?.picked?.length) picked = saved.picked.filter((s) => BY[s]).slice(0, 5);
+  if (saved?.metric && HISTORIC.some((v) => v.history === saved.metric)) cmpMetric = saved.metric;
+} catch {}
+function saveCompare() { try { localStorage.setItem("abs-compare", JSON.stringify({ picked, metric: cmpMetric })); } catch {} }
+const metricInfo = (h) => HISTORIC.find((v) => v.history === h);
+function allYears() {
+  const ys = new Set();
+  for (const s of picked) Object.keys(DATA.history[s]?.[cmpMetric] ?? {}).forEach((y) => ys.add(y));
+  return [...ys].sort();
+}
+function renderPicked() {
+  const root = document.getElementById("picked"); root.replaceChildren();
+  picked.forEach((s, i) => {
+    const b = el("button", { type: "button", "aria-label": `Remove ${s}` });
+    const dot = el("i"); dot.style.setProperty("--c", `var(${SERIES[i]})`);
+    b.append(dot, document.createTextNode(`${s} `), el("span", { class: "x" }, "✕"));
+    b.addEventListener("click", () => { picked = picked.filter((p) => p !== s); saveCompare(); renderCompare(); });
+    root.appendChild(b);
+  });
+  const lg = document.getElementById("cmp-legend"); lg.replaceChildren();
+  picked.forEach((s, i) => { const sp = el("span"); const k = el("i"); k.style.setProperty("--c", `var(${SERIES[i]})`); sp.append(k, document.createTextNode(`${s} · ${BY[s].name}`)); lg.appendChild(sp); });
+}
+function renderCompareChart() {
+  const box = document.getElementById("cmp-chart"); box.replaceChildren();
+  const info = metricInfo(cmpMetric); if (!info) return;
+  const years = allYears();
+  if (!years.length || !picked.length) { box.appendChild(el("p", { class: "count" }, "No history for this value and these companies.")); return; }
+  const W = box.clientWidth || 800, H = Math.max(240, Math.min(340, W * 0.4)), m = { t: 12, r: 70, b: 26, l: 56 };
+  const vals = picked.flatMap((s) => years.map((y) => DATA.history[s]?.[cmpMetric]?.[y])).filter((v) => v != null);
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals), 5);
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const x = (i) => m.l + (years.length === 1 ? (W - m.l - m.r) / 2 : (i / (years.length - 1)) * (W - m.l - m.r));
+  const y = (v) => m.t + (1 - (v - y0) / (y1 - y0)) * (H - m.t - m.b);
+  const svg = el("svg:svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${info.label} by fiscal year` });
+  for (const t of ticks) {
+    svg.appendChild(el("svg:line", { class: t === 0 ? "zero" : "gridline", x1: m.l, x2: W - m.r, y1: y(t), y2: y(t) }));
+    svg.appendChild(el("svg:text", { class: "axis", x: m.l - 6, y: y(t) + 4, "text-anchor": "end" }, money(t, info.unit, info.unit === "$" ? 0 : undefined)));
+  }
+  years.forEach((yr, i) => { if (years.length <= 10 || i % 2 === 0) svg.appendChild(el("svg:text", { class: "axis", x: x(i), y: H - 6, "text-anchor": "middle" }, `FY${yr.slice(2)}`)); });
+  const ends = [];
+  picked.forEach((s, si) => {
+    const h = DATA.history[s]?.[cmpMetric] ?? {};
+    let d = "", lastI = -1;
+    years.forEach((yr, i) => { const v = h[yr]; if (v == null) { d += " "; return; } d += `${d.trim() && !d.endsWith(" ") ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; lastI = i; });
+    svg.appendChild(el("svg:path", { d: d.trim(), fill: "none", stroke: css(SERIES[si]), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    years.forEach((yr, i) => { const v = h[yr]; if (v != null) svg.appendChild(el("svg:circle", { cx: x(i), cy: y(v), r: i === lastI ? 4 : 2.5, fill: css(SERIES[si]), stroke: css("--card"), "stroke-width": 1.5 })); });
+    if (lastI >= 0) ends.push({ s, y: y(h[years[lastI]]), x: x(lastI) });
+  });
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
+  for (const e of ends) svg.appendChild(el("svg:text", { class: "endlabel", x: e.x + 8, y: e.y + 4 }, e.s));
+  const cross = el("svg:line", { x1: 0, x2: 0, y1: m.t, y2: H - m.b, stroke: css("--ink-3"), "stroke-width": 1, visibility: "hidden" });
+  svg.appendChild(cross);
+  const hit = el("svg:rect", { class: "hit", x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, tabindex: 0, "aria-label": "Chart area. Use arrow keys to read each year." });
+  svg.appendChild(hit);
+  box.appendChild(svg);
+  const tip = tooltip(box);
+  let cur = years.length - 1;
+  const show = (i) => {
+    cur = Math.max(0, Math.min(years.length - 1, i));
+    cross.setAttribute("x1", x(cur)); cross.setAttribute("x2", x(cur)); cross.setAttribute("visibility", "visible");
+    const k = box.clientWidth / W;
+    tip.show(x(cur) * k, (m.t + 40) * k, `FY${years[cur]} · ${info.label}`,
+      picked.map((s, si) => ({ label: s, value: money(DATA.history[s]?.[cmpMetric]?.[years[cur]], info.unit), color: css(SERIES[si]) })));
+  };
+  hit.addEventListener("pointermove", (ev) => { const r = svg.getBoundingClientRect(); const px = (ev.clientX - r.left) * (W / r.width); show(Math.round(((px - m.l) / (W - m.l - m.r)) * (years.length - 1))); });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); tip.hide(); });
+  hit.addEventListener("focus", () => show(cur));
+  hit.addEventListener("blur", () => { cross.setAttribute("visibility", "hidden"); tip.hide(); });
+  hit.addEventListener("keydown", (ev) => { if (ev.key === "ArrowLeft") { show(cur - 1); ev.preventDefault(); } if (ev.key === "ArrowRight") { show(cur + 1); ev.preventDefault(); } });
+}
+function renderCompareTable() {
+  const t = document.getElementById("cmp-table"); t.replaceChildren();
+  const info = metricInfo(cmpMetric); if (!info) return;
+  const years = allYears();
+  const hr = el("tr"); hr.appendChild(el("th", {}, info.label));
+  years.forEach((y) => hr.appendChild(el("th", {}, `FY${y}`))); hr.appendChild(el("th", {}, "Latest 12m"));
+  const th = el("thead"); th.appendChild(hr); t.appendChild(th);
+  const tb = el("tbody");
+  for (const s of picked) {
+    const tr = el("tr"); tr.appendChild(el("td", {}, `${s} · ${BY[s].name}`));
+    for (const y of years) { const v = DATA.history[s]?.[cmpMetric]?.[y]; const td = el("td", {}, money(v, info.unit)); if (v < 0) td.className = "neg"; tr.appendChild(td); }
+    const lv = BY[s][info.column]; const td = el("td", {}, money(lv, info.unit)); if (lv < 0) td.className = "neg"; tr.appendChild(td);
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+}
+function renderCompare() { renderPicked(); renderCompareChart(); renderCompareTable(); }
+function setupCompare() {
+  const sel = document.getElementById("cmp-metric");
+  for (const v of HISTORIC) { const o = el("option", { value: v.history }, v.label.replace(" (12m)", "")); if (v.history === cmpMetric) o.selected = true; sel.appendChild(o); }
+  sel.addEventListener("change", () => { cmpMetric = sel.value; saveCompare(); renderCompare(); });
+  const dl = document.getElementById("co-list");
+  for (const r of ROWS) dl.appendChild(el("option", { value: r.symbol }, r.name));
+  const inp = document.getElementById("cmp-add");
+  const add = () => {
+    const q = inp.value.trim().toUpperCase();
+    const hit = BY[q] ? q : ROWS.find((r) => (r.name || "").toUpperCase().includes(q))?.symbol;
+    if (!hit || picked.includes(hit)) return;
+    picked = [...picked, hit].slice(-5); inp.value = ""; saveCompare(); renderCompare();
+  };
+  inp.addEventListener("change", add);
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+}
+
+/* ---------------- all companies ---------------- */
+let state = { sort: "market_cap", dir: -1, industry: "All", q: "", trend: "revenue" };
+try { const s = JSON.parse(localStorage.getItem("abs-table") || "null"); if (s) state = { ...state, ...s, q: "" }; } catch {}
+function sparkCell(sym) {
+  const h = DATA.history[sym]?.[state.trend];
+  const td = el("td", { class: "spark" });
+  if (!h) { td.textContent = "–"; return td; }
+  const ys = Object.keys(h).sort(); const vals = ys.map((y) => h[y]);
+  const sv = el("svg:svg", { role: "img", "aria-label": `${sym} ${state.trend} FY${ys[0]} to FY${ys[ys.length - 1]}` });
+  td.appendChild(sv); spark(sv, vals, vals[vals.length - 1] < 0 ? css("--bar-neg") : css("--bar"));
+  td.title = ys.map((y) => `FY${y}: ${money(h[y], metricInfo(state.trend)?.unit ?? "$bn")}`).join("\n");
+  return td;
+}
+function renderChips() {
+  const root = document.getElementById("chips"); root.replaceChildren();
+  for (const name of ["All", ...INDUSTRIES]) {
+    const b = el("button", { type: "button", "aria-pressed": String(state.industry === name) }, SHORT[name] ?? name);
+    b.addEventListener("click", () => { state.industry = name; renderChips(); renderTable(); });
+    root.appendChild(b);
+  }
+}
+function renderTable() {
+  try { localStorage.setItem("abs-table", JSON.stringify(state)); } catch {}
+  const t = document.getElementById("main-table"); t.replaceChildren();
+  const groups = [...new Set(VALUES.map((v) => v.group))];
+  const thead = el("thead");
+  const gr = el("tr", { class: "groups" }); gr.appendChild(el("th", {}, "")); gr.appendChild(el("th", { class: "gstart" }, "Trend"));
+  for (const g of groups) gr.appendChild(el("th", { class: "gstart", colspan: String(VALUES.filter((v) => v.group === g).length) }, g));
+  const cr = el("tr");
+  const mk = (key, label, cls) => {
+    const th = el("th", { "aria-sort": state.sort === key ? (state.dir > 0 ? "ascending" : "descending") : "none" });
+    if (cls) th.className = cls;
+    const b = el("button", { type: "button" }, label);
+    b.addEventListener("click", () => { if (state.sort === key) state.dir *= -1; else { state.sort = key; state.dir = key === "name" ? 1 : -1; } renderTable(); });
+    th.appendChild(b); return th;
+  };
+  cr.appendChild(mk("name", "Company"));
+  cr.appendChild(el("th", { class: "gstart" }, metricInfo(state.trend)?.label.replace(" (12m)", "") ?? ""));
+  let prev = null;
+  for (const v of VALUES) { cr.appendChild(mk(v.column, v.label, v.group !== prev ? "gstart" : "")); prev = v.group; }
+  thead.append(gr, cr); t.appendChild(thead);
+  const q = state.q.trim().toLowerCase();
+  let rows = ROWS.filter((r) => (state.industry === "All" || r.industry === state.industry) && (!q || r.symbol.toLowerCase().includes(q) || (r.name || "").toLowerCase().includes(q)));
+  rows = rows.sort((a, b) => {
+    const va = a[state.sort], vb = b[state.sort];
+    if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1;
+    return (typeof va === "string" ? va.localeCompare(vb) : va - vb) * state.dir;
+  });
+  const tb = el("tbody");
+  for (const r of rows) {
+    const tr = el("tr");
+    const td = el("td"); const co = el("div", { class: "co" });
+    const tl = el("span", { class: "t" }, r.symbol);
+    if (r.data_flag) tl.appendChild(el("span", { class: "flag", title: r.data_flag }, "  converted"));
+    co.append(tl, el("span", { class: "n", title: `${r.name} · ${r.industry}` }, r.name)); td.appendChild(co); tr.appendChild(td);
+    const sc = sparkCell(r.symbol); sc.classList.add("gstart"); tr.appendChild(sc);
+    prev = null;
+    for (const v of VALUES) {
+      const val = r[v.column];
+      const c = el("td", {}, money(val, v.unit));
+      if (v.group !== prev) { c.classList.add("gstart"); prev = v.group; }
+      if (val != null && val < 0) c.classList.add("neg");
+      tr.appendChild(c);
+    }
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+  document.getElementById("count").textContent = `${rows.length} of ${ROWS.length} companies`;
+  requestAnimationFrame(() => { const h = gr.getBoundingClientRect().height; cr.querySelectorAll("th").forEach((th) => (th.style.top = `${h}px`)); });
+}
+function setupTable() {
+  const sel = document.getElementById("trend-metric");
+  for (const v of HISTORIC) { const o = el("option", { value: v.history }, v.label.replace(" (12m)", "")); if (v.history === state.trend) o.selected = true; sel.appendChild(o); }
+  sel.addEventListener("change", () => { state.trend = sel.value; renderTable(); });
+  document.getElementById("search").addEventListener("input", (e) => { state.q = e.target.value; renderTable(); });
+}
+
+/* ---------------- boot ---------------- */
+function seg(id, set) {
+  document.querySelectorAll(`#${id} button`).forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(`#${id} button`).forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+    set(b.dataset.v); renderTiles(); renderMultiples();
+  }));
+}
+document.getElementById("asof").textContent = DATA.asOf;
+document.getElementById("n-co").textContent = ROWS.length;
+seg("agg", (v) => (agg = v)); seg("scope", (v) => (scope = v));
+setupCompare(); setupTable(); renderChips();
+function renderAll() { renderTiles(); renderMultiples(); renderGroups(); renderCompare(); renderTable(); }
+renderAll();
+let rt, lastW = 0;
+new ResizeObserver(([e]) => { const w = Math.round(e.contentRect.width); if (w === lastW) return; lastW = w; clearTimeout(rt); rt = setTimeout(() => { renderMultiples(); renderCompareChart(); }, 120); }).observe(document.querySelector(".wrap"));
+const retheme = () => { renderTiles(); renderMultiples(); renderCompareChart(); renderTable(); };
+new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
+</script>
