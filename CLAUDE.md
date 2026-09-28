@@ -27,6 +27,9 @@ Ratios and scores hide important information, so they come after, never instead.
   value records its source; raw SEC files cache in `.cache/sec/`). Foreign filers are
   converted at today's exchange rate, and market value is only shown for US-dollar filers.
 - In answers, present the absolute-values table first, then ratios, scores and conclusions.
+- The sector dashboard of absolute values is `dashboard/absolute.html`, built by
+  `uv run python dashboard/build_absolute.py`; it reads the same config, so new values
+  appear there automatically.
 - Other tools, in the usual order after step 1: `analysis/screen.py` (strict and weighted
   screens), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
   `analysis/valuation.py`, `analysis/debt_to_ebitda.py`.

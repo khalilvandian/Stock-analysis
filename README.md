@@ -38,6 +38,7 @@ uv run python analysis/sector.py              # refresh data for every US-listed
 uv run python analysis/absolute.py CEG VST    # absolute values, grouped
 uv run python analysis/history.py             # yearly history from SEC filings (2016+)
 uv run python analysis/absolute.py --history CEG VST   # every fiscal year + latest 12m
+uv run python dashboard/build_absolute.py             # rebuild dashboard/absolute.html
 ```
 
 The list of values is in `config/absolute_values.toml`. Add new ones there.
