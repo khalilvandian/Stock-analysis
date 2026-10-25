@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
@@ -28,7 +29,9 @@ import yfinance as yf
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / ".cache/sec"
 OUT = ROOT / "data/sector"
-UA = {"User-Agent": "stock-analysis research b.khalilvandian@gmail.com"}
+# SEC asks automated clients to identify themselves; set SEC_USER_AGENT to
+# "<project name> <contact email>" in the environment to include your own contact.
+UA = {"User-Agent": os.environ.get("SEC_USER_AGENT", "stock-analysis research project")}
 ANNUAL_FORMS = {"10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A", "10-KT"}
 FIRST_YEAR = 2016
 TAX = 0.21

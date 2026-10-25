@@ -1,5 +1,7 @@
 # Calpine (acquired by CEG on 2026-01-07)
 
+*Researched 2026-09-27 from the CEG Form 8-K/A (Calpine FY2025 audited financials).*
+
 - US independent power producer, founded 1984 in San Jose. It went through Chapter 11 in 2005–2008, was taken
   private in 2018 by an Energy Capital Partners-led group, and was bought by Constellation for about $22B equity
   (about $26.6B including debt).

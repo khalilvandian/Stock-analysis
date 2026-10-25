@@ -3,7 +3,9 @@
 Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests in `tests/`.
 
 - Market data: `stock_analysis.fetch` (Yahoo Finance via yfinance) saves CSVs to `data/<SYMBOL>/`. `FMPClient` wraps Financial Modeling Prep, but the free plan blocks most symbols (HTTP 402).
-- The API key is read from the `FMP_API_KEY` env var. Never hardcode or commit it.
+- The API key is read from the `FMP_API_KEY` env var. Never hardcode or commit it. The SEC
+  downloader identifies itself with `SEC_USER_AGENT`; never hardcode a personal email.
+- Setup for new sessions and environments: `docs/SETUP.md`.
 - Tests must not hit the network; mock HTTP with `respx`.
 - Before committing: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
 
@@ -33,3 +35,11 @@ Ratios and scores hide important information, so they come after, never instead.
 - Other tools, in the usual order after step 1: `analysis/screen.py` (strict and weighted
   screens), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
   `analysis/valuation.py`, `analysis/debt_to_ebitda.py`.
+
+## Reports
+
+Every distinct analysis is written up as a numbered report in `reports/` (see
+`reports/README.md` for the index and layout: data date, absolute values first, method,
+findings, caveats, command to reproduce). When an analysis is redone with new data,
+update its report and the date rather than leaving stale numbers. Add new reports to the
+index.

@@ -1,66 +1,87 @@
 # Stock Analysis
 
-Stock market analysis built on [Financial Modeling Prep](https://site.financialmodelingprep.com/) data.
+A working process for analysing listed companies with Claude. It pulls data from free APIs and public filings, screens whole sectors, values companies, and records every finding as a reproducible report and dashboard.
+
+The process is general. The first application is the **US utilities sector** (all 102 US-listed utilities), starting from Constellation Energy (CEG) and widening to its peers and the full sector.
+
+## How the process works
+
+1. **Get the data.** Yahoo Finance supplies the latest prices, statements and sector lists. SEC EDGAR supplies the history from annual filings (2016 onward). Financial Modeling Prep (FMP) can be used for symbols its plan covers. Web search covers company guidance and deal details.
+2. **Screen the absolute values first, with their history.** Look at price, market value, debt, cash, revenue, earnings and cash flow, year by year, before any ratio, score or summary. Ratios hide information.
+3. **Then use ratios and comparisons.** Leverage, margins, growth (average and median of yearly rates), valuation multiples, and comparisons with peers and sub-industries.
+4. **Value the companies.** Enterprise DCF (FCFF discounted at WACC), equity DCF, dividend model for utilities, and reverse DCF.
+5. **Screen and rank.** Hard rules for data quality and growth, then a weighted score with debt weighted most, plus profitability and cash, plus cheapness.
+6. **Write it up.** Each analysis becomes a numbered report in [`reports/`](reports/README.md), and the results go into the dashboards.
+
+Claude runs the process in Claude Code. [`CLAUDE.md`](CLAUDE.md) holds the rules every session follows.
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `reports/` | One report per analysis, numbered, with data date and reproduce command ([index](reports/README.md)) |
+| `config/absolute_values.toml` | The absolute values screened first. Add new ones here |
+| `analysis/` | Analysis scripts (see below) |
+| `dashboard/` | Dashboard builders and the generated HTML pages |
+| `data/` | Saved data. `data/<TICKER>/` holds a single company; `data/sector/` holds the sector screen and history |
+| `src/stock_analysis/` | Data clients: `fetch.py` (Yahoo), `fmp.py` (FMP) |
+| `tests/` | Tests (no network) |
+| `.cache/sec/` | Raw SEC downloads (not committed) |
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `uv run python analysis/sector.py` | Screens every US-listed utility from Yahoo and writes `data/sector/utilities.csv` (about 1 minute) |
+| `uv run python analysis/history.py` | Builds the yearly history from SEC filings and writes `data/sector/history.csv` |
+| `uv run python analysis/absolute.py [TICKERS]` | Absolute values, latest |
+| `uv run python analysis/absolute.py --history TICKERS` | Absolute values for every fiscal year, plus the latest 12 months |
+| `uv run python analysis/screen.py --balanced` | Weighted ranking (debt 50%, profitability and cash 25%, cheapness 25%) with a growth requirement |
+| `uv run python analysis/screen.py --strict` | Strict debt rules, ranked by cheapness |
+| `uv run python analysis/dcf_firm.py` | Enterprise DCF for the power producers, plus the utility diagnostic |
+| `uv run python analysis/dcf.py` | Equity DCF, dividend model and reverse DCF |
+| `uv run python analysis/compare.py CEG VST ...` | Debt and growth comparison |
+| `uv run python analysis/valuation.py CEG VST ...` | Valuation multiples |
+| `uv run python analysis/debt_to_ebitda.py CEG VST ...` | Leverage history |
+| `uv run python analysis/debt.py CEG` | One company's leverage over time |
+| `uv run python -m stock_analysis.fetch CEG` | Saves one company's Yahoo data to `data/CEG/` |
+
+## Dashboards
+
+The pages are built from the saved data and published as Claude artifacts. They are private until shared from the page's Share menu.
+
+| Page | Build | Published |
+|---|---|---|
+| US Utilities Absolute Values | `uv run python dashboard/build_absolute.py` → `dashboard/absolute.html` | https://claude.ai/artifact/KsT1wqQXQmimANRYfPa4yt |
+| US Utilities Sector Screen | `uv run python dashboard/build_sector.py` → `dashboard/sector.html` | https://claude.ai/artifact/5wD1VfDLCzCidMs5DP9a6B |
+| Constellation Energy Dashboard | `uv run python dashboard/build.py` → `dashboard/index.html` | https://claude.ai/artifact/R39P1BoAQMcpfvNTVnEBQX |
+
+## Refreshing everything
+
+```bash
+uv run python analysis/sector.py && uv run python analysis/history.py
+uv run python dashboard/build_absolute.py && uv run python dashboard/build_sector.py && uv run python dashboard/build.py
+```
+
+After a refresh, ask Claude to republish the dashboards and update the reports.
 
 ## Setup
 
-```bash
-uv sync                 # install dependencies into .venv
-cp .env.example .env    # then set FMP_API_KEY
-```
+See [`docs/SETUP.md`](docs/SETUP.md) for running this in Claude Code on the web: environment variables, network access and how to start a session.
 
-## Usage
-
-```python
-from stock_analysis import FMPClient
-
-with FMPClient() as fmp:
-    print(fmp.quote("AAPL"))
-```
-
-## Fetching data
+Locally:
 
 ```bash
-uv run python -m stock_analysis.fetch CEG      # writes data/CEG/*.csv
+uv sync
+cp .env.example .env   # optional: FMP_API_KEY, SEC_USER_AGENT
+uv run pytest && uv run ruff check .
 ```
 
-Prices, dividends, income / balance sheet / cash flow (annual and quarterly) and company info
-come from Yahoo Finance via `yfinance`. The FMP free plan only covers a limited set of symbols.
+## Caveats
 
-## Step 1: absolute values
+- Yahoo Finance data is unofficial.
+- Reported EBITDA and EPS include hedge accounting, so they swing a lot for power producers.
+- Foreign filers are converted at today's exchange rate.
+- DCF assumptions (growth, required returns) are judgement calls; each report states them.
 
-Every analysis starts by screening the absolute numbers (price, market value, DCF fair value,
-debt, cash, revenue, EBITDA, net income, EPS, cash flow, capex, free cash flow) before any
-ratio or score:
-
-```bash
-uv run python analysis/sector.py              # refresh data for every US-listed utility
-uv run python analysis/absolute.py CEG VST    # absolute values, grouped
-uv run python analysis/history.py             # yearly history from SEC filings (2016+)
-uv run python analysis/absolute.py --history CEG VST   # every fiscal year + latest 12m
-uv run python dashboard/build_absolute.py             # rebuild dashboard/absolute.html
-```
-
-The list of values is in `config/absolute_values.toml`. Add new ones there.
-
-## Analysis and dashboard
-
-```bash
-uv run python analysis/debt.py CEG                 # CEG leverage history
-uv run python analysis/compare.py CEG VST NRG      # debt and growth vs peers
-uv run python analysis/debt_to_ebitda.py CEG VST   # debt/EBITDA history
-uv run python analysis/valuation.py CEG VST        # valuation snapshot
-uv run python analysis/dcf.py                      # equity DCF / dividend model and reverse DCF
-uv run python analysis/dcf_firm.py                 # enterprise DCF (FCFF at WACC)
-uv run python dashboard/build.py                   # rebuild dashboard/index.html
-uv run python analysis/sector.py                   # screen every US-listed utility
-uv run python dashboard/build_sector.py            # rebuild dashboard/sector.html
-```
-
-## Development
-
-```bash
-uv run pytest           # tests (no network, API calls are mocked)
-uv run ruff check .     # lint
-uv run ruff format .    # format
-```
+Nothing here is investment advice.

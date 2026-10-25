@@ -1,4 +1,6 @@
-# CEG: why debt rose in 2026 (researched 2026-09-27)
+# CEG: why debt rose in 2026
+
+*Researched 2026-09-27 from SEC filings and company releases via web search.*
 
 Total debt went from $9.0B (Dec 2025) to $24.7B (Jun 2026), per `analysis/debt.py`.
 
