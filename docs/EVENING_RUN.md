@@ -30,7 +30,9 @@ Babak approved committing the results straight to `main` (no pull request each n
    key in `RESEND_API_KEY`; neither is ever written into this public repository. Babak
    asked for it not to come from their own Gmail.
    Until Resend is set up, send one email through the Gmail connector with the run's
-   subject and HTML body, which links to every PDF on GitHub. Don't attach files that
+   subject and HTML body, which links to every PDF on the public page
+   (https://khalilvandian.github.io/Stock-analysis/, republished a minute or two after the
+   push to `main`). Don't attach files that
    way: the connector only takes a file typed out as base64, which is slow and breaks
    PDFs. The light copies (`analysis/slim_pdf.py`, listed under `light` in
    `.cache/watchlist/last_run.json`) remain for small one-off attachments.

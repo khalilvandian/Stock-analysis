@@ -133,3 +133,47 @@ def test_light_copy_keeps_the_text_without_embedded_fonts(tmp_path):
     text = pypdfium2.PdfDocument(str(light))[0].get_textpage().get_text_range()
     assert "Boston Scientific (BSX)" in text and "Price $45.03, adjusted P/E 14.0x" in text
     assert "office file" in text
+
+
+def test_links_go_to_the_pages_site_on_main(monkeypatch):
+    pdf = watchlist.OUT / "BSX/2026-10-27_2100.pdf"
+    monkeypatch.setenv("WATCHLIST_BRANCH", "main")
+    assert watchlist.link(pdf) == f"{watchlist.PAGES_URL}/BSX/2026-10-27_2100.pdf"
+    assert watchlist.link(watchlist.OUT / "README.md") == f"{watchlist.PAGES_URL}/"
+    monkeypatch.setenv("WATCHLIST_BRANCH", "work")
+    assert watchlist.link(pdf).endswith("/blob/work/analyses/BSX/2026-10-27_2100.pdf")
+
+
+def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
+    import importlib.util  # analysis/site.py shares its name with the stdlib site module
+
+    spec = importlib.util.spec_from_file_location(
+        "analyses_site", Path(__file__).resolve().parent.parent / "analysis/site.py"
+    )
+    site = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(site)
+
+    analyses = tmp_path / "analyses"
+    (analyses / "BSX").mkdir(parents=True)
+    (analyses / "market").mkdir()
+    (analyses / "BSX/README.md").write_text(
+        "# Boston Scientific Corporation (BSX): dated analyses\n"
+    )
+    (analyses / "BSX/runs.csv").write_text(
+        "run,file,price,eps_adj_ttm,pe_adj,pe_median_10y,target_pe,entry_price,to_entry,verdict\n"
+        "2026-10-26 21:00 CET,2026-10-26_2100.pdf,44,3.2,13.8,25.2,13,41.7,-0.05,Old.\n"
+        "2026-10-27 21:00 CET,2026-10-27_2100.pdf,45,3.2,14.0,25.2,13,41.7,-0.07,Cheap.\n"
+    )
+    for p in ("BSX/2026-10-26_2100.pdf", "BSX/2026-10-27_2100.pdf", "market/2026-10-27_2100.pdf"):
+        (analyses / p).write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(site, "ANALYSES", analyses)
+    out = site.build(tmp_path / "_site")
+    page = (out / "index.html").read_text()
+    assert (out / "BSX/2026-10-26_2100.pdf").exists() and (
+        out / "market/2026-10-27_2100.pdf"
+    ).exists()
+    assert page.index("2026-10-27 21:00 CET") < page.index("2026-10-26 21:00 CET")  # newest first
+    assert (
+        "Boston Scientific Corporation (BSX)" in page
+        and 'href="market/2026-10-27_2100.pdf"' in page
+    )

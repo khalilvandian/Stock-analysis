@@ -915,9 +915,15 @@ EMAIL = ROOT / ".cache/watchlist/email.html"
 LAST_RUN = ROOT / ".cache/watchlist/last_run.json"  # read by analysis/send_email.py
 
 
+PAGES_URL = "https://khalilvandian.github.io/Stock-analysis"  # built by analysis/site.py
+
+
 def link(path: Path) -> str:
-    """GitHub page for a file on the branch the run is pushed to (shows PDFs in the browser)."""
+    """Public link to a file: the Pages site for runs on main, else GitHub on the run's branch."""
     branch = os.environ.get("WATCHLIST_BRANCH", "main")
+    rel = path.relative_to(OUT if path.is_relative_to(OUT) else ROOT).as_posix()
+    if branch == "main" and path.is_relative_to(OUT):
+        return f"{PAGES_URL}/" if rel == "README.md" else f"{PAGES_URL}/{rel}"
     return f"{REPO_URL}/{branch}/{path.relative_to(ROOT).as_posix()}"
 
 

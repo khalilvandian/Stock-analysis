@@ -44,7 +44,9 @@ corrections). Every evening at 21:00 Italy time a scheduled session follows
 `analyses/market/notes.md`, `analyses/summaries/notes.md`), runs
 `uv run python analysis/watchlist.py`, commits the dated PDFs to `main` and emails Babak.
 Every run is kept: `analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf` plus a dated list in each
-folder's `README.md`. Call it a list of dated analyses, not an archive. Adjusted EPS for
+folder's `README.md`. Call it a list of dated analyses, not an archive. The public page of all dated analyses is
+https://khalilvandian.github.io/Stock-analysis/, built by `analysis/site.py` and published by
+`.github/workflows/pages.yml` on every push to `main`. Adjusted EPS for
 the own-history P/E is Yahoo's reported quarterly EPS (split-adjusted).
 
 ## Reports
