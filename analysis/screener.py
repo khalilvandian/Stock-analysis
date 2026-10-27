@@ -29,18 +29,28 @@ import stage2  # noqa: E402
 from screen_common import OUT, ROOT, load_config  # noqa: E402
 
 
+def run(adjusted: bool = True, refresh: bool = False) -> tuple[pd.DataFrame, pd.DataFrame, Path]:
+    """Run and save both stages. Returns (every company, the top per sector, dated CSV).
+
+    The evening run (analysis/watchlist.py) calls this before the market report, which
+    lists the top per sector from data/screener/top.csv.
+    """
+    cfg = load_config()
+    d = stage1.run(cfg, refresh=refresh)
+    stage1.save(d)
+    d, top = stage2.run(stage2.load_stage1(), cfg, adjusted=adjusted)
+    stage2.save(top)
+    path = OUT / f"{date.today().isoformat()}.csv"
+    d[[c for c in d.columns if not c.endswith("_fy_h")]].round(4).to_csv(path)
+    return d, top, path
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-adjusted", action="store_true", help="skip Yahoo adjusted EPS")
     ap.add_argument("--refresh", action="store_true", help="download again, ignore today's cache")
     args = ap.parse_args()
-    cfg = load_config()
-    d = stage1.run(cfg, refresh=args.refresh)
-    stage1.save(d)
-    d, top = stage2.run(stage2.load_stage1(), cfg, adjusted=not args.no_adjusted)
-    stage2.save(top)
-    path = OUT / f"{date.today().isoformat()}.csv"
-    d[[c for c in d.columns if not c.endswith("_fy_h")]].round(4).to_csv(path)
+    d, top, path = run(adjusted=not args.no_adjusted, refresh=args.refresh)
 
     pd.set_option("display.width", 250)
     pd.set_option("display.max_rows", 500)

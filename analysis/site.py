@@ -1,9 +1,10 @@
 """Build the public website of the watch list analyses (GitHub Pages).
 
 Pages: an overview (market strip and one card per stock), one page per stock (verdict,
-key numbers, Claude's notes, every dated PDF), the market reports and the watch list
-summaries, with a menu on every page. The PDFs are copied next to the pages, so a link
-opens the report in the browser. The evening run commits to `main`; the Pages workflow
+key numbers, Claude's notes, every dated PDF), the market reports, the market screener's
+latest top 3 per sector (data/screener/) and the watch list summaries, with a menu on
+every page. The PDFs are copied next to the pages, so a link opens the report in the
+browser. The evening run commits to `main`; the Pages workflow
 (.github/workflows/pages.yml) then runs this and publishes `_site/` at
 https://khalilvandian.github.io/Stock-analysis/.
 
@@ -26,6 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ANALYSES = ROOT / "analyses"
 CONFIG = ROOT / "config/watchlist.toml"
+SCREENER = ROOT / "data/screener"  # written by analysis/screener.py
 SITE = ROOT / "_site"
 URL = "https://khalilvandian.github.io/Stock-analysis/"
 
@@ -334,8 +336,9 @@ def market_strip(r: dict) -> str:
     )
     look = esc(r.get("stocks_to_look_at", ""))
     out += (
-        f'<div class="card tile" style="grid-column: span 2"><small>Stocks to look at</small>'
-        f'<b style="font-size:1em">{look}</b></div>'
+        f'<a class="card tile" style="grid-column: span 2" href="screener.html">'
+        f"<small>Stocks to look at (screener, cheapest first)</small>"
+        f'<b style="font-size:1em">{look}</b></a>'
     )
     return f'<div class="strip">{out}</div>'
 
@@ -533,6 +536,76 @@ def market_page(menu) -> str:
     return layout("Market reports", "market", "\n".join(body), menu)
 
 
+def read_csv(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    with path.open(newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def screener_page(menu) -> str:
+    """The market screener's latest top 3 cheap or close-to-cheap stocks per sector."""
+    top, stage1 = read_csv(SCREENER / "top.csv"), read_csv(SCREENER / "stage1.csv")
+    dated = sorted(p.stem for p in SCREENER.glob("????-??-??.csv"))
+    passed = [r for r in stage1 if r.get("status") == "pass"]
+    body = [
+        "<h1>Market screener</h1>",
+        f'<p class="sub">Run {esc(dated[-1] if dated else "never")} on the S&amp;P 500. '
+        f"Stage 1: {len(passed)} of {len(stage1)} companies have good financial statements "
+        "for their Peter Lynch category. Stage 2: of those, the top 3 per sector that are "
+        f"cheap or close to cheap against their own history ({len(top)} stocks). Refreshed "
+        "every evening before the market report.</p>",
+    ]
+    cats: dict[str, list[int]] = {}
+    for r in stage1:
+        c = cats.setdefault(r.get("category") or "not classified", [0, 0])
+        c[0] += 1
+        c[1] += r.get("status") == "pass"
+    body.append(
+        '<div class="strip">'
+        + "".join(
+            f'<div class="card tile"><small>{esc(k.replace("_", " "))}</small>'
+            f"<b>{v[1]} / {v[0]}</b><small>pass</small></div>"
+            for k, v in sorted(cats.items(), key=lambda kv: -kv[1][0])
+        )
+        + "</div>"
+    )
+    sectors: dict[str, list[dict]] = {}
+    for r in top:
+        sectors.setdefault(r["sector"], []).append(r)
+    body.append(
+        "<h2>Top 3 per sector</h2><div class='card wrap'><table><tr><th>Sector</th>"
+        "<th>Stock</th><th>Lynch category</th><th>Price</th><th>P/E now</th>"
+        "<th>Cheap P/E</th><th>Cheap price</th><th>Price vs cheap</th><th></th>"
+        "<th>Trend</th></tr>"
+    )
+    for sector in sorted(sectors):
+        rows = sorted(sectors[sector], key=lambda r: int(float(r["rank_in_sector"])))
+        for i, r in enumerate(rows):
+            cell = f"<td rowspan={len(rows)}><b>{esc(sector)}</b></td>" if i == 0 else ""
+            body.append(
+                f'<tr>{cell}<td title="{esc(r["why"])}"><b>{esc(r["name"])}</b> '
+                f"{esc(r['description'])}</td>"
+                f"<td>{esc(r['category'].replace('_', ' '))}</td>"
+                f"<td class='n'>{num(r['close'], '{:,.2f}')}</td>"
+                f"<td class='n'>{num(r['pe_now'], '{:.1f}x')}</td>"
+                f"<td class='n'>{num(r['cheap_multiple'], '{:.1f}x')} "
+                f"<small>{esc(r['cheap_basis'])}</small></td>"
+                f"<td class='n'>{num(r['cheap_price'], '{:,.2f}')}</td>"
+                f"<td class='n'>{num(r['vs_cheap'], '{:+.1%}')}</td>"
+                f"<td>{esc(r['cheapness'])}</td><td>{esc(r['trend'])}</td></tr>"
+            )
+    body.append(
+        "</table></div><p class='sub'>Cheap price = adjusted EPS times the bottom quarter of "
+        "the stock's own yearly P/E over 10 years (the sector median when the history is too "
+        'short). "Cheap" is at or below it, "close" within 15% above. Trend is timing only. '
+        'Hover a stock for the reason it is listed. "Not classified" = too little EPS history '
+        "for a Lynch category; those don't pass. Every rule and its source: report 13 and "
+        "docs/SCREENER.md in the repository.</p>"
+    )
+    return layout("Market screener", "screener", "\n".join(body), menu)
+
+
 def summaries_page(menu) -> str:
     folder = ANALYSES / "summaries"
     n = notes(folder)
@@ -561,11 +634,17 @@ def build(out: Path = SITE) -> Path:
         dst = out / pdf.parent.name / pdf.name
         dst.parent.mkdir(exist_ok=True)
         shutil.copy2(pdf, dst)
-    menu = [("index", "Watch list"), ("market", "Market"), ("summaries", "Summaries")]
+    menu = [
+        ("index", "Watch list"),
+        ("market", "Market"),
+        ("screener", "Screener"),
+        ("summaries", "Summaries"),
+    ]
     (out / "index.html").write_text(overview(menu))
     for f in stocks():
         (out / f"{f.name}.html").write_text(stock_page(f, menu))
     (out / "market.html").write_text(market_page(menu))
+    (out / "screener.html").write_text(screener_page(menu))
     (out / "summaries.html").write_text(summaries_page(menu))
     (out / ".nojekyll").write_text("")
     return out

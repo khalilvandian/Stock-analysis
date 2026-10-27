@@ -3,9 +3,11 @@
 Same template as every report: 1. Summary, 2. The numbers, 3. Analysis.
   - Market: main indices, rates, oil, gold, the dollar and bitcoin; the 11 S&P 500 sectors;
     breadth (share of S&P 500 stocks above their 200-day average, near 52-week highs/lows).
-  - Stocks to look at: the panic-sell screen. S&P 500 stocks at least 25% below their
-    52-week high whose adjusted earnings are still growing, ranked by how cheap their
-    adjusted P/E is against their own 10-year (and 5-year) median.
+  - Stocks to look at: the market screener's top 3 cheap or close-to-cheap stocks per
+    sector (analysis/screener.py, report 13): Stage 1 keeps companies with good financial
+    statements for their Lynch category, Stage 2 ranks the survivors by price against
+    their own cheap price. Read from data/screener/top.csv; the evening run refreshes it
+    first (analysis/watchlist.py).
   - Claude's view (summary, what is driving the market, comments on the names) comes from
     analyses/market/notes.md.
 
@@ -23,8 +25,8 @@ from __future__ import annotations
 import argparse
 import html
 import sys
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+import tomllib
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -66,8 +68,9 @@ SECTORS = {
     "XLRE": "Real estate",
     "XLU": "Utilities",
 }
-DRAWDOWN = -0.25  # at least 25% below the 52-week high
-TOP = 10
+SCREENER = ROOT / "data/screener"  # written by analysis/screener.py
+SCREENER_CONFIG = ROOT / "config/screeners.toml"
+TOP = 10  # names in the summary line (the cheapest first)
 
 
 def closes(symbols: list[str], period: str) -> pd.DataFrame:
@@ -108,54 +111,27 @@ def breadth(px: pd.DataFrame) -> dict:
     }
 
 
-def own_history(symbol: str, now: pd.Timestamp) -> dict | None:
-    """Adjusted P/E now against the stock's own yearly P/E history (as in watchlist.py)."""
-    try:
-        t = yf.Ticker(symbol)
-        q = w.quarterly_eps(t.get_earnings_dates(limit=60))
-        start = (now - pd.DateOffset(years=w.YEARS + 1)).strftime("%Y-%m-%d")
-        prices = t.history(start=start, auto_adjust=False)["Close"]
-    except Exception:  # noqa: BLE001 - one bad symbol shouldn't stop the report
-        return None
-    if prices.empty or len(q) < 8:
-        return None
-    prices.index = prices.index.tz_localize(None).normalize()
-    ttm = w.trailing_eps(q)
-    if len(ttm) < 5 or ttm.iloc[-1] <= 0:
-        return None
-    yearly = w.yearly_pe(prices, ttm)
-    if len(yearly) < 6:  # too short a history to call it cheap against its own
-        return None
-    eps, eps_year_ago = float(ttm.iloc[-1]), float(ttm.iloc[-5])
-    pe = float(prices.iloc[-1]) / eps
-    med10 = float(yearly["pe"].median())
-    med5 = float(yearly["pe"].tail(5).median())
-    return {
-        "symbol": symbol,
-        "eps_adj_ttm": eps,
-        "eps_growth": eps / eps_year_ago - 1 if eps_year_ago > 0 else np.nan,
-        "pe_adj": pe,
-        "pe_median_10y": med10,
-        "pe_median_5y": med5,
-        "pe_low_10y": float(yearly["pe"].min()),
-        # against the lower of the two medians, so a stock's early hyper-growth years
-        # don't make it look cheap
-        "vs_median": pe / min(med10, med5) - 1,
+def load_screener() -> tuple[pd.DataFrame, dict]:
+    """The market screener's latest top per sector (data/screener/top.csv), cheapest first,
+    and Stage 1's counts. The evening run refreshes both just before this report."""
+    top_path, stage1_path = SCREENER / "top.csv", SCREENER / "stage1.csv"
+    if not top_path.exists() or not stage1_path.exists():
+        return pd.DataFrame(), {}
+    top = pd.read_csv(top_path).sort_values("vs_cheap")
+    s1 = pd.read_csv(stage1_path)
+    dated = sorted(p.stem for p in SCREENER.glob("????-??-??.csv"))
+    info = {
+        "date": dated[-1] if dated else "",
+        "screened": len(s1),
+        "passed": int((s1["status"] == "pass").sum()),
+        "listed": len(top),
+        "sectors": int(top["sector"].nunique()) if len(top) else 0,
+        "stale": bool(dated) and dated[-1] != date.today().isoformat(),
     }
-
-
-def screen_stocks(stocks: pd.DataFrame, now: pd.Timestamp) -> pd.DataFrame:
-    hit = stocks[stocks["from_high"] <= DRAWDOWN]
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        rows = [r for r in pool.map(lambda s: own_history(s, now), hit.index) if r]
-    if not rows:
-        return pd.DataFrame()
-    h = pd.DataFrame(rows).set_index("symbol").join(hit)
-    # earnings still growing: fear rather than falling profits
-    h = h[h["eps_growth"] > 0]
-    # a P/E under 5x is almost always a data problem (e.g. EPS not split-adjusted)
-    h = h[h["pe_adj"] >= 5]
-    return h.sort_values("vs_median")
+    with SCREENER_CONFIG.open("rb") as f:
+        cfg = tomllib.load(f)
+    info |= {"top_n": cfg["top_per_sector"], "close": cfg["close_to_cheap"]}
+    return top, info
 
 
 def pct(v: float) -> str:
@@ -173,9 +149,16 @@ def level(sym: str, v: float) -> str:
 
 
 def render(
-    m: pd.DataFrame, sec: pd.DataFrame, b: dict, top: pd.DataFrame, run_label: str, price_date: str
+    m: pd.DataFrame,
+    sec: pd.DataFrame,
+    b: dict,
+    top: pd.DataFrame,
+    info: dict,
+    run_label: str,
+    price_date: str,
 ) -> str:
     updated, notes = w.read_notes("market")
+    top_n, close = info.get("top_n", 3), info.get("close", 0.15)
 
     def note(section: str) -> str:
         if section in notes:
@@ -204,20 +187,30 @@ def render(
         ]
         for s, r in sec.sort_values("ytd", ascending=False).iterrows()
     ]
-    top_rows = [
-        [
-            f"<b>{s}</b> {html.escape(str(r['name']))}",
-            html.escape(str(r["sector"])),
-            w.money(r["last"]),
-            pct(r["from_high"]),
-            w.times(r["pe_adj"]),
-            w.times(r["pe_median_5y"]),
-            w.times(r["pe_median_10y"]),
-            pct(r["eps_growth"]),
-        ]
-        for s, r in top.head(TOP).iterrows()
-    ]
-    names = ", ".join(top.head(TOP).index)
+    top_rows = []
+    for _, r in top.sort_values(["sector", "rank_in_sector"]).iterrows():
+        cur = "$" if r["currency"] == "USD" else f"{r['currency']} "
+        top_rows.append(
+            [
+                f"<b>{html.escape(str(r['name']))}</b> {html.escape(str(r['description']))}",
+                html.escape(str(r["sector"])),
+                html.escape(str(r["category"]).replace("_", " ")),
+                w.money(r["close"], cur),
+                w.times(r["pe_now"]),
+                f"{w.times(r['cheap_multiple'])} ({html.escape(str(r['cheap_basis']))})",
+                w.money(r["cheap_price"], cur),
+                pct(r["vs_cheap"]),
+                html.escape(str(r["cheapness"])),
+                html.escape(str(r["trend"]) if pd.notna(r["trend"]) else ""),
+            ]
+        )
+    names = ", ".join(top["name"].head(TOP)) if len(top) else ""
+    stale = (
+        f" <b>The screener's data is from {html.escape(info['date'])}</b>, not today: its run"
+        " failed tonight, so these are the last good results."
+        if info.get("stale")
+        else ""
+    )
     return f"""<!doctype html><html><head><meta charset="utf-8"><style>{w.CSS}</style></head><body>
 <h1>Market report</h1>
 <div class="sub">{run_label}. Latest prices on {price_date}. Claude's notes updated
@@ -235,35 +228,43 @@ def render(
   <span>of {b["count"]}</span></div>
 </div>
 {note("Summary")}
-<p><b>Stocks to look at:</b> {names or "none passed the screen today"}.</p>
+<p><b>Stocks to look at</b> (the screener's cheapest first): {
+        names or "none passed the screen today"
+    }.</p>
 
 <h2>2. The numbers</h2>
 <h3>Markets</h3>
 {w.table(["", "Level", "Day", "1 month", "This year", "From 52-wk high"], idx_rows)}
 <h3>S&amp;P 500 sectors (sector ETFs), best this year first</h3>
 {w.table(["Sector", "Day", "1 month", "This year", "From 52-wk high"], sec_rows)}
-<h3>Stocks to look at: sold off, earnings still growing, cheap against their own history</h3>
+<h3>Stocks to look at: the market screener's top {top_n} per sector</h3>
+<p>{info.get("passed", 0)} of {info.get("screened", 0)} S&amp;P 500 companies pass Stage 1
+(good financial statements for their Peter Lynch category); {info.get("listed", 0)} of them
+are cheap or close to cheap, the top {top_n} in each of {info.get("sectors", 0)} sectors.{stale}</p>
 {
         w.table(
             [
                 "Stock",
                 "Sector",
+                "Lynch category",
                 "Price",
-                "From 52-wk high",
-                "Adjusted P/E",
-                "5-yr median",
-                "10-yr median",
-                "EPS growth, 1 yr",
+                "P/E now",
+                "Cheap P/E",
+                "Cheap price",
+                "Price vs cheap",
+                "Cheap or close",
+                "Trend",
             ],
             top_rows,
         )
     }
-<p class="note">S&amp;P 500 stocks at least {abs(DRAWDOWN):.0%} below their 52-week high
-({int(top.shape[0])} of them with growing adjusted EPS), ranked by adjusted P/E against the lower
-of their 5- and 10-year median yearly P/E. Stocks with under six years of history or a P/E
-below 5x (usually a data problem) are left out. Adjusted EPS is Yahoo's reported quarterly EPS,
-as in the watch list analyses. One-offs inside it are not corrected here, so check each name
-before acting.</p>
+<p class="note">Stage 1 sorts each company into one of Lynch's six categories and keeps those
+that pass every financial-statement rule for their category (banks, insurers and REITs by their
+own rules). Stage 2 sets each survivor's cheap price: adjusted EPS times the bottom quarter of
+its own yearly P/E over 10 years, or the sector median when the history is too short. "Cheap"
+is at or below that price; "close" is within {close:.0%} above it. Trend is timing only, not a
+rule. Details and every rule's source: report 13 and docs/SCREENER.md. Check each name before
+acting.</p>
 
 <h2>3. Analysis</h2>
 <h3>What is driving the market</h3>
@@ -278,32 +279,30 @@ before acting.</p>
 
 def build(local: datetime, numbers: bool = False) -> Path | None:
     """Fetch, print the numbers and (unless numbers) write the dated PDF; returns its path."""
-    now = pd.Timestamp(local.astimezone(ZoneInfo("UTC")).replace(tzinfo=None))
     m = moves(closes(list(INDICES), "2y")).reindex(list(INDICES))
     sec = moves(closes(list(SECTORS), "2y"))
     universe = pd.read_csv(UNIVERSE).set_index("symbol")
     px = closes(universe.index.tolist(), "2y")
     b = breadth(px)
-    stocks = moves(px).join(universe)
-    top = screen_stocks(stocks, now)
+    top, info = load_screener()
     price_date = px.index[-1].date().isoformat()
 
     spx = m.loc["^GSPC"]
     print(
         f"Market: S&P 500 {spx['last']:,.0f} ({pct(spx['day'])} today, {pct(spx['ytd'])} this "
         f"year), VIX {m.loc['^VIX', 'last']:.1f}, {b['above_200d']:.0%} above 200-day; "
-        f"stocks to look at: {' '.join(top.head(TOP).index) or 'none'}"
+        f"stocks to look at: {' '.join(top['name'].head(TOP)) if len(top) else 'none'}"
     )
     if numbers:
         print(m.round(4).to_string())
-        cols = ["name", "last", "from_high", "pe_adj", "pe_median_5y", "pe_median_10y"]
-        print(top[cols + ["eps_growth"]].head(TOP).round(3).to_string() if len(top) else "")
+        cols = ["name", "sector", "category", "close", "pe_now", "cheap_price", "vs_cheap"]
+        print(top[cols].round(3).to_string(index=False) if len(top) else "")
         return None
 
     stamp = local.strftime("%Y-%m-%d_%H%M")
     run_label = local.strftime("%Y-%m-%d %H:%M ") + local.tzname()
     pdf = w.new_pdf(OUT, stamp)
-    w.to_pdf(render(m, sec, b, top, run_label, price_date), pdf)
+    w.to_pdf(render(m, sec, b, top, info, run_label, price_date), pdf)
     runs = OUT / "runs.csv"
     row = pd.DataFrame(
         [
@@ -314,7 +313,11 @@ def build(local: datetime, numbers: bool = False) -> Path | None:
                 "sp500_day": spx["day"],
                 "vix": m.loc["^VIX", "last"],
                 "above_200d": b["above_200d"],
-                "stocks_to_look_at": " ".join(top.head(TOP).index),
+                "stocks_to_look_at": " ".join(top["name"].head(TOP)) if len(top) else "",
+                "screener_date": info.get("date", ""),
+                "screener_passed": info.get("passed", 0),
+                "screener_screened": info.get("screened", 0),
+                "screener_listed": info.get("listed", 0),
             }
         ]
     )

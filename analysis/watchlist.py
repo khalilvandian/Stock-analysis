@@ -18,7 +18,9 @@ analyses/<SYMBOL>/runs.csv and rebuilds the dated lists analyses/<SYMBOL>/README
 analyses/README.md. Earlier PDFs are never overwritten.
 
 Usage:
-    uv run python analysis/watchlist.py              # market report + every stock + summary
+    uv run python analysis/watchlist.py              # screener, market report, every stock
+                                                     # and the summary
+    uv run python analysis/watchlist.py --no-screener  # same, reusing the last screener run
     uv run python analysis/watchlist.py BSX NFLX     # selected stocks
     uv run python analysis/watchlist.py --numbers    # print the key numbers, no PDF
 """
@@ -822,6 +824,11 @@ def main() -> None:
     ap.add_argument("symbols", nargs="*", help="only these stocks (default: the whole list)")
     ap.add_argument("--numbers", action="store_true", help="print key numbers, write nothing")
     ap.add_argument("--no-market", action="store_true", help="skip the market report")
+    ap.add_argument(
+        "--no-screener",
+        action="store_true",
+        help="don't rerun the market screener; the market report uses its last results",
+    )
     args = ap.parse_args()
 
     cfg = load_watchlist()
@@ -842,6 +849,14 @@ def main() -> None:
     if not args.numbers and not args.no_market and not args.symbols:
         import market  # the whole-market report goes with the full evening run
 
+        if not args.no_screener:
+            # the market report lists the screener's top per sector, so refresh it first
+            import screener
+
+            try:
+                screener.run()
+            except Exception as e:  # noqa: BLE001 - the report then uses the last results
+                print(f"Screener failed ({e}); the market report uses its last results")
         written.append(market.build(local))
     for stock in stocks:
         sym = stock["symbol"]
@@ -917,8 +932,18 @@ def email_html(run_label: str, written: list[Path], results: list[tuple[dict, di
             md(notes.get("Verdict", "")),
             f"<p>S&amp;P 500 {r['sp500']:,.0f} ({pct(r['sp500_day'])} today), VIX "
             f"{r['vix']:.1f}, {r['above_200d']:.0%} of S&amp;P 500 stocks above their "
-            f"200-day average. Stocks to look at: {html.escape(str(r['stocks_to_look_at']))}.</p>",
+            f"200-day average.</p>",
         ]
+        if "screener_listed" in r and pd.notna(r["screener_listed"]):
+            parts.append(
+                f"<p>Market screener: {int(r['screener_passed'])} of "
+                f"{int(r['screener_screened'])} S&amp;P 500 companies have good financial "
+                f"statements; {int(r['screener_listed'])} are cheap or close to cheap (top 3 per "
+                f"sector, in the market report). Cheapest: "
+                f"{html.escape(str(r['stocks_to_look_at']))}.</p>"
+            )
+        else:
+            parts.append(f"<p>Stocks to look at: {html.escape(str(r['stocks_to_look_at']))}.</p>")
     _, notes = read_notes("summaries")
     parts += ["<h3>Watch list</h3>", md(notes.get("Verdict", "")), "<ul>"]
     for d, k in results:
