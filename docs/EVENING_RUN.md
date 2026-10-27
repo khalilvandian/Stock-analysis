@@ -28,6 +28,6 @@ Babak approved committing the results straight to `main` (no pull request each n
    with every PDF of the run attached, through Resend (resend.com), from Resend's own
    address. The recipient is given in the scheduled task (or `WATCHLIST_EMAIL_TO`) and the
    key in `RESEND_API_KEY`; neither is ever written into this public repository. Babak
-   does not want it sent from his own Gmail.
+   asked for it not to come from their own Gmail.
 
 If a step fails, still commit what was built and say in the email what failed.
