@@ -4,8 +4,10 @@ Every evening at 21:00 Italy time a scheduled Claude session runs these steps on
 Babak approved committing the results straight to `main` (no pull request each night).
 
 1. **Set up:** `uv sync`. Check out `main` and pull.
-2. **Numbers first:** `uv run python analysis/watchlist.py --numbers` and
-   `uv run python analysis/market.py --numbers` print today's figures.
+2. **Numbers first:** `uv run python analysis/screener.py` refreshes the market screener,
+   then `uv run python analysis/watchlist.py --numbers` and
+   `uv run python analysis/market.py --numbers` print today's figures (the market one
+   includes the screener's top names).
 3. **Update Claude's notes** where the story changed, and set `Updated:` to today:
    - `analyses/<SYMBOL>/notes.md` for each stock in `config/watchlist.toml`: Verdict,
      Summary (4 one-line bullets: cheap, strong, weak, uncertain), Business, Risks, News
@@ -13,17 +15,26 @@ Babak approved committing the results straight to `main` (no pull request each n
      earnings report, update the verdict, entry price and, if a quarter's adjusted EPS
      includes a one-off, add an `eps_override` in the config.
    - `analyses/market/notes.md`: Verdict, Summary, What is driving the market, Stocks to
-     look at (comment on the screen's names), What to watch.
+     look at (comment on the screener's top names; `uv run python analysis/market.py
+     --numbers` lists them after the screener has run), What to watch.
    - `analyses/summaries/notes.md`: Verdict across the watch list, and Analysis.
    - A new stock on the watch list with no `notes.md` gets a short first analysis.
    Every report keeps the same template: a high-level summary first, then the numbers,
    then the detail. Keep the summaries short and free of detail.
-4. **Build:** `uv run python analysis/watchlist.py`. It writes the market report, one PDF
-   per stock and the watch list summary, each dated `YYYY-MM-DD_HHMM.pdf`, adds a line to
+4. **Build:** `uv run python analysis/watchlist.py`. It first reruns the market screener
+   (`analysis/screener.py`: Stage 1 then Stage 2 on the S&P 500; same-day downloads are
+   cached, so this is quick after step 2; `--no-screener` skips it) and writes
+   `data/screener/stage1.csv`, `top.csv` and the dated `YYYY-MM-DD.csv`. The market report
+   lists the screener's top 3 cheap or close-to-cheap stocks per sector (if the screener
+   fails, it uses the last results and says so). Then it writes one PDF per stock and the
+   watch list summary, each dated `YYYY-MM-DD_HHMM.pdf`, adds a line to
    each `runs.csv`, rebuilds the dated lists (`analyses/README.md`, `analyses/<SYMBOL>/README.md`)
    and writes the email body to `.cache/watchlist/email.html` (not committed).
-5. **Check:** `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
-6. **Save:** commit `analyses/` (and any config or notes changes) to `main` and push.
+5. **Check:** `uv run python analysis/validate.py` (the run's outputs are complete and
+   consistent; a FAIL goes in the email) and
+   `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
+6. **Save:** commit `analyses/` and `data/screener/` (and any config or notes changes) to
+   `main` and push. The push publishes the site, including its Screener page.
 7. **Email:** `uv run python analysis/send_email.py --to <addresses>` sends one email
    through Brevo (brevo.com, free, 300 a day) with the run's HTML body and every PDF of the
    run attached. It needs `BREVO_API_KEY` and the verified sender in `WATCHLIST_EMAIL_FROM`
