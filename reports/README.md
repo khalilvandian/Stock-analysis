@@ -15,6 +15,7 @@ Each report covers one piece of analysis. It states the data date, the method, t
 | 09 | [Screening](09-screening-low-debt-cheap-growth.md) | Seven rounds of screen design, ending with the current weighted top 5 |
 | 10 | [Absolute values](10-absolute-values-sector.md) | The absolute-values-first framework and sector totals FY2018–FY2025 |
 | 11 | [Boston Scientific](11-bsx-fundamentals.md) | Summary, then BSX absolute values, ratios and screens against 13 medical-device peers, then analysis (P/E vs its own history, entry price) |
+| 14 | [Metrics dictionary](14-metrics-dictionary.md) | Every fundamental metric used so far, defined with formula, source and a worked example; the proposed first vector and the choices to make (issue #8) |
 
 ## Writing a new report
 

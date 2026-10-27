@@ -36,6 +36,14 @@ Ratios and scores hide important information, so they come after, never instead.
   screens), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
   `analysis/valuation.py`, `analysis/debt_to_ebitda.py`.
 
+## Metrics dictionary
+
+Every fundamental metric is defined once in `config/metrics.toml` (definition, formula,
+source columns, worked example, draft vector status). When a new metric is used, add it
+there and regenerate `docs/METRICS.md` with `uv run python -m stock_analysis.metrics doc`
+(`tests/test_metrics.py` fails if the doc is stale). `stock_analysis.metrics.build_vectors`
+builds a per-stock vector from any chosen set (report 14).
+
 ## Watch list and the evening run
 
 The watch list is `config/watchlist.toml` (symbol, sector peers, target P/E, one-off EPS
