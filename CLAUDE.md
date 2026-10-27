@@ -33,9 +33,12 @@ Ratios and scores hide important information, so they come after, never instead.
   `uv run python dashboard/build_absolute.py`; it reads the same config, so new values
   appear there automatically.
 - Market screener: `uv run python analysis/screener.py` screens every US and European
-  company above $1bn (TradingView, Yahoo, SEC, ECB; all free) with rules per kind of
-  business (`config/screeners.toml`) and lists the top 3 cheap or close-to-cheap stocks
-  per sector against each stock's own cheap P/E (report 13).
+  company above $1bn (TradingView, Yahoo, SEC, ECB; all free) in two separate stages
+  (report 13, settings in `config/screeners.toml`). Stage 1 (`analysis/stage1.py`) puts
+  each company in one of Peter Lynch's six categories and keeps those with good financial
+  statements by the rules for their category (banks, insurers, REITs by kind of business).
+  Stage 2 (`analysis/stage2.py`) reads Stage 1's output and lists the top 3 cheap or
+  close-to-cheap survivors per sector against each stock's own cheap P/E.
 - Other tools, in the usual order after step 1: `analysis/screen.py` (strict and weighted
   screens), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
   `analysis/valuation.py`, `analysis/debt_to_ebitda.py`.
