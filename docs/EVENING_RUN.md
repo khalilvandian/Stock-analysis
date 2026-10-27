@@ -24,12 +24,14 @@ Babak approved committing the results straight to `main` (no pull request each n
    and writes the email body to `.cache/watchlist/email.html` (not committed).
 5. **Check:** `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
 6. **Save:** commit `analyses/` (and any config or notes changes) to `main` and push.
-7. **Email:** `uv run python analysis/send_email.py --to <address>` sends the email body
-   with every PDF of the run attached, through Resend (resend.com), from Resend's own
-   address. The recipient is given in the scheduled task (or `WATCHLIST_EMAIL_TO`) and the
-   key in `RESEND_API_KEY`; neither is ever written into this public repository. Babak
-   asked for it not to come from their own Gmail.
-   Until Resend is set up, send one email through the Gmail connector with the run's
+7. **Email:** `uv run python analysis/send_email.py --to <addresses>` sends the email body
+   with every PDF of the run attached (uploaded by the script, never typed out). It uses
+   Brevo (brevo.com, free, 300 a day, any recipients) when `BREVO_API_KEY` is set, with
+   the verified sender in `WATCHLIST_EMAIL_FROM`; otherwise Resend (`RESEND_API_KEY`,
+   only to the Resend account's own address). Up to 5 recipients, comma separated, from
+   the scheduled task or `WATCHLIST_EMAIL_TO`. Keys and addresses are never written into
+   this public repository. Babak asked for it not to come from their own Gmail.
+   Until a key is set, send one email through the Gmail connector with the run's
    subject and HTML body, which links to every PDF on the public page
    (https://khalilvandian.github.io/Stock-analysis/, republished a minute or two after the
    push to `main`). Don't attach files that
