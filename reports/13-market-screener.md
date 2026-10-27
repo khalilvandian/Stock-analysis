@@ -6,8 +6,8 @@
 
 - **3,431 companies** above $1bn market value in the US and 17 European markets were screened in about two minutes, all from free sources with no keys.
 - **880 pass** the fundamentals rules of their screener (general, utilities, banks, insurers, REITs). **263 of them are cheap or close to cheap** against their own cheap price; the top 3 per sector make an **85-name list** (42 US, 43 Europe).
-- **Cheapest against their own history (US):** Trade Desk, Adobe, Intuit, Euronet, Maximus, Zoetis, Incyte. **Europe:** Aena, naturenergie, H&K, Novo Nordisk, Fielmann, Vitec Software. Most cheap names are in a downtrend: the technicals say to wait for the trend to turn.
-- **No bank made the list** in either region: the 200 banks that pass are all priced above their own cheap multiple after the 2023–2026 rally.
+- **Cheapest against their own history (US):** Trade Desk, Adobe, Intuit, Euronet, Maximus, Zoetis, Incyte. **Europe:** H&K, naturenergie, Novo Nordisk, Fielmann, Vitec Software, Autotrader. Most cheap names are in a downtrend: the technicals say to wait for the trend to turn.
+- **No actual bank made the list** in either region: the 200 banks and brokers that pass are priced above their own cheap multiple, except the two Swedish holding companies (Lundberg, Industrivärden) and the Brazilian broker XP, which the bank screener also covers.
 
 ## 2. The numbers
 
