@@ -32,6 +32,10 @@ Ratios and scores hide important information, so they come after, never instead.
 - The sector dashboard of absolute values is `dashboard/absolute.html`, built by
   `uv run python dashboard/build_absolute.py`; it reads the same config, so new values
   appear there automatically.
+- Market screener: `uv run python analysis/screener.py` screens every US and European
+  company above $1bn (TradingView, Yahoo, SEC, ECB; all free) with rules per kind of
+  business (`config/screeners.toml`) and lists the top 3 cheap or close-to-cheap stocks
+  per sector against each stock's own cheap P/E (report 13).
 - Other tools, in the usual order after step 1: `analysis/screen.py` (strict and weighted
   screens), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
   `analysis/valuation.py`, `analysis/debt_to_ebitda.py`.

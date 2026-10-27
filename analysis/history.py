@@ -208,21 +208,27 @@ def annual_values(facts: dict, tag: str, instant: bool) -> pd.Series:
             continue
         if end not in best or x.get("filed", "") > best[end][0]:
             best[end] = (x.get("filed", ""), float(x["val"]), unit)
-    out = {}
-    for end, (_, val, unit) in best.items():
+    out, filed = {}, {}
+    for end, (when, val, unit) in best.items():
         cur = _currency(unit)
         out[pd.Timestamp(end)] = val * fx_to_usd(cur) if cur else val
-    return pd.Series(out, dtype=float).sort_index()
+        filed[pd.Timestamp(end)] = when
+    s = pd.Series(out, dtype=float).sort_index()
+    s.attrs["filed"] = filed
+    return s
 
 
 def first_available(facts: dict, tags: list[str], instant: bool) -> tuple[pd.Series, pd.Series]:
     """Merge tags in priority order; returns values and the tag used for each date."""
     values, used = pd.Series(dtype=float), pd.Series(dtype=object)
+    filed: dict = {}
     for tag in tags:
         s = annual_values(facts, tag, instant)
         new = s.index.difference(values.index)
         values = pd.concat([values, s[new]]).sort_index()
         used = pd.concat([used, pd.Series(tag, index=new)]).sort_index()
+        filed.update({e: s.attrs["filed"][e] for e in new})
+    values.attrs["filed"] = filed
     return values, used
 
 
@@ -286,6 +292,11 @@ def sec_history(symbol: str, facts: dict) -> pd.DataFrame:
     }
     rows["net_debt"] = rows["total_debt"] - rows["cash"]
     rows["_shares"] = flows["diluted_shares"]
+    # filing dates of per-share figures, to undo share splits made after they were filed
+    filed = {
+        k: flows[f].attrs.get("filed", {})
+        for k, f in (("eps", "eps"), ("_shares", "diluted_shares"))
+    }
     out = []
     for col, s in rows.items():
         for end, v in s.dropna().items():
@@ -297,9 +308,32 @@ def sec_history(symbol: str, facts: dict) -> pd.DataFrame:
                         "column": col,
                         "value": v,
                         "source": "SEC",
+                        "filed": filed.get(col, {}).get(end, ""),
                     }
                 )
     return pd.DataFrame(out)
+
+
+def split_adjust(hist: pd.DataFrame, splits: pd.Series) -> pd.DataFrame:
+    """Put SEC share counts and EPS on today's share basis.
+
+    A value filed before a split is in pre-split shares; Yahoo prices are split-adjusted,
+    so without this a 25-for-1 split makes market value 25 times too low. Values filed
+    after the split are already restated and are left alone.
+    """
+    if hist.empty or "filed" not in hist or splits is None or splits.empty:
+        return hist
+    splits = splits[splits > 0]
+    splits.index = pd.DatetimeIndex(splits.index).tz_localize(None)
+    hist = hist.copy()
+    for i, r in hist[hist["column"].isin(["_shares", "eps"])].iterrows():
+        if not isinstance(r["filed"], str) or not r["filed"]:
+            continue
+        factor = float(splits[splits.index > pd.Timestamp(r["filed"])].prod())
+        if factor != 1:
+            per_share = r["column"] == "eps"
+            hist.loc[i, "value"] = r["value"] / factor if per_share else r["value"] * factor
+    return hist
 
 
 def add_prices(hist: pd.DataFrame, symbol: str, financial_currency: str | None) -> pd.DataFrame:
@@ -312,7 +346,9 @@ def add_prices(hist: pd.DataFrame, symbol: str, financial_currency: str | None) 
     if not ends:
         return hist
     try:
-        px = yf.Ticker(symbol).history(start=f"{FIRST_YEAR - 1}-12-01", auto_adjust=False)["Close"]
+        t = yf.Ticker(symbol)
+        px = t.history(start=f"{FIRST_YEAR - 1}-12-01", auto_adjust=False)["Close"]
+        hist = split_adjust(hist, t.splits)
     except Exception:  # noqa: BLE001
         return hist
     if px.empty:
@@ -389,6 +425,7 @@ def build(refresh: bool = False) -> pd.DataFrame:
         hist = fill_from_yahoo(hist, yahoo, symbol)
         currency = reporting_currency(facts) if facts else sector.loc[symbol, "currency"]
         hist = add_prices(hist, symbol, currency if isinstance(currency, str) else "USD")
+        hist = hist.drop(columns="filed", errors="ignore")
         return hist[hist["column"] != "_shares"] if not hist.empty else hist
 
     with ThreadPoolExecutor(max_workers=4) as pool:
