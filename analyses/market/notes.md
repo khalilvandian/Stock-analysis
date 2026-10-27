@@ -21,7 +21,13 @@ On Oct 27 the S&P 500 rose about 0.7% to about 7,730 and the Nasdaq about 1.3%, 
 
 ## Stocks to look at
 
-The screen picks stocks sold off by at least 25% whose adjusted earnings are still growing. Adobe, Intuit and Fair Isaac match the October 25 panic-sell screen: AI fears rather than falling profits. Check each name's latest results and any one-offs in its earnings before acting.
+From tonight the list comes from the market screener, not the panic-sell screen. 169 of the 497 S&P 500 companies pass Stage 1 (good financial statements for their Lynch category), and 29 of those are cheap or close to cheap: the top 3 in each of 14 sectors.
+
+- **Cheapest against their own history:** Adobe, Zoetis, Intuit, Incyte and Gartner sit 40-60% below their own cheap price. Adobe and Intuit are the same AI-fear names the October 25 screen found, now confirmed by the statement checks.
+- **Check before trusting:** Allstate (5.2x) and Comcast (5.8x) look cheap because recent earnings are unusually high (a light catastrophe year; one-off gains), and Valero's refining margins are at a peak with oil near $100. Cyclicals look cheapest exactly when earnings peak.
+- **On the watch list too:** Booking is in the list (fast grower, about 15% below its cheap price on adjusted EPS).
+
+Each name still needs step 1 (absolute values with history) before any decision.
 
 ## What to watch
 

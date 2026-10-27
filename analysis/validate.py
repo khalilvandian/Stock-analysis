@@ -40,6 +40,7 @@ import tomllib
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -548,7 +549,9 @@ def check_analyses(root: Path, today: date) -> list[Check]:
             out.append(_warn("newest PDFs from the same run", f"older than {latest}: {behind}"))
         else:
             out.append(_pass("newest PDFs from the same run", f"{latest}, {len(stamps)} folders"))
-        if latest[:10] != today.isoformat():
+        # runs are stamped in the watch list's time zone (Italy), the screener in UTC
+        local = datetime.now(ZoneInfo("Europe/Rome")).date().isoformat()
+        if latest[:10] not in (today.isoformat(), local):
             out.append(_warn("newest run date", f"{latest[:10]}, not today ({today})"))
     return out
 
