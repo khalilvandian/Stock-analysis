@@ -198,3 +198,20 @@ def test_split_adjust_only_values_filed_before_the_split():
     splits = pd.Series([25.0], index=pd.to_datetime(["2026-06-08"]))
     out = history.split_adjust(hist, splits)
     assert list(out["value"]) == [34e6 * 25, 172.7 / 25, 800e6]
+
+
+def test_stage1_counts_and_survivors():
+    d = pd.DataFrame(
+        {
+            "region": ["US", "US", "US", "Europe"],
+            "sector": ["Retail Trade", "Retail Trade", "Finance", "Retail Trade"],
+            "status": ["pass", "fail", "pass", "incomplete"],
+            "cap_usd_bn": [5.0, 9.0, 3.0, 2.0],
+        },
+        index=["a", "b", "c", "d"],
+    )
+    counts = screener.stage1_counts(d)
+    assert counts.loc["Retail Trade", ("screened", "US")] == 2
+    assert counts.loc["Retail Trade", ("passed", "US")] == 1
+    assert counts.loc["Retail Trade", ("passed", "Europe")] == 0
+    assert list(screener.stage1_survivors(d).index) == ["c", "a"]

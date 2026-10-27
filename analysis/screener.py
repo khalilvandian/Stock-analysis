@@ -1,25 +1,30 @@
 """Market screener: cheap or close-to-cheap stocks in the US and Europe, top 3 per sector.
 
-Steps (settings in config/screeners.toml):
+Two stages (settings in config/screeners.toml):
+
+Stage 1, good financial statements: find the companies worth owning.
   1. Universe: every primary-listed stock above the minimum market value in the US and
      European markets, from TradingView's screener (current figures, 20 years of yearly
      EPS and revenue, technicals). Market values converted to US dollars at ECB rates.
   2. Gap filling: debt, cash and interest figures TradingView leaves blank are filled from
      Yahoo where it has them. Each filled value is listed in the `filled` column.
-  3. Screener by kind of business (general, utilities, banks, insurers, REITs): a stock
-     must pass every rule of its screener to be ranked. Missing data = "incomplete".
+  3. Rules by kind of business (general, utilities, banks, insurers, REITs): debt, cash,
+     interest cover, profitability, 5-year growth, Piotroski and Altman scores. A stock
+     must pass every rule of its screener. Missing data = "incomplete", not a pass.
+
+Stage 2, cheapness: rank only the Stage 1 survivors, by how cheap they are.
   4. Cheap price: the stock's own cheap multiple (bottom quarter of its yearly P/E over
-     10 fiscal years, on Yahoo average prices and TradingView diluted EPS) times today's
-     EPS. For the stocks near the top, Yahoo's adjusted EPS replaces diluted EPS where it
-     has at least 6 years (the watch list's method).
+     10 fiscal years, on Yahoo average prices and TradingView diluted EPS, capped at the
+     sector median) times today's EPS. For the stocks near the top, Yahoo's adjusted EPS
+     replaces diluted EPS where it has at least 6 years (the watch list's method).
   5. Rank inside each region and sector by price against the cheap price, lowest first.
      Below it = "cheap"; within 15% above = "close". Technicals (trend, RSI, 52-week
      range, TradingView rating) are shown for timing, not used in the ranking.
   6. US stocks' latest-year EPS is checked against SEC EDGAR; a mismatch is flagged.
 
-Writes data/screener/YYYY-MM-DD.csv (every stock with its status) and
-data/screener/top.csv (the top per region and sector). Raw downloads are cached for the
-day in .cache/screener/.
+Writes data/screener/YYYY-MM-DD.csv (every stock with its status), data/screener/stage1.csv
+(the Stage 1 survivors) and data/screener/top.csv (the Stage 2 top per region and
+sector). Raw downloads are cached for the day in .cache/screener/.
 
 Usage:
     uv run python analysis/screener.py               # full run, prints the top list
@@ -835,11 +840,45 @@ SHOW = [
 ]
 
 
+STAGE1 = [
+    "description",
+    "region",
+    "sector",
+    "industry",
+    "type",
+    *ABSOLUTE,
+    "cash_to_short_term_debt",
+    "cash_to_long_term_debt",
+    "net_debt_to_ebitda",
+    "interest_cover",
+    "return_on_equity_fq",
+    "revenue_growth_median",
+    "eps_growth_median",
+    "piotroski_f_score_ttm",
+    "altman_z_score_ttm",
+    "flags",
+]
+
+
+def stage1_survivors(d: pd.DataFrame) -> pd.DataFrame:
+    """Stage 1 survivors, largest first within each region and sector."""
+    s = d[d["status"] == "pass"]
+    return s.sort_values(["region", "sector", "cap_usd_bn"], ascending=[True, True, False])
+
+
+def stage1_counts(d: pd.DataFrame) -> pd.DataFrame:
+    """Per region and sector: companies screened and how many passed Stage 1."""
+    g = d.groupby(["sector", "region"])["status"]
+    out = pd.DataFrame({"screened": g.size(), "passed": g.apply(lambda s: (s == "pass").sum())})
+    return out.unstack("region", fill_value=0)
+
+
 def save(d: pd.DataFrame, top: pd.DataFrame) -> Path:
     OUT.mkdir(parents=True, exist_ok=True)
     keep = [c for c in d.columns if not c.endswith("_fy_h")]
     path = OUT / f"{date.today().isoformat()}.csv"
     d[keep].round(4).to_csv(path)
+    stage1_survivors(d)[STAGE1].round(4).to_csv(OUT / "stage1.csv")
     top[[c for c in top.columns if not c.endswith("_fy_h")]].round(4).to_csv(OUT / "top.csv")
     return path
 
@@ -854,12 +893,15 @@ def main() -> None:
     path = save(d, top)
     pd.set_option("display.width", 250)
     pd.set_option("display.max_rows", 500)
-    print(d.groupby(["region", "type", "status"]).size().unstack(fill_value=0).to_string())
+    print("Stage 1: good financial statements (companies screened and passed)")
+    print(stage1_counts(d).to_string())
     print()
+    print(d.groupby(["region", "type", "status"]).size().unstack(fill_value=0).to_string())
+    print("\nStage 2: cheapest Stage 1 survivors per sector")
     for (region, sector), g in top.groupby(["region", "sector"]):
         print(f"{region} / {sector}")
         print(g[SHOW].round(2).to_string(header=False))
-    print(f"\nSaved {path.relative_to(ROOT)} and data/screener/top.csv")
+    print(f"\nSaved {path.relative_to(ROOT)}, data/screener/stage1.csv and top.csv")
 
 
 if __name__ == "__main__":

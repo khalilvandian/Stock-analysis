@@ -5,15 +5,79 @@
 ## 1. Summary
 
 - **3,431 companies** above $1bn market value in the US and 17 European markets were screened in about two minutes, all from free sources with no keys.
-- **880 pass** the fundamentals rules of their screener (general, utilities, banks, insurers, REITs). **263 of them are cheap or close to cheap** against their own cheap price; the top 3 per sector make an **85-name list** (42 US, 43 Europe).
+- **Stage 1, good financial statements: 880 pass** the rules for their kind of business (debt, cash, interest cover, profitability, 5-year growth, Piotroski and Altman scores).
+- **Stage 2, cheapness: 263 of the 880 are cheap or close to cheap** against their own cheap price; the top 3 per sector make an **85-name list** (42 US, 43 Europe).
 - **Cheapest against their own history (US):** Trade Desk, Adobe, Intuit, Euronet, Maximus, Zoetis, Incyte. **Europe:** H&K, naturenergie, Novo Nordisk, Fielmann, Vitec Software, Autotrader. Most cheap names are in a downtrend: the technicals say to wait for the trend to turn.
 - **No actual bank made the list** in either region: the 200 banks and brokers that pass are priced above their own cheap multiple, except the two Swedish holding companies (Lundberg, Industrivärden) and the Brazilian broker XP, which the bank screener also covers.
 
 ## 2. The numbers
 
-Absolute values first, then the cheap price and the timing read. Full table of every company with its status, the rules it failed and the source of every filled value: `data/screener/2026-10-27.csv`; the top list: `data/screener/top.csv`.
+Two stages: Stage 1 keeps the companies with good financial statements; Stage 2 ranks only those by how cheap they are. Every company with its status, the rules it failed and the source of every filled value: `data/screener/2026-10-27.csv`.
 
-### US: absolute values
+### Stage 1: good financial statements
+
+Every company must pass every rule of the screener for its kind of business (full rules in section 3). Ordinary companies: cash covers debt due within a year, cash at least 5% of long-term debt, net debt at most 4.5x EBITDA, EBITDA at least 4x interest (net cash passes both), profitable (net income, EBITDA, EPS above zero), revenue and EPS growth positive on average and in the median year over 5 years, Piotroski F-score at least 5, Altman Z-score above 1.8. Missing data makes a stock "incomplete", not a pass.
+
+**880 of 3,431 companies pass Stage 1.** Every survivor with its absolute values and ratios: `data/screener/stage1.csv`.
+
+| Sector | US screened | US passed | Europe screened | Europe passed |
+|---|---|---|---|---|
+| Commercial Services | 79 | 19 | 48 | 11 |
+| Communications | 18 | 1 | 28 | 2 |
+| Consumer Durables | 48 | 16 | 47 | 11 |
+| Consumer Non-Durables | 80 | 19 | 68 | 19 |
+| Consumer Services | 97 | 13 | 46 | 11 |
+| Distribution Services | 39 | 12 | 34 | 7 |
+| Electronic Technology | 170 | 57 | 71 | 23 |
+| Energy Minerals | 54 | 1 | 26 | 2 |
+| Finance | 483 | 203 | 284 | 108 |
+| Health Services | 49 | 6 | 15 | 2 |
+| Health Technology | 254 | 31 | 80 | 19 |
+| Industrial Services | 75 | 17 | 60 | 12 |
+| Miscellaneous | 0 | 0 | 1 | 0 |
+| Non-Energy Minerals | 53 | 9 | 46 | 8 |
+| Process Industries | 72 | 11 | 64 | 12 |
+| Producer Manufacturing | 143 | 47 | 118 | 41 |
+| Retail Trade | 84 | 18 | 41 | 14 |
+| Technology Services | 253 | 48 | 58 | 19 |
+| Transportation | 65 | 13 | 56 | 8 |
+| Utilities | 68 | 2 | 56 | 8 |
+| **Total** | **2184** | **543** | **1247** | **337** |
+
+#### By kind of business
+
+| Region | Screener | Fail | Incomplete | Pass |
+|---|---|---|---|---|
+| Europe | banks | 41 | 4 | 84 |
+| Europe | general | 732 | 41 | 226 |
+| Europe | insurers | 19 | 0 | 18 |
+| Europe | reits | 24 | 1 | 1 |
+| Europe | utilities | 48 | 0 | 8 |
+| US | banks | 68 | 13 | 116 |
+| US | general | 1242 | 142 | 351 |
+| US | insurers | 38 | 5 | 32 |
+| US | reits | 65 | 2 | 42 |
+| US | utilities | 66 | 0 | 2 |
+
+#### Rules failed most often
+
+| Rule | Stocks failing it |
+|---|---|
+| revenue and EPS growth | 1196 |
+| cash covers short-term debt | 704 |
+| Altman Z-score | 673 |
+| profitable | 626 |
+| Piotroski score | 505 |
+| net debt / EBITDA | 486 |
+| interest cover | 485 |
+| cash vs long-term debt | 274 |
+| return on equity | 75 |
+
+### Stage 2: the cheapest survivors, top 3 per sector
+
+Only Stage 1 survivors are ranked, purely by price against their own cheap price (section 3). Below it = cheap; up to 15% above = close. Absolute values first, then the cheap price and the timing read.
+
+#### US: absolute values
 
 Price in the trading currency; amounts in US$ billions; EPS (12 months, diluted) in the reporting currency.
 
@@ -62,7 +126,7 @@ Price in the trading currency; amounts in US$ billions; EPS (12 months, diluted)
 | DHT Holdings, Inc. (DHT) | Transportation | 24.41 USD | 3.9 | 0.4 | 0.3 | 0.0 | 0.4 | 0.2 | 0.7 | 0.5 | 0.5 | 2.94 | 0.5 | -0.4 | 0.0 |
 | Atmos Energy Corporation (ATO) | Utilities | 170.87 USD | 28.9 | 10.3 | 9.8 | 0.5 | 9.8 | 0.5 | 4.9 | 2.6 | 1.4 | 8.40 | 2.0 | -4.0 | -2.0 |
 
-### US: cheap price and timing
+#### US: cheap price and timing
 
 | Company | Sector | P/E now | Cheap P/E | Set by | Cheap price | Price vs cheap | Label | EPS used | Trend | RSI | TradingView rating |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -109,7 +173,7 @@ Price in the trading currency; amounts in US$ billions; EPS (12 months, diluted)
 | DHT Holdings, Inc. | Transportation | 9.6x | 8.7x | own history | 22.11 USD | +10% | close | adjusted | uptrend | 57 | buy |
 | Atmos Energy Corporation | Utilities | 20.3x | 18.5x | own history | 155.88 USD | +10% | close | adjusted | downtrend | 65 | buy |
 
-### Europe: absolute values
+#### Europe: absolute values
 
 Price in the trading currency; amounts in US$ billions; EPS (12 months, diluted) in the reporting currency.
 
@@ -159,7 +223,7 @@ Price in the trading currency; amounts in US$ billions; EPS (12 months, diluted)
 | Aker Solutions ASA (AKSO) | Utilities | 38.16 NOK | 2.0 | 0.3 | -0.2 | 0.1 | 0.2 | 0.5 | 6.4 | 0.5 | 0.3 | 6.70 | 0.5 | -0.0 | 0.5 |
 | Fluxys Belgium SA Class D (FLUX) | Utilities | 20.60 EUR | 1.6 | 1.2 | 0.3 | 0.1 | 1.1 | 0.9 | 0.8 | 0.4 | 0.1 | 1.28 | 0.2 | -0.3 | -0.1 |
 
-### Europe: cheap price and timing
+#### Europe: cheap price and timing
 
 | Company | Sector | P/E now | Cheap P/E | Set by | Cheap price | Price vs cheap | Label | EPS used | Trend | RSI | TradingView rating |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -207,36 +271,9 @@ Price in the trading currency; amounts in US$ billions; EPS (12 months, diluted)
 | Aker Solutions ASA | Utilities | 6.4x | 8.1x | own history | 48.57 NOK | -21% | cheap | adjusted | downtrend | 40 | sell |
 | Fluxys Belgium SA Class D | Utilities | 16.1x | 17.3x | sector median | 22.18 EUR | -7% | cheap | diluted | mixed | 42 | sell |
 
-### Status counts
-
-| Region | Screener | Fail | Incomplete | Pass |
-|---|---|---|---|---|
-| Europe | banks | 41 | 4 | 84 |
-| Europe | general | 732 | 41 | 226 |
-| Europe | insurers | 19 | 0 | 18 |
-| Europe | reits | 24 | 1 | 1 |
-| Europe | utilities | 48 | 0 | 8 |
-| US | banks | 68 | 13 | 116 |
-| US | general | 1242 | 142 | 351 |
-| US | insurers | 38 | 5 | 32 |
-| US | reits | 65 | 2 | 42 |
-| US | utilities | 66 | 0 | 2 |
-
-### Rules failed
-
-| Rule | Stocks failing it |
-|---|---|
-| revenue and EPS growth | 1196 |
-| cash covers short-term debt | 704 |
-| Altman Z-score | 673 |
-| profitable | 626 |
-| Piotroski score | 505 |
-| net debt / EBITDA | 486 |
-| interest cover | 485 |
-| cash vs long-term debt | 274 |
-| return on equity | 75 |
-
 ## 3. Method
+
+**Stage 1: good financial statements**
 
 1. **Universe.** TradingView's screener, primary listings of common shares above $1bn (converted at ECB reference rates): the US (NYSE, Nasdaq, NYSE American) and the UK, Germany, France, Italy, Spain, the Netherlands, Switzerland, Sweden, Denmark, Norway, Finland, Belgium, Austria, Portugal, Ireland, Poland and Greece. Funds and trusts are skipped.
 2. **Gap filling.** Short-term debt left blank is total debt minus long-term debt (690 stocks). Debt, cash, EBITDA and interest cover still blank are taken from Yahoo's statements (about 400 values); blank cash flows of the listed names too. Each filled value is named in the `filled` column.
@@ -246,9 +283,11 @@ Price in the trading currency; amounts in US$ billions; EPS (12 months, diluted)
     - Banks and insurers: profitable, return on equity ≥ 8%, growth. No debt rules: deposits and float are not debt in the usual sense.
     - REITs: cash ≥ short-term debt, net debt/EBITDA ≤ 7x, interest cover ≥ 2.5x, profitable.
     - Missing data for a required rule makes a stock "incomplete" (208 stocks), not a pass.
+**Stage 2: cheapness (Stage 1 survivors only)**
+
 4. **Cheap price.** Yearly P/E for the last 10 fiscal years = Yahoo average monthly price over the fiscal year / TradingView diluted EPS for that year (both split-adjusted, price converted to the reporting currency). The cheap multiple is the bottom quarter of those P/Es (at least 6 years needed), capped at the median P/E of the same region and sector, so a stock whose whole history was priced for fast growth isn't called cheap at a multiple its peers never get. Cheap price = cheap multiple × EPS of the last 12 months.
 5. **Adjusted EPS.** For the 9 closest names per sector, Yahoo's adjusted quarterly EPS replaces diluted EPS, with its own adjusted P/E history (the watch list's method), when it has at least 6 years and is within a factor of 2 of diluted EPS (a bigger gap is a data error: XP's Yahoo EPS was rejected).
-6. **Ranking.** Inside each region and sector, by price against the cheap price, lowest first. Below it = cheap; up to 15% above = close; anything higher is not listed. Debt and profitability decide who gets in, not the order.
+6. **Ranking.** Inside each region and sector, by price against the cheap price, lowest first. Below it = cheap; up to 15% above = close; anything higher is not listed. Stage 1 decides who gets in; only cheapness sets the order.
 7. **Technicals, for timing only.** Trend from the 50- and 200-day averages, RSI (below 30 oversold, above 70 overbought), position in the 52-week range, and TradingView's technical rating.
 8. **Cross-check.** US names' latest fiscal-year diluted EPS is compared with SEC EDGAR (38 of 42 found, none off by more than 10%).
 
