@@ -1,0 +1,183 @@
+# The market screener (analysis/screener.py): every listed company in the US and Europe
+# above a minimum market value, checked by the screener that fits its kind of business,
+# then ranked by how close the price is to the stock's own cheap price.
+#
+# Data: TradingView's screener (current figures, 20 years of yearly figures, technicals),
+# Yahoo (price history, adjusted EPS, gap filling), SEC EDGAR (US cross-check) and the
+# ECB (exchange rates). All free, no keys.
+
+# Minimum market value in US dollars, converted at the ECB's latest rates.
+min_market_cap_usd = 1e9
+# Stocks shown per sector in each region.
+top_per_sector = 3
+# Within this much above its cheap price a stock counts as "close to cheap".
+close_to_cheap = 0.15
+# The cheap multiple is this percentile of the stock's own yearly P/E over the last
+# `history_years` fiscal years (0.25 = the bottom quarter). Needs `min_history_years`.
+cheap_percentile = 0.25
+history_years = 10
+min_history_years = 6
+
+# Which companies to screen. `index` = a TradingView index code: only its members are
+# screened ("SP:SPX" = the S&P 500; "" = every company above the minimum market value).
+# `regions` = the regions below to scan ([] = all of them).
+# Babak, 2026-10-27: "for now, we're focusing on the S&P 500".
+[universe]
+index = "SP:SPX"
+regions = ["US"]
+
+# TradingView markets in each region. Each market lists its primary listings only.
+[regions]
+US = ["america"]
+Europe = [
+  "uk", "germany", "france", "italy", "spain", "netherlands", "switzerland", "sweden",
+  "denmark", "norway", "finland", "belgium", "austria", "portugal", "ireland", "poland",
+  "greece",
+]
+
+# Which screener each company gets, by TradingView industry (or sector for utilities).
+# Anything not listed uses "general". Industries under `exclude` are not companies to own
+# for their earnings (funds and trusts) and are skipped.
+[types]
+banks = [
+  "Major Banks", "Regional Banks", "Savings Banks", "Financial Conglomerates",
+  "Investment Banks/Brokers",
+]
+insurers = [
+  "Multi-Line Insurance", "Property/Casualty Insurance", "Life/Health Insurance",
+  "Specialty Insurance",
+]
+reits = ["Real Estate Investment Trusts"]
+utilities_sector = ["Utilities"]
+exclude = ["Investment Trusts/Mutual Funds"]
+
+# Peter Lynch's six categories (One Up on Wall Street, 1989, ch. 7), tested in this order:
+# no profit in 5 years (not a Lynch category: failed), cyclical by industry, turnaround,
+# cyclical by EPS history, asset play, then by median yearly EPS growth over
+# `growth_years`: fast grower, stalwart, slow grower.
+[lynch]
+growth_years = 5
+fast_growth = 0.20          # Lynch: fast growers 20-25% a year
+stalwart_growth = 0.08      # Lynch: stalwarts 10-12%, slow growers about the economy's 2-4%
+turnaround_drop = 0.50      # EPS more than 50% below its 5-year peak (or a loss now)
+cyclical_drops = 3          # EPS fell by more than `cyclical_drop_size` in 3+ of 10 years
+cyclical_drop_size = 0.30
+asset_price_to_book = 1.0   # price below book value
+asset_net_cash = 0.30       # or net cash above 30% of market value
+recession_years = [2009, 2020]
+cyclical_industries = [
+  "Motor Vehicles", "Auto Parts: OEM", "Airlines", "Steel", "Aluminum",
+  "Other Metals/Minerals", "Precious Metals", "Chemicals: Major Diversified",
+  "Chemicals: Agricultural", "Integrated Oil", "Oil & Gas Production",
+  "Oil Refining/Marketing", "Contract Drilling", "Oilfield Services/Equipment", "Coal",
+  "Marine Shipping", "Homebuilding", "Electronic Production Equipment",
+  "Trucks/Construction/Farm Machinery", "Forest Products", "Pulp & Paper",
+  "Construction Materials", "Hotels/Resorts/Cruise lines",
+]
+
+# Rules: a stock must pass every rule of its rule set. Companies get the rules of their
+# Lynch category; banks, insurers and REITs get the rules of their kind of business
+# (`screener.*` below). Utilities use their category's rules without the Altman score.
+# Rules under `optional` are skipped (and flagged) when the data is missing; every other
+# rule with missing data makes the stock "incomplete" rather than passing.
+#
+# cash_to_short_term_debt     cash and short-term investments / debt due within a year
+# cash_to_long_term_debt      cash / long-term debt
+# max_net_debt_to_ebitda      net debt / EBITDA, 12 months (net cash always passes)
+# max_net_debt_to_avg_ebitda  net debt / average EBITDA over 10 years (cyclicals)
+# min_interest_cover          EBITDA / interest expense (net cash always passes)
+# max_debt_to_equity          total debt / equity (net cash always passes)
+# min_cash_to_total_debt      cash / total debt
+# profitable                  net income, EBITDA (not for banks) and EPS above zero
+# profitable_10y_avg          average EPS over 10 years above zero
+# positive_ocf                operating cash flow (12 months) above zero
+# growth_years                revenue and EPS growth: average and median yearly growth over
+#                             this many years must both be above zero
+# min_eps_growth_3y           EPS growth a year, compounded over the last 3 fiscal years
+# min_dividend_years          years with a dividend, of the last 10 (no dividend at all passes)
+# max_payout                  dividends / earnings
+# max_recession_eps_drop      largest EPS fall allowed in the 2009 and 2020 fiscal years
+# min_roe                     return on equity, percent
+# min_piotroski               Piotroski F-score, 0 to 9
+# min_altman_z                Altman Z-score (1.81 and below is the distress zone)
+
+# Babak's debt rules, Lynch's dividend checks (payout leaves a cushion in hard times).
+[category.slow_grower]
+cash_to_short_term_debt = 1.0
+cash_to_long_term_debt = 0.05
+max_net_debt_to_ebitda = 4.5
+min_interest_cover = 4.0
+profitable = true
+growth_years = 5
+min_dividend_years = 10
+max_payout = 0.8
+min_piotroski = 5
+min_altman_z = 1.8
+optional = ["min_piotroski", "min_altman_z"]
+
+# Babak's debt rules and growth, and Lynch's test of how it held up in past recessions.
+[category.stalwart]
+cash_to_short_term_debt = 1.0
+cash_to_long_term_debt = 0.05
+max_net_debt_to_ebitda = 4.5
+min_interest_cover = 4.0
+profitable = true
+growth_years = 5
+max_recession_eps_drop = 0.30
+min_piotroski = 5
+min_altman_z = 1.8
+optional = ["min_piotroski", "min_altman_z", "max_recession_eps_drop"]
+
+# Lynch: fast growers must not be over-borrowed, and growth must still be fast now.
+# His "normal" balance sheet is 75% equity and 25% debt (debt/equity 0.33), from before
+# leases were counted as debt (2019); with leases in, debt no larger than equity (1.0).
+[category.fast_grower]
+cash_to_short_term_debt = 1.0
+max_debt_to_equity = 1.0
+min_interest_cover = 4.0
+profitable = true
+min_eps_growth_3y = 0.20
+min_piotroski = 5
+min_altman_z = 1.8
+optional = ["min_piotroski", "min_altman_z"]
+
+# Lynch: a cyclical must survive the downturn. Debt is measured against average EBITDA
+# over the cycle, and profit on average over 10 years, not at today's point in the cycle.
+[category.cyclical]
+cash_to_short_term_debt = 1.0
+cash_to_long_term_debt = 0.05
+max_net_debt_to_avg_ebitda = 2.5
+min_interest_cover = 4.0
+profitable_10y_avg = true
+min_altman_z = 1.8
+optional = ["min_altman_z"]
+
+# Lynch: for a turnaround the question is survival: cash against debt, cash coming in.
+[category.turnaround]
+cash_to_short_term_debt = 1.0
+min_cash_to_total_debt = 0.25
+positive_ocf = true
+
+# Lynch: an asset play's assets are only worth what's left after the debt.
+[category.asset_play]
+cash_to_short_term_debt = 1.0
+max_debt_to_equity = 1.0
+positive_ocf = true
+
+# Deposits and funding make debt rules meaningless for banks: judge them on returns.
+[screener.banks]
+profitable = true
+min_roe = 8
+growth_years = 5
+
+[screener.insurers]
+profitable = true
+min_roe = 8
+growth_years = 5
+
+# REITs carry more debt by design; EPS understates their cash earnings (depreciation).
+[screener.reits]
+cash_to_short_term_debt = 1.0
+max_net_debt_to_ebitda = 7.0
+min_interest_cover = 2.5
+profitable = true
