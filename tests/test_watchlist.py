@@ -111,13 +111,25 @@ def test_email_attaches_every_pdf_and_sends_once(tmp_path, monkeypatch):
         assert route.calls[0].request.headers["Authorization"] == "Bearer key"
 
 
-def test_light_pdf_is_a_small_valid_pdf():
-    data = watchlist.light_pdf("Title (BSX)", [("h", "Summary"), ("p", "x " * 300), ("t", "a b")])
-    assert data.startswith(b"%PDF-1.4") and data.rstrip().endswith(b"%%EOF")
-    xref = int(data.rsplit(b"startxref\n", 1)[1].split(b"\n")[0])
-    assert data[xref : xref + 4] == b"xref"
-    assert len(data) < 5000
+def test_light_copy_keeps_the_text_without_embedded_fonts(tmp_path):
+    import pikepdf
+    import pypdfium2
+    import slim_pdf
 
-
-def test_bullets():
-    assert watchlist.bullets("- **a:** one\n- b") == ["- a: one", "- b"]
+    html = tmp_path / "page.html"
+    html.write_text(
+        f"<style>{watchlist.CSS}</style><h1>Boston Scientific (BSX)</h1>"
+        "<p>Price $45.03, adjusted P/E 14.0x – the office ﬁle.</p>"
+    )
+    full, light = tmp_path / "full.pdf", tmp_path / "light.pdf"
+    watchlist.to_pdf(html.read_text(), full)
+    slim_pdf.slim(full, light)
+    assert light.stat().st_size < full.stat().st_size / 3
+    with pikepdf.open(light) as pdf:
+        fonts = pdf.pages[0].Resources.Font
+        assert all(
+            fonts[n].Subtype == "/Type1" and "/FontDescriptor" not in fonts[n] for n in fonts
+        )
+    text = pypdfium2.PdfDocument(str(light))[0].get_textpage().get_text_range()
+    assert "Boston Scientific (BSX)" in text and "Price $45.03, adjusted P/E 14.0x" in text
+    assert "office file" in text
