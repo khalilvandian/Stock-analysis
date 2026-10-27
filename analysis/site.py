@@ -20,10 +20,12 @@ import html
 import re
 import shutil
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ANALYSES = ROOT / "analyses"
+CONFIG = ROOT / "config/watchlist.toml"
 SITE = ROOT / "_site"
 URL = "https://khalilvandian.github.io/Stock-analysis/"
 
@@ -80,7 +82,7 @@ h2 { font-size: 1.2em; margin: 36px 0 12px; }
   white-space: nowrap; }
 .badge.good { background: var(--good-soft); color: var(--good); }
 .badge.warn { background: var(--warn-soft); color: var(--warn); }
-.strip { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.strip { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .tile { padding: 14px 16px; }
 .tile small { color: var(--muted); display: block; font-size: .8em; }
 .tile b { font-size: 1.3em; font-variant-numeric: tabular-nums; }
@@ -105,7 +107,43 @@ th { color: var(--muted); font-weight: 600; font-size: .85em; text-transform: up
 tr:last-child td { border-bottom: 0; }
 td.d { white-space: nowrap; }
 td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.split { display: grid; grid-template-columns: 230px 1fr; gap: 28px; align-items: start; }
+aside.side { position: sticky; top: 76px; }
+.split > * { min-width: 0; }
+.side h4 { font-size: .75em; text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+  margin: 0 0 8px 4px; }
+.side .list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 22px; }
+.side a.it { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 9px 12px; border-radius: 10px; color: var(--text); border: 1px solid transparent; }
+.side a.it:hover { background: var(--card); border-color: var(--line); text-decoration: none; }
+.side a.it.on { background: var(--card); border-color: var(--brand); }
+.side a.it b { font-size: 1em; }
+.side a.it small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.side a.it.old { color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
+.dot.good { background: var(--good); } .dot.warn { background: var(--warn); }
+.panel { padding: 20px 22px; margin-bottom: 18px; scroll-margin-top: 76px; }
+.panel .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  flex-wrap: wrap; }
+.panel h2 { margin: 0; font-size: 1.3em; }
+.panel .lead { margin: 12px 0; font-weight: 600; }
+.panel ul { padding-left: 18px; margin: 8px 0 0; }
+.panel .kv { grid-template-columns: repeat(4, 1fr); margin-top: 12px; }
+.viewer { padding: 0; overflow: hidden; }
+.viewer .head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.viewer select { font: inherit; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.viewer iframe { width: 100%; height: 80vh; border: 0; display: block; background: #fff; }
 footer { color: var(--muted); font-size: .85em; text-align: center; padding: 24px 16px; }
+@media (max-width: 860px) {
+  .split { grid-template-columns: 1fr; gap: 12px; }
+  aside.side { position: static; }
+  .side .list { flex-direction: row; overflow-x: auto; }
+  .side a.it { flex: none; background: var(--card); border-color: var(--line); }
+  .panel .kv { grid-template-columns: repeat(2, 1fr); }
+  .viewer iframe { height: 70vh; }
+}
 @media (max-width: 640px) {
   .bar .in { gap: 12px; } .brand { font-size: .95em; } h1 { font-size: 1.5em; }
 }
@@ -167,6 +205,20 @@ def stocks() -> list[Path]:
         if f.is_dir() and f.name not in ("market", "summaries") and read_runs(f)
     ]
     return sorted(found, key=lambda f: read_runs(f)[0]["run"], reverse=True)
+
+
+def active() -> list[str]:
+    """Symbols on the watch list now, in config order."""
+    if not CONFIG.exists():
+        return []
+    return [x["symbol"] for x in tomllib.loads(CONFIG.read_text()).get("stock", [])]
+
+
+def watched() -> tuple[list[Path], list[Path]]:
+    """(stocks on the watch list now, stocks analysed before but since removed)."""
+    have = {f.name: f for f in stocks()}
+    now = [have[s] for s in active() if s in have]
+    return now, [f for f in have.values() if f not in now]
 
 
 # --- formatting -------------------------------------------------------------------
@@ -270,24 +322,6 @@ def layout(title_: str, active: str, body: str, menu: list[tuple[str, str]]) -> 
     )
 
 
-def stock_card(f: Path) -> str:
-    r = read_runs(f)[0]
-    verdict = first_sentence(r.get("verdict", "") or notes(f).get("Verdict", ""))
-    return (
-        f'<a class="card stock" href="{f.name}.html">'
-        f'<div class="top"><div><div class="sym">{esc(f.name)}</div>'
-        f'<div class="name">{esc(company(f))}</div></div>'
-        f'<div class="price">{num(r["price"], "${:,.2f}")}</div></div>'
-        f"{badge(r['to_entry'])}"
-        f'<div class="kv">'
-        f"<div><small>Adjusted P/E</small><b>{num(r['pe_adj'], '{:.1f}x')}</b></div>"
-        f"<div><small>10y median</small><b>{num(r['pe_median_10y'], '{:.1f}x')}</b></div>"
-        f"<div><small>Entry ({num(r['target_pe'], '{:g}x')})</small>"
-        f"<b>{num(r['entry_price'], '${:,.2f}')}</b></div></div>"
-        f'<p class="verdict">{esc(verdict)}</p></a>'
-    )
-
-
 def market_strip(r: dict) -> str:
     tiles = [
         ("S&P 500", num(r.get("sp500"), "{:,.0f}"), num(r.get("sp500_day"), "{:+.1%} today")),
@@ -306,45 +340,99 @@ def market_strip(r: dict) -> str:
     return f'<div class="strip">{out}</div>'
 
 
+def tone(to_entry) -> str:
+    try:
+        d = float(to_entry)
+    except (TypeError, ValueError):
+        return ""
+    return "good" if d >= 0 else "warn" if d > -0.10 else ""
+
+
+def sidebar(current: str, on_index: bool = False) -> str:
+    """Stocks on the watch list, then the ones analysed before. On the watch list page the
+    links jump to each stock's summary; elsewhere they open the stock's page."""
+    now, former = watched()
+    out = ['<aside class="side"><h4>On the watch list</h4><div class="list">']
+    for f in now:
+        r = read_runs(f)[0]
+        href = f"#{f.name}" if on_index else f"{f.name}.html"
+        on = " on" if f.name == current else ""
+        out.append(
+            f'<a class="it{on}" href="{href}"><span style="display:flex;gap:8px;'
+            f'align-items:center"><span class="dot {tone(r["to_entry"])}"></span>'
+            f"<b>{esc(f.name)}</b></span><small>{num(r['price'], '${:,.2f}')}</small></a>"
+        )
+    out.append("</div>")
+    if former:
+        out.append('<h4>Previously watched</h4><div class="list">')
+        for f in former:
+            on = " on" if f.name == current else ""
+            out.append(
+                f'<a class="it old{on}" href="{f.name}.html"><b>{esc(f.name)}</b>'
+                f"<small>{len(read_runs(f))} analyses</small></a>"
+            )
+        out.append("</div>")
+    out.append("</aside>")
+    return "".join(out)
+
+
+def summary_panel(f: Path) -> str:
+    """The latest analysis of one stock, in short."""
+    r, n, runs = read_runs(f)[0], notes(f), read_runs(f)
+    verdict = n.get("Verdict", "") or r.get("verdict", "")
+    bullets = md(n["Summary"]) if n.get("Summary") else ""
+    return (
+        f'<section class="card panel" id="{f.name}">'
+        f'<div class="top"><div><h2>{esc(f.name)} <span style="color:var(--muted);'
+        f'font-weight:500;font-size:.75em">{esc(company(f))}</span></h2>'
+        f'<small style="color:var(--muted)">Latest analysis {esc(r["run"])}</small></div>'
+        f'<div style="text-align:right"><div class="price">{num(r["price"], "${:,.2f}")}</div>'
+        f"{badge(r['to_entry'])}</div></div>"
+        f'<p class="lead">{inline(verdict.strip())}</p>'
+        f"{bullets}"
+        '<div class="kv">'
+        f"<div><small>Adjusted P/E</small><b>{num(r['pe_adj'], '{:.1f}x')}</b></div>"
+        f"<div><small>10y median</small><b>{num(r['pe_median_10y'], '{:.1f}x')}</b></div>"
+        f"<div><small>Target P/E</small><b>{num(r['target_pe'], '{:g}x')}</b></div>"
+        f"<div><small>Entry price</small><b>{num(r['entry_price'], '${:,.2f}')}</b></div></div>"
+        '<div class="row" style="margin-bottom:0">'
+        + a(f"{f.name}.html", "Full report", "btn")
+        + a(f"{f.name}/{r['file']}", "PDF", "btn ghost")
+        + a(f"{f.name}.html#previous", f"Previous analyses ({len(runs) - 1})", "btn ghost")
+        + "</div></section>"
+    )
+
+
 def overview(menu) -> str:
     market = ANALYSES / "market"
     summaries = ANALYSES / "summaries"
-    runs = [read_runs(f)[0]["run"] for f in stocks()]
-    latest = max(runs) if runs else ""
-    body = [
+    now, _ = watched()
+    latest = max((read_runs(f)[0]["run"] for f in now), default="")
+    main = [
         "<h1>Watch list</h1>",
-        f'<p class="sub">Last analysed {esc(latest)}. Each card opens the stock\'s page '
-        "with its notes and every dated report.</p>",
+        f'<p class="sub">{len(now)} stocks, last analysed {esc(latest)}. Each summary below is '
+        "the latest analysis; open the full report for the numbers and every earlier "
+        "analysis.</p>",
     ]
     buttons = []
     if summaries.exists() and pdfs(summaries):
         buttons.append(
-            a(f"summaries/{pdfs(summaries)[0]}", "Latest watch list summary (PDF)", "btn")
+            a(f"summaries/{pdfs(summaries)[0]}", "Watch list summary (PDF)", "btn ghost")
         )
     if market.exists() and pdfs(market):
-        buttons.append(a(f"market/{pdfs(market)[0]}", "Latest market report (PDF)", "btn ghost"))
+        buttons.append(a("market.html", "Today's market", "btn ghost"))
     if buttons:
-        body.append(f'<div class="row">{"".join(buttons)}</div>')
-    body.append('<div class="grid">' + "".join(stock_card(f) for f in stocks()) + "</div>")
-    mruns = read_runs(market)
-    if mruns:
-        verdict = first_sentence(notes(market).get("Verdict", ""))
-        body += [
-            "<h2>Market <a href='market.html' style='font-size:.75em;font-weight:500'>"
-            "all market reports →</a></h2>",
-            market_strip(mruns[0]),
-        ]
-        if verdict:
-            body.append(
-                f'<div class="card callout" style="margin-top:16px"><p>{esc(verdict)}</p></div>'
-            )
-    return layout("Watch list analyses", "index", "\n".join(body), menu)
+        main.append(f'<div class="row" style="margin-top:0">{"".join(buttons)}</div>')
+    main += [summary_panel(f) for f in now]
+    body = f'<div class="split">{sidebar("", on_index=True)}<div>{"".join(main)}</div></div>'
+    return layout("Watch list", "index", body, menu)
 
 
 def stock_page(f: Path, menu) -> str:
     runs = read_runs(f)
     r = runs[0]
     n = notes(f)
+    now, _ = watched()
     tiles = [
         ("Price", num(r["price"], "${:,.2f}")),
         ("Adjusted P/E", num(r["pe_adj"], "{:.1f}x")),
@@ -353,49 +441,62 @@ def stock_page(f: Path, menu) -> str:
         ("Entry price", num(r["entry_price"], "${:,.2f}")),
         ("Price vs entry", num(-float(r["to_entry"]) if r["to_entry"] else None, "{:+.1%}")),
     ]
-    body = [
+    status = "" if f in now else " · no longer on the watch list"
+    main = [
         f"<h1>{esc(company(f))} <span style='color:var(--muted);font-weight:500'>"
         f"{esc(f.name)}</span></h1>",
-        f'<p class="sub">Latest analysis {esc(r["run"])} {badge(r["to_entry"])}</p>',
+        f'<p class="sub">Latest analysis {esc(r["run"])}{status} {badge(r["to_entry"])}</p>',
     ]
     if n.get("Verdict"):
-        body.append(f'<div class="card callout">{md(n["Verdict"])}</div>')
-    body.append(
-        '<div class="row">'
-        + a(f"{f.name}/{r['file']}", "Open the latest report (PDF)", "btn")
-        + a("#history", f"All {len(runs)} dated reports", "btn ghost")
-        + "</div>"
-    )
-    body.append(
-        '<div class="strip">'
+        main.append(f'<div class="card callout">{md(n["Verdict"])}</div>')
+    main.append(
+        '<div class="strip" style="margin-top:16px">'
         + "".join(
             f'<div class="card tile"><small>{esc(k)}</small><b>{v}</b></div>' for k, v in tiles
         )
         + "</div>"
     )
+    options = "".join(
+        f'<option value="{esc(f.name + "/" + x["file"])}">{esc(x["run"])}'
+        f"{' (latest)' if i == 0 else ''}</option>"
+        for i, x in enumerate(runs)
+    )
+    first = f"{f.name}/{r['file']}"
+    main.append(
+        "<h2>Full report</h2>"
+        '<div class="card viewer"><div class="head">'
+        f'<label for="pick">Analysis of</label><select id="pick">{options}</select>'
+        f'<a id="open" class="btn ghost" href="{esc(first)}" target="_blank">Open PDF</a>'
+        f'</div><iframe id="pdf" src="{esc(first)}" title="Report"></iframe></div>'
+        "<script>const p=document.getElementById('pick'),o=document.getElementById('open'),"
+        "v=document.getElementById('pdf');p.addEventListener('change',()=>{v.src=p.value;"
+        "o.href=p.value;});</script>"
+    )
     cols = [k for k in ("Summary", "What to watch", "Risks", "News") if n.get(k)]
     if cols:
-        body.append("<h2>Claude's notes</h2><div class='cols'>")
-        body += [f'<div class="card notes"><h3>{esc(k)}</h3>{md(n[k])}</div>' for k in cols]
-        body.append("</div>")
+        main.append("<h2>Claude's notes</h2><div class='cols'>")
+        main += [f'<div class="card notes"><h3>{esc(k)}</h3>{md(n[k])}</div>' for k in cols]
+        main.append("</div>")
     if n.get("Business"):
-        body.append(f'<h2>Business</h2><div class="card notes">{md(n["Business"])}</div>')
-    body.append(
-        "<h2 id='history'>Every dated report</h2><div class='card wrap'><table>"
+        main.append(f'<h2>Business</h2><div class="card notes">{md(n["Business"])}</div>')
+    main.append(
+        '<h2 id="previous">Previous analyses</h2><div class="card wrap"><table>'
         "<tr><th>Date and time</th><th>Price</th><th>Adj. P/E</th><th>Entry price</th>"
         "<th>Price vs entry</th><th>Verdict</th></tr>"
     )
     for x in runs:
-        body.append(
+        main.append(
             f"<tr><td class='d'>{a(f.name + '/' + x['file'], x['run'])}</td>"
             f"<td class='n'>{num(x['price'], '${:,.2f}')}</td>"
             f"<td class='n'>{num(x['pe_adj'], '{:.1f}x')}</td>"
             f"<td class='n'>{num(x['entry_price'], '${:,.2f}')}</td>"
-            f"<td class='n'>{num(-float(x['to_entry']) if x['to_entry'] else None, '{:+.1%}')}</td>"
+            f"<td class='n'>{num(-float(x['to_entry']) if x['to_entry'] else None, '{:+.1%}')}"
+            "</td>"
             f"<td>{esc(x.get('verdict', ''))}</td></tr>"
         )
-    body.append("</table></div>")
-    return layout(f"{f.name}: {company(f)}", f.name, "\n".join(body), menu)
+    main.append("</table></div>")
+    body = f'<div class="split">{sidebar(f.name)}<div>{"".join(main)}</div></div>'
+    return layout(f"{f.name}: {company(f)}", "index", body, menu)
 
 
 def market_page(menu) -> str:
@@ -460,8 +561,7 @@ def build(out: Path = SITE) -> Path:
         dst = out / pdf.parent.name / pdf.name
         dst.parent.mkdir(exist_ok=True)
         shutil.copy2(pdf, dst)
-    menu = [("index", "Overview")] + [(f.name, f.name) for f in stocks()]
-    menu += [("market", "Market"), ("summaries", "Summaries")]
+    menu = [("index", "Watch list"), ("market", "Market"), ("summaries", "Summaries")]
     (out / "index.html").write_text(overview(menu))
     for f in stocks():
         (out / f"{f.name}.html").write_text(stock_page(f, menu))

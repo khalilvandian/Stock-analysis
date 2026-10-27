@@ -164,14 +164,25 @@ def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
         "2026-10-26 21:00 CET,2026-10-26_2100.pdf,44,3.2,13.8,25.2,13,41.7,-0.05,Old.\n"
         "2026-10-27 21:00 CET,2026-10-27_2100.pdf,45,3.2,14.0,25.2,13,41.7,-0.07,Cheap.\n"
     )
+    (analyses / "OLD").mkdir()  # analysed before, since removed from the watch list
+    (analyses / "OLD/runs.csv").write_text(
+        "run,file,price,eps_adj_ttm,pe_adj,pe_median_10y,target_pe,entry_price,to_entry,verdict\n"
+        "2026-10-20 21:00 CEST,2026-10-20_2100.pdf,10,1,10,12,9,9,-0.1,Gone.\n"
+    )
     for p in ("BSX/2026-10-26_2100.pdf", "BSX/2026-10-27_2100.pdf", "market/2026-10-27_2100.pdf"):
         (analyses / p).write_bytes(b"%PDF-1.4")
+    (tmp_path / "watchlist.toml").write_text('[[stock]]\nsymbol = "BSX"\n')
     monkeypatch.setattr(site, "ANALYSES", analyses)
+    monkeypatch.setattr(site, "CONFIG", tmp_path / "watchlist.toml")
     out = site.build(tmp_path / "_site")
     index, bsx = (out / "index.html").read_text(), (out / "BSX.html").read_text()
     assert (out / "BSX/2026-10-26_2100.pdf").exists() and (
         out / "market/2026-10-27_2100.pdf"
     ).exists()
-    assert 'href="BSX.html"' in index and 'href="market/2026-10-27_2100.pdf"' in index
+    # the watch list page: active stocks in the sidebar, each with its latest summary
+    assert 'href="#BSX"' in index and 'id="BSX"' in index and 'href="BSX.html"' in index
+    assert "Previously watched" in index and 'href="OLD.html"' in index and 'id="OLD"' not in index
+    # the stock page: the report viewer can switch to every earlier analysis
+    assert 'value="BSX/2026-10-26_2100.pdf"' in bsx and 'id="previous"' in bsx
     assert bsx.index("2026-10-27 21:00 CET") < bsx.index("2026-10-26 21:00 CET")  # newest first
     assert "Boston Scientific Corporation" in bsx and 'href="market.html"' in bsx  # the menu
