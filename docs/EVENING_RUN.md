@@ -33,8 +33,8 @@ Babak approved committing the results straight to `main` (no pull request each n
    the light copies listed under `light` in `.cache/watchlist/last_run.json`
    (`base64 -w0 <file>` for each). They are the same reports, page for page, with the
    standard PDF fonts instead of embedded ones (`analysis/slim_pdf.py`): about 5 KB for the
-   summary, 8 KB for the market report and 17 KB per stock. Send one email with the market
-   report and the summary (subject and HTML body from the run), then one email per stock
-   with its report attached.
+   summary, 8 KB for the market report and 17 KB per stock. Send them all in one email
+   (subject and HTML body from the run), as Babak asked. Copy each base64 string exactly:
+   one wrong character breaks that PDF.
 
 If a step fails, still commit what was built and say in the email what failed.
