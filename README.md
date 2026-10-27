@@ -6,7 +6,7 @@ The process is general. The first application is the **US utilities sector** (al
 
 ## How the process works
 
-1. **Get the data.** Yahoo Finance supplies the latest prices, statements and sector lists. SEC EDGAR supplies the history from annual filings (2016 onward). Financial Modeling Prep (FMP) can be used for symbols its plan covers. Web search covers company guidance and deal details.
+1. **Get the data.** Yahoo Finance supplies the latest prices, statements and sector lists. SEC EDGAR supplies the history from annual filings (2016 onward). TradingView's public screener supplies whole-market fundamentals and technicals for the market screener, and the ECB supplies exchange rates. Financial Modeling Prep (FMP) is wired in but its current key is rejected, so nothing depends on it. Web search covers company guidance and deal details.
 2. **Screen the absolute values first, with their history.** Look at price, market value, debt, cash, revenue, earnings and cash flow, year by year, before any ratio, score or summary. Ratios hide information.
 3. **Then use ratios and comparisons.** Leverage, margins, growth (average and median of yearly rates), valuation multiples, and comparisons with peers and sub-industries.
 4. **Value the companies.** Enterprise DCF (FCFF discounted at WACC), equity DCF, dividend model for utilities, and reverse DCF.
@@ -24,7 +24,10 @@ Claude runs the process in Claude Code. [`CLAUDE.md`](CLAUDE.md) holds the rules
 | `analysis/` | Analysis scripts (see below) |
 | `dashboard/` | Dashboard builders and the generated HTML pages |
 | `data/` | Saved data. `data/<TICKER>/` holds a single company; `data/sector/` holds the sector screen and history |
-| `src/stock_analysis/` | Data clients: `fetch.py` (Yahoo), `fmp.py` (FMP) |
+| `src/stock_analysis/` | Data clients: `fetch.py` (Yahoo), `fmp.py` (FMP), `tradingview.py` (TradingView screener), `ecb.py` (ECB exchange rates); `metrics.py` (metrics dictionary and vectors) |
+| `config/` | `absolute_values.toml`, `watchlist.toml`, `screeners.toml` (market screener rules), `metrics.toml` (metrics dictionary), `market_universe.csv` (S&P 500 list) |
+| `analyses/` | The evening run's dated PDFs per stock, market and summary, with Claude's `notes.md` |
+| `docs/` | Full documentation: [start here](docs/README.md) |
 | `tests/` | Tests (no network) |
 | `.cache/sec/` | Raw SEC downloads (not committed) |
 
@@ -46,6 +49,13 @@ Claude runs the process in Claude Code. [`CLAUDE.md`](CLAUDE.md) holds the rules
 | `uv run python analysis/debt.py CEG` | One company's leverage over time |
 | `uv run python analysis/peer_screen.py NAME TICKERS` | Metrics and screens for a hand-picked peer group outside utilities |
 | `uv run python -m stock_analysis.fetch CEG` | Saves one company's Yahoo data to `data/CEG/` |
+| `uv run python analysis/screener.py` | Market screener: Stage 1 (Lynch category and financial-statement rules) then Stage 2 (top 3 cheap or close-to-cheap per sector); writes `data/screener/` |
+| `uv run python analysis/watchlist.py` | The evening run: screener, market report, one PDF per watch-list stock and the summary, in `analyses/` |
+| `uv run python analysis/market.py --numbers` | The market report's numbers (indices, sectors, breadth, the screener's top names) |
+| `uv run python analysis/validate.py` | Checks the latest outputs are complete and consistent |
+| `python analysis/site.py` | Builds the public site in `_site/` (GitHub Pages) |
+| `uv run python analysis/send_email.py --to ADDRESS` | Emails the last run with every PDF through Brevo |
+| `uv run python -m stock_analysis.metrics list --set proposed` | The metrics dictionary and per-stock vectors |
 
 ## Dashboards
 
@@ -75,7 +85,7 @@ Locally:
 ```bash
 uv sync
 cp .env.example .env   # optional: FMP_API_KEY, SEC_USER_AGENT
-uv run pytest && uv run ruff check .
+uv run ruff check . && uv run ruff format --check . && uv run pytest
 ```
 
 ## Caveats

@@ -18,7 +18,9 @@ analyses/<SYMBOL>/runs.csv and rebuilds the dated lists analyses/<SYMBOL>/README
 analyses/README.md. Earlier PDFs are never overwritten.
 
 Usage:
-    uv run python analysis/watchlist.py              # market report + every stock + summary
+    uv run python analysis/watchlist.py              # screener, market report, every stock
+                                                     # and the summary
+    uv run python analysis/watchlist.py --no-screener  # same, reusing the last screener run
     uv run python analysis/watchlist.py BSX NFLX     # selected stocks
     uv run python analysis/watchlist.py --numbers    # print the key numbers, no PDF
 """
@@ -149,10 +151,18 @@ def fetch_row(symbol: str) -> dict:
     """sector.analyse() with retries: Yahoo sometimes answers without a price."""
     for attempt in range(4):
         row = sector.analyse({"symbol": symbol})
-        if row.get("price"):
+        if has_price(row):
             return row
         time.sleep(5 * (attempt + 1))
     return row
+
+
+def has_price(row: dict) -> bool:
+    """A usable price: present, a number and above zero (NaN is truthy, so test it)."""
+    try:
+        return float(row.get("price")) > 0
+    except (TypeError, ValueError):
+        return False
 
 
 def split_adjust(hist: pd.DataFrame, splits: pd.Series, shares_now: float) -> pd.DataFrame:
@@ -171,7 +181,8 @@ def split_adjust(hist: pd.DataFrame, splits: pd.Series, shares_now: float) -> pd
     for end in ends.unique():
         factor = float(splits[splits.index > end].prod())
         sh = h[(ends == end) & (h["column"] == "_shares")]["value"]
-        if factor < 1.5 or sh.empty:
+        # forward or reverse split (a 1-for-20 reverse split is a factor of 0.05)
+        if abs(np.log(factor)) < np.log(1.5) or sh.empty:
             continue
         if abs(np.log(sh.iloc[0] * factor / shares_now)) < abs(np.log(sh.iloc[0] / shares_now)):
             h.loc[(ends == end) & (h["column"] == "_shares"), "value"] *= factor
@@ -190,7 +201,8 @@ def sec_years(
     facts = history.company_facts(symbol, cik, refresh=stale) if cik else None
     hist = history.sec_history(symbol, facts) if facts else pd.DataFrame()
     hist = history.fill_from_yahoo(hist, pd.DataFrame(yahoo_rows), symbol)
-    hist = split_adjust(hist, yf.Ticker(symbol).splits, shares_now)
+    # history.add_prices puts SEC shares and EPS on today's share basis by filing date
+    # (history.split_adjust); adjusting here as well would apply each split twice
     cur = history.reporting_currency(facts) if facts else (currency or "USD")
     hist = history.add_prices(hist, symbol, cur)
     return hist[hist["column"] != "_shares"] if not hist.empty else hist
@@ -221,7 +233,8 @@ def gather(stock: dict, rows: dict[str, dict], now: pd.Timestamp) -> dict:
             sym,
             yahoo_rows,
             row.get("currency"),
-            sector._div(row.get("market_cap") or np.nan, row.get("price") or np.nan) * 1e9,
+            sector._div(row.get("market_cap") or np.nan, row["price"] if has_price(row) else np.nan)
+            * 1e9,
         ),
         "peers": peers,
         "next_report": nxt,
@@ -232,7 +245,7 @@ def gather(stock: dict, rows: dict[str, dict], now: pd.Timestamp) -> dict:
 def key_numbers(d: dict) -> dict:
     """The few numbers that go in the summary, the dated list and the evening message."""
     stock, row, prices, ttm = d["stock"], d["row"], d["prices"], d["ttm"]
-    price = float(row.get("price") or prices.iloc[-1])
+    price = float(row["price"]) if has_price(row) else float(prices.iloc[-1])
     eps = float(ttm.iloc[-1]) if not ttm.empty else np.nan
     yearly = yearly_pe(prices, ttm)
     median = float(yearly["pe"].median()) if not yearly.empty else np.nan
@@ -822,6 +835,11 @@ def main() -> None:
     ap.add_argument("symbols", nargs="*", help="only these stocks (default: the whole list)")
     ap.add_argument("--numbers", action="store_true", help="print key numbers, write nothing")
     ap.add_argument("--no-market", action="store_true", help="skip the market report")
+    ap.add_argument(
+        "--no-screener",
+        action="store_true",
+        help="don't rerun the market screener; the market report uses its last results",
+    )
     args = ap.parse_args()
 
     cfg = load_watchlist()
@@ -842,6 +860,14 @@ def main() -> None:
     if not args.numbers and not args.no_market and not args.symbols:
         import market  # the whole-market report goes with the full evening run
 
+        if not args.no_screener:
+            # the market report lists the screener's top per sector, so refresh it first
+            import screener
+
+            try:
+                screener.run()
+            except Exception as e:  # noqa: BLE001 - the report then uses the last results
+                print(f"Screener failed ({e}); the market report uses its last results")
         written.append(market.build(local))
     for stock in stocks:
         sym = stock["symbol"]
@@ -917,8 +943,18 @@ def email_html(run_label: str, written: list[Path], results: list[tuple[dict, di
             md(notes.get("Verdict", "")),
             f"<p>S&amp;P 500 {r['sp500']:,.0f} ({pct(r['sp500_day'])} today), VIX "
             f"{r['vix']:.1f}, {r['above_200d']:.0%} of S&amp;P 500 stocks above their "
-            f"200-day average. Stocks to look at: {html.escape(str(r['stocks_to_look_at']))}.</p>",
+            f"200-day average.</p>",
         ]
+        if "screener_listed" in r and pd.notna(r["screener_listed"]):
+            parts.append(
+                f"<p>Market screener: {int(r['screener_passed'])} of "
+                f"{int(r['screener_screened'])} S&amp;P 500 companies have good financial "
+                f"statements; {int(r['screener_listed'])} are cheap or close to cheap (top 3 per "
+                f"sector, in the market report). Cheapest: "
+                f"{html.escape(str(r['stocks_to_look_at']))}.</p>"
+            )
+        else:
+            parts.append(f"<p>Stocks to look at: {html.escape(str(r['stocks_to_look_at']))}.</p>")
     _, notes = read_notes("summaries")
     parts += ["<h3>Watch list</h3>", md(notes.get("Verdict", "")), "<ul>"]
     for d, k in results:

@@ -1,0 +1,7 @@
+{"taxonomy": "us-gaap", "tag": "EarningsPerShareDiluted", "ccp": "CY2025", "uom": "USD-per-shares",
+ "data": [
+  {"accn": "0001075531-26-000010", "cik": 1075531, "entityName": "Booking Holdings Inc.", "end": "2025-12-31", "val": 165.57},
+  {"accn": "0001067983-26-000005", "cik": 1067983, "entityName": "Berkshire Hathaway Inc.", "end": "2025-12-31", "val": 41000.0},
+  {"accn": "0001065280-26-000003", "cik": 1065280, "entityName": "Netflix, Inc.", "end": "2025-12-31", "val": 2.40},
+  {"accn": "0000885725-26-000004", "cik": 885725, "entityName": "Boston Scientific Corp", "end": "2025-12-31", "val": 1.95}
+ ]}

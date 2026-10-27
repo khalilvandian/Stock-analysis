@@ -1,7 +1,7 @@
 [project]
 name = "stock-analysis"
 version = "0.1.0"
-description = "Stock market analysis using Financial Modeling Prep data"
+description = "Stock analysis: absolute values first, a two-stage market screener and evening watch-list reports"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -9,6 +9,7 @@ dependencies = [
     "markdown>=3.11.2",
     "pandas>=2.2",
     "python-dotenv>=1.0",
+    "requests>=2.31",
     "yfinance>=1.7.0",
 ]
 

@@ -1,4 +1,5 @@
-# Publishes the watch list analyses (analyses/*) as a web page on GitHub Pages:
+# Publishes the watch list analyses (analyses/*) and the market screener's latest results
+# (data/screener/*) as a web page on GitHub Pages:
 # https://khalilvandian.github.io/Stock-analysis/
 # One-time setup: Settings > Pages > Build and deployment > Source: GitHub Actions.
 name: Publish analyses page
@@ -6,7 +7,7 @@ name: Publish analyses page
 on:
   push:
     branches: [main]
-    paths: ["analyses/**", "analysis/site.py", ".github/workflows/pages.yml"]
+    paths: ["analyses/**", "data/screener/**", "analysis/site.py", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:

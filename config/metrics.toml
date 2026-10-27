@@ -1,0 +1,1290 @@
+# The metrics dictionary: every fundamental metric the project has used so far, defined
+# once, so that a chosen set can become each stock's vector (issue #8, "Quantification").
+#
+# Read by src/stock_analysis/metrics.py, which lists the metrics, picks a set and builds the
+# vector for any stock. reports/14-metrics-dictionary.md is the readable version, built from
+# this file with `uv run python -m stock_analysis.metrics doc`.
+#
+# Each [[metric]]:
+#   id          name used in the vector
+#   name        readable name
+#   group       one of [groups] below
+#   unit        $bn (billions of US dollars), $ (per share), x (a multiple), fraction
+#               (0.12 = 12%), pp (percentage points a year, as a fraction), score, count,
+#               bool, category
+#   better      higher, lower, or none (no direction: size, a category, or "it depends")
+#   period      ttm (last 12 months), fq (latest quarter's balance sheet), fy (fiscal
+#               years), now (today's price), history (several years)
+#   definition  what it measures, in words
+#   formula     how it is calculated from other metrics or statement lines
+#   sources     where it lives: `sector` = column made by analysis/sector.py
+#               (data/sector/*.csv, data/peers/*.csv, Yahoo); `stage1` = column in
+#               data/screener/stage1.csv (analysis/stage1.py, TradingView, PR #7);
+#               `watchlist` = key from analysis/watchlist.py key_numbers(); `stage2` =
+#               column in data/screener/top.csv; `tradingview`, `yahoo` and `sec` name the
+#               raw field, statement line or XBRL tag. A source can be {column, scale} when
+#               the column's unit differs (TradingView gives percentages as 15.5, not 0.155).
+#   used_in     where the project uses it
+#   example     a worked example on a real stock, with the data date and the working
+#   vector      draft status for the vector, for Babak to confirm:
+#               core       = proposed for the first vector
+#               candidate  = worth considering
+#               context    = needed to read the others (size, price), not a feature itself
+#               derived    = depends on a peer group or a model, not the stock alone
+#   notes       caveats and open choices
+#   clip        optional {lower, upper}: bounds applied when the vector is built, before
+#               standardizing (report 14, open choice 6: net debt ratios at 0, so every
+#               net-cash company counts the same; cover ratios at 50x, so "no debt" (an
+#               infinite ratio) counts as the best value rather than a blank)
+
+[meta]
+example_stock = "BSX"
+example_note = """Worked examples are Boston Scientific (BSX) unless they say otherwise. \
+Yahoo figures (sector.py, peer screen) are as of the 2026-10-26 close; TradingView figures \
+(Stage 1) as of 2026-10-27; adjusted EPS and P/E history from the 2026-10-27 20:55 watch-list \
+run. Booking (BKNG) is used where BSX can't show a case (net cash, negative equity)."""
+
+[groups]
+size_price = "Size and price"
+balance_sheet = "Balance sheet (absolute)"
+income = "Income statement (absolute)"
+cash_flow = "Cash flow (absolute)"
+debt = "Debt and liquidity ratios"
+profitability = "Profitability"
+growth = "Growth"
+earnings_history = "Earnings history (Lynch inputs)"
+quality = "Quality scores"
+valuation = "Valuation (needs the price)"
+
+# --- Size and price -------------------------------------------------------------------
+
+[[metric]]
+id = "price"
+name = "Share price"
+group = "size_price"
+unit = "$"
+better = "none"
+period = "now"
+definition = "Last closing price."
+formula = "close"
+sources = { sector = "price", stage1 = "close", watchlist = "price", yahoo = "regularMarketPrice", tradingview = "close" }
+used_in = ["absolute values", "watch list", "screener"]
+example = { symbol = "BSX", value = 45.58, as_of = "2026-10-26", working = "Yahoo close" }
+vector = "context"
+
+[[metric]]
+id = "market_cap"
+name = "Market value"
+group = "size_price"
+unit = "$bn"
+better = "none"
+period = "now"
+definition = "What the stock market values all the shares at."
+formula = "price x shares outstanding"
+sources = { sector = "market_cap", stage1 = "cap_usd_bn", tradingview = "market_cap_basic", yahoo = "marketCap" }
+used_in = ["absolute values", "strict screen (>= $1bn)", "screener (>= $1bn)"]
+example = { symbol = "BSX", value = 66.06, as_of = "2026-10-26", working = "$45.58 x 1.449bn shares" }
+vector = "context"
+notes = "Foreign filers are converted to US dollars at today's exchange rate (ECB in the screener)."
+
+[[metric]]
+id = "enterprise_value"
+name = "Enterprise value"
+group = "size_price"
+unit = "$bn"
+better = "none"
+period = "now"
+definition = "Price of the whole business: the shares plus the debt, less the cash."
+formula = "market_cap + net_debt"
+sources = { tradingview = "enterprise_value_fq" }
+used_in = ["EV / EBITDA", "DCF (equity = enterprise value - net debt)"]
+example = { symbol = "BSX", value = 78.14, as_of = "2026-10-26", working = "66.06 + 12.085" }
+vector = "context"
+
+# --- Balance sheet --------------------------------------------------------------------
+
+[[metric]]
+id = "total_debt"
+name = "Total debt"
+group = "balance_sheet"
+unit = "$bn"
+better = "lower"
+period = "fq"
+definition = "All borrowings, short and long term, including leases."
+formula = "short_term_debt + long_term_debt"
+sources = { sector = "total_debt", stage1 = "total_debt_usd_bn", tradingview = "total_debt_fq", yahoo = "Total Debt", sec = "LongTermDebt + DebtCurrent (+ ShortTermBorrowings)" }
+used_in = ["absolute values", "debt / equity", "WACC"]
+example = { symbol = "BSX", value = 12.624, as_of = "2026-09-30", working = "1.709 short-term + 10.915 long-term" }
+vector = "candidate"
+notes = "Includes lease liabilities since 2019 (ASC 842 / IFRS 16), which makes older debt figures look lower. BSX will add about $11bn for Penumbra."
+
+[[metric]]
+id = "short_term_debt"
+name = "Short-term debt"
+group = "balance_sheet"
+unit = "$bn"
+better = "lower"
+period = "fq"
+definition = "Debt due within a year, including the current part of long-term debt."
+formula = "current debt + current lease liabilities; if blank, total_debt - long_term_debt"
+sources = { sector = "short_term_debt", stage1 = "short_term_debt_usd_bn", tradingview = "short_term_debt_fq", yahoo = "Current Debt And Capital Lease Obligation", sec = "DebtCurrent / LongTermDebtCurrent + ShortTermBorrowings" }
+used_in = ["absolute values", "cash / short-term debt"]
+example = { symbol = "BSX", value = 1.709, as_of = "2026-09-30", working = "balance sheet, current debt" }
+vector = "candidate"
+
+[[metric]]
+id = "long_term_debt"
+name = "Long-term debt"
+group = "balance_sheet"
+unit = "$bn"
+better = "lower"
+period = "fq"
+definition = "Debt due after more than a year."
+formula = "non-current debt + non-current lease liabilities"
+sources = { sector = "long_term_debt", stage1 = "long_term_debt_usd_bn", tradingview = "long_term_debt_fq", yahoo = "Long Term Debt And Capital Lease Obligation", sec = "LongTermDebtNoncurrent" }
+used_in = ["absolute values", "cash / long-term debt"]
+example = { symbol = "BSX", value = 10.915, as_of = "2026-09-30", working = "balance sheet, long-term debt" }
+vector = "candidate"
+
+[[metric]]
+id = "cash"
+name = "Cash and short-term investments"
+group = "balance_sheet"
+unit = "$bn"
+better = "higher"
+period = "fq"
+definition = "Cash, cash equivalents and short-term investments."
+formula = "cash and equivalents + short-term investments"
+sources = { sector = "cash", stage1 = "cash_usd_bn", tradingview = "cash_n_short_term_invest_fq", yahoo = "Cash Cash Equivalents And Short Term Investments", sec = "CashAndCashEquivalentsAtCarryingValue" }
+used_in = ["absolute values", "every cash-against-debt rule"]
+example = { symbol = "BSX", value = 0.539, as_of = "2026-09-30", working = "Yahoo; TradingView has 0.648" }
+vector = "candidate"
+notes = "Yahoo and TradingView differ by what they count as short-term investments; SEC's tag is cash only."
+
+[[metric]]
+id = "net_debt"
+name = "Net debt"
+group = "balance_sheet"
+unit = "$bn"
+better = "lower"
+period = "fq"
+definition = "Debt left after paying off what cash can. Negative = net cash."
+formula = "total_debt - cash"
+sources = { sector = "net_debt", stage1 = "net_debt_usd_bn", tradingview = "net_debt_fq" }
+used_in = ["absolute values", "net debt / EBITDA", "DCF"]
+example = { symbol = "BSX", value = 12.085, as_of = "2026-09-30", working = "12.624 - 0.539. BKNG: 20.694 - 17.508 = 3.19" }
+vector = "candidate"
+
+[[metric]]
+id = "book_equity"
+name = "Shareholders' equity (book value)"
+group = "balance_sheet"
+unit = "$bn"
+better = "higher"
+period = "fq"
+definition = "Assets less liabilities on the balance sheet."
+formula = "total assets - total liabilities"
+sources = { tradingview = "total_equity_fq", yahoo = "Stockholders Equity", sec = "StockholdersEquity" }
+used_in = ["debt / equity", "price / book", "Lynch asset play", "ROE"]
+example = { symbol = "BSX", value = 25.17, as_of = "2026-09-30", working = "TradingView. BKNG: -10.78 (buybacks larger than its retained profits)" }
+vector = "candidate"
+notes = "Negative for heavy buyers of their own shares (BKNG), which makes debt / equity and ROE meaningless; Stage 1 then uses net debt / EBITDA <= 2x instead."
+
+# --- Income statement -----------------------------------------------------------------
+
+[[metric]]
+id = "revenue"
+name = "Revenue"
+group = "income"
+unit = "$bn"
+better = "higher"
+period = "ttm"
+definition = "Sales over the last 12 months."
+formula = "sum of the last 4 quarters' revenue"
+sources = { sector = "revenue", stage1 = "revenue_usd_bn", tradingview = "total_revenue_ttm", yahoo = "Total Revenue", sec = "Revenues / RevenueFromContractWithCustomerExcludingAssessedTax" }
+used_in = ["absolute values", "net margin", "price / sales"]
+example = { symbol = "BSX", value = 20.996, as_of = "2026-09-30", working = "Q4 2025 to Q3 2026" }
+vector = "context"
+
+[[metric]]
+id = "ebitda"
+name = "EBITDA"
+group = "income"
+unit = "$bn"
+better = "higher"
+period = "ttm"
+definition = "Earnings before interest, tax, depreciation and amortization: operating cash earnings, before paying lenders or replacing assets."
+formula = "operating income + depreciation and amortization"
+sources = { sector = "ebitda", stage1 = "ebitda_usd_bn", tradingview = "ebitda_ttm", yahoo = "EBITDA", sec = "OperatingIncomeLoss + DepreciationDepletionAndAmortization" }
+used_in = ["absolute values", "net debt / EBITDA", "interest cover", "EV / EBITDA"]
+example = { symbol = "BSX", value = 5.637, as_of = "2026-09-30", working = "Yahoo; TradingView 5.991" }
+vector = "context"
+notes = "Yahoo and TradingView differ by how they treat one-offs (BSX: 5.64 vs 5.99)."
+
+[[metric]]
+id = "net_income"
+name = "Net income"
+group = "income"
+unit = "$bn"
+better = "higher"
+period = "ttm"
+definition = "Profit after everything, attributable to shareholders (GAAP)."
+formula = "sum of the last 4 quarters' net income"
+sources = { sector = "net_income", stage1 = "net_income_usd_bn", tradingview = "net_income_ttm", yahoo = "Net Income", sec = "NetIncomeLoss" }
+used_in = ["absolute values", "strict screen (profitable)", "net margin"]
+example = { symbol = "BSX", value = 3.675, as_of = "2026-09-30", working = "Q4 2025 to Q3 2026" }
+vector = "context"
+
+[[metric]]
+id = "interest_expense"
+name = "Interest expense"
+group = "income"
+unit = "$bn"
+better = "lower"
+period = "ttm"
+definition = "What the company pays its lenders in a year."
+formula = "sum of the last 4 quarters' interest expense"
+sources = { yahoo = "Interest Expense", sec = "InterestExpense" }
+used_in = ["interest cover", "DCF (after-tax interest added back)"]
+example = { symbol = "BSX", value = 0.363, as_of = "2026-09-30", working = "EBITDA 5.637 / interest cover 15.53" }
+vector = "candidate"
+
+[[metric]]
+id = "d_and_a"
+name = "Depreciation and amortization"
+group = "income"
+unit = "$bn"
+better = "none"
+period = "ttm"
+definition = "The yearly cost of wearing out assets and writing off acquired intangibles."
+formula = "from the cash-flow statement"
+sources = { yahoo = "Depreciation And Amortization", sec = "DepreciationDepletionAndAmortization" }
+used_in = ["standard DCF (stands in for maintenance capex)"]
+example = { symbol = "BSX", value = 1.413, as_of = "2026-09-30", working = "4.529 OCF + 0.363 x 0.79 - 3.403 DCF base" }
+vector = "context"
+
+[[metric]]
+id = "eps_ttm"
+name = "EPS, GAAP diluted"
+group = "income"
+unit = "$"
+better = "higher"
+period = "ttm"
+definition = "Net income per share, after counting options and convertibles."
+formula = "net_income / diluted shares"
+sources = { sector = "eps_ttm", stage1 = "eps", tradingview = "earnings_per_share_diluted_ttm", yahoo = "trailingEps", sec = "EarningsPerShareDiluted" }
+used_in = ["absolute values", "trailing P/E", "screener P/E history", "Lynch categories"]
+example = { symbol = "BSX", value = 2.47, as_of = "2026-09-30", working = "3.675bn / about 1.49bn diluted shares" }
+vector = "candidate"
+notes = "Includes amortization and one-offs, so it understates acquisitive companies like BSX (adjusted EPS $3.21)."
+
+[[metric]]
+id = "eps_adj_ttm"
+name = "EPS, adjusted"
+group = "income"
+unit = "$"
+better = "higher"
+period = "ttm"
+definition = "EPS without amortization of acquired intangibles and one-offs, on the same basis as analysts' estimates. Babak's 'true' EPS."
+formula = "sum of the last 4 quarters' reported (adjusted) EPS, with eps_override corrections"
+sources = { watchlist = "eps_adj_ttm", yahoo = "earnings_dates: Reported EPS" }
+used_in = ["watch list: own-history P/E and entry price", "screener Stage 2 (top stocks)"]
+example = { symbol = "BSX", value = 3.21, as_of = "2026-09-30", working = "sum of the last 4 reported quarters" }
+vector = "core"
+notes = "Company-defined, so not identical across companies. One-offs Yahoo still includes are fixed by hand in config/watchlist.toml (NFLX)."
+
+[[metric]]
+id = "eps_fwd"
+name = "Forward EPS"
+group = "income"
+unit = "$"
+better = "higher"
+period = "fy"
+definition = "Analysts' average EPS estimate for the next fiscal year."
+formula = "consensus estimate"
+sources = { sector = "eps_fwd", tradingview = "earnings_per_share_forecast_next_fy", yahoo = "forwardEps" }
+used_in = ["absolute values", "forward P/E", "getting-cheaper test"]
+example = { symbol = "BSX", value = 3.38, as_of = "2026-10-26", working = "Yahoo consensus, adjusted basis" }
+vector = "candidate"
+notes = "Not from the statements: an estimate. Keep or drop is an open choice."
+
+# --- Cash flow ------------------------------------------------------------------------
+
+[[metric]]
+id = "operating_cf"
+name = "Operating cash flow"
+group = "cash_flow"
+unit = "$bn"
+better = "higher"
+period = "ttm"
+definition = "Cash the business brought in from operations, after tax and interest, before investing."
+formula = "net income + non-cash charges +/- working-capital changes"
+sources = { sector = "operating_cf", stage1 = "ocf_usd_bn", tradingview = "cash_f_operating_activities_ttm", yahoo = "Operating Cash Flow", sec = "NetCashProvidedByUsedInOperatingActivities" }
+used_in = ["absolute values", "turnaround and asset-play rules (positive OCF)", "DCF"]
+example = { symbol = "BSX", value = 4.529, as_of = "2026-09-30", working = "Q4 2025 to Q3 2026" }
+vector = "context"
+
+[[metric]]
+id = "capex"
+name = "Capital expenditure"
+group = "cash_flow"
+unit = "$bn"
+better = "none"
+period = "ttm"
+definition = "Cash spent on property, plant and equipment (negative number = spent)."
+formula = "purchases of property, plant and equipment"
+sources = { sector = "capex", stage1 = "capex_usd_bn", tradingview = "capital_expenditures_ttm", yahoo = "Capital Expenditure", sec = "PaymentsToAcquirePropertyPlantAndEquipment" }
+used_in = ["absolute values", "free cash flow"]
+example = { symbol = "BSX", value = -2.723, as_of = "2026-09-30", working = "Yahoo; TradingView -0.904" }
+vector = "context"
+notes = "Yahoo's capex can include acquisitions and stakes (BSX: -2.72 vs -0.90 on TradingView and SEC). Check SEC."
+
+[[metric]]
+id = "free_cf"
+name = "Free cash flow"
+group = "cash_flow"
+unit = "$bn"
+better = "higher"
+period = "ttm"
+definition = "Cash left after keeping the business going and growing it: what can pay debt, dividends and buybacks."
+formula = "operating_cf + capex"
+sources = { sector = "free_cf", stage1 = "fcf_usd_bn", tradingview = "free_cash_flow_ttm" }
+used_in = ["absolute values", "FCF yield"]
+example = { symbol = "BSX", value = 1.806, as_of = "2026-09-30", working = "4.529 - 2.723 (Yahoo); 3.625 on TradingView" }
+vector = "context"
+
+[[metric]]
+id = "fcff_before_growth"
+name = "Cash flow before growth (DCF base)"
+group = "cash_flow"
+unit = "$bn"
+better = "higher"
+period = "ttm"
+definition = "Cash the whole firm earns before growth investment and before paying lenders: the standard DCF's starting cash flow."
+formula = "operating_cf - d_and_a + interest_expense x (1 - 21% tax)"
+sources = { sector = "fcff_before_growth" }
+used_in = ["absolute values", "standard DCF"]
+example = { symbol = "BSX", value = 3.403, as_of = "2026-09-30", working = "4.529 - 1.413 + 0.363 x 0.79" }
+vector = "candidate"
+notes = "Treats depreciation as maintenance capex, so all capex above it counts as growth."
+
+# --- Debt and liquidity ratios --------------------------------------------------------
+
+[[metric]]
+id = "cash_to_short_term_debt"
+name = "Cash / short-term debt"
+group = "debt"
+unit = "x"
+better = "higher"
+period = "fq"
+definition = "Can today's cash pay what falls due this year? Babak's first must-have."
+formula = "cash / short_term_debt (no short-term debt = passes)"
+sources = { sector = "cash_to_short_term_debt", stage1 = "cash_to_short_term_debt" }
+used_in = ["strict screen (>= 1)", "weighted debt score", "every Stage 1 rule set (>= 1)"]
+example = { symbol = "BSX", value = 0.315, as_of = "2026-09-30", working = "0.539 / 1.709: fails. BKNG: 17.5 / 2.0 = 8.8" }
+vector = "core"
+clip = { upper = 50.0 }
+
+[[metric]]
+id = "cash_plus_ocf_to_short_term_debt"
+name = "(Cash + operating cash flow) / short-term debt"
+group = "debt"
+unit = "x"
+better = "higher"
+period = "fq"
+definition = "Same test, counting a year's operating cash flow as well as cash on hand."
+formula = "(cash + max(operating_cf, 0)) / short_term_debt"
+sources = { sector = "cash_plus_ocf_to_short_term_debt" }
+used_in = ["sector table (shown, not a rule)"]
+example = { symbol = "BSX", value = 2.97, as_of = "2026-09-30", working = "(0.539 + 4.529) / 1.709" }
+vector = "candidate"
+clip = { upper = 50.0 }
+notes = "Open choice: a fairer version of the first must-have for companies that keep little cash (BSX passes this, fails the strict one)."
+
+[[metric]]
+id = "cash_to_long_term_debt"
+name = "Cash / long-term debt"
+group = "debt"
+unit = "x"
+better = "higher"
+period = "fq"
+definition = "Is there a cash cushion against long-term debt? Babak's second must-have."
+formula = "cash / long_term_debt"
+sources = { sector = "cash_to_long_term_debt", stage1 = "cash_to_long_term_debt" }
+used_in = ["strict screen (>= 5%)", "weighted debt score", "Stage 1 slow grower, stalwart, cyclical (>= 5%)"]
+example = { symbol = "BSX", value = 0.049, as_of = "2026-09-30", working = "0.539 / 10.915: just under 5% (TradingView's 0.648 gives 5.9%)" }
+vector = "core"
+clip = { upper = 50.0 }
+
+[[metric]]
+id = "cash_to_total_debt"
+name = "Cash / total debt"
+group = "debt"
+unit = "x"
+better = "higher"
+period = "fq"
+definition = "Share of all debt cash could repay today."
+formula = "cash / total_debt"
+sources = { stage1 = "cash_to_total_debt" }
+used_in = ["Stage 1 turnaround (>= 25%)"]
+example = { symbol = "BSX", value = 0.051, as_of = "2026-09-30", working = "0.648 / 12.624 (TradingView)" }
+vector = "candidate"
+clip = { upper = 50.0 }
+notes = "Overlaps cash / short-term and cash / long-term debt."
+
+[[metric]]
+id = "net_debt_to_ebitda"
+name = "Net debt / EBITDA"
+group = "debt"
+unit = "x"
+better = "lower"
+period = "ttm"
+definition = "Years of operating earnings needed to repay the net debt. The standard leverage measure."
+formula = "net_debt / ebitda (net cash always passes; EBITDA <= 0 fails)"
+sources = { sector = "net_debt_to_ebitda", stage1 = "net_debt_to_ebitda" }
+used_in = ["strict screen (<= 4.5x)", "weighted debt score", "Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x)", "debt_to_ebitda.py history"]
+example = { symbol = "BSX", value = 2.14, as_of = "2026-09-30", working = "12.085 / 5.637. BKNG: 3.19 / 10.65 = 0.30" }
+vector = "core"
+clip = { lower = 0.0 }
+notes = "Negative when net cash; clipped at 0 for the vector (open choice 6, default until Babak decides), so every net-cash company counts the same."
+
+[[metric]]
+id = "net_debt_to_avg_ebitda"
+name = "Net debt / 10-year average EBITDA"
+group = "debt"
+unit = "x"
+better = "lower"
+period = "history"
+definition = "Leverage against earnings over a whole cycle rather than today's point in it."
+formula = "net_debt / mean(EBITDA, last 10 fiscal years; needs 5)"
+sources = { stage1 = "net_debt_to_avg_ebitda" }
+used_in = ["Stage 1 cyclical (<= 2.5x)"]
+example = { symbol = "BSX", value = 3.97, as_of = "2026-09-30", working = "11.976 / 3.02 average 2016-2025 EBITDA" }
+vector = "candidate"
+clip = { lower = 0.0 }
+notes = "For growing companies it overstates leverage (BSX 3.97x against 2.0x on today's EBITDA)."
+
+[[metric]]
+id = "interest_cover"
+name = "Interest cover (EBITDA / interest)"
+group = "debt"
+unit = "x"
+better = "higher"
+period = "ttm"
+definition = "How many times operating earnings cover the interest bill."
+formula = "ebitda / interest_expense (net cash always passes)"
+sources = { sector = "ebitda_to_interest", stage1 = "interest_cover", tradingview = "ebitda_interst_cover_ttm" }
+used_in = ["strict screen (>= 4x)", "weighted debt score", "Stage 1 (>= 4x; REITs >= 2.5x)"]
+example = { symbol = "BSX", value = 15.53, as_of = "2026-09-30", working = "5.637 / 0.363 (TradingView 18.3)" }
+vector = "core"
+clip = { upper = 50.0 }
+
+[[metric]]
+id = "debt_to_equity"
+name = "Debt / equity"
+group = "debt"
+unit = "x"
+better = "lower"
+period = "fq"
+definition = "Borrowed money against owners' money. Lynch's balance-sheet test for fast growers."
+formula = "total_debt / book_equity"
+sources = { sector = "debt_to_equity", stage1 = "debt_to_equity", tradingview = "debt_to_equity_fq" }
+used_in = ["Stage 1 fast grower and asset play (<= 1.0)"]
+example = { symbol = "BSX", value = 0.51, as_of = "2026-09-30", working = "12.624 / 24.93. BKNG: undefined (negative equity)" }
+vector = "candidate"
+notes = "Lynch's 'normal' was 0.33 before leases counted as debt; Stage 1 uses 1.0. Meaningless with negative equity."
+
+[[metric]]
+id = "net_cash_to_market_cap"
+name = "Net cash / market value"
+group = "debt"
+unit = "fraction"
+better = "higher"
+period = "fq"
+definition = "Part of the price covered by net cash. Lynch's asset-play signal."
+formula = "-net_debt / market_cap"
+sources = { stage1 = "net_cash_to_cap" }
+used_in = ["Lynch category: asset play (> 30%)"]
+example = { symbol = "BSX", value = -0.183, as_of = "2026-10-27", working = "-11.976 / 65.41 (net debt, so negative)" }
+vector = "candidate"
+
+# --- Profitability --------------------------------------------------------------------
+
+[[metric]]
+id = "net_margin"
+name = "Net margin"
+group = "profitability"
+unit = "fraction"
+better = "higher"
+period = "ttm"
+definition = "Profit kept from each dollar of sales."
+formula = "net_income / revenue"
+sources = { sector = "net_margin", tradingview = { column = "net_margin_ttm", scale = 0.01 } }
+used_in = ["weighted quality score (weight 2)"]
+example = { symbol = "BSX", value = 0.175, as_of = "2026-09-30", working = "3.675 / 20.996" }
+vector = "core"
+
+[[metric]]
+id = "net_margin_avg"
+name = "Net margin, average of fiscal years"
+group = "profitability"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Average yearly net margin over the fiscal years on record (Yahoo: 4)."
+formula = "mean(net income / revenue per fiscal year)"
+sources = { sector = "net_margin_avg" }
+used_in = ["sector table"]
+example = { symbol = "BSX", value = 0.105, as_of = "FY2022-FY2025", working = "mean(5.5%, 11.2%, 11.1%, 14.4%)" }
+vector = "candidate"
+
+[[metric]]
+id = "margin_change_avg"
+name = "Net margin change, average"
+group = "profitability"
+unit = "pp"
+better = "higher"
+period = "history"
+definition = "Is the margin widening? Average yearly change in percentage points."
+formula = "mean(margin_y - margin_y-1)"
+sources = { sector = "margin_change_avg" }
+used_in = ["weighted quality score (weight 1)"]
+example = { symbol = "BSX", value = 0.0298, as_of = "FY2022-FY2025", working = "mean(+5.7, -0.1, +3.3) pp = +3.0 pp a year" }
+vector = "candidate"
+
+[[metric]]
+id = "margin_change_median"
+name = "Net margin change, median"
+group = "profitability"
+unit = "pp"
+better = "higher"
+period = "history"
+definition = "Median yearly change in net margin: the typical year, less swayed by one jump."
+formula = "median(margin_y - margin_y-1)"
+sources = { sector = "margin_change_median" }
+used_in = ["weighted quality score (weight 1)"]
+example = { symbol = "BSX", value = 0.0337, as_of = "FY2022-FY2025", working = "median(+5.7, -0.1, +3.3) pp" }
+vector = "candidate"
+
+[[metric]]
+id = "roe"
+name = "Return on equity"
+group = "profitability"
+unit = "fraction"
+better = "higher"
+period = "ttm"
+definition = "Profit on the owners' money."
+formula = "net_income / average book_equity"
+sources = { stage1 = { column = "return_on_equity_fq", scale = 0.01 }, tradingview = { column = "return_on_equity_fq", scale = 0.01 } }
+used_in = ["Stage 1 banks and insurers (>= 8%)"]
+example = { symbol = "BSX", value = 0.155, as_of = "2026-09-30", working = "3.675 / about 23.7 average equity" }
+vector = "candidate"
+notes = "Flattered by debt and buybacks; undefined with negative equity (BKNG). Return on invested capital would avoid both: not yet used, candidate to add."
+
+# --- Growth ---------------------------------------------------------------------------
+
+[[metric]]
+id = "revenue_growth_avg"
+name = "Revenue growth, average year"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Average yearly revenue growth over the fiscal years on record."
+formula = "mean(revenue_y / revenue_y-1 - 1)"
+sources = { sector = "revenue_growth_avg" }
+used_in = ["weighted screen growth gate (> 0)"]
+example = { symbol = "BSX", value = 0.166, as_of = "FY2022-FY2025", working = "mean(+12.3%, +17.6%, +19.9%)" }
+vector = "candidate"
+notes = "sector.py uses Yahoo's 3-4 years; Stage 1 uses 5 years from TradingView. Open choice: which window."
+
+[[metric]]
+id = "revenue_growth_median"
+name = "Revenue growth, median year"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Median yearly revenue growth: the typical year."
+formula = "median(revenue_y / revenue_y-1 - 1)"
+sources = { sector = "revenue_growth_median", stage1 = "revenue_growth_median" }
+used_in = ["weighted screen growth gate (> 0)", "Stage 1 growth rule (> 0 over 5 years)"]
+example = { symbol = "BSX", value = 0.176, as_of = "FY2022-FY2025", working = "median(+12.3%, +17.6%, +19.9%); 5-year TradingView also 17.6%" }
+vector = "core"
+
+[[metric]]
+id = "revenue_cagr_3y"
+name = "Revenue growth, 3-year compound"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Yearly growth rate that turns revenue 3 years ago into revenue now."
+formula = "(revenue_FY0 / revenue_FY-3) ^ (1/3) - 1"
+sources = { sector = "revenue_cagr_3y" }
+used_in = ["sector table"]
+example = { symbol = "BSX", value = 0.165, as_of = "FY2022-FY2025", working = "(1.123 x 1.176 x 1.199) ^ (1/3) - 1" }
+vector = "candidate"
+
+[[metric]]
+id = "revenue_growth_yoy"
+name = "Revenue growth, latest quarter"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "ttm"
+definition = "Latest quarter's revenue against the same quarter a year before."
+formula = "revenue_Q / revenue_Q-4 - 1"
+sources = { sector = "revenue_growth_yoy", yahoo = "revenueGrowth" }
+used_in = ["sector table"]
+example = { symbol = "BSX", value = 0.075, as_of = "Q3 2026", working = "Yahoo" }
+vector = "candidate"
+notes = "Shows a slowdown before the yearly figures do (BSX 7.5% now vs 17.6% median)."
+
+[[metric]]
+id = "ebitda_cagr_3y"
+name = "EBITDA growth, 3-year compound"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Compound yearly EBITDA growth over 3 fiscal years."
+formula = "(ebitda_FY0 / ebitda_FY-3) ^ (1/3) - 1"
+sources = { sector = "ebitda_cagr_3y" }
+used_in = ["sector table"]
+example = { symbol = "BSX", value = 0.229, as_of = "FY2022-FY2025", working = "Yahoo yearly EBITDA" }
+vector = "candidate"
+
+[[metric]]
+id = "eps_growth_avg"
+name = "EPS growth, average year"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Average yearly GAAP EPS growth."
+formula = "mean(eps_y / eps_y-1 - 1), years with eps_y-1 > 0"
+sources = { sector = "eps_growth_avg" }
+used_in = ["weighted screen growth gate (> 0)"]
+example = { symbol = "BSX", value = 0.699, as_of = "FY2022-FY2025", working = "mean(+137.8%, +16.8%, +55.2%)" }
+vector = "candidate"
+notes = "One recovery year dominates the average (BSX 2023). The median is steadier."
+
+[[metric]]
+id = "eps_growth_median"
+name = "EPS growth, median year"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Median yearly GAAP EPS growth. Sorts Lynch's growers: >= 20% fast, >= 8% stalwart, else slow."
+formula = "median(eps_y / eps_y-1 - 1)"
+sources = { sector = "eps_growth_median", stage1 = "eps_growth_median" }
+used_in = ["weighted screen growth gate", "Stage 1 growth rule", "Lynch category"]
+example = { symbol = "BSX", value = 0.359, as_of = "FY2020-FY2025", working = "TradingView 5 years (2021 skipped: 2020 was a loss); Yahoo 3 years gives 55%" }
+vector = "core"
+
+[[metric]]
+id = "eps_cagr_3y"
+name = "EPS growth, 3-year compound"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Compound yearly GAAP EPS growth over the last 3 fiscal years. Lynch: a fast grower must still grow fast now."
+formula = "(eps_FY0 / eps_FY-3) ^ (1/3) - 1"
+sources = { sector = "eps_cagr_3y", stage1 = "eps_growth_3y" }
+used_in = ["Stage 1 fast grower (>= 20%)", "sector table"]
+example = { symbol = "BSX", value = 0.632, as_of = "FY2022-FY2025", working = "(1.939 / 0.446) ^ (1/3) - 1" }
+vector = "candidate"
+
+[[metric]]
+id = "earnings_growth_yoy"
+name = "Earnings growth, latest quarter"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "ttm"
+definition = "Latest quarter's earnings against the same quarter a year before."
+formula = "eps_Q / eps_Q-4 - 1"
+sources = { sector = "earnings_growth_yoy", yahoo = "earningsGrowth" }
+used_in = ["sector table"]
+example = { symbol = "BSX", value = 0.151, as_of = "Q3 2026", working = "Yahoo" }
+vector = "candidate"
+
+[[metric]]
+id = "ocf_growth_avg"
+name = "Operating cash flow growth, average year"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Average yearly growth in operating cash flow."
+formula = "mean(ocf_y / ocf_y-1 - 1)"
+sources = { sector = "ocf_growth_avg" }
+used_in = ["weighted quality score (weight 1)"]
+example = { symbol = "BSX", value = 0.444, as_of = "FY2022-FY2025", working = "mean(+64.0%, +37.2%, +32.0%)" }
+vector = "candidate"
+
+[[metric]]
+id = "ocf_growth_median"
+name = "Operating cash flow growth, median year"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Median yearly growth in operating cash flow."
+formula = "median(ocf_y / ocf_y-1 - 1)"
+sources = { sector = "ocf_growth_median" }
+used_in = ["weighted quality score (weight 1)"]
+example = { symbol = "BSX", value = 0.372, as_of = "FY2022-FY2025", working = "median(+64.0%, +37.2%, +32.0%)" }
+vector = "core"
+
+[[metric]]
+id = "cash_growth_avg"
+name = "Cash balance growth, average year"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Average yearly change in the cash balance."
+formula = "mean(cash_y / cash_y-1 - 1)"
+sources = { sector = "cash_growth_avg" }
+used_in = ["weighted quality score (weight 0.5)"]
+example = { symbol = "BSX", value = 1.052, as_of = "FY2022-FY2025", working = "mean(-6.8%, -52.1%, +374.6%)" }
+vector = "context"
+notes = "Cash swings with deals and debt raises (BSX +375% in 2025), so it is noisy. Context only, not for the vector (open choice 9, default until Babak decides); kept because the weighted screen uses it."
+
+[[metric]]
+id = "cash_growth_median"
+name = "Cash balance growth, median year"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Median yearly change in the cash balance."
+formula = "median(cash_y / cash_y-1 - 1)"
+sources = { sector = "cash_growth_median" }
+used_in = ["weighted quality score (weight 0.5)"]
+example = { symbol = "BSX", value = -0.068, as_of = "FY2022-FY2025", working = "median(-6.8%, -52.1%, +374.6%)" }
+vector = "context"
+notes = "Context only, not for the vector, like the average (open choice 9)."
+
+# --- Earnings history (Lynch inputs) --------------------------------------------------
+
+[[metric]]
+id = "eps_vs_5y_peak"
+name = "EPS against its 5-year peak"
+group = "earnings_history"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "How far today's EPS is below (or above) the best of the last 5 fiscal years. Below -50% = Lynch turnaround."
+formula = "max(eps_ttm, eps_FY0) / max(eps, last 5 FY) - 1"
+sources = { stage1 = "eps_vs_5y_peak" }
+used_in = ["Lynch category: turnaround"]
+example = { symbol = "BSX", value = 0.272, as_of = "2026-09-30", working = "2.466 / 1.939 - 1: 27% above the old peak" }
+vector = "candidate"
+
+[[metric]]
+id = "loss_now"
+name = "Losing money now"
+group = "earnings_history"
+unit = "bool"
+better = "lower"
+period = "ttm"
+definition = "EPS of the last 12 months or of the latest fiscal year is zero or below."
+formula = "eps_ttm <= 0 or eps_FY0 <= 0"
+sources = { stage1 = "loss_now" }
+used_in = ["Lynch category: turnaround"]
+example = { symbol = "BSX", value = false, as_of = "2026-09-30", working = "2.47 > 0 and 1.94 > 0" }
+vector = "candidate"
+
+[[metric]]
+id = "no_profit_5y"
+name = "No profit in 5 years"
+group = "earnings_history"
+unit = "bool"
+better = "lower"
+period = "history"
+definition = "Loss in every one of the last 5 fiscal years. Not a Lynch category: Stage 1 fails these."
+formula = "max(eps, last 5 FY) <= 0"
+sources = { stage1 = "no_profit_5y" }
+used_in = ["Stage 1 (fail)"]
+example = { symbol = "BSX", value = false, as_of = "FY2021-FY2025", working = "best year 1.94" }
+vector = "candidate"
+
+[[metric]]
+id = "eps_big_drops_10y"
+name = "Big EPS drops in 10 years"
+group = "earnings_history"
+unit = "count"
+better = "lower"
+period = "history"
+definition = "Years in the last 10 when EPS fell by more than 30%. 3 or more = cyclical by history (unless a fast grower)."
+formula = "count(eps_y / eps_y-1 - 1 < -30%, eps_y-1 > 0)"
+sources = { stage1 = "eps_big_drops_10y" }
+used_in = ["Lynch category: cyclical"]
+example = { symbol = "BSX", value = 3, as_of = "FY2015-FY2025", working = "2017 (-70%), 2020 (a loss after 2019's one-off tax gain), 2022 (-35%)" }
+vector = "candidate"
+notes = "GAAP one-offs count as drops (BSX's 2019 tax gain), so this flags lumpy accounting as well as real cycles."
+
+[[metric]]
+id = "eps_avg_10y"
+name = "Average EPS over 10 years"
+group = "earnings_history"
+unit = "$"
+better = "higher"
+period = "history"
+definition = "Mean diluted EPS over the last 10 fiscal years (needs 5). For a cyclical, profit over the cycle."
+formula = "mean(eps, last 10 FY)"
+sources = { stage1 = "eps_avg_10y" }
+used_in = ["Stage 1 cyclical (> 0)"]
+example = { symbol = "BSX", value = 1.016, as_of = "FY2016-FY2025", working = "mean of 1.94, 1.25, 1.07, 0.45, 0.69, -0.08, 3.33, 1.19, 0.07, 0.25" }
+vector = "candidate"
+notes = "In dollars per share, so it doesn't compare across stocks; use eps_ttm / eps_avg_10y if it goes in the vector."
+
+[[metric]]
+id = "recession_eps_change"
+name = "EPS change in recessions"
+group = "earnings_history"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Worst yearly EPS change in the 2009 and 2020 fiscal years. Lynch: stalwarts hold up in recessions."
+formula = "min(eps_2009 / eps_2008 - 1, eps_2020 / eps_2019 - 1)"
+sources = { stage1 = "recession_eps_change" }
+used_in = ["Stage 1 stalwart (no worse than -30%)"]
+example = { symbol = "BSX", value = -1.024, as_of = "FY2020", working = "-0.081 / 3.332 - 1 (2019 had a one-off tax gain)" }
+vector = "candidate"
+
+[[metric]]
+id = "dividend_years_10y"
+name = "Years with a dividend, of 10"
+group = "earnings_history"
+unit = "count"
+better = "higher"
+period = "history"
+definition = "How many of the last 10 fiscal years paid a dividend."
+formula = "count(dps > 0, last 10 FY)"
+sources = { stage1 = "dividend_years_10y" }
+used_in = ["Stage 1 slow grower (10 of 10; none at all passes)"]
+example = { symbol = "BSX", value = 0, as_of = "FY2016-FY2025", working = "no dividend. BKNG: 2 (since 2024)" }
+vector = "candidate"
+
+[[metric]]
+id = "payout_ratio"
+name = "Dividend payout ratio"
+group = "earnings_history"
+unit = "fraction"
+better = "lower"
+period = "ttm"
+definition = "Share of earnings paid out as dividends. Lynch: leaves a cushion in hard times."
+formula = "dividends per share / eps_ttm"
+sources = { stage1 = { column = "dividend_payout_ratio_ttm", scale = 0.01 }, tradingview = { column = "dividend_payout_ratio_ttm", scale = 0.01 } }
+used_in = ["Stage 1 slow grower (<= 80%)"]
+example = { symbol = "BKNG", value = 0.178, as_of = "2026-09-30", working = "TradingView (BSX pays none: 0)" }
+vector = "candidate"
+
+[[metric]]
+id = "lynch_category"
+name = "Lynch category"
+group = "earnings_history"
+unit = "category"
+better = "none"
+period = "history"
+definition = "Peter Lynch's six kinds of stock (One Up on Wall Street, ch. 7): slow grower, stalwart, fast grower, cyclical, turnaround, asset play; plus no_profit."
+formula = "tested in order: no_profit_5y; cyclical industry; turnaround (loss_now or eps_vs_5y_peak < -50%); cyclical history (eps_big_drops_10y >= 3, not fast); asset play (price/book < 1 or net cash > 30% of value); then eps_growth_median >= 20% fast, >= 8% stalwart, else slow"
+sources = { stage1 = "category" }
+used_in = ["Stage 1: picks each company's rule set"]
+example = { symbol = "BSX", value = "fast_grower", as_of = "2026-10-27", working = "EPS median growth 36% >= 20%; 3 big drops but fast growers are exempt" }
+vector = "core"
+notes = "A label, not a number: in the vector it would be one-hot (six 0/1 columns) or used to compare stocks only within a category (open choice)."
+
+# --- Quality scores -------------------------------------------------------------------
+
+[[metric]]
+id = "piotroski_f"
+name = "Piotroski F-score"
+group = "quality"
+unit = "score"
+better = "higher"
+period = "fy"
+definition = "Nine pass/fail tests of financial strength, one point each (Piotroski 2000). Profit: net income > 0, OCF > 0, ROA up, OCF > net income. Balance sheet: long-term debt ratio down, current ratio up, no new shares. Efficiency: gross margin up, asset turnover up."
+formula = "sum of 9 binary tests, latest fiscal year against the one before"
+sources = { stage1 = "piotroski_f_score_ttm", tradingview = "piotroski_f_score_ttm" }
+used_in = ["Stage 1 (>= 5, all non-financial categories but cyclical, turnaround, asset play)"]
+example = { symbol = "BSX", value = 8, as_of = "2026-10-27", working = "TradingView; BKNG 7" }
+vector = "core"
+notes = "Computed by TradingView; we don't recompute the nine parts. Recomputing from SEC filings is possible (open choice)."
+
+[[metric]]
+id = "altman_z"
+name = "Altman Z-score"
+group = "quality"
+unit = "score"
+better = "higher"
+period = "fq"
+definition = "Bankruptcy-risk score (Altman 1968). Below 1.81 = distress zone, 1.81-2.99 grey, above 2.99 safe."
+formula = "1.2 x working capital/assets + 1.4 x retained earnings/assets + 3.3 x EBIT/assets + 0.6 x market value/liabilities + 1.0 x sales/assets"
+sources = { stage1 = "altman_z_score_ttm", tradingview = "altman_z_score_ttm" }
+used_in = ["Stage 1 (>= 1.8, not utilities, banks, insurers or REITs)"]
+example = { symbol = "BSX", value = 2.93, as_of = "2026-10-27", working = "TradingView: grey zone, just under safe. BKNG 6.17" }
+vector = "core"
+notes = "Built for manufacturers; it penalizes asset-heavy and lease-heavy businesses."
+
+[[metric]]
+id = "debt_score"
+name = "Weighted screen: debt score"
+group = "quality"
+unit = "score"
+better = "higher"
+period = "fq"
+definition = "Percentile (0-100) within the peer group, averaged over cash / short-term debt, cash / long-term debt, net debt / EBITDA and interest cover."
+formula = "mean(percentile ranks of the 4 debt ratios)"
+sources = { sector = "debt_score" }
+used_in = ["weighted screen (50% of the total)"]
+example = { symbol = "BSX", value = 29.5, as_of = "2026-10-27", working = "against 9 medical-device peers (report 11)" }
+vector = "derived"
+notes = "Relative to whichever peers it is run on, so not a property of the stock. Built from the ratios above; the vector can take the ratios instead."
+
+[[metric]]
+id = "quality_score"
+name = "Weighted screen: profitability and cash score"
+group = "quality"
+unit = "score"
+better = "higher"
+period = "history"
+definition = "Weighted percentile of net margin (2), margin change avg and median (1 each), OCF growth avg and median (1 each), cash growth avg and median (0.5 each)."
+formula = "weighted mean of percentile ranks"
+sources = { sector = "quality_score" }
+used_in = ["weighted screen (25%)"]
+example = { symbol = "BSX", value = 77.0, as_of = "2026-10-27", working = "against 9 medical-device peers (report 11)" }
+vector = "derived"
+
+[[metric]]
+id = "cheap_score"
+name = "Weighted screen: cheapness score"
+group = "quality"
+unit = "score"
+better = "higher"
+period = "now"
+definition = "Percentile of price vs DCF, P/E vs industry median, EV/EBITDA vs industry median and expected P/E change (lower = cheaper = higher score)."
+formula = "mean(percentile ranks, reversed)"
+sources = { sector = "cheap_score" }
+used_in = ["weighted screen (25%)"]
+example = { symbol = "BSX", value = 80.6, as_of = "2026-10-27", working = "against 9 medical-device peers (report 11)" }
+vector = "derived"
+
+[[metric]]
+id = "total_score"
+name = "Weighted screen: total"
+group = "quality"
+unit = "score"
+better = "higher"
+period = "now"
+definition = "Babak's weighted score: debt 50%, profitability and cash 25%, cheapness 25%."
+formula = "0.5 x debt_score + 0.25 x quality_score + 0.25 x cheap_score"
+sources = { sector = "total_score" }
+used_in = ["weighted screen ranking"]
+example = { symbol = "BSX", value = 54.1, as_of = "2026-10-27", working = "0.5 x 29.5 + 0.25 x 77.0 + 0.25 x 80.6; 5th of 9 (report 11)" }
+vector = "derived"
+
+# --- Valuation ------------------------------------------------------------------------
+
+[[metric]]
+id = "pe_ttm"
+name = "P/E, trailing GAAP"
+group = "valuation"
+unit = "x"
+better = "lower"
+period = "now"
+definition = "Price against the last 12 months' GAAP EPS."
+formula = "price / eps_ttm"
+sources = { sector = "pe_ttm", tradingview = "price_earnings_ttm", yahoo = "trailingPE" }
+used_in = ["peer screen", "cheap score (vs industry median)"]
+example = { symbol = "BSX", value = 18.45, as_of = "2026-10-26", working = "45.58 / 2.47" }
+vector = "candidate"
+
+[[metric]]
+id = "pe_adj"
+name = "P/E, trailing adjusted"
+group = "valuation"
+unit = "x"
+better = "lower"
+period = "now"
+definition = "Price against adjusted EPS: Babak's 'true' P/E."
+formula = "price / eps_adj_ttm"
+sources = { watchlist = "pe_adj" }
+used_in = ["watch list", "entry price"]
+example = { symbol = "BSX", value = 14.02, as_of = "2026-10-27", working = "45.02 / 3.21" }
+vector = "core"
+
+[[metric]]
+id = "pe_fwd"
+name = "P/E, forward"
+group = "valuation"
+unit = "x"
+better = "lower"
+period = "now"
+definition = "Price against next year's consensus EPS."
+formula = "price / eps_fwd"
+sources = { sector = "pe_fwd", yahoo = "forwardPE" }
+used_in = ["getting-cheaper test"]
+example = { symbol = "BSX", value = 13.50, as_of = "2026-10-26", working = "45.58 / 3.38" }
+vector = "candidate"
+
+[[metric]]
+id = "pe_change_expected"
+name = "Expected P/E change"
+group = "valuation"
+unit = "fraction"
+better = "lower"
+period = "now"
+definition = "How much the P/E falls at today's price if next year's estimate is met."
+formula = "pe_fwd / pe_ttm - 1"
+sources = { sector = "pe_change_expected" }
+used_in = ["cheap score", "getting-cheaper test (<= -15%)"]
+example = { symbol = "BSX", value = -0.268, as_of = "2026-10-26", working = "13.50 / 18.45 - 1" }
+vector = "candidate"
+notes = "Mixes adjusted (forward) and GAAP (trailing) EPS, so it overstates the drop for acquisitive companies."
+
+[[metric]]
+id = "pe_median_10y"
+name = "Own P/E, 10-year median"
+group = "valuation"
+unit = "x"
+better = "none"
+period = "history"
+definition = "Median of the stock's yearly P/E (average price / adjusted EPS) over 10 calendar years."
+formula = "median(avg price_y / adjusted eps_y, last 10 years)"
+sources = { watchlist = "pe_median_10y", stage2 = "pe_median_10y" }
+used_in = ["watch list", "Stage 2"]
+example = { symbol = "BSX", value = 25.17, as_of = "2016-2025", working = "watch list, adjusted EPS" }
+vector = "context"
+
+[[metric]]
+id = "pe_vs_own_median"
+name = "P/E against own 10-year median"
+group = "valuation"
+unit = "fraction"
+better = "lower"
+period = "now"
+definition = "How cheap the stock is against its own history."
+formula = "pe_adj / pe_median_10y - 1"
+sources = {}
+used_in = ["watch list (shown)", "panic-sell screen"]
+example = { symbol = "BSX", value = -0.443, as_of = "2026-10-27", working = "14.02 / 25.17 - 1" }
+vector = "core"
+
+[[metric]]
+id = "pe_rel"
+name = "P/E against industry median"
+group = "valuation"
+unit = "fraction"
+better = "lower"
+period = "now"
+definition = "Trailing P/E against the median of its industry in the peer group."
+formula = "pe_ttm / median(pe_ttm, same industry) - 1"
+sources = { sector = "pe_rel", stage2 = "pe_vs_sector" }
+used_in = ["strict and weighted screens (cheapness)"]
+example = { symbol = "BSX", value = -0.342, as_of = "2026-10-26", working = "18.45 / 28.04 Medical Devices median - 1" }
+vector = "derived"
+
+[[metric]]
+id = "ev_to_ebitda"
+name = "EV / EBITDA"
+group = "valuation"
+unit = "x"
+better = "lower"
+period = "now"
+definition = "Price of the whole business against its operating earnings; unaffected by how it is financed."
+formula = "enterprise_value / ebitda"
+sources = { sector = "ev_to_ebitda", tradingview = "enterprise_value_ebitda_ttm" }
+used_in = ["peer screen", "cheap score"]
+example = { symbol = "BSX", value = 13.86, as_of = "2026-10-26", working = "78.14 / 5.637" }
+vector = "candidate"
+
+[[metric]]
+id = "ev_rel"
+name = "EV / EBITDA against industry median"
+group = "valuation"
+unit = "fraction"
+better = "lower"
+period = "now"
+definition = "EV / EBITDA against its industry's median."
+formula = "ev_to_ebitda / median(ev_to_ebitda, same industry) - 1"
+sources = { sector = "ev_rel", stage2 = "ev_ebitda_vs_sector" }
+used_in = ["strict and weighted screens (cheapness)"]
+example = { symbol = "BSX", value = -0.109, as_of = "2026-10-26", working = "13.86 / 15.56 Medical Devices median - 1" }
+vector = "derived"
+
+[[metric]]
+id = "price_to_sales"
+name = "Price / sales"
+group = "valuation"
+unit = "x"
+better = "lower"
+period = "now"
+definition = "Market value against revenue."
+formula = "market_cap / revenue"
+sources = { sector = "price_to_sales" }
+used_in = ["sector table"]
+example = { symbol = "BSX", value = 3.15, as_of = "2026-10-26", working = "66.06 / 20.996" }
+vector = "candidate"
+
+[[metric]]
+id = "price_to_book"
+name = "Price / book"
+group = "valuation"
+unit = "x"
+better = "lower"
+period = "now"
+definition = "Market value against book equity."
+formula = "market_cap / book_equity"
+sources = { sector = "price_to_book", tradingview = "price_book_fq", yahoo = "priceToBook" }
+used_in = ["Lynch category: asset play (< 1)"]
+example = { symbol = "BSX", value = 2.65, as_of = "2026-10-26", working = "66.06 / 24.93" }
+vector = "candidate"
+
+[[metric]]
+id = "fcf_yield"
+name = "Free cash flow yield"
+group = "valuation"
+unit = "fraction"
+better = "higher"
+period = "now"
+definition = "Free cash flow as a share of the market value: the cash return at today's price."
+formula = "free_cf / market_cap"
+sources = { sector = "fcf_yield", stage2 = "fcf_yield" }
+used_in = ["sector table", "Stage 2 (shown)"]
+example = { symbol = "BSX", value = 0.027, as_of = "2026-10-26", working = "1.806 / 66.06 (5.5% with TradingView's capex)" }
+vector = "core"
+
+[[metric]]
+id = "dividend_yield"
+name = "Dividend yield"
+group = "valuation"
+unit = "fraction"
+better = "none"
+period = "now"
+definition = "Dividends over the last year against the price."
+formula = "dividends per share / price"
+sources = { sector = "dividend_yield", tradingview = { column = "dividends_yield", scale = 0.01 } }
+used_in = ["sector table"]
+example = { symbol = "BSX", value = 0.0, as_of = "2026-10-26", working = "no dividend" }
+vector = "candidate"
+
+[[metric]]
+id = "wacc"
+name = "Weighted cost of capital (WACC)"
+group = "valuation"
+unit = "fraction"
+better = "none"
+period = "now"
+definition = "Return investors require on the whole firm: the DCF discount rate."
+formula = "E/(D+E) x (5.18% + (0.67 x beta + 0.33) x 5%) + D/(D+E) x (5.18% + spread) x (1 - 21%); spread 1.3% / 2% / 3% for net debt / EBITDA < 3 / < 5 / higher"
+sources = { sector = "wacc" }
+used_in = ["standard DCF"]
+example = { symbol = "BSX", value = 0.0817, as_of = "2026-10-26", working = "beta 0.575; equity 66.06, debt 12.62" }
+vector = "derived"
+
+[[metric]]
+id = "dcf_fair_value"
+name = "DCF fair value"
+group = "valuation"
+unit = "$"
+better = "none"
+period = "now"
+definition = "Value per share if the DCF base cash flow grows at inflation (2.5%) for ever: what the stock is worth with no growth premium."
+formula = "(fcff_before_growth x 1.025 / (wacc - 2.5%) - net_debt) / shares"
+sources = { sector = "dcf_fair_value" }
+used_in = ["absolute values", "cheap score"]
+example = { symbol = "BSX", value = 34.09, as_of = "2026-10-26", working = "(3.403 x 1.025 / (8.17% - 2.5%) - 12.085) / 1.449" }
+vector = "derived"
+
+[[metric]]
+id = "price_vs_fair_value"
+name = "Price against DCF fair value"
+group = "valuation"
+unit = "fraction"
+better = "lower"
+period = "now"
+definition = "Premium (positive) or discount to the no-growth DCF value: the growth the price assumes."
+formula = "price / dcf_fair_value - 1"
+sources = { sector = "price_vs_fair_value" }
+used_in = ["strict and weighted screens (cheapness)"]
+example = { symbol = "BSX", value = 0.337, as_of = "2026-10-26", working = "45.58 / 34.09 - 1" }
+vector = "derived"
+
+[[metric]]
+id = "entry_price"
+name = "Entry price at target P/E"
+group = "valuation"
+unit = "$"
+better = "none"
+period = "now"
+definition = "The price at which the stock reaches Babak's target multiple."
+formula = "target_pe x eps_adj_ttm"
+sources = { watchlist = "entry_price" }
+used_in = ["watch list"]
+example = { symbol = "BSX", value = 41.73, as_of = "2026-10-27", working = "13 x 3.21" }
+vector = "derived"
+notes = "Depends on a chosen target, so it belongs to the decision, not the vector."
+
+[[metric]]
+id = "price_vs_cheap"
+name = "Price against own cheap price"
+group = "valuation"
+unit = "fraction"
+better = "lower"
+period = "now"
+definition = "Stage 2's ranking measure: price against the stock's own bottom-quarter P/E times today's EPS."
+formula = "price / (min(25th percentile of own 10-year P/E, sector median P/E) x eps) - 1"
+sources = { stage2 = "vs_cheap" }
+used_in = ["Stage 2 ranking"]
+example = { symbol = "IPS", value = -0.082, as_of = "2026-10-27", working = "Ipsos: 35.46 / (9.67 x 3.99) - 1. BSX failed Stage 1, so has no Stage 2 row" }
+vector = "core"
+
+# --- Named sets -----------------------------------------------------------------------
+# A set is a list of metric ids. "proposed" is Claude's draft for the first vector, for
+# Babak to cut or extend; the others are the inputs of each existing screen.
+
+[sets]
+proposed = [
+  "cash_to_short_term_debt", "cash_to_long_term_debt", "net_debt_to_ebitda", "interest_cover",
+  "net_margin", "revenue_growth_median", "eps_growth_median", "ocf_growth_median",
+  "piotroski_f", "altman_z", "lynch_category",
+  "eps_adj_ttm", "pe_adj", "pe_vs_own_median", "fcf_yield", "price_vs_cheap",
+]
+absolute_values = [
+  "price", "market_cap", "dcf_fair_value", "fcff_before_growth", "total_debt", "net_debt",
+  "short_term_debt", "long_term_debt", "cash", "revenue", "ebitda", "net_income", "eps_ttm",
+  "eps_fwd", "operating_cf", "capex", "free_cf",
+]
+strict_screen = [
+  "market_cap", "net_income", "ebitda", "cash_to_short_term_debt", "cash_to_long_term_debt",
+  "net_debt_to_ebitda", "interest_cover",
+]
+weighted_screen = [
+  "cash_to_short_term_debt", "cash_to_long_term_debt", "net_debt_to_ebitda", "interest_cover",
+  "net_margin", "margin_change_avg", "margin_change_median", "ocf_growth_avg",
+  "ocf_growth_median", "cash_growth_avg", "cash_growth_median", "price_vs_fair_value",
+  "pe_rel", "ev_rel", "pe_change_expected", "revenue_growth_avg", "revenue_growth_median",
+  "eps_growth_avg", "eps_growth_median",
+]
+stage1 = [
+  "cash_to_short_term_debt", "cash_to_long_term_debt", "cash_to_total_debt",
+  "net_debt_to_ebitda", "net_debt_to_avg_ebitda", "interest_cover", "debt_to_equity",
+  "net_cash_to_market_cap", "roe", "revenue_growth_median", "eps_growth_median",
+  "eps_cagr_3y", "eps_vs_5y_peak", "loss_now", "no_profit_5y", "eps_big_drops_10y",
+  "eps_avg_10y", "recession_eps_change", "dividend_years_10y", "payout_ratio",
+  "price_to_book", "piotroski_f", "altman_z", "lynch_category",
+]
+watchlist = ["price", "eps_adj_ttm", "pe_adj", "pe_median_10y", "pe_vs_own_median", "entry_price"]
+
+# Considered and left out of the dictionary: not from the financial statements.
+[excluded]
+technicals = "RSI, 50- and 200-day averages, 52-week range, one-year performance (Stage 2 timing only)"
+analyst = "Analyst target upside and rating (sector.py analyst_upside, analyst_view; TradingView Recommend.All)"
+market = "Beta (used inside WACC), indices, sector breadth (market report)"

@@ -15,15 +15,17 @@ Each report covers one piece of analysis. It states the data date, the method, t
 | 09 | [Screening](09-screening-low-debt-cheap-growth.md) | Seven rounds of screen design, ending with the current weighted top 5 |
 | 10 | [Absolute values](10-absolute-values-sector.md) | The absolute-values-first framework and sector totals FY2018–FY2025 |
 | 11 | [Boston Scientific](11-bsx-fundamentals.md) | Summary, then BSX absolute values, ratios and screens against 13 medical-device peers, then analysis (P/E vs its own history, entry price) |
+| 12 | [Booking Holdings](12-bkng-fundamentals.md) | Summary, then BKNG absolute values, ratios and screens against 6 online-travel peers, then analysis (adjusted P/E vs its own history, entry prices) |
+| 13 | [Market screener](13-market-screener.md) | The S&P 500 (497 companies; the US and Europe above $1bn with one setting). Stage 1: Peter Lynch's six categories and financial-statement rules per category (banks, insurers, REITs by kind of business). Stage 2: each survivor's own cheap price, top 3 cheap or close-to-cheap names per sector, technicals for timing |
+| 14 | [Metrics dictionary](14-metrics-dictionary.md) | Every fundamental metric used so far, defined with formula, source and a worked example; the proposed first vector and the choices to make (issue #8) |
 
 ## Writing a new report
 
-Number it after the last report and follow the same layout:
-1. Data date
-2. Absolute values first
-3. Method
-4. Findings
-5. Caveats
-6. Command to reproduce
+Number it after the last report. Since report 11 every report has three parts, in order
+(Babak, 2026-10-27):
+1. A short high-level summary, with no detail.
+2. The numbers: data date, absolute values first (with history), then ratios, screens,
+   DCF and P/E against the stock's own history.
+3. Claude's analysis: method, findings, caveats and the command to reproduce.
 
 Then add it to the table above.
