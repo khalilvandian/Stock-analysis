@@ -2,6 +2,14 @@
 
 *Data as of 2026-10-27 (US prices at the 2026-10-27 close). Written 2026-10-27, revised the same day for Peter Lynch's categories and narrowed to the S&P 500 at Babak's request. Tools: `analysis/stage1.py` and `analysis/stage2.py` (or both in a row with `analysis/screener.py`), settings in `config/screeners.toml`.*
 
+> **Update, 2026-10-27 late evening.** A code review fixed 12 screener bugs (listed in the
+> commit "Fix 12 screener bugs found in review"). Rerun: **169 of 497 pass Stage 1** (BlackRock
+> now passes: its short-term debt was left blank after Yahoo filled its debt) and the **same 29
+> names** are listed. The SEC cross-check now allows for splits after the 10-K, so Booking's
+> 25-for-1 split no longer shows as a data mismatch. The screener now runs every evening before
+> the market report, which lists its top 3 per sector; the site has a Screener page. The
+> tables below are from the first run and differ only by BlackRock.
+
 ## 1. Summary
 
 - **The S&P 500 only, for now** (Babak, 2026-10-27): 497 companies, as TradingView lists the index's members. Setting `index = ""` in `[universe]` brings back every US and European company above $1bn (3,432 companies in the earlier run today).
