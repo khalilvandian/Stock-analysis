@@ -109,3 +109,15 @@ def test_email_attaches_every_pdf_and_sends_once(tmp_path, monkeypatch):
         route = respx.post(send_email.API).mock(return_value=httpx.Response(200, json={"id": "e1"}))
         assert send_email.send(msg, "key")["id"] == "e1"
         assert route.calls[0].request.headers["Authorization"] == "Bearer key"
+
+
+def test_light_pdf_is_a_small_valid_pdf():
+    data = watchlist.light_pdf("Title (BSX)", [("h", "Summary"), ("p", "x " * 300), ("t", "a b")])
+    assert data.startswith(b"%PDF-1.4") and data.rstrip().endswith(b"%%EOF")
+    xref = int(data.rsplit(b"startxref\n", 1)[1].split(b"\n")[0])
+    assert data[xref : xref + 4] == b"xref"
+    assert len(data) < 5000
+
+
+def test_bullets():
+    assert watchlist.bullets("- **a:** one\n- b") == ["- a: one", "- b"]

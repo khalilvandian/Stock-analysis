@@ -29,5 +29,9 @@ Babak approved committing the results straight to `main` (no pull request each n
    address. The recipient is given in the scheduled task (or `WATCHLIST_EMAIL_TO`) and the
    key in `RESEND_API_KEY`; neither is ever written into this public repository. Babak
    asked for it not to come from their own Gmail.
+   Until Resend is set up, send through the Gmail connector instead: the same subject and
+   HTML body, with the light one-page PDFs listed under `light` in
+   `.cache/watchlist/last_run.json` attached (`base64 -w0 <file>` for each). They are
+   about 1.5 KB each, small enough to pass through the connector; the full PDFs are not.
 
 If a step fails, still commit what was built and say in the email what failed.

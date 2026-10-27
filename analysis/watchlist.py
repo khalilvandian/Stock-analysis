@@ -34,8 +34,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 import tomllib
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -878,10 +880,143 @@ def main() -> None:
                 "subject": f"Watch list analyses, {run_label}",
                 "html": str(EMAIL.relative_to(ROOT)),
                 "files": [str(p.relative_to(ROOT)) for p in written],
+                "light": [
+                    str(p.relative_to(ROOT))
+                    for p in light_pdfs(
+                        run_label, results, any(p.parent.name == "market" for p in written)
+                    )
+                ],
             },
             indent=2,
         )
     )
+
+
+# --- light PDFs: one text-only page per report, small enough to attach through Gmail ---
+
+LIGHT = ROOT / ".cache/watchlist/light"
+
+
+def light_pdf(title: str, blocks: list[tuple[str, str]]) -> bytes:
+    """A one-page PDF in the standard Helvetica and Courier fonts (nothing embedded).
+
+    blocks: ("h", heading), ("p", paragraph, wrapped) or ("t", fixed-width table line).
+    """
+    rows = [("F2", 13, title), ("F1", 9, "")]
+    for kind, text in blocks:
+        if kind == "h":
+            rows += [("F1", 9, ""), ("F2", 10, text)]
+        elif kind == "t":
+            rows.append(("F3", 8, text))
+        else:
+            rows += [("F1", 9, line) for line in textwrap.wrap(text, 100)]
+    ops, y = ["BT"], 800
+    for font, size, text in rows:
+        text = text.encode("latin-1", "replace").decode("latin-1")
+        text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        ops.append(f"/{font} {size} Tf 1 0 0 1 50 {y} Tm ({text}) Tj")
+        y -= size + 5
+    ops.append("ET")
+    stream = zlib.compress("\n".join(ops).encode("latin-1"), 9)
+    objs = [
+        b"<</Type/Catalog/Pages 2 0 R>>",
+        b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+        b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 5 0 R"
+        b"/F2 6 0 R/F3 7 0 R>>>>/Contents 4 0 R>>",
+        b"<</Length %d/Filter/FlateDecode>>stream\n" % len(stream) + stream + b"\nendstream",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Courier>>",
+    ]
+    out, offsets = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    out += b"trailer\n<</Size %d/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    return out
+
+
+def plain(text: str) -> str:
+    return re.sub(r"[*_`#]", "", text).replace("\n", " ").strip()
+
+
+def bullets(text: str) -> list[str]:
+    """Markdown bullets (or paragraphs) as plain lines, one per item."""
+    items = re.split(r"\n(?=- )|\n\n", text.strip())
+    return [("- " if i.startswith("- ") else "") + plain(i.removeprefix("- ")) for i in items if i]
+
+
+def light_pdfs(run_label: str, results: list[tuple[dict, dict]], with_market: bool) -> list[Path]:
+    """Light versions of this run's reports, written to .cache/watchlist/light/."""
+    LIGHT.mkdir(parents=True, exist_ok=True)
+    for old in LIGHT.glob("*.pdf"):
+        old.unlink()
+    stamp = run_label[:16].replace(" ", "_").replace(":", "")
+    files = {}
+    header = f"{'Stock':6} {'Price':>9} {'Adj P/E':>8} {'10y med':>8} {'Target':>7} "
+    header += f"{'Entry':>9} {'vs price':>9}  Next report"
+
+    def line(sym: str, k: dict) -> str:
+        return (
+            f"{sym:6} {money(k['price']):>9} {times(k['pe_adj']):>8} "
+            f"{times(k['pe_median_10y']):>8} {k['target_pe']:>6g}x {money(k['entry_price']):>9} "
+            f"{pct(k['to_entry']):>9}  {k['next_report'] or '-'}"
+        )
+
+    if with_market and (OUT / "market/runs.csv").exists():
+        r = pd.read_csv(OUT / "market/runs.csv").iloc[-1]
+        _, notes = read_notes("market")
+        files["market"] = light_pdf(
+            f"Market report - {run_label}",
+            [
+                ("h", "Summary"),
+                ("p", plain(notes.get("Verdict", ""))),
+                (
+                    "p",
+                    f"S&P 500 {r['sp500']:,.0f} ({pct(r['sp500_day'])} today), VIX "
+                    f"{r['vix']:.1f}, {r['above_200d']:.0%} of S&P 500 stocks above their "
+                    "200-day average.",
+                ),
+                ("h", "Stocks to look at"),
+                ("p", str(r["stocks_to_look_at"])),
+                (
+                    "p",
+                    "Light version: the full report, with tables and the screen, is linked "
+                    "in the email.",
+                ),
+            ],
+        )
+    for d, k in results:
+        sym = d["stock"]["symbol"]
+        _, notes = read_notes(sym)
+        blocks = [("h", "Summary"), ("p", plain(notes.get("Verdict", "")))]
+        blocks += [("p", b) for b in bullets(notes.get("Summary", ""))]
+        blocks += [("h", "The numbers"), ("t", header), ("t", line(sym, k))]
+        blocks += [("h", "What to watch")]
+        blocks += [("p", b) for b in bullets(notes.get("What to watch", ""))]
+        blocks += [("p", "Light version: the full analysis is linked in the email.")]
+        files[sym] = light_pdf(f"{d['row'].get('name') or sym} ({sym}) - {run_label}", blocks)
+    _, notes = read_notes("summaries")
+    table_rows = [("t", line(d["stock"]["symbol"], k)) for d, k in results]
+    files["watchlist_summary"] = light_pdf(
+        f"Watch list summary - {run_label}",
+        [
+            ("h", "Summary"),
+            ("p", plain(notes.get("Verdict", ""))),
+            ("h", "The numbers"),
+            ("t", header),
+            *table_rows,
+        ],
+    )
+    paths = []
+    for name, data in files.items():
+        p = LIGHT / f"{name}_{stamp}.pdf"
+        p.write_bytes(data)
+        paths.append(p)
+    return paths
 
 
 # --- the evening email ---------------------------------------------------------------
