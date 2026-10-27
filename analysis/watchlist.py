@@ -880,32 +880,10 @@ def main() -> None:
                 "subject": f"Watch list analyses, {run_label}",
                 "html": str(EMAIL.relative_to(ROOT)),
                 "files": [str(p.relative_to(ROOT)) for p in written],
-                "light": [str(p.relative_to(ROOT)) for p in light_copies(written)],
             },
             indent=2,
         )
     )
-
-
-# --- light PDFs: the same reports, small enough to attach through the Gmail connector ---
-
-LIGHT = ROOT / ".cache/watchlist/light"
-
-
-def light_copies(written: list[Path]) -> list[Path]:
-    """Slim copies of this run's PDFs (standard fonts, nothing embedded), for the Gmail fallback."""
-    import slim_pdf
-
-    LIGHT.mkdir(parents=True, exist_ok=True)
-    for old in LIGHT.glob("*.pdf"):
-        old.unlink()
-    names = {"summaries": "watchlist_summary"}
-    paths = []
-    for pdf in written:
-        light = LIGHT / f"{names.get(pdf.parent.name, pdf.parent.name)}_{pdf.name}"
-        slim_pdf.slim(pdf, light)
-        paths.append(light)
-    return paths
 
 
 # --- the evening email ---------------------------------------------------------------
