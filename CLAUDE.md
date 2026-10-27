@@ -36,6 +36,17 @@ Ratios and scores hide important information, so they come after, never instead.
   screens), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
   `analysis/valuation.py`, `analysis/debt_to_ebitda.py`.
 
+## Watch list and the evening run
+
+The watch list is `config/watchlist.toml` (symbol, sector peers, target P/E, one-off EPS
+corrections). Every evening at 21:00 Italy time a scheduled session follows
+`docs/EVENING_RUN.md`: it updates Claude's notes (`analyses/<SYMBOL>/notes.md`,
+`analyses/market/notes.md`, `analyses/summaries/notes.md`), runs
+`uv run python analysis/watchlist.py`, commits the dated PDFs to `main` and emails Babak.
+Every run is kept: `analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf` plus a dated list in each
+folder's `README.md`. Call it a list of dated analyses, not an archive. Adjusted EPS for
+the own-history P/E is Yahoo's reported quarterly EPS (split-adjusted).
+
 ## Reports
 
 Every distinct analysis is written up as a numbered report in `reports/` (see
