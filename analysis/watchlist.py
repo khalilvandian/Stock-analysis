@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import os
 import re
 import shutil
@@ -871,12 +872,23 @@ def main() -> None:
     EMAIL.write_text(email_html(run_label, written, results))
     print(f"\nEmail subject: Watch list analyses, {run_label}")
     print(f"Email body (HTML): {EMAIL.relative_to(ROOT)}")
+    LAST_RUN.write_text(
+        json.dumps(
+            {
+                "subject": f"Watch list analyses, {run_label}",
+                "html": str(EMAIL.relative_to(ROOT)),
+                "files": [str(p.relative_to(ROOT)) for p in written],
+            },
+            indent=2,
+        )
+    )
 
 
 # --- the evening email ---------------------------------------------------------------
 
 REPO_URL = "https://github.com/khalilvandian/Stock-analysis/blob"
 EMAIL = ROOT / ".cache/watchlist/email.html"
+LAST_RUN = ROOT / ".cache/watchlist/last_run.json"  # read by analysis/send_email.py
 
 
 def link(path: Path) -> str:
@@ -886,7 +898,7 @@ def link(path: Path) -> str:
 
 
 def email_html(run_label: str, written: list[Path], results: list[tuple[dict, dict]]) -> str:
-    """Email body: the high-level summary first, then a link to every PDF from this run."""
+    """Email body: the high-level summary first, then the PDFs (attached, and linked)."""
     parts = [f"<h2>Watch list analyses, {html.escape(run_label)}</h2>"]
     market_runs = OUT / "market/runs.csv"
     if any(p.parent.name == "market" for p in written) and market_runs.exists():
@@ -910,7 +922,7 @@ def email_html(run_label: str, written: list[Path], results: list[tuple[dict, di
             f"{k['target_pe']:g}x, {pct(k['to_entry'])} from today's price. "
             f"{html.escape(verdict)}</li>"
         )
-    parts += ["</ul>", "<h3>The PDFs</h3>", "<ul>"]
+    parts += ["</ul>", "<h3>The PDFs (attached, and online here)</h3>", "<ul>"]
     names = {"market": "Market report", "summaries": "Watch list summary"}
     for p in written:
         title = names.get(p.parent.name, f"{p.parent.name} analysis")

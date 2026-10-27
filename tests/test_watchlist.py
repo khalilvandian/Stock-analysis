@@ -90,3 +90,22 @@ def test_new_pdf_never_overwrites(tmp_path):
 def test_formatting():
     assert watchlist.times(np.nan) == "–"
     assert watchlist.pct(-0.0712) == "-7.1%"
+
+
+def test_email_attaches_every_pdf_and_sends_once(tmp_path, monkeypatch):
+    import httpx
+    import respx
+    import send_email
+
+    (tmp_path / "analyses/BSX").mkdir(parents=True)
+    (tmp_path / "analyses/BSX/2026-10-27_2100.pdf").write_bytes(b"%PDF-1.4")
+    (tmp_path / "email.html").write_text("<p>hi</p>")
+    monkeypatch.setattr(send_email, "ROOT", tmp_path)
+    run = {"subject": "S", "html": "email.html", "files": ["analyses/BSX/2026-10-27_2100.pdf"]}
+    msg = send_email.build_message(run, "to@example.com", send_email.SENDER, test=True)
+    assert msg["to"] == ["to@example.com"] and msg["subject"] == "[Test] S"
+    assert msg["attachments"][0]["filename"] == "BSX_2026-10-27_2100.pdf"
+    with respx.mock:
+        route = respx.post(send_email.API).mock(return_value=httpx.Response(200, json={"id": "e1"}))
+        assert send_email.send(msg, "key")["id"] == "e1"
+        assert route.calls[0].request.headers["Authorization"] == "Bearer key"

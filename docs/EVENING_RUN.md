@@ -24,8 +24,10 @@ Babak approved committing the results straight to `main` (no pull request each n
    and writes the email body to `.cache/watchlist/email.html` (not committed).
 5. **Check:** `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
 6. **Save:** commit `analyses/` (and any config or notes changes) to `main` and push.
-7. **Email:** send `.cache/watchlist/email.html` as the HTML body with the printed subject,
-   through the Gmail connector, only to the address given in the scheduled task (never in
-   this public repository). Its links open each PDF on GitHub.
+7. **Email:** `uv run python analysis/send_email.py --to <address>` sends the email body
+   with every PDF of the run attached, through Resend (resend.com), from Resend's own
+   address. The recipient is given in the scheduled task (or `WATCHLIST_EMAIL_TO`) and the
+   key in `RESEND_API_KEY`; neither is ever written into this public repository. Babak
+   does not want it sent from his own Gmail.
 
 If a step fails, still commit what was built and say in the email what failed.
