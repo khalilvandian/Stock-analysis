@@ -29,12 +29,10 @@ Babak approved committing the results straight to `main` (no pull request each n
    address. The recipient is given in the scheduled task (or `WATCHLIST_EMAIL_TO`) and the
    key in `RESEND_API_KEY`; neither is ever written into this public repository. Babak
    asked for it not to come from their own Gmail.
-   Until Resend is set up, send through the Gmail connector instead, with real attachments:
-   the light copies listed under `light` in `.cache/watchlist/last_run.json`
-   (`base64 -w0 <file>` for each). They are the same reports, page for page, with the
-   standard PDF fonts instead of embedded ones (`analysis/slim_pdf.py`): about 5 KB for the
-   summary, 8 KB for the market report and 17 KB per stock. Send them all in one email
-   (subject and HTML body from the run), as Babak asked. Copy each base64 string exactly:
-   one wrong character breaks that PDF.
+   Until Resend is set up, send one email through the Gmail connector with the run's
+   subject and HTML body, which links to every PDF on GitHub. Don't attach files that
+   way: the connector only takes a file typed out as base64, which is slow and breaks
+   PDFs. The light copies (`analysis/slim_pdf.py`, listed under `light` in
+   `.cache/watchlist/last_run.json`) remain for small one-off attachments.
 
 If a step fails, still commit what was built and say in the email what failed.
