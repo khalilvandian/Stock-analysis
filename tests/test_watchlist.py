@@ -111,6 +111,34 @@ def test_email_attaches_every_pdf_and_sends_once(tmp_path, monkeypatch):
         assert route.calls[0].request.headers["Authorization"] == "Bearer key"
 
 
+def test_brevo_sends_pdfs_to_several_recipients(tmp_path, monkeypatch):
+    import json
+
+    import httpx
+    import pytest
+    import respx
+    import send_email
+
+    (tmp_path / "a.pdf").write_bytes(b"%PDF-1.4")
+    (tmp_path / "email.html").write_text("<p>hi</p>")
+    monkeypatch.setattr(send_email, "ROOT", tmp_path)
+    run = {"subject": "S", "html": "email.html", "files": ["a.pdf"]}
+    msg = send_email.build_message(run, "a@example.com, b@example.com", "Bot <bot@example.com>")
+    with respx.mock:
+        route = respx.post(send_email.BREVO_API).mock(
+            return_value=httpx.Response(201, json={"messageId": "<m1>"})
+        )
+        assert send_email.send_brevo(msg, "k")["id"] == "<m1>"
+        req = route.calls[0].request
+    body = json.loads(req.content)
+    assert req.headers["api-key"] == "k"
+    assert body["sender"] == {"email": "bot@example.com", "name": "Bot"}
+    assert body["to"] == [{"email": "a@example.com"}, {"email": "b@example.com"}]
+    assert body["attachment"][0] == {"name": "_a.pdf", "content": "JVBERi0xLjQ="}
+    with pytest.raises(SystemExit):
+        send_email.recipients(",".join(f"{i}@example.com" for i in range(6)))
+
+
 def test_light_copy_keeps_the_text_without_embedded_fonts(tmp_path):
     import pikepdf
     import pypdfium2
