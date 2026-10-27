@@ -32,8 +32,9 @@ Ratios and scores hide important information, so they come after, never instead.
 - The sector dashboard of absolute values is `dashboard/absolute.html`, built by
   `uv run python dashboard/build_absolute.py`; it reads the same config, so new values
   appear there automatically.
-- Market screener: `uv run python analysis/screener.py` screens every US and European
-  company above $1bn (TradingView, Yahoo, SEC, ECB; all free) in two separate stages
+- Market screener: `uv run python analysis/screener.py` screens the S&P 500 for now
+  (`[universe]` in the config; "" = every US and European company above $1bn;
+  TradingView, Yahoo, SEC, ECB; all free) in two separate stages
   (report 13, settings in `config/screeners.toml`). Stage 1 (`analysis/stage1.py`) puts
   each company in one of Peter Lynch's six categories and keeps those with good financial
   statements by the rules for their category (banks, insurers, REITs by kind of business).

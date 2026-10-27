@@ -18,6 +18,14 @@ cheap_percentile = 0.25
 history_years = 10
 min_history_years = 6
 
+# Which companies to screen. `index` = a TradingView index code: only its members are
+# screened ("SP:SPX" = the S&P 500; "" = every company above the minimum market value).
+# `regions` = the regions below to scan ([] = all of them).
+# Babak, 2026-10-27: "for now, we're focusing on the S&P 500".
+[universe]
+index = "SP:SPX"
+regions = ["US"]
+
 # TradingView markets in each region. Each market lists its primary listings only.
 [regions]
 US = ["america"]

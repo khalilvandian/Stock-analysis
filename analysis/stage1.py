@@ -102,6 +102,7 @@ COLUMNS = [
     "price_52_week_low",
     "Recommend.All",
     "Perf.Y",
+    "indexes",
 ]
 FILTERS = [
     {"left": "is_primary", "operation": "equal", "right": True},
@@ -175,21 +176,35 @@ def screener_type(sector: str | None, industry: str | None, types: dict) -> str 
 
 def fetch_universe(cfg: dict, today: str, refresh: bool = False) -> pd.DataFrame:
     """Every market of every region from TradingView, cached for the day."""
-    cache = CACHE / f"tradingview_{today}.pkl"
+    tag = cfg.get("universe", {}).get("index", "").replace(":", "_") or "all"
+    cache = CACHE / f"tradingview_{tag}_{today}.pkl"
     if cache.exists() and not refresh:
         return pd.read_pickle(cache)
+    universe = cfg.get("universe", {})
+    regions = universe.get("regions") or list(cfg["regions"])
     frames = []
     with httpx.Client(timeout=60) as client:
         for region, markets in cfg["regions"].items():
+            if region not in regions:
+                continue
             for m in markets:
                 d = tradingview.scan(m, COLUMNS, FILTERS, client=client)
                 d["market"], d["region"] = m, region
                 frames.append(d)
     d = pd.concat(frames)
     d = d[~d.index.duplicated()]
+    if universe.get("index"):
+        d = d[in_index(d["indexes"], universe["index"])]
     CACHE.mkdir(parents=True, exist_ok=True)
     d.to_pickle(cache)
     return d
+
+
+def in_index(indexes: pd.Series, proname: str) -> pd.Series:
+    """True where TradingView lists the stock in the index (e.g. "SP:SPX", the S&P 500)."""
+    return indexes.map(
+        lambda v: isinstance(v, list) and any(i.get("proname") == proname for i in v)
+    )
 
 
 def yearly_growth(values, years: int) -> list[float]:

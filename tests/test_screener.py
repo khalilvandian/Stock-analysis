@@ -327,3 +327,17 @@ def test_stage2_refuses_stage1_output_without_its_columns(tmp_path):
     full = pd.DataFrame({c: [1] for c in stage2.NEEDS})
     full.to_pickle(path)
     assert len(stage2.load_stage1(path)) == 1
+
+
+def test_index_membership():
+    idx = pd.Series(
+        [
+            [
+                {"name": "S&P 500", "proname": "SP:SPX"},
+                {"name": "Nasdaq 100", "proname": "NASDAQ:NDX"},
+            ],
+            [{"name": "Russell 2000", "proname": "TVC:RUT"}],
+            None,
+        ]
+    )
+    assert list(stage1.in_index(idx, "SP:SPX")) == [True, False, False]
