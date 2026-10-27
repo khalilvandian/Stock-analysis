@@ -1,10 +1,22 @@
-# Boston Scientific (BSX): fundamentals screen
+# Boston Scientific (BSX): fundamentals and analysis
 
 *Prices at the 2026-10-26 close; SEC filings through 2026-06-30. Written 2026-10-27.*
 
-The first company outside utilities. It runs the same process on BSX against 13 US medical-device peers. The full investment write-up (adjusted P/E against BSX's own history, entry price, business, risks) is in the project's Claude Doc "Boston Scientific (BSX): investment analysis".
+## 1. Summary
 
-## Absolute values, latest 12 months
+**Boston Scientific is a strong, profitable business whose stock has halved this year because its growth slowed sharply. It now looks cheap against its own history and its peers, but debt is its weak spot and part of the slowdown looks lasting. View: wait for the Q3 results on Oct 28, then buy at around $42.**
+
+- **Cheap:** the lowest valuation in a decade, and cheaper than most medical-device peers.
+- **Strong:** the best profitability and cash generation in its peer group.
+- **Weak:** little cash against its debt, with more debt coming from the Penumbra deal.
+- **Uncertain:** growth has fallen from about 16% to about 5%, and it is not yet clear how much of that is temporary.
+
+## 2. The numbers
+
+The first company outside utilities, run through this project's process against 13 US medical-device peers.
+
+### Absolute values, latest 12 months
+
 
 | Group | Value | BSX |
 |---|---|---|
@@ -28,7 +40,7 @@ The first company outside utilities. It runs the same process on BSX against 13 
 
 Capex and free cash flow are from SEC filings. Yahoo reports capex of $2.72bn (free cash flow $1.81bn) because it counts the $1.5bn MiRus stake bought in Q2 2026 as a capital purchase.
 
-## Absolute values by year (SEC)
+### Absolute values by year (SEC)
 
 | Year | Price | Market value | Revenue | EBITDA | Net income | EPS | Operating CF | Free CF | Net debt | Cash |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -43,13 +55,13 @@ Capex and free cash flow are from SEC filings. Yahoo reports capex of $2.72bn (f
 | 2017 | $24.79 | $34.5bn | $9.0bn | $2.1bn | $0.1bn | $0.08 | $1.4bn | $1.1bn | $5.4bn | $0.2bn |
 | 2016 | $21.63 | $29.8bn | $9.1bn | $1.3bn | $0.4bn | $0.25 | $1.2bn | $0.8bn | $5.3bn | $0.2bn |
 
-## Method
+### Method
 
 - `analysis/sector.py`'s `analyse()` for latest values and ratios, `analysis/history.py`'s `sec_history()` for the yearly history.
 - `analysis/screen.py` rules and weights unchanged; peers replace the utilities universe, with one peer median for P/E and EV / EBITDA.
 - Peers: ABT, MDT, SYK, ISRG, BDX, EW, ZBH, DXCM, STE, PODD, TFX, GEHC, RMD.
 
-## Findings
+### Ratios and screens
 
 **BSX passes the profit, growth and leverage rules but fails both cash-covers-debt rules, so the strict screen drops it. In the weighted screen it ranks 5th of 9: top on profitability and cash, second cheapest, bottom third on debt.**
 
@@ -84,6 +96,32 @@ Weighted screen (growth required):
 | 9 | GEHC | 40.6 | 30.9 | 25.4 | 75.0 |
 
 The pending $14.5bn Penumbra deal adds about $11bn of debt, which would take net debt / EBITDA near 3.8x.
+
+## 3. Analysis
+
+**BSX is cheap for good reasons as well as bad ones.** The full write-up is in the project's Claude Doc "Boston Scientific (BSX): investment analysis".
+
+**Valuation against its own history.** Using adjusted EPS (the company's figure without amortization, restructuring, litigation and deal costs), BSX trades at 14.2x trailing EPS of $3.21. Its yearly average from 2016 to 2025 ranged from 19x to 36x, with a median of 25x, and its lowest point was 14.5x in early 2016.
+
+| Year | Average price | Adjusted EPS | P/E on average price |
+|---|---|---|---|
+| Now (TTM) | $45.58 | $3.21 | 14.2x |
+| 2025 | $100.87 | $3.06 | 33.0x |
+| 2024 | $76.24 | $2.51 | 30.4x |
+| 2023 | $51.31 | $2.05 | 25.0x |
+| 2022 | $41.86 | $1.71 | 24.5x |
+| 2021 | $41.59 | $1.63 | 25.5x |
+| 2020 | $37.41 | $1.05 | 35.6x |
+| 2019 | $40.25 | $1.58 | 25.5x |
+| 2018 | $32.17 | $1.47 | 21.9x |
+| 2017 | $26.52 | $1.26 | 21.0x |
+| 2016 | $21.26 | $1.11 | 19.2x |
+
+**Why it fell.** Most of the drop is a real growth reset. Organic growth went from 15.8% in 2025 to a 5–6% guide for 2026 after three cuts. US electrophysiology is losing share in pulsed field ablation, and stand-alone Watchman procedures are falling. The Aug 25 cyberattack, which disrupted manufacturing and shipping, is the one-off part.
+
+**Entry price.** 13x trailing core EPS gives about $42 (about $41 if Q3 EPS is the $0.72 consensus). 13x is about half the 10-year median, a discount for slower growth and the Penumbra debt. At 15x the entry is about $48, above today's price.
+
+**What to watch.** The Q3 report on Oct 28, above all the 2027 outlook; whether US electrophysiology and Watchman stabilise; and the Penumbra closing, FTC remedy and debt package.
 
 ## Caveats
 

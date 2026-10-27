@@ -14,7 +14,7 @@ Each report covers one piece of analysis. It states the data date, the method, t
 | 08 | [Utilities sector overview](08-utilities-sector-overview.md) | All 102 US-listed utilities, medians by sub-industry |
 | 09 | [Screening](09-screening-low-debt-cheap-growth.md) | Seven rounds of screen design, ending with the current weighted top 5 |
 | 10 | [Absolute values](10-absolute-values-sector.md) | The absolute-values-first framework and sector totals FY2018–FY2025 |
-| 11 | [Boston Scientific fundamentals](11-bsx-fundamentals.md) | BSX absolute values, ratios and screens against 13 medical-device peers |
+| 11 | [Boston Scientific](11-bsx-fundamentals.md) | Summary, then BSX absolute values, ratios and screens against 13 medical-device peers, then analysis (P/E vs its own history, entry price) |
 
 ## Writing a new report
 
