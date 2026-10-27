@@ -44,6 +44,7 @@ Claude runs the process in Claude Code. [`CLAUDE.md`](CLAUDE.md) holds the rules
 | `uv run python analysis/valuation.py CEG VST ...` | Valuation multiples |
 | `uv run python analysis/debt_to_ebitda.py CEG VST ...` | Leverage history |
 | `uv run python analysis/debt.py CEG` | One company's leverage over time |
+| `uv run python analysis/peer_screen.py NAME TICKERS` | Metrics and screens for a hand-picked peer group outside utilities |
 | `uv run python -m stock_analysis.fetch CEG` | Saves one company's Yahoo data to `data/CEG/` |
 
 ## Dashboards

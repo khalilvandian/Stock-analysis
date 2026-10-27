@@ -1,0 +1,37 @@
+# The watch list. Every stock here is analysed each evening by analysis/watchlist.py and
+# saved as a dated PDF in analyses/<SYMBOL>/ (see analyses/README.md).
+#
+# To add a stock, copy a [[stock]] block. To drop one, delete its block: its dated
+# analyses stay in analyses/<SYMBOL>/.
+#
+# symbol      Yahoo ticker.
+# peers       Sector-appropriate peers for the ratios and the strict and weighted screens.
+# target_pe   Entry multiple: entry price = target_pe x trailing 12-month adjusted EPS.
+# target_note Where the target comes from and whether Babak has confirmed it.
+# eps_override  Optional one-off corrections to a quarter's adjusted EPS, by report date,
+#               when Yahoo's figure still includes a one-off (e.g. a tax charge).
+
+# Time zone for the dated file names.
+timezone = "Europe/Rome"
+
+[[stock]]
+symbol = "BSX"
+peers = ["ABT", "MDT", "SYK", "ISRG", "BDX", "EW", "ZBH", "DXCM", "STE", "PODD", "TFX", "GEHC", "RMD"]
+target_pe = 13
+target_note = "Proposed 2026-10-27 (report 11): about half the 10-year median, a discount for slower growth and the Penumbra debt."
+
+[[stock]]
+symbol = "BKNG"
+peers = ["EXPE", "ABNB", "TCOM", "TRIP", "MMYT", "TRVG"]
+target_pe = 15
+target_note = "Proposed 2026-10-25 (report 12), not yet confirmed by Babak: below the 18x decade low, a discount for the AI-agent risk."
+
+[[stock]]
+symbol = "NFLX"
+peers = ["DIS", "WBD", "CMCSA", "SPOT", "ROKU", "GOOGL", "META", "PSKY"]
+target_pe = 20
+target_note = "Proposed 2026-10-27, not yet confirmed by Babak: the 10-year median (about 60x) reflects Netflix's early hyper-growth years, so the target is set against the last five years (about 34x median, 29x low), discounted for slower growth now."
+eps_override = [
+  { reported = "2025-10-21", eps = 0.73, reason = "excludes the Brazilian tax charge of about $619m (about $0.14 a share)." },
+  { reported = "2026-04-16", eps = 0.69, reason = "excludes the $2.8bn Warner Bros. Discovery termination fee (about $0.54 a share after an estimated 18% tax); Claude's estimate." },
+]
