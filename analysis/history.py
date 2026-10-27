@@ -385,6 +385,8 @@ def add_prices(hist: pd.DataFrame, symbol: str, financial_currency: str | None) 
 
 def fill_from_yahoo(hist: pd.DataFrame, yahoo: pd.DataFrame, symbol: str) -> pd.DataFrame:
     """Add Yahoo annual values for (column, year) pairs the SEC data doesn't cover."""
+    if yahoo.empty or "symbol" not in yahoo:  # Yahoo failed for this stock: SEC only
+        return hist
     y = yahoo[yahoo["symbol"] == symbol].copy()
     if y.empty:
         return hist

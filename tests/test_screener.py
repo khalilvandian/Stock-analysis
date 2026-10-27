@@ -424,3 +424,16 @@ def test_latest_history_entry():
     assert stage2._latest(np.nan) is None
     assert stage2._latest([None, 2024]) is None
     assert stage2._latest([]) is None
+
+
+def test_split_factor_since(monkeypatch):
+    class T:
+        splits = pd.Series(
+            [25.0, 2.0],
+            index=pd.DatetimeIndex(["2026-03-02", "2020-06-01"]).tz_localize("America/New_York"),
+        )
+
+    monkeypatch.setattr(stage2.yf, "Ticker", lambda s: T())
+    assert stage2.split_factor_since("BKNG", 2025) == 25.0
+    assert stage2.split_factor_since("BKNG", 2019) == 50.0
+    assert stage2.split_factor_since(None, 2025) == 1.0

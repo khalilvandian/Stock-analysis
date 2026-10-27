@@ -2,7 +2,8 @@
 cross-checks between sources. No network: HTTP is mocked with respx (httpx) or
 monkeypatched (requests, yfinance); everything else runs on small hand-built frames.
 
-Tests marked xfail(strict=True) expose bugs in the source; each reason says what is wrong.
+Four tests here first exposed bugs (double split, reverse splits, NaN price, empty Yahoo
+history); they are regression tests now.
 """
 
 import json
@@ -210,12 +211,6 @@ def test_key_numbers_falls_back_to_the_last_close_when_yahoo_has_no_price():
     assert watchlist.key_numbers(_key_inputs(price=None))["price"] == 100.0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="watchlist.key_numbers: `row.get('price') or prices.iloc[-1]` keeps a NaN price "
-    "(NaN is truthy), so P/E, entry gap and the summary go blank instead of using the "
-    "last close; fetch_row's retry has the same `if row.get('price')` test",
-)
 def test_key_numbers_falls_back_to_the_last_close_when_the_price_is_nan():
     assert watchlist.key_numbers(_key_inputs(price=np.nan))["price"] == 100.0
 
@@ -475,15 +470,7 @@ def test_history_split_adjust_leaves_restated_values_and_counts_only_later_split
     [
         2.0,
         10.0,
-        pytest.param(
-            0.05,
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="watchlist.split_adjust skips any split product under 1.5 "
-                "(`if factor < 1.5`), so a reverse split is never applied: pre-split share "
-                "counts stay 20x too high and EPS 20x too low against Yahoo's adjusted prices",
-            ),
-        ),
+        pytest.param(0.05),
     ],
 )
 def test_watchlist_split_adjust_keeps_market_value_and_pe(ratio):
@@ -521,13 +508,6 @@ def test_watchlist_split_adjust_leaves_restated_counts_and_handles_missing_input
     assert watchlist.split_adjust(hist, pd.Series(dtype=float), 1000.0).equals(hist)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="watchlist.sec_years applies a split twice: watchlist.split_adjust rescales the "
-    "pre-split SEC shares and EPS, then history.add_prices calls history.split_adjust, which "
-    "rescales them again from their (unchanged) filing dates; a 25:1 split leaves EPS 625x "
-    "too low and market value 25x too high",
-)
 def test_watchlist_sec_years_applies_a_split_once(fake_yf, monkeypatch, tmp_path):
     facts = _facts(
         {
@@ -905,13 +885,6 @@ def test_sec_values_win_and_yahoo_fills_gaps_with_its_source():
     assert set(h["symbol"]) == {"X"} and h["source"].notna().all()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=KeyError,
-    reason="history.fill_from_yahoo indexes yahoo['symbol'] before checking the frame is "
-    "empty; watchlist.sec_years passes pd.DataFrame([]) when sector.analyse failed (no "
-    "'_history'), so one failed Yahoo fetch crashes the stock's whole analysis",
-)
 def test_fill_from_yahoo_with_no_yahoo_rows():
     sec = _sec_hist([("2024-12-31", "revenue", 1.0, "")])
     assert history.fill_from_yahoo(sec, pd.DataFrame([]), "X").equals(sec)

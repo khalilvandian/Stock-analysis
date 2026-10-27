@@ -367,8 +367,27 @@ def _latest(values, int_: bool = True):
     return int(values[0]) if int_ else float(values[0])
 
 
+def split_factor_since(symbol, year: int) -> float:
+    """Product of the stock's splits after the end of calendar `year` (1 if none or unknown).
+
+    A split after the year's 10-K leaves the SEC's EPS for that year on the old share basis.
+    """
+    if not isinstance(symbol, str):
+        return 1.0
+    try:
+        splits = yf.Ticker(symbol).splits
+    except Exception:  # noqa: BLE001
+        return 1.0
+    if splits is None or splits.empty:
+        return 1.0
+    splits.index = pd.DatetimeIndex(splits.index).tz_localize(None)
+    after = splits[(splits.index > pd.Timestamp(f"{year}-12-31")) & (splits > 0)]
+    return float(after.prod()) if len(after) else 1.0
+
+
 def sec_check(d: pd.DataFrame, rows: pd.Index) -> None:
-    """Flag US stocks whose latest-year diluted EPS differs from SEC EDGAR by over 10%."""
+    """Flag US stocks whose latest-year diluted EPS differs from SEC EDGAR by over 10%,
+    after putting the SEC figure on today's share basis."""
     try:
         with httpx.Client(timeout=60, headers=SEC_UA) as c:
             tickers = c.get("https://www.sec.gov/files/company_tickers.json").json()
@@ -396,6 +415,9 @@ def sec_check(d: pd.DataFrame, rows: pd.Index) -> None:
         tv = _latest(r["earnings_per_share_diluted_fy_h"], int_=False)
         if sec is None or tv is None:
             continue
+        if abs(sec - tv) > 0.1 * max(abs(sec), 0.01):
+            # SEC values are as filed; TradingView's are split-adjusted
+            sec /= split_factor_since(r.get("yahoo"), year)
         d.loc[idx, "sec_eps"] = sec
         if abs(sec - tv) > 0.1 * max(abs(sec), 0.01):
             d.loc[idx, "flags"] += f"EPS {year}: TradingView {tv:.2f} vs SEC {sec:.2f}; "
