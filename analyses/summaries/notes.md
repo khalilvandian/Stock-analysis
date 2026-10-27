@@ -6,7 +6,7 @@ The evening run copies these sections into the watch list summary PDF.
 
 ## Verdict
 
-**All three watch list stocks are within about 10% of their entry prices. Booking is closest and has the strongest balance sheet; Boston Scientific reports tomorrow (Oct 28); Netflix needs a full analysis before its target is firm.**
+**All three watch list stocks are within about 10% of their entry prices. Booking is closest (about 4% above $144) after a new 52-week low today and has the strongest balance sheet; Boston Scientific reports tomorrow (Oct 28); Netflix needs a full analysis before its target is firm.**
 
 ## Analysis
 

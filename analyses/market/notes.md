@@ -17,7 +17,7 @@ The evening run copies these sections into the market PDF. Keep it short.
 
 ## What is driving the market
 
-Oil topped $100 a barrel in September on Middle East supply worries, and the 10-year yield broke 5% for the first time since 2023 on inflation fears and the chance of Fed rate rises. The index has held up because the largest companies keep growing earnings, but breadth is middling: a little under 60% of S&P 500 stocks are above their 200-day average.
+On Oct 27 the S&P 500 rose about 0.7% to about 7,730 and the Nasdaq about 1.3%, led by chips and Big Tech ahead of their earnings and this week's Fed meeting. Oil topped $100 a barrel in September on Middle East supply worries, and the 10-year yield broke 5% for the first time since 2023 on inflation fears and the chance of Fed rate rises. The index has held up because the largest companies keep growing earnings, but breadth is middling: a little under 60% of S&P 500 stocks are above their 200-day average.
 
 ## Stocks to look at
 

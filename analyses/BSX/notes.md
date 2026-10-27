@@ -28,7 +28,8 @@ Boston Scientific makes devices for heart, vascular, digestive and urology proce
 
 ## News
 
-- 2026-10-27: Q3 results are due before the open on Oct 28; consensus adjusted EPS is about $0.72.
+- 2026-10-27 (evening): closed about $45.0 ahead of tomorrow's report. Stifel cut its target from $60 to $55 on Oct 26 but kept Buy.
+- Q3 results are due before the open on Oct 28; consensus adjusted EPS is about $0.72.
 - 2026: the stock is down about half from its 2025 high after three guidance cuts.
 
 ## What to watch

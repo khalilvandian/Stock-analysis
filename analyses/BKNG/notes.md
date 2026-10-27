@@ -27,7 +27,8 @@ Booking runs Booking.com, Priceline, Agoda, KAYAK and OpenTable. Most of its pro
 
 ## News
 
-- 2026-10-27: the stock is about $152, down about 29% this year, most of it since late August.
+- 2026-10-27: a new 52-week low near $150 intraday, closing about $150. Options imply about a 6% move on the Nov 3 report. Wells Fargo cut its target to $190 (Equal Weight); BofA ($232) and BTIG ($250) keep Buy.
+- The stock is down about 29% this year, most of it since late August.
 - Q3 results are due Nov 3; consensus adjusted EPS is about $4.49.
 
 ## What to watch

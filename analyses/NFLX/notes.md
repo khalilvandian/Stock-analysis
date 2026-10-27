@@ -28,6 +28,7 @@ Netflix is the largest paid streaming service, earning almost all its revenue fr
 
 ## News
 
+- 2026-10-26/27: the stock broke below $65 and closed about $62.6 after a Bloomberg report that viewers spend less time on the service; Huatai downgraded it to Hold.
 - 2026-10-20: Q3 results beat on EPS, but soft Q4 guidance sent the stock down about 6% after hours. Free cash flow guidance was lowered to about $12bn, mainly because of a real-estate transaction.
 - Peter Rice, formerly of Disney and Fox, was named Chief Content Officer.
 - 2026-04-16: Q1 EPS of $1.23 included the $2.8bn WBD termination fee; Netflix authorised a $25bn buyback.
