@@ -32,6 +32,10 @@
 #               context    = needed to read the others (size, price), not a feature itself
 #               derived    = depends on a peer group or a model, not the stock alone
 #   notes       caveats and open choices
+#   clip        optional {lower, upper}: bounds applied when the vector is built, before
+#               standardizing (report 14, open choice 6: net debt ratios at 0, so every
+#               net-cash company counts the same; cover ratios at 50x, so "no debt" (an
+#               infinite ratio) counts as the best value rather than a blank)
 
 [meta]
 example_stock = "BSX"
@@ -379,6 +383,7 @@ sources = { sector = "cash_to_short_term_debt", stage1 = "cash_to_short_term_deb
 used_in = ["strict screen (>= 1)", "weighted debt score", "every Stage 1 rule set (>= 1)"]
 example = { symbol = "BSX", value = 0.315, as_of = "2026-09-30", working = "0.539 / 1.709: fails. BKNG: 17.5 / 2.0 = 8.8" }
 vector = "core"
+clip = { upper = 50.0 }
 
 [[metric]]
 id = "cash_plus_ocf_to_short_term_debt"
@@ -393,6 +398,7 @@ sources = { sector = "cash_plus_ocf_to_short_term_debt" }
 used_in = ["sector table (shown, not a rule)"]
 example = { symbol = "BSX", value = 2.97, as_of = "2026-09-30", working = "(0.539 + 4.529) / 1.709" }
 vector = "candidate"
+clip = { upper = 50.0 }
 notes = "Open choice: a fairer version of the first must-have for companies that keep little cash (BSX passes this, fails the strict one)."
 
 [[metric]]
@@ -408,6 +414,7 @@ sources = { sector = "cash_to_long_term_debt", stage1 = "cash_to_long_term_debt"
 used_in = ["strict screen (>= 5%)", "weighted debt score", "Stage 1 slow grower, stalwart, cyclical (>= 5%)"]
 example = { symbol = "BSX", value = 0.049, as_of = "2026-09-30", working = "0.539 / 10.915: just under 5% (TradingView's 0.648 gives 5.9%)" }
 vector = "core"
+clip = { upper = 50.0 }
 
 [[metric]]
 id = "cash_to_total_debt"
@@ -422,6 +429,7 @@ sources = { stage1 = "cash_to_total_debt" }
 used_in = ["Stage 1 turnaround (>= 25%)"]
 example = { symbol = "BSX", value = 0.051, as_of = "2026-09-30", working = "0.648 / 12.624 (TradingView)" }
 vector = "candidate"
+clip = { upper = 50.0 }
 notes = "Overlaps cash / short-term and cash / long-term debt."
 
 [[metric]]
@@ -437,7 +445,8 @@ sources = { sector = "net_debt_to_ebitda", stage1 = "net_debt_to_ebitda" }
 used_in = ["strict screen (<= 4.5x)", "weighted debt score", "Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x)", "debt_to_ebitda.py history"]
 example = { symbol = "BSX", value = 2.14, as_of = "2026-09-30", working = "12.085 / 5.637. BKNG: 3.19 / 10.65 = 0.30" }
 vector = "core"
-notes = "Negative when net cash; for the vector, clip or use net_cash flag (open choice)."
+clip = { lower = 0.0 }
+notes = "Negative when net cash; clipped at 0 for the vector (open choice 6, default until Babak decides), so every net-cash company counts the same."
 
 [[metric]]
 id = "net_debt_to_avg_ebitda"
@@ -452,6 +461,7 @@ sources = { stage1 = "net_debt_to_avg_ebitda" }
 used_in = ["Stage 1 cyclical (<= 2.5x)"]
 example = { symbol = "BSX", value = 3.97, as_of = "2026-09-30", working = "11.976 / 3.02 average 2016-2025 EBITDA" }
 vector = "candidate"
+clip = { lower = 0.0 }
 notes = "For growing companies it overstates leverage (BSX 3.97x against 2.0x on today's EBITDA)."
 
 [[metric]]
@@ -467,6 +477,7 @@ sources = { sector = "ebitda_to_interest", stage1 = "interest_cover", tradingvie
 used_in = ["strict screen (>= 4x)", "weighted debt score", "Stage 1 (>= 4x; REITs >= 2.5x)"]
 example = { symbol = "BSX", value = 15.53, as_of = "2026-09-30", working = "5.637 / 0.363 (TradingView 18.3)" }
 vector = "core"
+clip = { upper = 50.0 }
 
 [[metric]]
 id = "debt_to_equity"
@@ -741,8 +752,8 @@ formula = "mean(cash_y / cash_y-1 - 1)"
 sources = { sector = "cash_growth_avg" }
 used_in = ["weighted quality score (weight 0.5)"]
 example = { symbol = "BSX", value = 1.052, as_of = "FY2022-FY2025", working = "mean(-6.8%, -52.1%, +374.6%)" }
-vector = "candidate"
-notes = "Cash swings with deals and debt raises (BSX +375% in 2025), so it is noisy. Proposed to drop."
+vector = "context"
+notes = "Cash swings with deals and debt raises (BSX +375% in 2025), so it is noisy. Context only, not for the vector (open choice 9, default until Babak decides); kept because the weighted screen uses it."
 
 [[metric]]
 id = "cash_growth_median"
@@ -756,7 +767,8 @@ formula = "median(cash_y / cash_y-1 - 1)"
 sources = { sector = "cash_growth_median" }
 used_in = ["weighted quality score (weight 0.5)"]
 example = { symbol = "BSX", value = -0.068, as_of = "FY2022-FY2025", working = "median(-6.8%, -52.1%, +374.6%)" }
-vector = "candidate"
+vector = "context"
+notes = "Context only, not for the vector, like the average (open choice 9)."
 
 # --- Earnings history (Lynch inputs) --------------------------------------------------
 

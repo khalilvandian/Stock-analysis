@@ -88,8 +88,8 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Earnings growth, latest quarter](#earnings-growth-yoy) | eps_Q / eps_Q-4 - 1 | higher | candidate |
 | [Operating cash flow growth, average year](#ocf-growth-avg) | mean(ocf_y / ocf_y-1 - 1) | higher | candidate |
 | [Operating cash flow growth, median year](#ocf-growth-median) | median(ocf_y / ocf_y-1 - 1) | higher | core |
-| [Cash balance growth, average year](#cash-growth-avg) | mean(cash_y / cash_y-1 - 1) | higher | candidate |
-| [Cash balance growth, median year](#cash-growth-median) | median(cash_y / cash_y-1 - 1) | higher | candidate |
+| [Cash balance growth, average year](#cash-growth-avg) | mean(cash_y / cash_y-1 - 1) | higher | context |
+| [Cash balance growth, median year](#cash-growth-median) | median(cash_y / cash_y-1 - 1) | higher | context |
 
 **Earnings history (Lynch inputs)** (9)
 
@@ -439,6 +439,7 @@ Can today's cash pay what falls due this year? Babak's first must-have.
 - **Used in:** strict screen (>= 1); weighted debt score; every Stage 1 rule set (>= 1)
 - **Example (BSX, 2026-09-30):** 0.32x = 0.539 / 1.709: fails. BKNG: 17.5 / 2.0 = 8.8
 - **Vector:** core
+- **Clipped in the vector:** upper 50.00x
 
 <a id="cash-plus-ocf-to-short-term-debt"></a>
 #### (Cash + operating cash flow) / short-term debt (`cash_plus_ocf_to_short_term_debt`)
@@ -451,6 +452,7 @@ Same test, counting a year's operating cash flow as well as cash on hand.
 - **Used in:** sector table (shown, not a rule)
 - **Example (BSX, 2026-09-30):** 2.97x = (0.539 + 4.529) / 1.709
 - **Vector:** candidate
+- **Clipped in the vector:** upper 50.00x
 - **Note:** Open choice: a fairer version of the first must-have for companies that keep little cash (BSX passes this, fails the strict one).
 
 <a id="cash-to-long-term-debt"></a>
@@ -464,6 +466,7 @@ Is there a cash cushion against long-term debt? Babak's second must-have.
 - **Used in:** strict screen (>= 5%); weighted debt score; Stage 1 slow grower, stalwart, cyclical (>= 5%)
 - **Example (BSX, 2026-09-30):** 0.05x = 0.539 / 10.915: just under 5% (TradingView's 0.648 gives 5.9%)
 - **Vector:** core
+- **Clipped in the vector:** upper 50.00x
 
 <a id="cash-to-total-debt"></a>
 #### Cash / total debt (`cash_to_total_debt`)
@@ -476,6 +479,7 @@ Share of all debt cash could repay today.
 - **Used in:** Stage 1 turnaround (>= 25%)
 - **Example (BSX, 2026-09-30):** 0.05x = 0.648 / 12.624 (TradingView)
 - **Vector:** candidate
+- **Clipped in the vector:** upper 50.00x
 - **Note:** Overlaps cash / short-term and cash / long-term debt.
 
 <a id="net-debt-to-ebitda"></a>
@@ -489,7 +493,8 @@ Years of operating earnings needed to repay the net debt. The standard leverage 
 - **Used in:** strict screen (<= 4.5x); weighted debt score; Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x); debt_to_ebitda.py history
 - **Example (BSX, 2026-09-30):** 2.14x = 12.085 / 5.637. BKNG: 3.19 / 10.65 = 0.30
 - **Vector:** core
-- **Note:** Negative when net cash; for the vector, clip or use net_cash flag (open choice).
+- **Clipped in the vector:** lower 0.00x
+- **Note:** Negative when net cash; clipped at 0 for the vector (open choice 6, default until Babak decides), so every net-cash company counts the same.
 
 <a id="net-debt-to-avg-ebitda"></a>
 #### Net debt / 10-year average EBITDA (`net_debt_to_avg_ebitda`)
@@ -502,6 +507,7 @@ Leverage against earnings over a whole cycle rather than today's point in it.
 - **Used in:** Stage 1 cyclical (<= 2.5x)
 - **Example (BSX, 2026-09-30):** 3.97x = 11.976 / 3.02 average 2016-2025 EBITDA
 - **Vector:** candidate
+- **Clipped in the vector:** lower 0.00x
 - **Note:** For growing companies it overstates leverage (BSX 3.97x against 2.0x on today's EBITDA).
 
 <a id="interest-cover"></a>
@@ -515,6 +521,7 @@ How many times operating earnings cover the interest bill.
 - **Used in:** strict screen (>= 4x); weighted debt score; Stage 1 (>= 4x; REITs >= 2.5x)
 - **Example (BSX, 2026-09-30):** 15.53x = 5.637 / 0.363 (TradingView 18.3)
 - **Vector:** core
+- **Clipped in the vector:** upper 50.00x
 
 <a id="debt-to-equity"></a>
 #### Debt / equity (`debt_to_equity`)
@@ -751,8 +758,8 @@ Average yearly change in the cash balance.
 - **Source:** sector: `cash_growth_avg`
 - **Used in:** weighted quality score (weight 0.5)
 - **Example (BSX, FY2022-FY2025):** +105.2% = mean(-6.8%, -52.1%, +374.6%)
-- **Vector:** candidate
-- **Note:** Cash swings with deals and debt raises (BSX +375% in 2025), so it is noisy. Proposed to drop.
+- **Vector:** context
+- **Note:** Cash swings with deals and debt raises (BSX +375% in 2025), so it is noisy. Context only, not for the vector (open choice 9, default until Babak decides); kept because the weighted screen uses it.
 
 <a id="cash-growth-median"></a>
 #### Cash balance growth, median year (`cash_growth_median`)
@@ -764,7 +771,8 @@ Median yearly change in the cash balance.
 - **Source:** sector: `cash_growth_median`
 - **Used in:** weighted quality score (weight 0.5)
 - **Example (BSX, FY2022-FY2025):** -6.8% = median(-6.8%, -52.1%, +374.6%)
-- **Vector:** candidate
+- **Vector:** context
+- **Note:** Context only, not for the vector, like the average (open choice 9).
 
 ### Earnings history (Lynch inputs)
 

@@ -71,8 +71,33 @@ def test_build_vectors_maps_scales_and_derives(d):
     assert v.loc["NYSE:XYZ", "lynch_category=fast_grower"] == 0.0
     assert v.loc["NYSE:XYZ", "loss_now"] == 1.0
     assert v.loc["NYSE:BSX", "net_cash_to_market_cap"] == pytest.approx(-0.2)
-    assert np.isnan(v.loc["NYSE:XYZ", "cash_to_short_term_debt"])  # no debt: inf -> blank
+    assert v.loc["NYSE:XYZ", "cash_to_short_term_debt"] == 50.0  # no debt: inf -> ceiling
     assert v["altman_z"].isna().all()  # not in the table: blank column, same shape
+    raw = metrics.build_vectors(frame, ["cash_to_short_term_debt"], "stage1", d, clip=False)
+    assert np.isnan(raw.loc["NYSE:XYZ", "cash_to_short_term_debt"])  # unclipped inf: blank
+
+
+def test_clip_net_debt_at_zero_and_cover_at_50(d):
+    frame = pd.DataFrame(
+        {
+            "net_debt_to_ebitda": [-3.0, 2.0, np.nan],
+            "interest_cover": [400.0, 8.0, np.inf],
+            "net_debt_to_avg_ebitda": [-1.0, 3.0, 1.0],
+        },
+        index=["net_cash", "levered", "no_debt"],
+    )
+    ids = ["net_debt_to_ebitda", "interest_cover", "net_debt_to_avg_ebitda"]
+    v = metrics.build_vectors(frame, ids, "stage1", d)
+    assert v["net_debt_to_ebitda"].tolist()[:2] == [0.0, 2.0]
+    assert np.isnan(v.loc["no_debt", "net_debt_to_ebitda"])
+    assert v["interest_cover"].tolist() == [50.0, 8.0, 50.0]
+    assert v["net_debt_to_avg_ebitda"].tolist() == [0.0, 3.0, 1.0]
+
+
+def test_cash_growth_is_context_not_proposed(d):
+    for mid in ("cash_growth_avg", "cash_growth_median"):
+        assert d["by_id"][mid]["vector"] == "context"
+        assert mid not in d["sets"]["proposed"]
 
 
 def test_standardize_puts_best_at_100(d):

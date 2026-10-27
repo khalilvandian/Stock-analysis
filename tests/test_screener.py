@@ -341,3 +341,86 @@ def test_index_membership():
         ]
     )
     assert list(stage1.in_index(idx, "SP:SPX")) == [True, False, False]
+
+
+def test_growth_rule_uses_its_own_years():
+    # revenue and EPS fell over the last 3 years but grew over the 6 before
+    hist = [90, 95, 100, 70, 60, 50, 40, 30, 20, 10]
+    d = pd.DataFrame(
+        {
+            "total_revenue_fy_h": [hist],
+            "earnings_per_share_diluted_fy_h": [hist],
+            "revenue_growth_avg": [0.5],
+            "revenue_growth_median": [0.5],
+            "eps_growth_avg": [0.5],
+            "eps_growth_median": [0.5],
+            "net_cash": [False],
+        },
+        index=["a"],
+    )
+    assert stage1._rule(d, "growth_years", 3)["a"] == False  # noqa: E712
+    assert stage1._rule(d, "growth_years", 9)["a"] == True  # noqa: E712
+
+
+def test_debt_rules_fail_without_ebitda_to_carry_the_debt():
+    d = pd.DataFrame(
+        {
+            "net_cash": [False, False, True],
+            "net_debt_to_avg_ebitda": [np.nan, 1.0, np.nan],
+            "ebitda_avg_10y": [-5.0, 10.0, -5.0],
+            "debt_to_equity": [np.nan, np.nan, np.nan],
+            "total_equity_fq": [-1.0, 5.0, -1.0],
+            "price_book_fq": [np.nan, np.nan, np.nan],
+            "total_debt_fq": [10.0, 10.0, 10.0],
+            "net_debt_to_ebitda": [np.nan, 1.0, np.nan],
+            "ebitda_ttm": [-2.0, 10.0, -2.0],
+        },
+        index=["losing", "fine", "net_cash"],
+    )
+    # 10-year average EBITDA below zero with net debt: a fail, not "incomplete"
+    assert list(stage1._rule(d, "max_net_debt_to_avg_ebitda", 2.5)) == [False, True, True]
+    # negative equity is judged on net debt / EBITDA; with no EBITDA it fails. Equity
+    # known and positive but debt/equity blank stays missing data
+    r = stage1._rule(d, "max_debt_to_equity", 1.0)
+    assert r["losing"] == False  # noqa: E712
+    assert pd.isna(r["fine"])
+    assert r["net_cash"] == True  # noqa: E712
+
+
+def test_negative_price_to_book_is_not_an_asset_play():
+    lynch = load_config()["lynch"]
+    steady = [1.1, 1.08, 1.06, 1.04, 1.02, 1.0]
+    d = pd.DataFrame(
+        {
+            "neg_equity": _history(steady, price_book_fq=-4.0),
+            "below_book": _history(steady, price_book_fq=0.8),
+        }
+    ).T
+    for c in ("eps", "net_debt_fq", "market_cap_basic", "price_book_fq", "total_debt_fq"):
+        d[c] = d[c].astype(float)
+    for c in ("cash_n_short_term_invest_fq", "debt_to_equity_fq"):
+        d[c] = d[c].astype(float)
+    _, d["eps_growth_median"] = stage1.growth_stats(d["earnings_per_share_diluted_fy_h"], 5)
+    stage1.history_measures(d, lynch)
+    cat = stage1.lynch_category(d, lynch)
+    assert cat["neg_equity"] == "slow_grower"
+    assert cat["below_book"] == "asset_play"
+
+
+def test_fiscal_pe_follows_year_labels_across_a_gap():
+    idx = pd.date_range("2015-01-31", "2025-12-31", freq="ME")
+    prices = pd.Series(range(len(idx)), index=idx, dtype=float)
+    # 2023 is missing from the list: 2022 must still use calendar 2022's prices
+    h = stage2.fiscal_pe(
+        prices, [1.0, 1.0, 1.0], [2025, 2024, 2022], pd.Timestamp("2025-12-31"), 10
+    )
+    in_2022 = prices[(prices.index.year == 2022)].mean()
+    assert h.loc[h["year"] == 2022, "avg_price"].iloc[0] == in_2022
+
+
+def test_latest_history_entry():
+    assert stage2._latest([2025, 2024]) == 2025
+    assert stage2._latest([1.5, 1.2], int_=False) == 1.5
+    assert stage2._latest(np.nan) is None
+    assert stage2._latest([None, 2024]) is None
+    assert stage2._latest([]) is None

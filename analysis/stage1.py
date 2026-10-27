@@ -82,6 +82,7 @@ COLUMNS = [
     "price_earnings_ttm",
     "enterprise_value_ebitda_ttm",
     "price_book_fq",
+    "total_equity_fq",
     "book_tangible_per_share_fq",
     "dividends_yield",
     "earnings_per_share_forecast_next_fy",
@@ -176,12 +177,16 @@ def screener_type(sector: str | None, industry: str | None, types: dict) -> str 
 
 def fetch_universe(cfg: dict, today: str, refresh: bool = False) -> pd.DataFrame:
     """Every market of every region from TradingView, cached for the day."""
-    tag = cfg.get("universe", {}).get("index", "").replace(":", "_") or "all"
-    cache = CACHE / f"tradingview_{tag}_{today}.pkl"
-    if cache.exists() and not refresh:
-        return pd.read_pickle(cache)
     universe = cfg.get("universe", {})
     regions = universe.get("regions") or list(cfg["regions"])
+    tag = universe.get("index", "").replace(":", "_") or "all"
+    tag += "_" + "-".join(sorted(regions))
+    cache = CACHE / f"tradingview_{tag}_{today}.pkl"
+    if cache.exists() and not refresh:
+        cached = pd.read_pickle(cache)
+        # an earlier run today may have asked for fewer columns
+        if set(COLUMNS) <= set(cached.columns):
+            return cached
     frames = []
     with httpx.Client(timeout=60) as client:
         for region, markets in cfg["regions"].items():
@@ -220,13 +225,24 @@ def yearly_growth(values, years: int) -> list[float]:
     return out
 
 
+GROWTH_HISTORY = (("total_revenue_fy_h", "revenue"), ("earnings_per_share_diluted_fy_h", "eps"))
+
+
+def growth_stats(history: pd.Series, years: int) -> tuple[pd.Series, pd.Series]:
+    """Average and median yearly growth over `years` years (blank under 3 changes)."""
+    g = history.map(lambda v: yearly_growth(v, years))
+    avg = g.map(lambda x: float(np.mean(x)) if len(x) >= 3 else np.nan).astype(float)
+    med = g.map(lambda x: float(np.median(x)) if len(x) >= 3 else np.nan).astype(float)
+    return avg, med
+
+
 def prepare(raw: pd.DataFrame, cfg: dict, fx: dict[str, float]) -> pd.DataFrame:
     """Convert to US dollars, derive ratios and pick each company's screener."""
     d = raw.copy()
     d["yahoo"] = [yahoo_symbol(s, m) for s, m in zip(d.index, d["market"], strict=False)]
     d["fx_fund"] = d["fundamental_currency_code"].map(fx)  # USD per unit of statements
     d["fx_price"] = d["currency"].map(fx)  # USD per unit of price
-    d = d[d["fx_fund"].notna() & d["fx_price"].notna()]
+    d = d[d["fx_fund"].notna() & d["fx_price"].notna()].copy()
     to_usd(d)
     d = d[d["cap_usd_bn"] * 1e9 >= cfg["min_market_cap_usd"]].copy()
     d["type"] = [
@@ -237,11 +253,9 @@ def prepare(raw: pd.DataFrame, cfg: dict, fx: dict[str, float]) -> pd.DataFrame:
     derive_short_term_debt(d)
     ratios(d)
     years = cfg["lynch"]["growth_years"]
-    for col, key in (("total_revenue_fy_h", "revenue"), ("earnings_per_share_diluted_fy_h", "eps")):
-        g = d[col].map(lambda v: yearly_growth(v, years))
-        d[f"{key}_growth_avg"] = g.map(lambda x: float(np.mean(x)) if len(x) >= 3 else np.nan)
-        d[f"{key}_growth_median"] = g.map(lambda x: float(np.median(x)) if len(x) >= 3 else np.nan)
-        d[f"{key}_growth_years"] = g.map(len)
+    for col, key in GROWTH_HISTORY:
+        d[f"{key}_growth_avg"], d[f"{key}_growth_median"] = growth_stats(d[col], years)
+        d[f"{key}_growth_years"] = d[col].map(lambda v: len(yearly_growth(v, years)))
     d["eps"] = d["earnings_per_share_diluted_ttm"]
     # price in the statements' currency, so P/E works for London pence and foreign reporters
     d["price_fund"] = d["close"] * d["fx_price"] / d["fx_fund"]
@@ -309,6 +323,7 @@ def history_measures(d: pd.DataFrame, lynch: dict) -> None:
     avg_ebitda = d["ebitda_fy_h"].map(
         lambda v: float(np.mean(_clean(v, 10))) if len(_clean(v, 10)) >= 5 else np.nan
     )
+    d["ebitda_avg_10y"] = avg_ebitda
     d["net_debt_to_avg_ebitda"] = (d["net_debt_fq"] / avg_ebitda).where(avg_ebitda > 0)
     d["net_cash_to_cap"] = -d["net_debt_fq"] / d["market_cap_basic"]
     d["debt_to_equity"] = d["debt_to_equity_fq"]
@@ -340,7 +355,7 @@ def lynch_category(d: pd.DataFrame, lynch: dict) -> pd.Series:
         d["industry"].isin(lynch["cyclical_industries"]),
         (d["loss_now"] == True) | (d["eps_vs_5y_peak"] < -lynch["turnaround_drop"]),  # noqa: E712
         (d["eps_big_drops_10y"] >= lynch["cyclical_drops"]) & ~(g >= lynch["fast_growth"]),
-        (d["price_book_fq"] < lynch["asset_price_to_book"])
+        ((d["price_book_fq"] > 0) & (d["price_book_fq"] < lynch["asset_price_to_book"]))
         | (d["net_cash_to_cap"] > lynch["asset_net_cash"]),
         g >= lynch["fast_growth"],
         g >= lynch["stalwart_growth"],
@@ -426,7 +441,7 @@ GAP_FIELDS = [
 ]
 
 
-def fill_gaps(d: pd.DataFrame, today: str, workers: int = 8) -> pd.DataFrame:
+def fill_gaps(d: pd.DataFrame, today: str, workers: int = 8, refresh: bool = False) -> pd.DataFrame:
     """Fill debt, cash, EBITDA and interest cover from Yahoo for stocks whose screener needs
     them. Cached for the day."""
     debt_types = d["type"].isin(["general", "utilities", "reits"])
@@ -435,7 +450,7 @@ def fill_gaps(d: pd.DataFrame, today: str, workers: int = 8) -> pd.DataFrame:
     )
     todo = d[debt_types & need & d["yahoo"].notna()]
     cache = CACHE / f"yahoo_fill_{today}.pkl"
-    got = pd.read_pickle(cache) if cache.exists() else {}
+    got = pd.read_pickle(cache) if cache.exists() and not refresh else {}
     missing = [s for s in todo["yahoo"] if s not in got]
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for s, r in zip(missing, pool.map(yahoo_figures, missing), strict=False):
@@ -459,6 +474,9 @@ def fill_gaps(d: pd.DataFrame, today: str, workers: int = 8) -> pd.DataFrame:
         d.loc[gap, "net_debt_fq"] = (
             d.loc[gap, "total_debt_fq"] - d.loc[gap, "cash_n_short_term_invest_fq"]
         )
+        d.loc[gap, "filled"] += "net debt (total debt minus cash); "
+    # Yahoo may have filled total and long-term debt but not short-term debt
+    derive_short_term_debt(d)
     to_usd(d)
     ratios(d)
     return d
@@ -502,8 +520,12 @@ def _rule(d: pd.DataFrame, name: str, value) -> pd.Series:
         return _all(parts)
     if name == "growth_years":
         parts = []
-        for key in ("revenue", "eps"):
-            avg, med = d[f"{key}_growth_avg"], d[f"{key}_growth_median"]
+        for col, key in GROWTH_HISTORY:
+            # over the rule's own number of years when the history lists are at hand
+            if col in d:
+                avg, med = growth_stats(d[col], int(value))
+            else:
+                avg, med = d[f"{key}_growth_avg"], d[f"{key}_growth_median"]
             parts += [cmp(avg, avg > 0), cmp(med, med > 0)]
         return _all(parts)
     if name == "min_roe":
@@ -527,14 +549,21 @@ def _rule(d: pd.DataFrame, name: str, value) -> pd.Series:
         s = d["recession_eps_change"]
         return cmp(s, s >= -value)
     if name == "max_debt_to_equity":
-        s = d["debt_to_equity"]
+        s = d["debt_to_equity"].where(d["debt_to_equity"] >= 0)
         r = cmp(s, s <= value)
         # TradingView leaves debt/equity blank when equity is negative, mostly from years
         # of buybacks (Booking, McDonald's). There the ratio means nothing: judge the debt
         # against EBITDA instead, at S&P's "modest" level (2x)
-        neg = s.isna() & d["price_book_fq"].isna() & (d["total_debt_fq"] > 0)
+        if "total_equity_fq" in d:
+            equity = d["total_equity_fq"]
+            negative = (equity < 0) | (equity.isna() & d["price_book_fq"].isna())
+        else:
+            negative = d["price_book_fq"].isna()
+        neg = s.isna() & negative & (d["total_debt_fq"] > 0)
         nd = d["net_debt_to_ebitda"]
         r[neg] = cmp(nd, nd <= NEGATIVE_EQUITY_MAX_NET_DEBT_TO_EBITDA)[neg]
+        if "ebitda_ttm" in d:  # negative equity and no EBITDA to carry the debt
+            r[neg & (d["ebitda_ttm"] <= 0)] = False
         r[net_cash] = True
         return r
     if name == "min_eps_growth_3y":
@@ -543,6 +572,8 @@ def _rule(d: pd.DataFrame, name: str, value) -> pd.Series:
     if name == "max_net_debt_to_avg_ebitda":
         s = d["net_debt_to_avg_ebitda"]
         r = cmp(s, s <= value)
+        if "ebitda_avg_10y" in d:  # no EBITDA on average over the cycle: fails, as above
+            r[(d["ebitda_avg_10y"] <= 0) & ~net_cash] = False
         r[net_cash] = True
         return r
     if name == "profitable_10y_avg":
@@ -658,14 +689,20 @@ STAGE1_COLUMNS = [
     "cash_to_long_term_debt",
     "net_debt_to_ebitda",
     "net_debt_to_avg_ebitda",
+    "cash_to_total_debt",
+    "net_cash_to_cap",
     "interest_cover",
     "debt_to_equity",
+    "price_book_fq",
     "return_on_equity_fq",
     "revenue_growth_median",
     "eps_growth_median",
     "eps_growth_3y",
     "eps_vs_5y_peak",
+    "loss_now",
+    "no_profit_5y",
     "eps_big_drops_10y",
+    "eps_avg_10y",
     "recession_eps_change",
     "dividend_years_10y",
     "dividend_payout_ratio_ttm",
@@ -677,7 +714,7 @@ STAGE1_COLUMNS = [
 def run(cfg: dict, refresh: bool = False) -> pd.DataFrame:
     today = date.today().isoformat()
     d = prepare(fetch_universe(cfg, today, refresh), cfg, ecb.usd_per_unit())
-    d = fill_gaps(d, today)
+    d = fill_gaps(d, today, refresh=refresh)
     return apply_screeners(d, cfg)
 
 

@@ -158,10 +158,14 @@ def fiscal_pe(
     """
     rows = []
     prices = prices.dropna()
+    latest = years_h[0] if years_h else None
     for k, (year, eps) in enumerate(zip(years_h[:n], eps_h[:n], strict=False)):
         if eps is None or year is None:
             continue
-        end = fy_end - pd.DateOffset(years=k)
+        # count back by the year labels, so a year missing from the list can't shift the
+        # price window of every year after it
+        back = int(latest) - int(year) if latest is not None else k
+        end = fy_end - pd.DateOffset(years=back)
         window = prices[(prices.index > end - pd.DateOffset(years=1)) & (prices.index <= end)]
         if len(window) < 9:
             continue
@@ -356,6 +360,13 @@ def rank(d: pd.DataFrame, cfg: dict) -> pd.DataFrame:
 # --- step 6: SEC cross-check ---------------------------------------------------------
 
 
+def _latest(values, int_: bool = True):
+    """The newest entry of a yearly history list, or None (blank or not a list)."""
+    if not isinstance(values, list | tuple) or not values or values[0] is None:
+        return None
+    return int(values[0]) if int_ else float(values[0])
+
+
 def sec_check(d: pd.DataFrame, rows: pd.Index) -> None:
     """Flag US stocks whose latest-year diluted EPS differs from SEC EDGAR by over 10%."""
     try:
@@ -363,7 +374,8 @@ def sec_check(d: pd.DataFrame, rows: pd.Index) -> None:
             tickers = c.get("https://www.sec.gov/files/company_tickers.json").json()
             cik = {v["ticker"].upper(): int(v["cik_str"]) for v in tickers.values()}
             frames = {}
-            for y in sorted({int(v[0]) for v in d.loc[rows, "fiscal_period_fy_h"] if v}):
+            years = {_latest(v) for v in d.loc[rows, "fiscal_period_fy_h"]}
+            for y in sorted(y for y in years if y is not None):
                 url = (
                     "https://data.sec.gov/api/xbrl/frames/us-gaap/"
                     f"EarningsPerShareDiluted/USD-per-shares/CY{y}.json"
@@ -376,12 +388,12 @@ def sec_check(d: pd.DataFrame, rows: pd.Index) -> None:
     d["sec_eps"] = d.get("sec_eps", np.nan)
     for idx in rows:
         r = d.loc[idx]
-        if r["region"] != "US" or not r["fiscal_period_fy_h"]:
+        year = _latest(r["fiscal_period_fy_h"])
+        if r["region"] != "US" or year is None:
             continue
         k = cik.get(idx.split(":", 1)[1].replace(".", "-"))
-        year = int(r["fiscal_period_fy_h"][0])
         sec = frames.get(year, {}).get(k)
-        tv = r["earnings_per_share_diluted_fy_h"][0]
+        tv = _latest(r["earnings_per_share_diluted_fy_h"], int_=False)
         if sec is None or tv is None:
             continue
         d.loc[idx, "sec_eps"] = sec
@@ -410,6 +422,7 @@ def run(d: pd.DataFrame, cfg: dict, adjusted: bool = True) -> tuple[pd.DataFrame
     top = rank(d, cfg)
     sec_check(d, top.index)
     fill_cash_flows(d, top.index)
+    peer_measures(d)  # free cash flow yield with the filled cash flows
     return d, rank(d, cfg)
 
 

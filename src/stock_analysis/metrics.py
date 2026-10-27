@@ -105,9 +105,13 @@ def build_vectors(
     source: str,
     dictionary: dict | None = None,
     one_hot: bool = True,
+    clip: bool = True,
 ) -> pd.DataFrame:
     """One row per stock, one column per chosen metric. Booleans become 0/1; a category
     becomes one 0/1 column per value (`lynch_category=fast_grower`) unless one_hot=False.
+    Metrics with a `clip` in the dictionary are held inside its bounds (net debt ratios at
+    0, cover ratios at 50x, so "no debt" is the best value rather than a blank) unless
+    clip=False; any other infinite value is left blank.
     Metrics the table can't supply are blank columns, so every vector has the same shape."""
     if source not in SOURCES:
         raise ValueError(f"source must be one of {SOURCES}")
@@ -125,7 +129,11 @@ def build_vectors(
         if unit == "bool":
             s = s.map({True: 1.0, False: 0.0, "True": 1.0, "False": 0.0})
         elif unit != "category":
-            s = pd.to_numeric(s, errors="coerce").replace([np.inf, -np.inf], np.nan)
+            s = pd.to_numeric(s, errors="coerce")
+            bounds = d["by_id"][mid].get("clip")
+            if clip and bounds:
+                s = s.clip(lower=bounds.get("lower"), upper=bounds.get("upper"))
+            s = s.replace([np.inf, -np.inf], np.nan)
         cols[mid] = s
     return pd.DataFrame(cols, index=frame.index)
 
@@ -227,6 +235,9 @@ def doc(d: dict) -> str:
                 f"{_fmt(ex['value'], m['unit'])} = {ex['working']}",
                 f"- **Vector:** {m['vector']}",
             ]
+            if m.get("clip"):
+                bounds = [f"{k} {_fmt(v, m['unit'])}" for k, v in m["clip"].items()]
+                lines.append(f"- **Clipped in the vector:** {', '.join(bounds)}")
             if m.get("notes"):
                 lines.append(f"- **Note:** {m['notes']}")
             lines.append("")
