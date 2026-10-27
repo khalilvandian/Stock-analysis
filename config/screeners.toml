@@ -1,5 +1,6 @@
-# The market screener (analysis/screener.py): every listed company in the US and Europe
-# above a minimum market value, checked by the screener that fits its kind of business,
+# The market screener (analysis/screener.py): the companies in `[universe]` (the S&P 500 for
+# now; every listed company in the US and Europe above a minimum market value with
+# index = ""), checked by the screener that fits its kind of business,
 # then ranked by how close the price is to the stock's own cheap price.
 #
 # Data: TradingView's screener (current figures, 20 years of yearly figures, technicals),

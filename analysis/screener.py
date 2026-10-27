@@ -9,7 +9,7 @@ Writes data/screener/stage1.csv, data/screener/top.csv and data/screener/YYYY-MM
 (every company with both stages' columns).
 
 Usage:
-    uv run python analysis/screener.py               # both stages, about 2 minutes
+    uv run python analysis/screener.py               # both stages, a few minutes
     uv run python analysis/screener.py --no-adjusted # skip the adjusted-EPS refinement
     uv run python analysis/screener.py --refresh     # ignore today's cached downloads
 """

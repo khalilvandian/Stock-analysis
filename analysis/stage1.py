@@ -4,8 +4,9 @@ Finds the companies worth owning, before any thought of price. Settings in
 config/screeners.toml; every rule, threshold and source is explained in report 13 and
 the methods doc.
 
-  1. Universe: every primary-listed stock above the minimum market value in the US and
-     European markets, from TradingView's screener (current figures, 20 years of yearly
+  1. Universe: the members of `[universe] index` (the S&P 500 for now), or with index = ""
+     every primary-listed stock above the minimum market value in the US and European
+     markets, from TradingView's screener (current figures, 20 years of yearly
      EPS, revenue, EBITDA and dividends). Market values converted to US dollars at ECB
      rates.
   2. Gap filling: debt, cash, EBITDA and interest figures TradingView leaves blank are
@@ -338,13 +339,13 @@ CATEGORIES = ["turnaround", "cyclical", "asset_play", "fast_grower", "stalwart",
 def lynch_category(d: pd.DataFrame, lynch: dict) -> pd.Series:
     """Peter Lynch's six categories (One Up on Wall Street, ch. 7), tested in order.
 
+    0. "no_profit": no profit in any of the last 5 fiscal years. Not one of Lynch's
+       categories; he skipped such companies ("avoid long shots"), so Stage 1 fails them.
     1. cyclical by industry (autos, airlines, steel, chemicals, oil...)
     2. turnaround: profitable in the last 5 years but losing money now, or EPS (both 12
        months and the latest fiscal year) less than half its 5-year peak
     3. cyclical by history: EPS fell sharply in several of the last 10 years, and the
        company isn't a fast grower
-    "no_profit": no profit in any of the last 5 fiscal years. Not one of Lynch's
-    categories; he skipped such companies ("avoid long shots"), so Stage 1 fails them.
     4. asset play: price below book value, or net cash a large part of market value
     5. fast grower / 6. stalwart / 7. slow grower by median yearly EPS growth (5 years)
     Blank when there isn't enough history to tell.

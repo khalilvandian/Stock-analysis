@@ -2,10 +2,14 @@
 
 Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests in `tests/`.
 
-- Market data: `stock_analysis.fetch` (Yahoo Finance via yfinance) saves CSVs to `data/<SYMBOL>/`. `FMPClient` wraps Financial Modeling Prep, but the free plan blocks most symbols (HTTP 402).
+- Market data: `stock_analysis.fetch` (Yahoo Finance via yfinance) saves CSVs to `data/<SYMBOL>/`. `FMPClient` wraps Financial Modeling Prep, but the free plan blocks most symbols (HTTP 402)
+  and the current key is rejected as invalid, so Yahoo, SEC EDGAR, TradingView and the ECB are
+  the working sources.
 - The API key is read from the `FMP_API_KEY` env var. Never hardcode or commit it. The SEC
   downloader identifies itself with `SEC_USER_AGENT`; never hardcode a personal email.
-- Setup for new sessions and environments: `docs/SETUP.md`.
+- Setup for new sessions and environments: `docs/SETUP.md`. The full documentation
+  (architecture, entities, every process, the screener rules, decisions, operations) starts
+  at `docs/README.md`; keep it matching the code when either changes.
 - Tests must not hit the network; mock HTTP with `respx`.
 - Before committing: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
 
@@ -21,7 +25,9 @@ Ratios and scores hide important information, so they come after, never instead.
   new absolute value, add it there (and to `analysis/sector.py` if the column doesn't
   exist yet). `tests/test_absolute.py` fails if a configured column is missing.
 - Run it with `uv run python analysis/absolute.py [TICKERS]` (refresh data first with
-  `uv run python analysis/sector.py`).
+  `uv run python analysis/sector.py`). That table covers the utilities sector; for any
+  other company, build its peer table first with `uv run python analysis/peer_screen.py
+  NAME TICKERS` (data/peers/NAME.csv, same columns) as reports 11 and 12 do.
 - **Always look at the history, not just the latest year:** `uv run python
   analysis/absolute.py --history TICKERS` shows every fiscal year on record (at least
   the last 5; SEC filings back to 2016) next to the latest 12 months. Build or refresh it
@@ -39,9 +45,11 @@ Ratios and scores hide important information, so they come after, never instead.
   each company in one of Peter Lynch's six categories and keeps those with good financial
   statements by the rules for their category (banks, insurers, REITs by kind of business).
   Stage 2 (`analysis/stage2.py`) reads Stage 1's output and lists the top 3 cheap or
-  close-to-cheap survivors per sector against each stock's own cheap P/E.
+  close-to-cheap survivors per sector against each stock's own cheap P/E. The evening run
+  reruns it, and the market report, the site's Screener page and the email show its top 3
+  per sector.
 - Other tools, in the usual order after step 1: `analysis/screen.py` (strict and weighted
-  screens), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
+  screens), `analysis/peer_screen.py` (the same screens on a hand-picked peer group), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
   `analysis/valuation.py`, `analysis/debt_to_ebitda.py`.
 
 ## Metrics dictionary
@@ -58,11 +66,15 @@ The watch list is `config/watchlist.toml` (symbol, sector peers, target P/E, one
 corrections). Every evening at 21:00 Italy time a scheduled session follows
 `docs/EVENING_RUN.md`: it updates Claude's notes (`analyses/<SYMBOL>/notes.md`,
 `analyses/market/notes.md`, `analyses/summaries/notes.md`), runs
-`uv run python analysis/watchlist.py`, commits the dated PDFs to `main` and emails Babak.
+`uv run python analysis/watchlist.py` (which reruns the market screener first), checks the
+outputs with `analysis/validate.py`, commits the dated PDFs and `data/screener/` to `main`
+and emails Babak.
 Every run is kept: `analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf` plus a dated list in each
-folder's `README.md`. Call it a list of dated analyses, not an archive. The public page of all dated analyses is
+stock folder's `README.md` (market reports and summaries are listed in
+`analyses/README.md`). Call it a list of dated analyses, not an archive. The public page of all dated analyses is
 https://khalilvandian.github.io/Stock-analysis/, built by `analysis/site.py` and published by
-`.github/workflows/pages.yml` on every push to `main`. Adjusted EPS for
+`.github/workflows/pages.yml` on every push to `main` that changes `analyses/`, `data/screener/`
+or the site script. Adjusted EPS for
 the own-history P/E is Yahoo's reported quarterly EPS (split-adjusted).
 
 ## Reports

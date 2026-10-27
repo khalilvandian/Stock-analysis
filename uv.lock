@@ -970,6 +970,7 @@ dependencies = [
     { name = "markdown" },
     { name = "pandas" },
     { name = "python-dotenv" },
+    { name = "requests" },
     { name = "yfinance" },
 ]
 
@@ -986,6 +987,7 @@ requires-dist = [
     { name = "markdown", specifier = ">=3.11.2" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "requests", specifier = ">=2.31" },
     { name = "yfinance", specifier = ">=1.7.0" },
 ]
 

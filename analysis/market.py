@@ -260,9 +260,10 @@ are cheap or close to cheap, the top {top_n} in each of {info.get("sectors", 0)}
     }
 <p class="note">Stage 1 sorts each company into one of Lynch's six categories and keeps those
 that pass every financial-statement rule for their category (banks, insurers and REITs by their
-own rules). Stage 2 sets each survivor's cheap price: adjusted EPS times the bottom quarter of
-its own yearly P/E over 10 years, or the sector median when the history is too short. "Cheap"
-is at or below that price; "close" is within {close:.0%} above it. Trend is timing only, not a
+own rules). Stage 2 sets each survivor's cheap price: EPS times the lower of the bottom quarter
+of its own yearly P/E over 10 years (6 years at least) and its sector's median P/E. EPS is
+Yahoo's adjusted EPS for the closest names in each sector, diluted EPS otherwise. "Cheap" is
+at or below that price; "close" is within {close:.0%} above it. Trend is timing only, not a
 rule. Details and every rule's source: report 13 and docs/SCREENER.md. Check each name before
 acting.</p>
 

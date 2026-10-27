@@ -596,9 +596,10 @@ def screener_page(menu) -> str:
                 f"<td>{esc(r['cheapness'])}</td><td>{esc(r['trend'])}</td></tr>"
             )
     body.append(
-        "</table></div><p class='sub'>Cheap price = adjusted EPS times the bottom quarter of "
-        "the stock's own yearly P/E over 10 years (the sector median when the history is too "
-        'short). "Cheap" is at or below it, "close" within 15% above. Trend is timing only. '
+        "</table></div><p class='sub'>Cheap price = EPS (Yahoo's adjusted EPS for the closest "
+        "names) times the lower of the bottom quarter of the stock's own yearly P/E over 10 "
+        'years and its sector\'s median P/E. "Cheap" is at or below it, "close" within '
+        "15% above. Trend is timing only. "
         'Hover a stock for the reason it is listed. "Not classified" = too little EPS history '
         "for a Lynch category; those don't pass. Every rule and its source: report 13 and "
         "docs/SCREENER.md in the repository.</p>"

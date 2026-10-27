@@ -1,0 +1,152 @@
+{
+ "cik": 999,
+ "entityName": "Example Foreign Filer N.V.",
+ "facts": {
+  "ifrs-full": {
+   "Revenue": {
+    "units": {
+     "EUR": [
+      {
+       "end": "2023-12-31",
+       "val": 10000000000.0,
+       "form": "20-F",
+       "filed": "2024-04-01",
+       "start": "2023-01-01"
+      },
+      {
+       "end": "2024-12-31",
+       "val": 12000000000.0,
+       "form": "20-F",
+       "filed": "2025-04-01",
+       "start": "2024-01-01"
+      }
+     ]
+    }
+   },
+   "ProfitLossAttributableToOwnersOfParent": {
+    "units": {
+     "EUR": [
+      {
+       "end": "2023-12-31",
+       "val": 1000000000.0,
+       "form": "20-F",
+       "filed": "2024-04-01",
+       "start": "2023-01-01"
+      },
+      {
+       "end": "2024-12-31",
+       "val": 1200000000.0,
+       "form": "20-F",
+       "filed": "2025-04-01",
+       "start": "2024-01-01"
+      }
+     ]
+    }
+   },
+   "DilutedEarningsLossPerShare": {
+    "units": {
+     "EUR/shares": [
+      {
+       "end": "2023-12-31",
+       "val": 2.0,
+       "form": "20-F",
+       "filed": "2024-04-01",
+       "start": "2023-01-01"
+      },
+      {
+       "end": "2024-12-31",
+       "val": 2.4,
+       "form": "20-F",
+       "filed": "2025-04-01",
+       "start": "2024-01-01"
+      }
+     ]
+    }
+   },
+   "CashFlowsFromUsedInOperatingActivities": {
+    "units": {
+     "EUR": [
+      {
+       "end": "2023-12-31",
+       "val": 2000000000.0,
+       "form": "20-F",
+       "filed": "2024-04-01",
+       "start": "2023-01-01"
+      },
+      {
+       "end": "2024-12-31",
+       "val": 2500000000.0,
+       "form": "20-F",
+       "filed": "2025-04-01",
+       "start": "2024-01-01"
+      }
+     ]
+    }
+   },
+   "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities": {
+    "units": {
+     "EUR": [
+      {
+       "end": "2024-12-31",
+       "val": 500000000.0,
+       "form": "20-F",
+       "filed": "2025-04-01",
+       "start": "2024-01-01"
+      }
+     ]
+    }
+   },
+   "CashAndCashEquivalents": {
+    "units": {
+     "EUR": [
+      {
+       "end": "2024-12-31",
+       "val": 1000000000.0,
+       "form": "20-F",
+       "filed": "2025-04-01"
+      }
+     ]
+    }
+   },
+   "LongtermBorrowings": {
+    "units": {
+     "EUR": [
+      {
+       "end": "2024-12-31",
+       "val": 4000000000.0,
+       "form": "20-F",
+       "filed": "2025-04-01"
+      }
+     ]
+    }
+   },
+   "ShorttermBorrowings": {
+    "units": {
+     "EUR": [
+      {
+       "end": "2024-12-31",
+       "val": 1000000000.0,
+       "form": "20-F",
+       "filed": "2025-04-01"
+      }
+     ]
+    }
+   }
+  },
+  "us-gaap": {
+   "WeightedAverageNumberOfDilutedSharesOutstanding": {
+    "units": {
+     "shares": [
+      {
+       "end": "2024-12-31",
+       "val": 500000000.0,
+       "form": "20-F",
+       "filed": "2025-04-01",
+       "start": "2024-01-01"
+      }
+     ]
+    }
+   }
+  }
+ }
+}

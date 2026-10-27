@@ -143,7 +143,7 @@ Results have not disappointed: Q2 adjusted EPS of $2.54 beat the $2.43 consensus
 
 ## Caveats
 
-- `history.py` multiplies split-adjusted Yahoo prices by pre-split SEC share counts, so its market value for BKNG is 25x too low. The table above corrects this by hand, and EPS is divided by 25.
+- When this report was written, `history.py` multiplied split-adjusted Yahoo prices by pre-split SEC share counts, so its market value for BKNG was 25x too low; the table above corrects this by hand, and EPS is divided by 25. `history.py` now adjusts SEC share counts and EPS for splits itself (PR #7, merged 2026-10-27).
 - SEC "cash" for 2016–2019 excludes short-term investments, which were large then. Net debt in those years is overstated.
 - Trip.com and trivago report in CNY and EUR. Trip.com's TTM figures include a large one-off gain.
 - The peer group is small and hand-picked, so the percentile scores move a lot with each name.

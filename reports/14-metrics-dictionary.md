@@ -115,6 +115,22 @@ vector has the same shape. `standardize()` turns a group of vectors into 0-100 p
 9. **Drop cash-balance growth.** It jumps with deals and debt raises (BSX +375% in 2025).
    [Drop.]
 
+**Defaults taken until Babak answers (2026-10-27).** Babak asked for the work to be
+finished without waiting, so Claude's suggestions above are the working defaults. Each one
+is a setting, not a rewrite, and can be changed after review:
+
+| # | Default in use | Where |
+|---|---|---|
+| 1 | The 16 metrics of the `proposed` set | `config/metrics.toml` `[sets]` |
+| 2 | Two vectors (quality, price) suggested; nothing builds one yet | report only |
+| 3 | 5-year growth window | `growth_years` in the screener and metrics |
+| 4 | Adjusted EPS where we have it (watch list, Stage 2's closest names) | `analysis/stage2.py`, `watchlist.py` |
+| 5 | Strict cash / short-term debt stays a must-have; cash plus OCF is a candidate | `config/metrics.toml` |
+| 6 | **Built:** net debt / EBITDA clipped at 0, cover ratios capped at 50x before standardizing (`clip=False` turns it off) | `clip` in `config/metrics.toml`, `build_vectors()` |
+| 7 | Compare within Lynch category (suggested); the vector still carries six 0/1 columns | report only |
+| 8 | Keep TradingView's Piotroski and Altman for now | report only |
+| 9 | **Built:** cash-balance growth is "context", not in the proposed set | `config/metrics.toml` |
+
 ## Caveats
 
 - Sources disagree. Yahoo and TradingView count cash, EBITDA and capex differently (BSX
@@ -130,5 +146,5 @@ uv run python -m stock_analysis.metrics list --set proposed
 uv run python -m stock_analysis.metrics doc            # rewrite docs/METRICS.md
 uv run python -m stock_analysis.metrics vector data/peers/medtech.csv --source sector BSX
 uv run python -m stock_analysis.metrics vector data/screener/stage1.csv --source stage1 \
-    --set stage1 --standardize percentile BSX       # after PR #7 is merged
+    --set stage1 --standardize percentile BSX
 ```

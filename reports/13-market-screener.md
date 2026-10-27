@@ -232,7 +232,7 @@ The two stages are separate programs. Stage 1 writes every company with its cate
 ## 6. Reproduce
 
 ```
-uv run python analysis/screener.py               # both stages, about a minute for the S&P 500
+uv run python analysis/screener.py               # both stages, a few minutes for the S&P 500
 uv run python analysis/stage1.py                 # Stage 1 only: data/screener/stage1.csv
 uv run python analysis/stage2.py                 # Stage 2 only, on Stage 1's last output
 uv run python analysis/screener.py --no-adjusted # skip the adjusted-EPS refinement

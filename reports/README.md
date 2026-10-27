@@ -21,12 +21,11 @@ Each report covers one piece of analysis. It states the data date, the method, t
 
 ## Writing a new report
 
-Number it after the last report and follow the same layout:
-1. Data date
-2. Absolute values first
-3. Method
-4. Findings
-5. Caveats
-6. Command to reproduce
+Number it after the last report. Since report 11 every report has three parts, in order
+(Babak, 2026-10-27):
+1. A short high-level summary, with no detail.
+2. The numbers: data date, absolute values first (with history), then ratios, screens,
+   DCF and P/E against the stock's own history.
+3. Claude's analysis: method, findings, caveats and the command to reproduce.
 
 Then add it to the table above.
