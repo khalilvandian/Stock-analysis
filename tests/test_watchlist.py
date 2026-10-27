@@ -168,12 +168,10 @@ def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
         (analyses / p).write_bytes(b"%PDF-1.4")
     monkeypatch.setattr(site, "ANALYSES", analyses)
     out = site.build(tmp_path / "_site")
-    page = (out / "index.html").read_text()
+    index, bsx = (out / "index.html").read_text(), (out / "BSX.html").read_text()
     assert (out / "BSX/2026-10-26_2100.pdf").exists() and (
         out / "market/2026-10-27_2100.pdf"
     ).exists()
-    assert page.index("2026-10-27 21:00 CET") < page.index("2026-10-26 21:00 CET")  # newest first
-    assert (
-        "Boston Scientific Corporation (BSX)" in page
-        and 'href="market/2026-10-27_2100.pdf"' in page
-    )
+    assert 'href="BSX.html"' in index and 'href="market/2026-10-27_2100.pdf"' in index
+    assert bsx.index("2026-10-27 21:00 CET") < bsx.index("2026-10-26 21:00 CET")  # newest first
+    assert "Boston Scientific Corporation" in bsx and 'href="market.html"' in bsx  # the menu
