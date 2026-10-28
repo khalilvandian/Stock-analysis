@@ -404,6 +404,7 @@ def behaviour_figures(u: pd.DataFrame, paths: pd.DataFrame, spy_paths: pd.DataFr
             f" median {med * scale:.{0 if scale == 100 else 2}f}{'%' if scale == 100 else ''}",
             color=INK,
             fontsize=8,
+            bbox={"facecolor": SURFACE, "edgecolor": "none", "pad": 1},
             va="top",
         )
         if col in spy:
@@ -414,6 +415,7 @@ def behaviour_figures(u: pd.DataFrame, paths: pd.DataFrame, spy_paths: pd.DataFr
                 f" S&P 500 {spy[col] * 100:.0f}%",
                 color=INK2,
                 fontsize=8,
+                bbox={"facecolor": SURFACE, "edgecolor": "none", "pad": 1},
                 va="top",
             )
         ax.set_title(title + (" (%)" if scale == 100 else ""), loc="left", fontsize=10, color=INK)
