@@ -31,5 +31,6 @@ it is the way it is. The project rules every Claude session follows are in
 | [`SETUP.md`](SETUP.md) | Setting up a Claude Code on the web workspace for this repository |
 | [`EVENING_RUN.md`](EVENING_RUN.md) | The steps the scheduled 21:00 session follows every evening |
 | [`METRICS.md`](METRICS.md) | The metrics dictionary, generated from `config/metrics.toml` (do not edit by hand) |
+| [`PREDICT.md`](PREDICT.md) | Predictive analysis: the point-in-time S&P 500 dataset, the "goodness" labels, features, walk-forward experiments and survivorship handling (report 15) |
 
 Nothing in this repository is investment advice.

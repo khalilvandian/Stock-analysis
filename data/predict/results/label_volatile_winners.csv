@@ -1,0 +1,11 @@
+label,description,avg_percentile_of_volatile_winners,share_in_top_fifth,volatile_winner_share_of_top_fifth
+cagr,Raw total return (annual),0.9040,1.0000,0.2983
+excess_cagr,Return minus the S&P 500,0.9040,1.0000,0.2983
+excess_vs_sector,Return minus the sector median,0.8833,0.8390,0.2983
+sharpe,Sharpe ratio,0.8062,0.5618,0.2983
+sortino,Sortino ratio,0.8103,0.5730,0.2983
+calmar,Calmar ratio (return / worst fall),0.7666,0.4082,0.2983
+martin,Martin ratio (return / ulcer index),0.7583,0.4270,0.2983
+info_ratio,Information ratio vs the S&P 500,0.8871,0.8951,0.2983
+beat_index,Beat the S&P 500 (yes/no),0.8166,1.0000,0.2983
+good,Beat the S&P 500 without a much deeper fall (yes/no),0.3788,0.0000,0.2983

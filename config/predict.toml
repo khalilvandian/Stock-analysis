@@ -1,0 +1,36 @@
+# Predictive analysis (issue #10, report 15): settings for the dataset, labels and experiments.
+# Run: uv run python analysis/predict.py all
+
+[universe]
+# Historical S&P 500 membership (fja05680/sp500, MIT licence, built from Clenow's list
+# and Wikipedia). A stock is in the universe at a decision date if it was an index member
+# on that day, including companies that later left the index.
+membership = "data/predict/sp500_ticker_start_end.csv"
+changes = "data/predict/sp500_changes_wikipedia.csv"
+resolved = "data/predict/universe.csv"
+
+[dates]
+# One decision date per year. June 30 is late enough that nearly every December
+# fiscal year-end 10-K has been filed (deadline: 60-90 days), so features are current.
+month_day = "06-30"
+first_year = 2010   # XBRL company facts start with 10-Ks filed in 2009-2010
+last_year = 2025    # features; labels need the full horizon after the date
+
+[labels]
+horizon_years = 5          # the "is year t a good buy, judged by t+1..t+5" window
+short_horizon_years = 1    # used only to compare how predictable a short horizon is
+benchmark = "SPY"          # S&P 500 total return (dividends reinvested)
+risk_free = "^IRX"         # 13-week T-bill yield, for Sharpe and Sortino
+# Primary binary label "good investment": beat the S&P 500 over the horizon AND the
+# worst fall from a peak was no more than `dd_margin` deeper than the index's own worst fall.
+dd_margin = 0.15
+
+[features]
+min_market_cap = 1.0e9     # rows outside these bounds are share-count errors (S&P members are large)
+max_market_cap = 5.0e12
+
+[experiments]
+seed = 7
+# Walk-forward: a model tested on cohort T is trained only on cohorts whose label
+# window has ended by T (cohort + horizon <= T), so no future returns leak into training.
+min_train_cohorts = 2
