@@ -1,6 +1,6 @@
 # Market report: Claude's notes
 
-Updated: 2026-10-27
+Updated: 2026-10-28
 
 The evening run copies these sections into the market PDF. Keep it short.
 
@@ -17,7 +17,7 @@ The evening run copies these sections into the market PDF. Keep it short.
 
 ## What is driving the market
 
-On Oct 27 the S&P 500 rose about 0.7% to about 7,730 and the Nasdaq about 1.3%, led by chips and Big Tech ahead of their earnings and this week's Fed meeting. Oil topped $100 a barrel in September on Middle East supply worries, and the 10-year yield broke 5% for the first time since 2023 on inflation fears and the chance of Fed rate rises. The index has held up because the largest companies keep growing earnings, but breadth is middling: a little under 60% of S&P 500 stocks are above their 200-day average.
+On Oct 28 the S&P 500 added about 0.3% to about 7,747, under 1% from its high; oil rose about 2.6% to about $102 and the 10-year yield is back above 5%. On Oct 27 the S&P 500 rose about 0.7% to about 7,730 and the Nasdaq about 1.3%, led by chips and Big Tech ahead of their earnings and this week's Fed meeting. Oil topped $100 a barrel in September on Middle East supply worries, and the 10-year yield broke 5% for the first time since 2023 on inflation fears and the chance of Fed rate rises. The index has held up because the largest companies keep growing earnings, but breadth is middling: a little under 60% of S&P 500 stocks are above their 200-day average.
 
 ## Stocks to look at
 
@@ -32,4 +32,4 @@ Each name still needs step 1 (absolute values with history) before any decision.
 ## What to watch
 
 - Oil and the 10-year yield: a move back below 4.5% would ease the pressure on valuations.
-- Earnings season this week and next, including BSX (Oct 28) and BKNG (Nov 3) from the watch list.
+- Earnings season continues, with BKNG (Nov 3) from the watch list; BSX reported Oct 28 and cut its outlook again.

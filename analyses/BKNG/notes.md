@@ -1,6 +1,6 @@
 # Booking Holdings (BKNG): Claude's notes
 
-Updated: 2026-10-27
+Updated: 2026-10-28
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -27,6 +27,7 @@ Booking runs Booking.com, Priceline, Agoda, KAYAK and OpenTable. Most of its pro
 
 ## News
 
+- 2026-10-28: about $148, another step down ahead of the Nov 3 report; now about 3% above the $144 entry.
 - 2026-10-27: a new 52-week low near $150 intraday, closing about $150. Options imply about a 6% move on the Nov 3 report. Wells Fargo cut its target to $190 (Equal Weight); BofA ($232) and BTIG ($250) keep Buy.
 - The stock is down about 29% this year, most of it since late August.
 - Q3 results are due Nov 3; consensus adjusted EPS is about $4.49.
