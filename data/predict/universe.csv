@@ -1,0 +1,805 @@
+ticker,left_index,exit_reason,cik,yahoo,name,method
+A,,,1090872,A,"AGILENT TECHNOLOGIES, INC.",sec_current
+AABA,2017-06-19,,,,,unresolved
+AAL,2024-09-23,Market capitalization changes.,6201,AAL,American Airlines Group Inc.,sec_current
+AAP,2023-08-25,Johnson & Johnson offered to exchange the shares of Kenvue held for shares of Johnson & Johnson in a split-off exchange offer.,1158449,AAP,ADVANCE AUTO PARTS INC,sec_current
+AAPL,,,320193,AAPL,Apple Inc.,sec_current
+ABBV,,,1551152,ABBV,AbbVie Inc.,sec_current
+ABC,2023-08-30,,1140859,COR,"Cencora, Inc.",override: AmerisourceBergen renamed Cencora (COR) 2023; same CIK
+ABMD,2022-12-22,Johnson & Johnson acquired Abiomed.,815094,,ABIOMED INC,name_search
+ABNB,,,1559720,ABNB,"Airbnb, Inc.",sec_current
+ABT,,,1800,ABT,ABBOTT LABORATORIES,sec_current
+ACGL,,,947484,ACGL,ARCH CAPITAL GROUP LTD.,sec_current
+ACN,,,1467373,ACN,Accenture plc,sec_current
+ADBE,,,796343,ADBE,ADOBE INC.,sec_current
+ADI,,,6281,ADI,ANALOG DEVICES INC,sec_current
+ADM,,,7084,ADM,Archer-Daniels-Midland Co,sec_current
+ADP,,,8670,ADP,AUTOMATIC DATA PROCESSING INC,sec_current
+ADS,2020-06-22,Market capitalization changes.,1101215,BFH,"BREAD FINANCIAL HOLDINGS, INC.",cik_current:BFH
+ADSK,,,769397,ADSK,"Autodesk, Inc.",sec_current
+ADT,2016-05-02,ADT was acquired by Apollo.,1703056,ADT,ADT Inc.,sec_current
+AEE,,,1002910,AEE,AMEREN CORP,sec_current
+AEP,,,4904,AEP,AMERICAN ELECTRIC POWER CO INC,sec_current
+AES,,,874761,AES,AES CORP,sec_current
+AET,2018-11-29,CVS acquired Aetna.,1013761,,Aetna,name_search
+AFL,,,4977,AFL,AFLAC INC,sec_current
+AGN,2020-05-12,Allergan was acquired by AbbVie.,884629,,Allergan,name_search
+AIG,,,5272,AIG,"AMERICAN INTERNATIONAL GROUP, INC.",sec_current
+AIV,2020-12-21,Aimco completed the corporate spin-off of Apartment Income REIT.,1820878,,Aimco,name_search
+AIZ,,,1267238,AIZ,"ASSURANT, INC.",sec_current
+AJG,,,354190,AJG,Arthur J. Gallagher & Co.,sec_current
+AKAM,,,1086222,AKAM,AKAMAI TECHNOLOGIES INC,sec_current
+AKS,2011-12-19,Market capitalization changes.,918160,,Cleveland-Cliffs Steel Holding Corp,name_search
+ALB,,,915913,ALB,ALBEMARLE CORP,sec_current
+ALGN,,,1097149,ALGN,ALIGN TECHNOLOGY INC,sec_current
+ALK,2023-12-18,Market capitalization changes.,766421,ALK,"ALASKA AIR GROUP, INC.",sec_current
+ALL,,,899051,ALL,ALLSTATE CORP,sec_current
+ALLE,,,1579241,ALLE,Allegion plc,sec_current
+ALTR,2015-12-28,Altera was acquired by Intel.,768251,,ALTERA CORP,name_search
+ALXN,2021-07-21,AstraZeneca acquired Alexion Pharmaceuticals.,899866,,"ALEXION PHARMACEUTICALS, INC.",name_search
+AMAT,,,6951,AMAT,APPLIED MATERIALS INC /DE,sec_current
+AMCR,,,1748790,AMCR,Amcor plc,sec_current
+AMD,,,2488,AMD,ADVANCED MICRO DEVICES INC,sec_current
+AME,,,1037868,AME,AMETEK INC/,sec_current
+AMG,2019-12-23,Market capitalization changes.,1004434,AMG,"AFFILIATED MANAGERS GROUP, INC.",sec_current
+AMGN,,,318154,AMGN,AMGEN INC,sec_current
+AMP,,,820027,AMP,AMERIPRISE FINANCIAL INC,sec_current
+AMT,,,1053507,AMT,AMERICAN TOWER CORP /MA/,sec_current
+AMZN,,,1018724,AMZN,AMAZON COM INC,sec_current
+AN,2017-08-08,MetLife completed the corporate spin-off of Brighthouse Financial.,350698,AN,"AUTONATION, INC.",sec_current
+ANDV,2018-10-01,ANDV was acquired by Marathon Petroleum.,50104,,Andeavor,name_search
+ANET,,,1596532,ANET,"Arista Networks, Inc.",sec_current
+ANF,2013-12-23,Market capitalization changes.,1018840,ANF,ABERCROMBIE & FITCH CO /DE/,sec_current
+ANRZQ,2012-10-02,,,,,unresolved
+ANSS,2025-07-18,Synopsys acquired Ansys.,1013462,,ANSYS INC,name_search
+ANTM,2022-06-28,,1156039,ELV,"Elevance Health, Inc.",rename:ELV
+AON,,,315293,AON,Aon plc,sec_current
+AOS,,,91142,AOS,SMITH A O CORP,sec_current
+APA,,,1841666,APA,APA Corp,sec_current
+APC,2019-08-09,Occidental Petroleum acquired Anadarko Petroleum.,773910,,ANADARKO PETROLEUM CORP,name_search
+APD,,,2969,APD,"Air Products & Chemicals, Inc.",sec_current
+APH,,,820313,APH,AMPHENOL CORP /DE/,sec_current
+APO,,,1858681,APO,"Apollo Global Management, Inc.",sec_current
+APOL,2013-07-01,Market capitalization changes.,929887,,APOLLO EDUCATION GROUP INC,name_search
+APTV,,,1521332,APTV,Aptiv PLC,sec_current
+ARE,,,1035443,ARE,"ALEXANDRIA REAL ESTATE EQUITIES, INC.",sec_current
+ARG,2016-05-23,Airgas was acquired by Air Liquide.,1158058,,Airgas,name_search
+ARNC,2020-04-06,Arconic separated into 2 companies - Howmet remained in the index.,1790982,,Arconic,name_search
+ATGE,2012-10-01,,,,,unresolved
+ATI,2015-07-02,Spin off of Columbia Pipeline.,1018963,ATI,ATI INC,cik_current:ATI
+ATO,,,731802,ATO,ATMOS ENERGY CORP,sec_current
+ATVI,2023-10-18,Acquisition of Activision Blizzard by Microsoft.,718877,,"Activision Blizzard, Inc.",name_search
+AVB,2026-08-18,Equity Residential (now Vivmark Residential) acquired AvalonBay Communities.,915912,,AVALONBAY COMMUNITIES INC,name_search
+AVGO,,,1730168,AVGO,Broadcom Inc.,sec_current
+AVP,2015-03-23,Market capitalization changes.,8868,,AVON PRODUCTS INC,name_search
+AVY,,,8818,AVY,Avery Dennison Corp,sec_current
+AWK,,,1410636,AWK,"American Water Works Company, Inc.",sec_current
+AXON,,,1069183,AXON,"AXON ENTERPRISE, INC.",sec_current
+AXP,,,4962,AXP,AMERICAN EXPRESS CO,sec_current
+AYE,2011-02-28,Alleghany was acquired by First Energy.,3673,,Allegheny Energy,name_search
+AYI,2018-06-18,Market capitalization changes.,1144215,AYI,ACUITY INC. (DE),sec_current
+AZO,,,866787,AZO,AUTOZONE INC,sec_current
+BA,,,12927,BA,BOEING CO,sec_current
+BAC,,,70858,BAC,BANK OF AMERICA CORP /DE/,sec_current
+BALL,,,9389,BALL,BALL Corp,sec_current
+BAX,,,10456,BAX,BAXTER INTERNATIONAL INC,sec_current
+BBBY,2017-07-26,Market capitalization changes.,886158,,Bed Bath & Beyond,name_search
+BBT,2019-12-09,,92230,TFC,Beacon Financial Corp,override: BB&T became Truist Financial (TFC) 2019; the BBT ticker now belongs to another bank
+BBWI,2024-10-01,Market capitalization changes.,701985,BBWI,"Bath & Body Works, Inc.",sec_current
+BBY,,,764478,BBY,BEST BUY CO INC,sec_current
+BCR,2017-12-29,Becton Dickinson acquired CR Bard.,,,CR Bard,unresolved
+BDX,,,10795,BDX,BECTON DICKINSON & CO,sec_current
+BEAM,2014-05-01,Beam was acquired by Suntory.,,,Suntory Global Spirits,unresolved
+BEN,,,38777,BEN,FRANKLIN TEMPLETON INC,sec_current
+BF.B,,,14693,BF-B,BROWN FORMAN CORP,sec_current
+BG,,,1996862,BG,Bunge Global SA,sec_current
+BHF,2019-04-02,DowDuPont completed the corporate spin-off of Dow Inc.,1685040,BHF,"Brighthouse Financial, Inc.",sec_current
+BHGE,2019-10-18,,1701605,BKR,Baker Hughes Co,rename:BKR
+BIG,2013-02-14,Market capitalization changes.,768835,,FORMER BL STORES INC,name_search
+BIIB,,,875045,BIIB,BIOGEN INC.,sec_current
+BIO,2024-09-23,Market capitalization changes.,12208,BIO,"BIO-RAD LABORATORIES, INC.",sec_current
+BK,2026-05-21,,1390777,BNY,Bank of New York Mellon Corp,rename:BNY
+BKNG,,,1075531,BKNG,Booking Holdings Inc.,sec_current
+BKR,,,1701605,BKR,Baker Hughes Co,sec_current
+BLDR,,,1316835,BLDR,"Builders FirstSource, Inc.",sec_current
+BLK,,,2012383,BLK,"BlackRock, Inc.",sec_current
+BLL,2022-05-10,,9389,BALL,BALL Corp,rename:BALL
+BMC,2013-09-11,BMC was acquired by a consortium.,835729,,BMC SOFTWARE INC,name_search
+BMS,2014-12-05,Market capitalization changes.,11199,,"Amcor Flexibles North America, Inc.",name_search
+BMY,,,14272,BMY,BRISTOL MYERS SQUIBB CO,sec_current
+BR,,,1383312,BR,"BROADRIDGE FINANCIAL SOLUTIONS, INC.",sec_current
+BRCM,2016-02-01,nan,1649345,,Broadcom,name_search
+BRK.B,,,1067983,BRK-B,BERKSHIRE HATHAWAY INC,sec_current
+BRO,,,79282,BRO,"BROWN & BROWN, INC.",sec_current
+BSX,,,885725,BSX,BOSTON SCIENTIFIC CORP,sec_current
+BTUUQ,2014-09-22,,,,,unresolved
+BWA,2025-03-24,Market capitalization changes.,908255,BWA,BORGWARNER INC,sec_current
+BX,,,1393818,BX,Blackstone Inc.,sec_current
+BXP,,,1037540,BXP,"BXP, Inc.",sec_current
+C,,,831001,C,CITIGROUP INC,sec_current
+CA,2018-11-06,CA was acquired by Broadcom.,,,CA Technologies,unresolved
+CAG,2026-06-30,Market capitalization changes.,23217,CAG,CONAGRA BRANDS INC.,sec_current
+CAH,,,721371,CAH,CARDINAL HEALTH INC,sec_current
+CAM,2016-04-04,Schlumberger acquired Cameron.,941548,,CAMERON INTERNATIONAL CORP,name_search
+CARR,,,1783180,CARR,CARRIER GLOBAL Corp,sec_current
+CAT,,,18230,CAT,CATERPILLAR INC,sec_current
+CB,,,896159,CB,Chubb Ltd,sec_current
+CBE,2012-12-03,Cooper was acquired by Eaton Corp. (ETN),24454,,Cooper Industries,name_search
+CBOE,,,1374310,CBOE,"Cboe Global Markets, Inc.",sec_current
+CBRE,,,1138118,CBRE,"CBRE GROUP, INC.",sec_current
+CBS,2019-12-05,,,,,unresolved
+CCE,2016-05-31,Coca-Cola Enterprises merged with European bottlers.,1491675,,"COCA-COLA EUROPEAN PARTNERS US, LLC",name_search
+CCI,,,1051470,CCI,CROWN CASTLE INC.,sec_current
+CCL,,,815097,CCL,Carnival Corp Ltd.,sec_current
+CDAY,2024-02-01,Ceridian changed its ticker symbol from CDAY to DAY.,109758,,Ceridian,name_search
+CDNS,,,813672,CDNS,CADENCE DESIGN SYSTEMS INC,sec_current
+CDW,,,1402057,CDW,CDW Corp,sec_current
+CE,2025-03-24,Market capitalization changes.,1306830,CE,Celanese Corp,sec_current
+CEG,,,1868275,CEG,Constellation Energy Corp,sec_current
+CELG,2019-11-21,Bristol-Myers Squibb acquired Celgene.,816284,,CELGENE CORP /DE/,name_search
+CEPH,2011-10-14,Cephalon was acquired by Teva Pharmaceutical Industries.,873364,,CEPHALON INC,name_search
+CERN,2022-06-08,Oracle acquired Cerner.,804753,,Cerner,name_search
+CF,,,1324404,CF,"CF Industries Holdings, Inc.",sec_current
+CFG,,,759944,CFG,CITIZENS FINANCIAL GROUP INC/RI,sec_current
+CFN,2015-03-17,Carefusion was acquired by Becton Dickinson.,1457543,,CAREFUSION Corp,name_search
+CHD,,,313927,CHD,CHURCH & DWIGHT CO INC /DE/,sec_current
+CHK,2018-03-19,Market capitalization changes.,895126,EXE,EXPAND ENERGY Corp,cik_current:EXE
+CHRW,,,1043277,CHRW,"C. H. ROBINSON WORLDWIDE, INC.",sec_current
+CHTR,,,1091667,CHTR,"CHARTER COMMUNICATIONS, INC. /MO/",sec_current
+CI,,,1739940,CI,Cigna Group,sec_current
+CINF,,,20286,CINF,CINCINNATI FINANCIAL CORP,sec_current
+CL,,,21665,CL,COLGATE PALMOLIVE CO,sec_current
+CLF,2014-04-02,Market capitalization changes.,764065,CLF,CLEVELAND-CLIFFS INC.,sec_current
+CLX,,,21076,CLX,CLOROX CO /DE/,sec_current
+CMA,2024-06-24,Market capitalization changes.,28412,,COMERICA INC,name_search
+CMCSA,,,1166691,CMCSA,COMCAST CORP,sec_current
+CME,,,1156375,CME,CME GROUP INC.,sec_current
+CMG,,,1058090,CMG,CHIPOTLE MEXICAN GRILL INC,sec_current
+CMI,,,26172,CMI,CUMMINS INC,sec_current
+CMS,,,811156,CMS,CMS ENERGY CORP,sec_current
+CNC,,,1071739,CNC,CENTENE CORP,sec_current
+CNP,,,1130310,CNP,CENTERPOINT ENERGY INC,sec_current
+CNX,2016-03-04,nan,1070412,CNX,Consol Energy,cik_current:CNX
+COF,,,927628,COF,CAPITAL ONE FINANCIAL CORP,sec_current
+COG,2021-10-04,,,,,unresolved
+COIN,,,1679788,COIN,"Coinbase Global, Inc.",sec_current
+COL,2018-11-27,,,,,unresolved
+COO,,,711404,COO,"COOPER COMPANIES, INC.",sec_current
+COP,,,1163165,COP,CONOCOPHILLIPS,sec_current
+COR,,,1140859,COR,"Cencora, Inc.",sec_current
+COST,,,909832,COST,COSTCO WHOLESALE CORP /NEW,sec_current
+COTY,2020-09-21,Market capitalization changes.,1024305,COTY,COTY INC.,sec_current
+COV,2015-01-27,Covidien was acquired by Medtronic.,1385187,,Covidien plc,name_search
+CPAY,,,1175454,CPAY,"CORPAY, INC.",sec_current
+CPB,2026-06-22,Market capitalization changes.,16732,CPB,CAMPBELL'S Co,sec_current
+CPGX,2016-07-01,CPGX was acquired by TRP.,1629995,,"Columbia Pipeline Group, Inc.",name_search
+CPRI,2020-05-12,Market capitalization changes.,1530721,CPRI,Capri Holdings Ltd,sec_current
+CPRT,,,900075,CPRT,COPART INC,sec_current
+CPT,,,906345,CPT,CAMDEN PROPERTY TRUST,sec_current
+CPWR,2012-01-03,Market capitalization changes.,859014,,COMPUWARE CORP,name_search
+CRL,,,1100682,CRL,"CHARLES RIVER LABORATORIES INTERNATIONAL, INC.",sec_current
+CRM,,,1108524,CRM,"Salesforce, Inc.",sec_current
+CRWD,,,1535527,CRWD,"CrowdStrike Holdings, Inc.",sec_current
+CSCO,,,858877,CSCO,"CISCO SYSTEMS, INC.",sec_current
+CSGP,,,1057352,CSGP,"COSTAR GROUP, INC.",sec_current
+CSRA,2018-04-04,General Dynamics acquired CSRA.,1646383,,CSRA Inc.,name_search
+CSX,,,277948,CSX,CSX CORP,sec_current
+CTAS,,,723254,CTAS,CINTAS CORP,sec_current
+CTL,2020-09-18,,18926,LUMN,"Lumen Technologies, Inc.",override: CenturyLink renamed Lumen Technologies (LUMN) 2020; same CIK
+CTLT,2024-12-23,Novo Holdings A/S acquired Catalent.,1416083,,Catalent,name_search
+CTRA,2026-05-07,Devon Energy acquired Coterra Energy.,858470,,Coterra Energy Inc.,name_search
+CTSH,,,1058290,CTSH,COGNIZANT TECHNOLOGY SOLUTIONS CORP,sec_current
+CTVA,,,1755672,CTVA,"Corteva, Inc.",sec_current
+CTXS,2022-10-03,Vista Equity Partners acquired Citrix Systems.,877890,,CITRIX SYSTEMS INC,name_search
+CVC,2016-06-21,Cablevision Systems was acquired by Altice.,784681,,Cablevision Systems,name_search
+CVH,2013-05-07,CVH was acquired by Aetna.,1054833,,COVENTRY HEALTH CARE INC,name_search
+CVS,,,64803,CVS,CVS HEALTH Corp,sec_current
+CVX,,,93410,CVX,CHEVRON CORP,sec_current
+CXO,2021-01-21,ConocoPhillips acquired Concho Resources.,1358071,,CONCHO RESOURCES INC,name_search
+CZR,2025-09-22,Market capitalization changes.,1590895,CZR,"Caesars Entertainment, Inc.",sec_current
+D,,,715957,D,"DOMINION ENERGY, INC",sec_current
+DAL,,,27904,DAL,"DELTA AIR LINES, INC.",sec_current
+DASH,,,1792789,DASH,"DoorDash, Inc.",sec_current
+DAY,2026-02-09,Thoma Bravo L.P. acquired Dayforce.,1725057,,"Dayforce, Inc.",name_search
+DD,,,1666700,DD,"DuPont de Nemours, Inc.",sec_current
+DE,,,315189,DE,DEERE & CO,sec_current
+DECK,,,910521,DECK,DECKERS OUTDOOR CORP,sec_current
+DELL,,,1571996,DELL,Dell Technologies Inc.,sec_current
+DF,2013-05-24,DF was too small after spinoff of White Wave Foods.,27500,,Dean Foods,name_search
+DFS,2025-05-19,Capital One acquired Discover Financial.,1393612,,Discover Financial Services,name_search
+DG,,,29534,DG,DOLLAR GENERAL CORP,sec_current
+DGX,,,1022079,DGX,QUEST DIAGNOSTICS INC,sec_current
+DHI,,,882184,DHI,HORTON D R INC /DE/,sec_current
+DHR,,,313616,DHR,DANAHER CORP /DE/,sec_current
+DIS,,,1744489,DIS,Walt Disney Co,sec_current
+DISCA,2022-04-11,WarnerMedia and Discovery merged to create Warner Bros. Discovery.,1437107,,Discovery,name_search
+DISCK,2022-04-11,WarnerMedia and Discovery merged to create Warner Bros. Discovery.,1437107,,Discovery,name_search
+DISH,2023-06-20,Market capitalization changes.,1001082,,DISH Network CORP,name_search
+DLR,,,1297996,DLR,"DIGITAL REALTY TRUST, INC.",sec_current
+DLTR,,,935703,DLTR,"DOLLAR TREE, INC.",sec_current
+DNB,2017-04-05,Gartner acquired CEB.,30419,,Dun & Bradstreet,name_search
+DNR,2015-03-23,Market capitalization changes.,945764,,DENBURY INC,name_search
+DO,2016-10-03,Siris Capital Group acquired Polycom.,949039,,"DIAMOND OFFSHORE DRILLING, INC.",name_search
+DOC,,,765880,DOC,"HEALTHPEAK PROPERTIES, INC.",sec_current
+DOV,,,29905,DOV,DOVER Corp,sec_current
+DOW,,,1751788,DOW,DOW INC.,sec_current
+DPZ,,,1286681,DPZ,DOMINOS PIZZA INC,sec_current
+DRE,2022-10-03,Prologis acquired Duke Realty.,783280,,Duke Realty,name_search
+DRI,,,940944,DRI,DARDEN RESTAURANTS INC,sec_current
+DTE,,,936340,DTE,DTE ENERGY CO,sec_current
+DTV,2015-07-27,DirecTV was acquired by AT&T.,1465112,,DirecTV,name_search
+DUK,,,1326160,DUK,Duke Energy CORP,sec_current
+DVA,,,927066,DVA,DAVITA INC.,sec_current
+DVN,,,1090012,DVN,DEVON ENERGY CORP/DE,sec_current
+DWDP,2019-06-03,DWDP changed to DD after spinning off Corteva.,1666700,DD,DuPont,cik_current:DD
+DXC,2023-10-02,Market capitalization changes.,1688568,DXC,DXC Technology Co,sec_current
+DXCM,,,1093557,DXCM,DEXCOM INC,sec_current
+EA,2026-08-05,"An investor consortium comprising Saudi Arabia's Public Investment Fund (PIF), Silver Lake, and Affinity Partners acquired Electronic Arts.",712515,,ELECTRONIC ARTS INC.,name_search
+EBAY,,,1065088,EBAY,EBAY INC,sec_current
+ECL,,,31462,ECL,ECOLAB INC.,sec_current
+ED,,,1047862,ED,CONSOLIDATED EDISON INC,sec_current
+EFX,,,33185,EFX,EQUIFAX INC,sec_current
+EG,,,1095073,EG,"EVEREST GROUP, LTD.",sec_current
+EIX,,,827052,EIX,EDISON INTERNATIONAL,sec_current
+EKDKQ,2010-12-20,,,,,unresolved
+EL,,,1001250,EL,ESTEE LAUDER COMPANIES INC,sec_current
+ELV,,,1156039,ELV,"Elevance Health, Inc.",sec_current
+EMC,2016-09-07,Dell acquired EMC.,790070,,EMC,name_search
+EMN,2025-11-04,Market capitalization changes.,915389,EMN,EASTMAN CHEMICAL CO,sec_current
+EMR,,,32604,EMR,EMERSON ELECTRIC CO,sec_current
+ENDP,2017-03-02,Regency Centers acquired EQY.,1593034,,Endo International plc,name_search
+ENPH,2025-09-22,Market capitalization changes.,1463101,ENPH,"Enphase Energy, Inc.",sec_current
+EOG,,,821189,EOG,EOG RESOURCES INC,sec_current
+EP,2012-05-25,,1066107,,EMPIRE PETROLEUM CORP,override: El Paso Corp (acquired by Kinder Morgan 2012); the EP ticker was reused
+EPAM,2026-06-02,Market capitalization changes.,1352010,EPAM,"EPAM Systems, Inc.",sec_current
+EQIX,,,1101239,EQIX,EQUINIX INC,sec_current
+EQR,2026-08-18,,906107,VMRK,VIVMARK RESIDENTIAL,rename:VMRK
+EQT,,,33213,EQT,EQT Corp,sec_current
+ERIE,,,922621,ERIE,ERIE INDEMNITY CO,sec_current
+ES,,,72741,ES,EVERSOURCE ENERGY,sec_current
+ESRX,2018-12-21,Cigna acquired Express Scripts.,1532063,,Express Scripts,name_search
+ESS,,,920522,ESS,"ESSEX PROPERTY TRUST, INC.",sec_current
+ESV,2016-03-30,Centene acquired Health Net.,314808,VAL,Valaris Ltd,cik_current:VAL
+ETFC,2020-10-07,Morgan Stanley acquired E*Trade.,,,E-Trade,unresolved
+ETN,,,1551182,ETN,Eaton Corp plc,sec_current
+ETR,,,65984,ETR,ENTERGY CORP /DE/,sec_current
+ETSY,2024-09-23,Market capitalization changes.,1370637,ETSY,ETSY INC,sec_current
+EVHC,2018-10-11,EVHC was acquired by KKR.,1344154,,Envision Healthcare,name_search
+EVRG,,,1711269,EVRG,"Evergy, Inc.",sec_current
+EW,,,1099800,EW,Edwards Lifesciences Corp,sec_current
+EXC,,,1109357,EXC,EXELON CORP,sec_current
+EXE,,,895126,EXE,EXPAND ENERGY Corp,sec_current
+EXPD,,,746515,EXPD,EXPEDITORS INTERNATIONAL OF WASHINGTON INC,sec_current
+EXPE,,,1324424,EXPE,"Expedia Group, Inc.",sec_current
+EXR,,,1289490,EXR,Extra Space Storage Inc.,sec_current
+F,,,37996,F,FORD MOTOR CO,sec_current
+FANG,,,1539838,FANG,"Diamondback Energy, Inc.",sec_current
+FAST,,,815556,FAST,FASTENAL CO,sec_current
+FB,2022-06-09,,1326801,META,"Meta Platforms, Inc.",override: renamed Meta Platforms (META) 2022; same CIK
+FBHS,2022-12-19,Market capitalization changes.,1519751,FBIN,"Fortune Brands Innovations, Inc.",cik_current:FBIN
+FCX,,,831259,FCX,FREEPORT-MCMORAN INC,sec_current
+FDO,2015-07-07,Family Dollar was acquired.,34408,,FAMILY DOLLAR STORES INC,name_search
+FDS,,,1013237,FDS,FACTSET RESEARCH SYSTEMS INC,sec_current
+FDX,,,1048911,FDX,FEDEX CORP,sec_current
+FE,,,1031296,FE,FIRSTENERGY CORP,sec_current
+FFIV,,,1048695,FFIV,"F5, INC.",sec_current
+FHN,2013-06-24,Pfizer completed the corporate spin-off of Zoetis.,36966,FHN,FIRST HORIZON CORP,sec_current
+FI,2025-11-11,,798354,FISV,FISERV INC,rename:FISV
+FICO,,,814547,FICO,FAIR ISAAC CORP,sec_current
+FII,2013-01-02,Abbott Labs completed the corporate spin-off of AbbVie.,1056288,FHI,"FEDERATED HERMES, INC.",cik_current:FHI
+FIS,,,1136893,FIS,"Fidelity National Information Services, Inc.",sec_current
+FISV,,,798354,FISV,FISERV INC,sec_current
+FITB,,,35527,FITB,FIFTH THIRD BANCORP,sec_current
+FL,2019-08-09,Market capitalization changes.,850209,,"FOOT LOCKER, INC.",name_search
+FLIR,2021-05-14,Teledyne Technologies acquired FLIR Systems.,354908,,"Teledyne FLIR, LLC",name_search
+FLR,2019-06-03,DowDuPont completed the corporate spin-off of Corteva.,1124198,FLR,FLUOR CORP,sec_current
+FLS,2021-03-22,Market capitalization changes.,30625,FLS,FLOWSERVE CORP,sec_current
+FLT,2024-03-25,,1175454,CPAY,"CORPAY, INC.",rename:CPAY
+FMC,2025-03-24,Market capitalization changes.,37785,FMC,FMC CORP,sec_current
+FOSL,2016-01-05,Willis Holdings merged with Towers Watson and was renamed Willis Towers Watson.,883569,FOSL,"Fossil Group, Inc.",sec_current
+FOX,,,1754301,FOX,Fox Corp,sec_current
+FOXA,,,1754301,FOXA,Fox Corp,sec_current
+FRC,2023-05-04,The Federal Deposit Insurance Corporation (FDIC) placed First Republic Bank into receivership.,1137111,,First Republic Bank,name_search
+FRT,,,34903,FRT,FEDERAL REALTY INVESTMENT TRUST,sec_current
+FRX,2014-07-01,Actavis acquired Forest Laboratories.,38074,,"Forest Laboratories, LLC",name_search
+FSLR,,,1274494,FSLR,"FIRST SOLAR, INC.",sec_current
+FTI,2021-02-12,Corporate spin-off of Technip Energies.,1681459,FTI,TechnipFMC plc,sec_current
+FTNT,,,1262039,FTNT,"Fortinet, Inc.",sec_current
+FTR,2017-03-20,Market capitalization changes.,20520,,Frontier Communications,name_search
+FTV,,,1659166,FTV,Fortive Corp,sec_current
+GAS,2016-07-01,AGL Resources was acquired by Southern Company.,1004155,,SOUTHERN CO GAS,name_search
+GD,,,40533,GD,GENERAL DYNAMICS CORP,sec_current
+GDDY,,,1609711,GDDY,GoDaddy Inc.,sec_current
+GE,,,40545,GE,GENERAL ELECTRIC CO,sec_current
+GEHC,,,1932393,GEHC,GE HealthCare Technologies Inc.,sec_current
+GEN,,,849399,GEN,Gen Digital Inc.,sec_current
+GENZ,2011-04-04,Genzyme was acquired by Sanofi Aventis.,732485,,Genzyme,name_search
+GEV,,,1996810,GEV,GE Vernova Inc.,sec_current
+GGP,2018-08-28,GGP was acquired by Brookfield Property Partners.,1496048,,GGP,name_search
+GHC,2014-09-22,Market capitalization changes.,104889,GHC,Graham Holdings Co,sec_current
+GILD,,,882095,GILD,"GILEAD SCIENCES, INC.",sec_current
+GIS,,,40704,GIS,GENERAL MILLS INC,sec_current
+GL,,,320335,GL,GLOBE LIFE INC.,sec_current
+GLW,,,24741,GLW,CORNING INC /NY,sec_current
+GM,,,1467858,GM,General Motors Co,sec_current
+GMCR,2016-03-03,JAB Holding Company acquired Keurig Green Mountain.,909954,,"KEURIG GREEN MOUNTAIN, INC.",name_search
+GME,2016-04-25,Global Payments acquired Heartland Payment Systems.,1326380,GME,GameStop Corp.,sec_current
+GNRC,,,1474735,GNRC,GENERAC HOLDINGS INC.,sec_current
+GNW,2015-11-18,GE completed the corporate spin-off of Synchrony Financial.,1276520,GNW,GENWORTH FINANCIAL INC,sec_current
+GOOG,,,1652044,GOOG,Alphabet Inc.,sec_current
+GOOGL,,,1652044,GOOGL,Alphabet Inc.,sec_current
+GPC,,,40987,GPC,GENUINE PARTS CO,sec_current
+GPN,,,1123360,GPN,GLOBAL PAYMENTS INC,sec_current
+GPS,2022-02-02,Market capitalization changes.,39911,GAP,Gap,cik_current:GAP
+GR,2012-07-27,Goodrich was acquired by United Technologies.,42542,,Goodrich,name_search
+GRMN,,,1121788,GRMN,GARMIN LTD,sec_current
+GS,,,886982,GS,GOLDMAN SACHS GROUP INC,sec_current
+GT,2019-02-27,Wabtec acquired GE transportation business,42582,GT,GOODYEAR TIRE & RUBBER CO /OH/,sec_current
+GWW,,,277135,GWW,"W.W. GRAINGER, INC.",sec_current
+HAL,,,45012,HAL,HALLIBURTON CO,sec_current
+HAR,2017-03-13,Samsung Electronics acquired Harman International Industries.,800459,,HARMAN INTERNATIONAL INDUSTRIES INC /DE/,name_search
+HAS,,,46080,HAS,"HASBRO, INC.",sec_current
+HBAN,,,49196,HBAN,HUNTINGTON BANCSHARES INC /MD/,sec_current
+HBI,2021-12-20,Market capitalization changes.,,,Hanesbrands,unresolved
+HCA,,,860730,HCA,"HCA Healthcare, Inc.",sec_current
+HCBK,2015-11-02,HPQ completed the corporate spin-off of Hewlett Packard Enterprise.,921847,,HUDSON CITY BANCORP INC,name_search
+HCP,2019-11-05,,765880,DOC,,override: HCP renamed Healthpeak (PEAK) then ticker DOC 2024; same CIK
+HD,,,354950,HD,"HOME DEPOT, INC.",sec_current
+HES,2025-07-23,Chevron acquired Hess.,1120916,,Hess,name_search
+HFC,2021-06-04,Market capitalization changes.,48039,,HollyFrontier Corp,name_search
+HIG,,,874766,HIG,"HARTFORD INSURANCE GROUP, INC.",sec_current
+HII,,,1501585,HII,"HUNTINGTON INGALLS INDUSTRIES, INC.",sec_current
+HLT,,,1585689,HLT,Hilton Worldwide Holdings Inc.,sec_current
+HNZ,2013-06-07,HNZ was acquired by a consortium.,46640,,Heinz,name_search
+HOG,2020-06-22,Market capitalization changes.,793952,HOG,"HARLEY-DAVIDSON, INC.",sec_current
+HOLX,2026-04-09,Blackstone Inc. and TPG Inc. acquired Hologic.,,,Hologic,unresolved
+HON,,,773840,HON,HONEYWELL INTERNATIONAL INC,sec_current
+HOT,2016-09-23,MAR acquired Starwood Hotels,,,Starwood Hotels and Resorts,unresolved
+HP,2020-05-22,Market capitalization changes.,46765,HP,"Helmerich & Payne, Inc.",sec_current
+HPE,,,1645590,HPE,Hewlett Packard Enterprise Co,sec_current
+HPQ,,,47217,HPQ,HP INC,sec_current
+HRB,2020-09-21,Market capitalization changes.,12659,HRB,H&R BLOCK INC,sec_current
+HRL,,,48465,HRL,HORMEL FOODS CORP /DE/,sec_current
+HRS,2019-06-01,,202058,LHX,"L3HARRIS TECHNOLOGIES, INC. /DE/",override: Harris merged with L3 and became L3Harris (LHX) 2019; same CIK
+HSH,2012-06-29,,,,,unresolved
+HSIC,,,1000228,HSIC,HENRY SCHEIN INC,sec_current
+HSP,2015-09-03,Hospira was acquired.,1274057,,HOSPIRA INC,name_search
+HST,,,1070750,HST,"HOST HOTELS & RESORTS, INC.",sec_current
+HSY,,,47111,HSY,HERSHEY CO,sec_current
+HUBB,,,48898,HUBB,HUBBELL INC,sec_current
+HUM,,,49071,HUM,HUMANA INC,sec_current
+HWM,,,4281,HWM,Howmet Aerospace Inc.,sec_current
+IBM,,,51143,IBM,INTERNATIONAL BUSINESS MACHINES CORP,sec_current
+ICE,,,1571949,ICE,"Intercontinental Exchange, Inc.",sec_current
+IDXX,,,874716,IDXX,IDEXX LABORATORIES INC /DE,sec_current
+IEX,,,832101,IEX,IDEX CORP /DE/,sec_current
+IFF,,,51253,IFF,INTERNATIONAL FLAVORS & FRAGRANCES INC,sec_current
+IGT,2014-06-20,Market capitalization changes.,353944,,INTERNATIONAL GAME TECHNOLOGY,name_search
+ILMN,2024-06-24,Market capitalization changes.,1110803,ILMN,"ILLUMINA, INC.",sec_current
+INCY,,,879169,INCY,INCYTE CORP,sec_current
+INFO,2022-03-02,S&P Global acquired IHS Markit.,1598014,,IHS Markit Ltd.,name_search
+INTC,,,50863,INTC,INTEL CORP,sec_current
+INTU,,,896878,INTU,INTUIT INC.,sec_current
+INVH,,,1687229,INVH,Invitation Homes Inc.,sec_current
+IP,,,51434,IP,INTERNATIONAL PAPER CO /NEW/,sec_current
+IPG,2025-11-28,Omnicom Group acquired (The) Interpublic Group.,51644,,"INTERPUBLIC GROUP OF COMPANIES, INC.",name_search
+IPGP,2022-06-21,Market capitalization changes.,1111928,IPGP,IPG PHOTONICS CORP,sec_current
+IQV,,,1478242,IQV,IQVIA HOLDINGS INC.,sec_current
+IR,,,1699150,IR,Ingersoll Rand Inc.,sec_current
+IRM,,,1020569,IRM,IRON MOUNTAIN INC,sec_current
+ISRG,,,1035267,ISRG,INTUITIVE SURGICAL INC,sec_current
+IT,,,749251,IT,GARTNER INC,sec_current
+ITT,2011-11-01,,216228,ITT,ITT INC.,sec_current
+ITW,,,49826,ITW,ILLINOIS TOOL WORKS INC,sec_current
+IVZ,,,914208,IVZ,Invesco Ltd.,sec_current
+J,,,52988,J,JACOBS SOLUTIONS INC.,sec_current
+JBHT,,,728535,JBHT,HUNT J B TRANSPORT SERVICES INC,sec_current
+JBL,,,898293,JBL,JABIL INC,sec_current
+JCI,,,833444,JCI,Johnson Controls International plc,sec_current
+JCP,2013-12-02,,,,,unresolved
+JEC,2019-12-10,,52988,J,,override: Jacobs Engineering ticker changed to J 2019; same CIK
+JEF,2019-09-26,SPB completed the corporate spin-off of Jefferies Financial Group.,96223,JEF,Jefferies Financial Group Inc.,sec_current
+JKHY,,,779152,JKHY,JACK HENRY & ASSOCIATES INC,sec_current
+JNJ,,,200406,JNJ,JOHNSON & JOHNSON,sec_current
+JNPR,2025-07-09,Hewlett Packard Enterprise acquired Juniper Networks.,,,Juniper Networks,unresolved
+JNS,2011-11-23,Market capitalization changes.,1065865,,JANUS CAPITAL GROUP INC,name_search
+JOY,2015-10-08,Market capitalization changes.,801898,,JOY GLOBAL INC,name_search
+JPM,,,19617,JPM,JPMORGAN CHASE & CO,sec_current
+JWN,2020-06-22,Market capitalization changes.,757439,,Nordstrom,name_search
+K,2025-12-11,Mars Inc. acquired Kellanova.,55067,,KELLANOVA,name_search
+KDP,,,1418135,KDP,Keurig Dr Pepper Inc.,sec_current
+KEY,,,91576,KEY,KEYCORP /NEW/,sec_current
+KEYS,,,1601046,KEYS,"Keysight Technologies, Inc.",sec_current
+KG,2010-12-20,King was acquired by Pfizer.,1047699,,KING PHARMACEUTICALS INC,name_search
+KHC,,,1637459,KHC,Kraft Heinz Co,sec_current
+KIM,,,879101,KIM,KIMCO REALTY CORP,sec_current
+KKR,,,1404912,KKR,KKR & Co. Inc.,sec_current
+KLAC,,,319201,KLAC,KLA CORP,sec_current
+KMB,,,55785,KMB,KIMBERLY CLARK CORP,sec_current
+KMI,,,1506307,KMI,"KINDER MORGAN, INC.",sec_current
+KMX,2025-10-31,Market capitalization changes.,1170010,KMX,CARMAX INC,sec_current
+KO,,,21344,KO,COCA COLA CO,sec_current
+KORS,2018-09-19,,1530721,CPRI,,override: Michael Kors Holdings renamed Capri Holdings (CPRI) 2018; same CIK
+KR,,,56873,KR,KROGER CO,sec_current
+KRFT,2015-07-06,Kraft merged with Heinz.,1545158,,Kraft Foods,name_search
+KSS,2020-09-21,Market capitalization changes.,885639,KSS,KOHLS Corp,sec_current
+KSU,2021-12-14,Canadian Pacific acquired Kansas City Southern.,54480,,Kansas City Southern,name_search
+KVUE,,,1944048,KVUE,Kenvue Inc.,sec_current
+L,,,60086,L,LOEWS CORP,sec_current
+LB,2021-08-03,,701985,BBWI,LandBridge Corp,override: L Brands renamed Bath & Body Works (BBWI) 2021; the LB ticker was reused
+LDOS,,,1336920,LDOS,"Leidos Holdings, Inc.",sec_current
+LEG,2021-12-20,Market capitalization changes.,58492,,LEGGETT &amp; PLATT INC,name_search
+LEN,,,920760,LEN,LENNAR CORP /NEW/,sec_current
+LH,,,920148,LH,LABCORP HOLDINGS INC.,sec_current
+LHX,,,202058,LHX,"L3HARRIS TECHNOLOGIES, INC. /DE/",sec_current
+LIFE,2014-01-24,Life Technologies was acquired by Thermo Fisher Scientific.,1073431,,Life Technologies,name_search
+LII,,,1069202,LII,LENNOX INTERNATIONAL INC,sec_current
+LIN,,,1707925,LIN,LINDE PLC,sec_current
+LKQ,2025-12-22,Market capitalization changes.,1065696,LKQ,LKQ CORP,sec_current
+LLL,2019-07-01,L3 was acquired by Harris Corporation.,1039101,,"L3 TECHNOLOGIES, INC.",name_search
+LLTC,2017-03-13,Analog Devices acquired Linear Technology.,791907,,LINEAR TECHNOLOGY CORP /CA/,name_search
+LLY,,,59478,LLY,ELI LILLY & Co,sec_current
+LM,2016-12-02,Market capitalization changes.,704051,,"LEGG MASON, INC.",name_search
+LMT,,,936468,LMT,LOCKHEED MARTIN CORP,sec_current
+LNC,2023-09-18,Market capitalization changes.,59558,LNC,LINCOLN NATIONAL CORP,sec_current
+LNT,,,352541,LNT,ALLIANT ENERGY CORP,sec_current
+LO,2015-06-12,Lorillard was acquired.,,,Lorillard Tobacco Company,unresolved
+LOW,,,60667,LOW,LOWES COMPANIES INC,sec_current
+LRCX,,,707549,LRCX,LAM RESEARCH CORP,sec_current
+LSI,2014-05-07,Avago acquired LSI.,,,LSI,override: LSI Corp (acquired by Avago 2014): EDGAR name search matched an unrelated company
+LULU,,,1397187,LULU,lululemon athletica inc.,sec_current
+LUMN,2023-03-20,Market capitalization changes.,18926,LUMN,"Lumen Technologies, Inc.",sec_current
+LUV,,,92380,LUV,SOUTHWEST AIRLINES CO,sec_current
+LVLT,2017-10-13,CenturyLink acquired Level 3 Communications.,794323,,"Level 3 Parent, LLC",name_search
+LVS,,,1300514,LVS,LAS VEGAS SANDS CORP,sec_current
+LW,2026-03-23,Market capitalization changes.,1679273,LW,"Lamb Weston Holdings, Inc.",sec_current
+LXK,2012-10-01,Tyco completed the corporate spin-off of ADT.,1001288,,LEXMARK INTERNATIONAL INC /KY/,name_search
+LYB,,,1489393,LYB,LyondellBasell Industries N.V.,sec_current
+LYV,,,1335258,LYV,"Live Nation Entertainment, Inc.",sec_current
+M,2020-04-06,Market capitalization changes.,794367,M,"Macy's, Inc.",sec_current
+MA,,,1141391,MA,Mastercard Inc,sec_current
+MAA,,,912595,MAA,MID AMERICA APARTMENT COMMUNITIES INC.,sec_current
+MAC,2019-12-23,Market capitalization changes.,912242,MAC,MACERICH CO,sec_current
+MAR,,,1048286,MAR,MARRIOTT INTERNATIONAL INC /MD/,sec_current
+MAS,,,62996,MAS,MASCO CORP /DE/,sec_current
+MAT,2019-06-07,Merger of Bemis and Amcor; Bemis was the surviving entity.,63276,MAT,MATTEL INC /DE/,sec_current
+MCD,,,63908,MCD,MCDONALDS CORP,sec_current
+MCHP,,,827054,MCHP,MICROCHIP TECHNOLOGY INC,sec_current
+MCK,,,927653,MCK,MCKESSON CORP,sec_current
+MCO,,,1059556,MCO,MOODYS CORP /DE/,sec_current
+MDLZ,,,1103982,MDLZ,"Mondelez International, Inc.",sec_current
+MDP,2011-01-04,Motorola completed the corporate spin-off of Motorola Mobility.,65011,,Meredith,name_search
+MDT,,,1613103,MDT,Medtronic plc,sec_current
+MEE,2011-06-02,Alpha Natural Resources acquired Massey Energy.,37748,,"Alpha Appalachia Holdings, Inc.",name_search
+MET,,,1099219,MET,METLIFE INC,sec_current
+META,,,1326801,META,"Meta Platforms, Inc.",sec_current
+MFE,2011-03-01,McAfee was acquired by Intel.,890801,,McAfee,name_search
+MGM,,,789570,MGM,MGM Resorts International,sec_current
+MHK,2025-12-22,Market capitalization changes.,851968,MHK,MOHAWK INDUSTRIES INC,sec_current
+MHS,2012-04-02,Medco was acquired by Express Scripts.,1170650,,MEDCO HEALTH SOLUTIONS INC,name_search
+MI,2011-07-06,Marshall & Ilsley was acquired by Bank of Montreal.,1399315,,Marshall & Ilsley,name_search
+MIL,2010-07-15,Millipore was acquired by Merck KGaA.,66479,,Millipore,name_search
+MJN,2017-06-15,Reckitt Benckiser acquired Mead Johnson Nutrition.,1452575,,Mead Johnson Nutrition Co,name_search
+MKC,,,63754,MKC,MCCORMICK & CO INC,sec_current
+MKTX,2025-09-22,Market capitalization changes.,1278021,MKTX,MARKETAXESS HOLDINGS INC,sec_current
+MLM,,,916076,MLM,MARTIN MARIETTA MATERIALS INC,sec_current
+MMC,2026-01-14,,62709,MRSH,"MARSH & MCLENNAN COMPANIES, INC.",rename:MRSH
+MMI,2012-05-22,Motorola Mobility was acquired by Google.,1495569,,"Motorola Mobility Holdings, Inc",name_search
+MMM,,,66740,MMM,3M CO,sec_current
+MNK,2017-07-26,Market capitalization changes.,51396,,Mallinckrodt,name_search
+MNST,,,865752,MNST,Monster Beverage Corp,sec_current
+MO,,,764180,MO,"ALTRIA GROUP, INC.",sec_current
+MOH,2026-03-23,Market capitalization changes.,1179929,MOH,"MOLINA HEALTHCARE, INC.",sec_current
+MOLX,2013-12-09,MOLX was acquired by Koch Industries.,67472,,MOLEX INC,name_search
+MON,2018-06-07,Bayer acquired Monsanto.,67686,,Monsanto,name_search
+MOS,,,1285785,MOS,MOSAIC CO,sec_current
+MPC,,,1510295,MPC,Marathon Petroleum Corp,sec_current
+MPWR,,,1280452,MPWR,"MONOLITHIC POWER SYSTEMS, INC.",sec_current
+MRK,,,310158,MRK,"Merck & Co., Inc.",sec_current
+MRNA,,,1682852,MRNA,"Moderna, Inc.",sec_current
+MRO,2024-11-26,ConocoPhillips acquired Marathon Oil.,101778,,MARATHON OIL CORP,name_search
+MS,,,895421,MS,MORGAN STANLEY,sec_current
+MSCI,,,1408198,MSCI,MSCI Inc.,sec_current
+MSFT,,,789019,MSFT,MICROSOFT CORP,sec_current
+MSI,,,68505,MSI,"Motorola Solutions, Inc.",sec_current
+MTB,,,36270,MTB,M&T BANK CORP,sec_current
+MTCH,2026-03-23,Market capitalization changes.,891103,MTCH,"Match Group, Inc.",sec_current
+MTD,,,1037646,MTD,METTLER TOLEDO INTERNATIONAL INC/,sec_current
+MU,,,723125,MU,MICRON TECHNOLOGY INC,sec_current
+MUR,2017-07-26,Market capitalization changes.,717423,MUR,MURPHY OIL CORP,sec_current
+MWV,2015-07-02,,,,,unresolved
+MWW,2011-12-19,Market capitalization changes.,1020416,,"MONSTER WORLDWIDE, INC.",name_search
+MXIM,2021-08-30,Analog Devices acquired Maxim Integrated Products.,743316,,MAXIM INTEGRATED PRODUCTS INC,name_search
+MYL,2020-11-17,,,,,unresolved
+NAVI,2018-06-05,Westar Energy acquired Great Plains Energy and changed name to Evergy.,1593538,NAVI,NAVIENT CORP,sec_current
+NBL,2020-10-12,Chevron acquired Noble Energy.,72207,,NOBLE ENERGY INC,name_search
+NBR,2015-03-23,Market capitalization changes.,1163739,NBR,NABORS INDUSTRIES LTD,sec_current
+NCLH,,,1513761,NCLH,Norwegian Cruise Line Holdings Ltd.,sec_current
+NDAQ,,,1120193,NDAQ,"NASDAQ, INC.",sec_current
+NDSN,,,72331,NDSN,NORDSON CORP,sec_current
+NE,2015-07-20,eBay completed the corporate spin-off of PayPal.,1895262,NE,Noble Corp plc,sec_current
+NEE,,,753308,NEE,NEXTERA ENERGY INC,sec_current
+NEM,,,1164727,NEM,NEWMONT Corp /DE/,sec_current
+NFLX,,,1065280,NFLX,NETFLIX INC,sec_current
+NFX,2019-02-15,Encana acquired Newfield Exploration.,912750,,Newfield Exploration,name_search
+NI,,,1111711,NI,NISOURCE INC.,sec_current
+NKE,,,320187,NKE,"NIKE, Inc.",sec_current
+NKTR,2019-10-03,Market capitalization changes.,906709,NKTR,NEKTAR THERAPEUTICS,sec_current
+NLOK,2022-11-08,,849399,GEN,Gen Digital Inc.,override: NortonLifeLock renamed Gen Digital (GEN) 2022; same CIK
+NLSN,2022-10-12,Elliott Investment Management acquired Nielsen Holdings.,1492633,,Nielsen Holdings plc,name_search
+NOC,,,1133421,NOC,NORTHROP GRUMMAN CORP /DE/,sec_current
+NOV,2021-09-20,Market capitalization changes.,1021860,NOV,NOV Inc.,sec_current
+NOVL,2011-04-28,Novell was acquired by private equity firms.,758004,,Novell,name_search
+NOW,,,1373715,NOW,"ServiceNow, Inc.",sec_current
+NRG,,,1013871,NRG,"NRG ENERGY, INC.",sec_current
+NSC,,,702165,NSC,NORFOLK SOUTHERN CORP,sec_current
+NSM,2011-09-26,National Semi was acquired by Texas Instruments.,70530,,NATIONAL SEMICONDUCTOR CORP,name_search
+NTAP,,,1002047,NTAP,"NetApp, Inc.",sec_current
+NTRS,,,73124,NTRS,NORTHERN TRUST CORP,sec_current
+NUE,,,73309,NUE,NUCOR CORP,sec_current
+NVDA,,,1045810,NVDA,NVIDIA CORP,sec_current
+NVLS,2012-06-05,Novellus Systems was acquired by Lam Research.,836106,,NOVELLUS SYSTEMS INC,name_search
+NVR,,,906163,NVR,NVR INC,sec_current
+NWL,2023-09-18,Market capitalization changes.,814453,NWL,NEWELL BRANDS INC.,sec_current
+NWS,,,1564708,NWS,NEWS CORP,sec_current
+NWSA,,,1564708,NWSA,NEWS CORP,sec_current
+NXPI,,,1413447,NXPI,NXP Semiconductors N.V.,sec_current
+NYT,2010-12-20,Market capitalization changes.,71691,NYT,NEW YORK TIMES CO,sec_current
+NYX,2013-11-13,ICE Exchange acquired NYSE Euronext.,1368007,,NYSE Euronext,name_search
+O,,,726728,O,REALTY INCOME CORP,sec_current
+ODFL,,,878927,ODFL,"OLD DOMINION FREIGHT LINE, INC.",sec_current
+ODP,2010-12-20,Market capitalization changes.,800240,,ODP Corp,name_search
+OGN,2023-10-18,Market capitalization changes.,1821825,OGN,Organon & Co.,sec_current
+OI,2016-12-02,Market capitalization changes.,812233,,OWENS-ILLINOIS GROUP INC,name_search
+OKE,,,1039684,OKE,ONEOK INC /NEW/,sec_current
+OMC,,,29989,OMC,OMNICOM GROUP INC.,sec_current
+ON,,,1097864,ON,ON SEMICONDUCTOR CORP,sec_current
+ORCL,,,1341439,ORCL,ORACLE CORP,sec_current
+ORLY,,,898173,ORLY,O REILLY AUTOMOTIVE INC,sec_current
+OTIS,,,1781335,OTIS,Otis Worldwide Corp,sec_current
+OXY,,,797468,OXY,OCCIDENTAL PETROLEUM CORP /DE/,sec_current
+PANW,,,1327567,PANW,Palo Alto Networks Inc,sec_current
+PARA,2025-08-08,,813828,,"Banzai International, Inc.",override: Paramount Global (merged into Paramount Skydance 2025); the PARA ticker was reused
+PAYC,2026-03-23,Market capitalization changes.,1590955,PAYC,"Paycom Software, Inc.",sec_current
+PAYX,,,723531,PAYX,PAYCHEX INC,sec_current
+PBCT,2022-04-04,M&T Bank acquired People's United Financial.,1378946,,"People's United Financial, Inc.",name_search
+PBI,2017-03-01,CBOE acquired BATS.,78814,PBI,PITNEY BOWES INC /DE/,sec_current
+PCAR,,,75362,PCAR,PACCAR INC,sec_current
+PCG,,,1004980,PCG,PG&E Corp,sec_current
+PCL,2016-02-22,Weyerhaeuser acquired Plum Creek Timber.,849213,,PLUM CREEK TIMBER CO INC,name_search
+PCP,2016-02-01,nan,79958,,PRECISION CASTPARTS CORP,name_search
+PDCO,2018-03-19,Market capitalization changes.,891024,,"PATTERSON COMPANIES, INC.",name_search
+PEAK,2024-03-04,,765880,DOC,"HEALTHPEAK PROPERTIES, INC.",override: Healthpeak ticker changed to DOC 2024; same CIK
+PEG,,,788784,PEG,PUBLIC SERVICE ENTERPRISE GROUP INC,sec_current
+PENN,2022-09-19,Market capitalization changes.,921738,PENN,"PENN Entertainment, Inc.",sec_current
+PEP,,,77476,PEP,PEPSICO INC,sec_current
+PETM,2015-03-12,PetSmart was acquired by private equity consortium.,863157,,PETSMART INC,name_search
+PFE,,,78003,PFE,PFIZER INC,sec_current
+PFG,,,1126328,PFG,PRINCIPAL FINANCIAL GROUP INC,sec_current
+PG,,,80424,PG,PROCTER & GAMBLE Co,sec_current
+PGN,2012-07-02,Progress Energy was acquired by Duke Energy.,1094093,,PROGRESS ENERGY INC,name_search
+PGR,,,80661,PGR,PROGRESSIVE CORP/OH/,sec_current
+PH,,,76334,PH,Parker-Hannifin Corp,sec_current
+PHM,,,822416,PHM,PULTEGROUP INC/MI/,sec_current
+PKG,,,75677,PKG,PACKAGING CORP OF AMERICA,sec_current
+PKI,2023-05-16,,31791,RVTY,"REVVITY, INC.",rename:RVTY
+PLD,,,1045609,PLD,"Prologis, Inc.",sec_current
+PLL,2015-08-31,Pall was acquired.,75829,,Pall,name_search
+PLTR,,,1321655,PLTR,Palantir Technologies Inc.,sec_current
+PM,,,1413329,PM,Philip Morris International Inc.,sec_current
+PNC,,,713676,PNC,"PNC FINANCIAL SERVICES GROUP, INC.",sec_current
+PNR,,,77360,PNR,PENTAIR plc,sec_current
+PNW,,,764622,PNW,PINNACLE WEST CAPITAL CORP,sec_current
+PODD,,,1145197,PODD,INSULET CORP,sec_current
+POM,2016-03-24,,1135971,,POMDOCTOR Ltd,override: Pepco Holdings (acquired by Exelon 2016); the POM ticker was reused
+POOL,2026-06-22,Market capitalization changes.,945841,POOL,POOL CORP,sec_current
+PPG,,,79879,PPG,PPG INDUSTRIES INC,sec_current
+PPL,,,922224,PPL,PPL Corp,sec_current
+PRGO,2021-09-20,Market capitalization changes.,1585364,PRGO,PERRIGO Co plc,sec_current
+PRU,,,1137774,PRU,PRUDENTIAL FINANCIAL INC,sec_current
+PSA,,,1393311,PSA,Public Storage,sec_current
+PSX,,,1534701,PSX,Phillips 66,sec_current
+PTC,,,857005,PTC,PTC INC.,sec_current
+PTV,2010-11-17,Reynolds Group Holdings acquired Pactiv.,1089976,,Pactiv,name_search
+PVH,2022-09-19,Market capitalization changes.,78239,PVH,PVH CORP. /DE/,sec_current
+PWR,,,1050915,PWR,"QUANTA SERVICES, INC.",sec_current
+PX,2018-10-31,,,,,unresolved
+PXD,2024-05-08,ExxonMobil acquired Pioneer Natural Resources.,1038357,,PIONEER NATURAL RESOURCES CO,name_search
+PYPL,,,1633917,PYPL,"PayPal Holdings, Inc.",sec_current
+Q,,,2058873,Q,"Qnity Electronics, Inc.",sec_current
+QCOM,,,804328,QCOM,QUALCOMM INC/DE,sec_current
+QEP,2015-07-01,Baxter completed the corporate spin-off of Baxalta.,1108827,,"QEP RESOURCES, INC.",name_search
+QLGC,2011-01-18,,,,,unresolved
+QRVO,2024-12-23,Market capitalization changes.,1604778,,"Qorvo, Inc.",name_search
+R,2017-06-19,Market capitalization changes.,85961,R,RYDER SYSTEM INC,sec_current
+RAI,2017-07-25,British American Tobacco (NYSE MKT:BTI) acquired Reynolds American.,1275283,,REYNOLDS AMERICAN INC,name_search
+RCL,,,884887,RCL,ROYAL CARIBBEAN CRUISES LTD,sec_current
+RDC,2014-08-19,Market capitalization changes.,85408,,ROWAN COMPANIES PLC,name_search
+RE,2023-07-10,,1095073,EG,"EVEREST GROUP, LTD.",rename:EG
+REG,,,910606,REG,REGENCY CENTERS CORP,sec_current
+REGN,,,872589,REGN,"REGENERON PHARMACEUTICALS, INC.",sec_current
+RF,,,1281761,RF,REGIONS FINANCIAL CORP,sec_current
+RHI,2024-06-24,Market capitalization changes.,315213,RHI,ROBERT HALF INC.,sec_current
+RHT,2019-07-15,IBM acquired Red Hat.,1087423,,RED HAT INC,name_search
+RIG,2017-07-26,Market capitalization changes.,1451505,RIG,Transocean Ltd.,sec_current
+RJF,,,720005,RJF,RAYMOND JAMES FINANCIAL INC,sec_current
+RL,,,1037038,RL,RALPH LAUREN CORP,sec_current
+RMD,,,943819,RMD,RESMED INC,sec_current
+ROK,,,1024478,ROK,"ROCKWELL AUTOMATION, INC",sec_current
+ROL,,,84839,ROL,ROLLINS INC,sec_current
+ROP,,,882835,ROP,ROPER TECHNOLOGIES INC,sec_current
+ROST,,,745732,ROST,"ROSS STORES, INC.",sec_current
+RRC,2018-06-18,Market capitalization changes.,315852,RRC,RANGE RESOURCES CORP,sec_current
+RRD,2012-12-12,Market capitalization changes.,29669,,RR Donnelley &amp; Sons Co,name_search
+RSG,,,1060391,RSG,"REPUBLIC SERVICES, INC.",sec_current
+RSHCQ,2011-07-01,,,,,unresolved
+RTN,2020-04-06,United Technologies corporate spin-off of Otis and Carrier and acquired Raytheon Company.,82267,,Raytheon,name_search
+RTX,,,101829,RTX,RTX Corp,sec_current
+RVTY,,,31791,RVTY,"REVVITY, INC.",sec_current
+S,2013-07-09,Softbank consortium purchase resulted in public float below 50%.,101830,,SPRINT LLC,name_search
+SBAC,,,1034054,SBAC,SBA COMMUNICATIONS CORP,sec_current
+SBNY,2023-03-15,The FDIC placed Signature Bank into FDIC Receivership.,,,Signature Bank,unresolved
+SBUX,,,829224,SBUX,STARBUCKS CORP,sec_current
+SCG,2019-01-02,Dominion Energy acquired SCANA.,754737,,SCANA CORP,name_search
+SCHW,,,316709,SCHW,SCHWAB CHARLES CORP,sec_current
+SE,2017-02-27,SE was acquired by ENB,1051116,,Spectra Energy,name_search
+SEDG,2023-12-18,Market capitalization changes.,1419612,SEDG,"SOLAREDGE TECHNOLOGIES, INC.",sec_current
+SEE,2023-12-18,Market capitalization changes.,88204,,Sealed Air,name_search
+SHLD,2012-09-05,SHLD below public float threshold.,1310067,,SEARS HOLDINGS CORP,name_search
+SHW,,,89800,SHW,SHERWIN WILLIAMS CO,sec_current
+SIAL,2015-11-18,Sigma-Aldrich was acquired by Merck KGaA.,,,Sigma-Aldrich,unresolved
+SIG,2018-03-19,Market capitalization changes.,832988,SIG,SIGNET JEWELERS LTD,sec_current
+SII,2010-08-27,Smith was acquired by Schlumberger.,721083,,SMITH INTERNATIONAL INC,name_search
+SIVB,2023-03-15,"The FDIC placed SVB's main subsidiary, Silicon Valley Bank, into receivership.",719739,,SVB FINANCIAL GROUP,name_search
+SJM,,,91419,SJM,J M SMUCKER Co,sec_current
+SLB,,,87347,SLB,SLB LIMITED/NV,sec_current
+SLG,2021-03-22,Market capitalization changes.,1040971,SLG,SL GREEN REALTY CORP,sec_current
+SLM,2014-05-01,SLM completed the corporate spin-off of Navient.,1032033,SLM,SLM Corp,sec_current
+SMCI,,,1375365,SMCI,"Super Micro Computer, Inc.",sec_current
+SNA,,,91440,SNA,Snap-on Inc,sec_current
+SNDK,,,2023554,SNDK,Sandisk Corp,sec_current
+SNI,2018-03-07,Discovery Communications acquired Scripps Networks Interactive.,1430602,,"Scripps Networks Interactive, Inc.",name_search
+SNPS,,,883241,SNPS,SYNOPSYS INC,sec_current
+SO,,,92122,SO,SOUTHERN CO,sec_current
+SOLV,,,1964738,SOLV,Solventum Corp,sec_current
+SPG,,,1063761,SPG,SIMON PROPERTY GROUP INC.,sec_current
+SPGI,,,64040,SPGI,S&P Global Inc.,sec_current
+SPLS,2017-09-13,Sycamore Partners acquired Staples.,791519,,STAPLES INC,name_search
+SRCL,2018-12-03,Market capitalization changes.,861878,,STERICYCLE INC,name_search
+SRE,,,1032208,SRE,SEMPRA,sec_current
+STE,,,1757898,STE,STERIS plc,sec_current
+STI,2019-12-09,BB&T acquired SunTrust to form Truist Financial.,750556,,SUNTRUST BANKS INC,name_search
+STJ,2017-01-05,Abbott Laboratories acquired St. Jude Medical.,203077,,"ST JUDE MEDICAL, LLC",name_search
+STLD,,,1022671,STLD,STEEL DYNAMICS INC,sec_current
+STR,2010-07-01,"Company split. QEP retained, but ticker changed.",726603,,Questar,name_search
+STT,,,93751,STT,STATE STREET CORP,sec_current
+STX,,,1137789,STX,Seagate Technology Holdings plc,sec_current
+STZ,,,16918,STZ,"CONSTELLATION BRANDS, INC.",sec_current
+SUN,2012-10-05,Sunoco was acquired by Energy Transfer Partners (ETP),1552275,SUN,Sunoco LP,sec_current
+SUNEQ,2011-12-19,,,,,unresolved
+SVU,2012-05-01,,,,,unresolved
+SW,,,2005951,SW,Smurfit Westrock plc,sec_current
+SWK,,,93556,SWK,"STANLEY BLACK & DECKER, INC.",sec_current
+SWKS,,,4127,SWKS,"SKYWORKS SOLUTIONS, INC.",sec_current
+SWN,2017-04-04,"HPE completed the corporate spin-off of Everett, merged with CSC to form DXC Technology.",7332,,SOUTHWESTERN ENERGY CO,name_search
+SWY,2015-01-27,Safeway was acquired by a private equity consortium.,86144,,SAFEWAY INC,name_search
+SYF,,,1601712,SYF,Synchrony Financial,sec_current
+SYK,,,310764,SYK,STRYKER CORP,sec_current
+SYMC,2019-11-05,,849399,GEN,,override: Symantec renamed NortonLifeLock (NLOK) then Gen Digital (GEN); same CIK
+SYY,,,96021,SYY,SYSCO CORP,sec_current
+T,,,732717,T,AT&T INC.,sec_current
+TAP,,,24545,TAP,MOLSON COORS BEVERAGE CO,sec_current
+TDC,2017-06-19,Market capitalization changes.,816761,TDC,TERADATA CORP /DE/,sec_current
+TDG,,,1260221,TDG,TransDigm Group INC,sec_current
+TDY,,,1094285,TDY,TELEDYNE TECHNOLOGIES INC,sec_current
+TE,2016-07-01,TECO Energy was acquired by EMA.,1992243,TE,T1 Energy Inc.,sec_current
+TECH,,,842023,TECH,BIO-TECHNE Corp,sec_current
+TEG,2015-06-30,Integrys was acquired.,916863,,"INTEGRYS HOLDING, INC.",name_search
+TEL,,,1385157,TEL,TE Connectivity plc,sec_current
+TER,,,97210,TER,"TERADYNE, INC",sec_current
+TFC,,,92230,TFC,TRUIST FINANCIAL CORP,sec_current
+TFX,2025-03-24,Market capitalization changes.,96943,TFX,TELEFLEX INC,sec_current
+TGNA,2017-06-02,TGNA completed the corporate spin-off of Cars.com.,39899,,TEGNA INC,name_search
+TGT,,,27419,TGT,TARGET CORP,sec_current
+THC,2016-04-18,nan,70318,THC,TENET HEALTHCARE CORP,sec_current
+TIE,2012-12-24,TIE was acquired by Precision Cast Parts.,1011657,,TITANIUM METALS CORP,name_search
+TIF,2021-01-07,LVMH Moet Hennessy-Louis Vuitton SE acquired Tiffany & Co.,98246,,TIFFANY &amp; CO,name_search
+TJX,,,109198,TJX,TJX COMPANIES INC /DE/,sec_current
+TKO,,,1973266,TKO,"TKO Group Holdings, Inc.",sec_current
+TLAB,2011-12-21,Expedia completed the corporate spin-off of TripAdvisor.,317771,,TELLABS INC,name_search
+TMK,2019-08-08,,320335,GL,GLOBE LIFE INC.,override: Torchmark renamed Globe Life (GL) 2019; same CIK
+TMO,,,97745,TMO,THERMO FISHER SCIENTIFIC INC.,sec_current
+TMUS,,,1283699,TMUS,"T-Mobile US, Inc.",sec_current
+TPL,,,1811074,TPL,Texas Pacific Land Corp,sec_current
+TPR,,,1116132,TPR,"TAPESTRY, INC.",sec_current
+TRGP,,,1389170,TRGP,Targa Resources Corp.,sec_current
+TRIP,2019-12-23,Market capitalization changes.,1526520,TRIP,"TripAdvisor, Inc.",sec_current
+TRMB,,,864749,TRMB,TRIMBLE INC.,sec_current
+TROW,,,1113169,TROW,PRICE T ROWE GROUP INC,sec_current
+TRV,,,86312,TRV,"TRAVELERS COMPANIES, INC.",sec_current
+TSCO,,,916365,TSCO,TRACTOR SUPPLY CO /DE/,sec_current
+TSLA,,,1318605,TSLA,"Tesla, Inc.",sec_current
+TSN,,,100493,TSN,"TYSON FOODS, INC.",sec_current
+TSS,2019-09-23,Global Payments acquired TSS.,,,TSYS,unresolved
+TT,,,1466258,TT,Trane Technologies plc,sec_current
+TTWO,,,946581,TTWO,TAKE TWO INTERACTIVE SOFTWARE INC,sec_current
+TWC,2016-05-18,Time Warner Cable was acquired by Charter.,893657,,Time Warner Cable,name_search
+TWTR,2022-11-01,Elon Musk acquired Twitter.,1418091,,"TWITTER, INC.",name_search
+TWX,2018-06-15,AT&T acquired Time Warner.,893657,,Time Warner,name_search
+TXN,,,97476,TXN,TEXAS INSTRUMENTS INC,sec_current
+TXT,,,217346,TXT,TEXTRON INC,sec_current
+TYL,,,860731,TYL,TYLER TECHNOLOGIES INC,sec_current
+UA,2022-06-21,Market capitalization changes.,1336917,UA,"Under Armour, Inc.",sec_current
+UAA,2022-06-21,Market capitalization changes.,1336917,UAA,"Under Armour, Inc.",sec_current
+UAL,,,100517,UAL,"United Airlines Holdings, Inc.",sec_current
+UBER,,,1543151,UBER,"Uber Technologies, Inc",sec_current
+UDR,,,74208,UDR,"UDR, Inc.",sec_current
+UHS,,,352915,UHS,UNIVERSAL HEALTH SERVICES INC,sec_current
+ULTA,,,1403568,ULTA,"Ulta Beauty, Inc.",sec_current
+UNH,,,731766,UNH,UNITEDHEALTH GROUP INC,sec_current
+UNM,2021-09-20,Market capitalization changes.,5513,UNM,Unum Group,sec_current
+UNP,,,100885,UNP,UNION PACIFIC CORP,sec_current
+UPS,,,1090727,UPS,UNITED PARCEL SERVICE INC,sec_current
+URBN,2017-03-20,Market capitalization changes.,912615,URBN,URBAN OUTFITTERS INC,sec_current
+URI,,,1067701,URI,"UNITED RENTALS, INC.",sec_current
+USB,,,36104,USB,US BANCORP DE,sec_current
+UTX,2020-04-03,,101829,RTX,RTX Corp,override: United Technologies became Raytheon Technologies / RTX 2020; same CIK
+V,,,1403161,V,VISA INC.,sec_current
+VAR,2021-04-20,Siemens Healthineers acquired Varian Medical Systems.,203527,,VARIAN MEDICAL SYSTEMS INC,name_search
+VFC,2024-04-01,Market capitalization changes.,103379,VFC,V F CORP,sec_current
+VIAB,2019-12-05,CBS acquired Viacom to form ViacomCBS.,813828,,Viacom,name_search
+VIAC,2022-02-17,,,,,unresolved
+VIAV,2013-12-23,,912093,VIAV,VIAVI SOLUTIONS INC.,sec_current
+VICI,,,1705696,VICI,VICI PROPERTIES INC.,sec_current
+VLO,,,1035002,VLO,VALERO ENERGY CORP/TX,sec_current
+VLTO,,,1967680,VLTO,Veralto Corp,sec_current
+VMC,,,1396009,VMC,Vulcan Materials CO,sec_current
+VNO,2023-01-04,Market capitalization changes.,899689,VNO,VORNADO REALTY TRUST,sec_current
+VRSK,,,1442145,VRSK,"Verisk Analytics, Inc.",sec_current
+VRSN,,,1014473,VRSN,VERISIGN INC/CA,sec_current
+VRTX,,,875320,VRTX,VERTEX PHARMACEUTICALS INC / MA,sec_current
+VST,,,1692819,VST,Vistra Corp.,sec_current
+VTR,,,740260,VTR,"Ventas, Inc.",sec_current
+VTRS,,,1792044,VTRS,Viatris Inc,sec_current
+VZ,,,732712,VZ,VERIZON COMMUNICATIONS INC,sec_current
+WAB,,,943452,WAB,WESTINGHOUSE AIR BRAKE TECHNOLOGIES CORP,sec_current
+WAT,,,1000697,WAT,WATERS CORP /DE/,sec_current
+WBA,2025-08-28,Sycamore Partners acquired Walgreen Boots Alliance.,1618921,,"Walgreens Boots Alliance, Inc.",name_search
+WBD,,,1437107,WBD,,override: current member in the Aug 2026 list but missing from SEC's ticker file
+WCG,2020-01-28,Centene acquired Wellcare.,1279363,,WellCare,name_search
+WDAY,,,1327811,WDAY,"Workday, Inc.",sec_current
+WDC,,,106040,WDC,WESTERN DIGITAL CORP,sec_current
+WEC,,,783325,WEC,"WEC ENERGY GROUP, INC.",sec_current
+WELL,,,766704,WELL,WELLTOWER INC.,sec_current
+WFC,,,72971,WFC,WELLS FARGO & COMPANY/MN,sec_current
+WFM,2017-08-28,Amazon acquired Whole Foods Market.,865436,,WHOLE FOODS MARKET INC,name_search
+WHR,2024-03-18,Market capitalization changes.,106640,WHR,WHIRLPOOL CORP /DE/,sec_current
+WIN,2015-04-07,Market capitalization changes.,,,Windstream Communications,unresolved
+WLTW,2022-01-10,Willis Towers Watson changed its ticker symbol from WLTW to WTW.,1140536,WTW,WILLIS TOWERS WATSON PLC,cik_current:WTW
+WM,,,823768,WM,WASTE MANAGEMENT INC,sec_current
+WMB,,,107263,WMB,"WILLIAMS COMPANIES, INC.",sec_current
+WMT,,,104169,WMT,Walmart Inc.,sec_current
+WPX,2014-03-24,Market capitalization changes.,1518832,,"WPX ENERGY, INC.",name_search
+WRB,,,11544,WRB,BERKLEY W R CORP,sec_current
+WRK,2024-07-08,,,,,unresolved
+WSM,,,719955,WSM,WILLIAMS SONOMA INC,sec_current
+WST,,,105770,WST,WEST PHARMACEUTICAL SERVICES INC,sec_current
+WTW,,,1140536,WTW,WILLIS TOWERS WATSON PLC,sec_current
+WU,2021-12-20,Market capitalization changes.,1365135,WU,Western Union CO,sec_current
+WY,,,106535,WY,WEYERHAEUSER CO,sec_current
+WYND,2018-05-31,,,,,unresolved
+WYNN,,,1174922,WYNN,WYNN RESORTS LTD,sec_current
+X,2014-07-02,Market capitalization changes.,1163302,,UNITED STATES STEEL CORP,name_search
+XEC,2020-03-03,"Gardner Denver acquired Ingersoll Rand's industrial businesses then changed its name to the ""new"" Ingersoll Rand Inc.",1168054,,CIMAREX ENERGY CO,name_search
+XEL,,,72903,XEL,XCEL ENERGY INC,sec_current
+XL,2018-09-12,XL was acquired by Axa.,875159,,XL GROUP LTD,name_search
+XLNX,2022-02-15,Advanced Micro Devices acquired Xilinx.,743988,,XILINX INC,name_search
+XOM,,,2115436,XOM,ExxonMobil Holdings Corp,sec_current
+XRAY,2024-04-02,Market capitalization changes.,818479,XRAY,DENTSPLY SIRONA Inc.,sec_current
+XRX,2021-03-22,Market capitalization changes.,1770450,XRX,Xerox Holdings Corp,sec_current
+XYL,,,1524472,XYL,Xylem Inc.,sec_current
+YUM,,,1041061,YUM,YUM BRANDS INC,sec_current
+ZBH,,,1136869,ZBH,"ZIMMER BIOMET HOLDINGS, INC.",sec_current
+ZBRA,,,877212,ZBRA,ZEBRA TECHNOLOGIES CORP,sec_current
+ZION,2024-03-18,Market capitalization changes.,109380,ZION,"ZIONS BANCORPORATION, NATIONAL ASSOCIATION /UT/",sec_current
+ZTS,,,1555280,ZTS,Zoetis Inc.,sec_current

@@ -1,0 +1,6 @@
+shape,steady_climb,bumpy_climb,faded,round_trip,decline
+steady_climb,0.0854,0.4111,0.3728,0.0610,0.0697
+bumpy_climb,0.0737,0.3485,0.3727,0.1099,0.0952
+faded,0.0584,0.4057,0.3289,0.1152,0.0918
+round_trip,0.0155,0.2093,0.5116,0.1318,0.1318
+decline,0.0721,0.2613,0.3874,0.1441,0.1351

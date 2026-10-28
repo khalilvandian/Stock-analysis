@@ -1,0 +1,9 @@
+,score,auc_good,ic_excess_cagr,ic_martin,good_top_fifth,good_all,excess_top_fifth,excess_bottom_fifth,excess_all,max_dd_top_fifth,max_dd_all
+all cohorts 2010-2021,Low volatility only,0.6154,0.0605,0.2177,0.3355,0.2716,-0.0336,-0.0494,-0.0331,0.3291,0.4340
+all cohorts 2010-2021,Profitability + low drawdown,0.6221,0.1169,0.2121,0.3775,0.2716,-0.0133,-0.0468,-0.0331,0.3639,0.4340
+all cohorts 2010-2021,Profitability only,0.5649,0.0741,0.0934,0.3061,0.2716,-0.0238,-0.0476,-0.0331,0.4230,0.4340
+all cohorts 2010-2021,Quality + calm,0.6285,0.1403,0.2141,0.3760,0.2716,-0.0136,-0.0559,-0.0331,0.3720,0.4340
+test cohorts 2016-2021,Low volatility only,0.5504,-0.0285,0.0837,0.2293,0.2201,-0.0631,-0.0476,-0.0485,0.4017,0.4886
+test cohorts 2016-2021,Profitability + low drawdown,0.6060,0.0999,0.1727,0.3120,0.2201,-0.0322,-0.0616,-0.0485,0.4264,0.4886
+test cohorts 2016-2021,Profitability only,0.5815,0.1088,0.1246,0.2846,0.2201,-0.0236,-0.0628,-0.0485,0.4637,0.4886
+test cohorts 2016-2021,Quality + calm,0.6081,0.1132,0.1716,0.2945,0.2201,-0.0341,-0.0686,-0.0485,0.4321,0.4886

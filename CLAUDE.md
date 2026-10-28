@@ -60,6 +60,16 @@ there and regenerate `docs/METRICS.md` with `uv run python -m stock_analysis.met
 (`tests/test_metrics.py` fails if the doc is stale). `stock_analysis.metrics.build_vectors`
 builds a per-stock vector from any chosen set (report 14).
 
+## Predictive analysis
+
+`analysis/predict.py` (package `stock_analysis.predict`, method in `docs/PREDICT.md`,
+results in report 15) builds a point-in-time S&P 500 panel (SEC facts used only as filed
+before each June 30, Yahoo total returns, historical index members) and tests what predicts
+long-term, predictable growth: the proposed label is the K-ratio over the next 5 years
+(trend growth per unit of wobble, ranked within the year; `growth.py`), with the yes/no
+`good` (beat the S&P 500 without a much deeper fall) kept as a reference. Keep it free of look-ahead: never use a fact filed after the
+decision date, and train only on years whose outcome was known by the test year.
+
 ## Watch list and the evening run
 
 The watch list is `config/watchlist.toml` (symbol, sector peers, target P/E, one-off EPS

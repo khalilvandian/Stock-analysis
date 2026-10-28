@@ -1,0 +1,22 @@
+|--- max_dd_3y <= 0.58
+|   |--- rnd_to_revenue <= 0.32
+|   |   |--- roe <= 0.38
+|   |   |   |--- weights: [212.00, 30.00] class: 0.0
+|   |   |--- roe >  0.38
+|   |   |   |--- weights: [337.00, 130.00] class: 0.0
+|   |--- rnd_to_revenue >  0.32
+|   |   |--- eps_big_drops <= 0.77
+|   |   |   |--- weights: [949.00, 634.00] class: 0.0
+|   |   |--- eps_big_drops >  0.77
+|   |   |   |--- weights: [215.00, 58.00] class: 0.0
+|--- max_dd_3y >  0.58
+|   |--- vol_1y <= 0.83
+|   |   |--- fcf_yield <= 0.23
+|   |   |   |--- weights: [200.00, 20.00] class: 0.0
+|   |   |--- fcf_yield >  0.23
+|   |   |   |--- weights: [751.00, 229.00] class: 0.0
+|   |--- vol_1y >  0.83
+|   |   |--- capex_to_revenue <= 0.74
+|   |   |   |--- weights: [396.00, 64.00] class: 0.0
+|   |   |--- capex_to_revenue >  0.74
+|   |   |   |--- weights: [225.00, 7.00] class: 0.0

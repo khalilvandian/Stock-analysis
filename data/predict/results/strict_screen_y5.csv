@@ -1,0 +1,3 @@
+,rows,good_rate,beat_index_rate,avg_excess_cagr,avg_max_dd
+fails strict screen,2232,0.2339,0.3374,-0.0440,0.4396
+passes strict screen,2225,0.2921,0.4153,-0.0284,0.4471

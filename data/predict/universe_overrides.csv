@@ -1,0 +1,20 @@
+ticker,cik,yahoo,note
+FB,1326801,META,renamed Meta Platforms (META) 2022; same CIK
+ABC,1140859,COR,AmerisourceBergen renamed Cencora (COR) 2023; same CIK
+JEC,52988,J,Jacobs Engineering ticker changed to J 2019; same CIK
+HRS,202058,LHX,Harris merged with L3 and became L3Harris (LHX) 2019; same CIK
+UTX,101829,RTX,United Technologies became Raytheon Technologies / RTX 2020; same CIK
+SYMC,849399,GEN,Symantec renamed NortonLifeLock (NLOK) then Gen Digital (GEN); same CIK
+NLOK,849399,GEN,NortonLifeLock renamed Gen Digital (GEN) 2022; same CIK
+TMK,320335,GL,Torchmark renamed Globe Life (GL) 2019; same CIK
+CTL,18926,LUMN,CenturyLink renamed Lumen Technologies (LUMN) 2020; same CIK
+KORS,1530721,CPRI,Michael Kors Holdings renamed Capri Holdings (CPRI) 2018; same CIK
+HCP,765880,DOC,HCP renamed Healthpeak (PEAK) then ticker DOC 2024; same CIK
+PEAK,765880,DOC,Healthpeak ticker changed to DOC 2024; same CIK
+WBD,1437107,WBD,current member in the Aug 2026 list but missing from SEC's ticker file
+LSI,,,LSI Corp (acquired by Avago 2014): EDGAR name search matched an unrelated company
+BBT,92230,TFC,BB&T became Truist Financial (TFC) 2019; the BBT ticker now belongs to another bank
+LB,701985,BBWI,L Brands renamed Bath & Body Works (BBWI) 2021; the LB ticker was reused
+EP,1066107,,El Paso Corp (acquired by Kinder Morgan 2012); the EP ticker was reused
+POM,1135971,,Pepco Holdings (acquired by Exelon 2016); the POM ticker was reused
+PARA,813828,,Paramount Global (merged into Paramount Skydance 2025); the PARA ticker was reused
