@@ -65,8 +65,9 @@ builds a per-stock vector from any chosen set (report 14).
 `analysis/predict.py` (package `stock_analysis.predict`, method in `docs/PREDICT.md`,
 results in report 15) builds a point-in-time S&P 500 panel (SEC facts used only as filed
 before each June 30, Yahoo total returns, historical index members) and tests what predicts
-the label `good`: beat the S&P 500 over 5 years without a worst fall more than 15 points
-deeper than the index's. Keep it free of look-ahead: never use a fact filed after the
+long-term, predictable growth: the proposed label is the K-ratio over the next 5 years
+(trend growth per unit of wobble, ranked within the year; `growth.py`), with the yes/no
+`good` (beat the S&P 500 without a much deeper fall) kept as a reference. Keep it free of look-ahead: never use a fact filed after the
 decision date, and train only on years whose outcome was known by the test year.
 
 ## Watch list and the evening run

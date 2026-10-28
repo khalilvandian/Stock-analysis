@@ -69,8 +69,22 @@ decision date and compare with the S&P 500 over the same days (`labels.py`).
 Each continuous label also has a within-year percentile (`*_pct`, 0–1), which removes the
 market regime (2010 cohort: S&P 500 +17%/yr; 2015 cohort: +11%/yr).
 
-The recommendation (report 15): **`good` is the primary label**; the within-year percentile
-of the Martin ratio is the continuous companion for ranking.
+### Growth labels (`growth.py`, added 2026-10-28)
+
+Babak's goal is long-term, predictable growth, so a second set of continuous labels
+describes how steadily the investment and the business compounded. Price labels fit a
+straight line to log total-return value over the 5 years: `trend_growth` (exp(slope) − 1),
+`trend_r2` (fit), `k_ratio` (slope t-statistic on month-end values / √months: growth per unit
+of wobble), `steady_growth` (growth × R²), `excess_trend` (minus the S&P 500's),
+`win_12m`, `worst_12m`, `underwater` (share of days >10% below the peak). Business labels
+use the next 5 fiscal years from today's filings: `eps_cagr_fwd`, `revenue_cagr_fwd`,
+`eps_r2_fwd`, `eps_down_years` (FY0 = last fiscal year ending ≥60 days before the date).
+They are outcomes, so using later filings is correct; they are never features.
+`dataset.add_growth_labels` adds them as `y5_<label>` and `y5_<label>_pct`.
+
+The recommendation (report 15, 2026-10-28): **the within-year percentile of `k_ratio` is
+the primary label**, read with trend growth, R² and worst 12 months. `good` (yes/no) and
+the Martin ratio remain as references.
 
 ## 4. Features (the inputs)
 

@@ -1,4 +1,4 @@
-# Predictive analysis: what makes an S&P 500 stock a good 5-year investment?
+# Predictive analysis: which S&P 500 stocks grow steadily over 5 years?
 
 *Prices through 2026-10-27; SEC filings as filed through 2026-10-27, used only as of each
 decision date; S&P 500 membership through 2026-08-18. Written 2026-10-28. Issue #10.
@@ -6,34 +6,35 @@ Method: [docs/PREDICT.md](../docs/PREDICT.md).*
 
 ## 1. Summary
 
-**The output to predict should be a yes/no label: "buying at year *t* was good" means that
-over the next 5 years the stock beat the S&P 500 (dividends included) and its worst fall
-was no more than 15 points deeper than the index's own worst fall. A continuous companion
-score, the stock's percentile of the Martin ratio (return per unit of drawdown pain) among
-that year's S&P 500, ranks how good.**
+**Update 2026-10-28.** Babak does not want a good/bad answer: the goal is long-term,
+*predictable* growth. So the output is now a continuous score of how steadily the stock
+compounded over the next 5 years, tested against 11 other growth scores (section 2.6).
 
-What the data says about predicting it, honestly:
+**Recommended label: the K-ratio, ranked within the year.** Fit a straight line through the
+log of the total-return value over the 5 years; the K-ratio is the slope of that line
+divided by how far the value wandered from it. It is high only when growth is both fast
+and steady. Read it with three plain numbers: trend growth (%/yr), steadiness (R², 1 = a
+perfectly straight climb) and the worst 12-month return the holder sat through.
 
-- **Raw and relative returns are not predictable** from fundamentals and price history at a
-  5-year horizon (out-of-sample rank correlation ≈ 0.02, no better than chance), and 1-year
-  returns were slightly *anti*-predictable (patterns from earlier years reversed).
-- **"Good" is modestly predictable**, because the crash part of it is: a stock's own past
-  falls and volatility, profitability and share dilution carry over. Best out-of-sample
-  model: AUC 0.57 (gradient boosting; 0.5 = coin flip), above 0.5 in all 6 test years.
-- **A simple fixed score beat every machine-learning model**: "Quality + calm" (high return
-  on assets, small past drawdown, no share dilution, few big EPS drops), an equal average
-  of four percentiles with nothing fitted. AUC 0.63 over 2010–2021 (0.61 in the 2016–2021
-  test years). Its top fifth was "good" 38% of the time against 27% for everyone, fell 37%
-  at worst instead of 43%, and beat the bottom fifth by 4 points a year.
-- **It failed in the 2020 and 2021 cohorts** (AUC 0.50 and 0.52), when speculative, volatile
-  stocks led. The signal is real but weak and regime-dependent: useful as a filter, not as
-  a forecast for one stock.
-- **Babak's strict debt screen helps:** stocks that passed it were "good" 29% of the time
-  against 23% for those that failed, and beat the index 42% vs 34% of the time.
+- **It is predictable, every year.** Out-of-sample rank correlation 0.16 (all 7 models
+  0.15–0.17, positive in all 6 test years), against 0.02 for raw return. The win rate of
+  12-month periods (0.17) and steadiness R² (0.14) behave the same way.
+- **The fixed "Quality + calm" score** (high return on assets, small past fall, no
+  dilution, few big EPS drops; nothing fitted) ranks it with correlation 0.23, positive in
+  all 12 years 2010–2021. From its lowest to its highest fifth: trend growth 8.7% → 12.0%
+  a year, steadiness 0.46 → 0.72, worst 12 months −34% → −21%, time spent >10% below the
+  peak 57% → 38%.
+- **The speed of growth alone is not predictable** (0.00): what can be forecast is the
+  steadiness, and steady stocks grew at least as fast.
+- **Business growth is very predictable (revenue 0.43, EPS 0.46) but already in the
+  price:** the best predictors are a high P/E and EV/EBITDA. The market prices next
+  5 years' growth well, so it is a check, not an edge.
+- **Weak spot:** the 2020 and 2021 cohorts (correlation 0.01–0.08), when speculative
+  stocks led.
 
-Recommendation: adopt `good` as the label for issue #10, use "Quality + calm" as the
-interpretable baseline any future model must beat, and treat any model at AUC ≈ 0.6 as a
-tilt of the odds, not a stock picker.
+Earlier recommendation, kept for reference: the yes/no label `good` (beat the S&P 500
+without a fall more than 15 points deeper than the index's). It ranks stocks much like the
+K-ratio but throws away how much better or worse a stock did.
 
 ## 2. The numbers
 
@@ -185,6 +186,57 @@ year over the bottom fifth.
 (The strict screen: cash ≥ short-term debt, cash ≥ 5% of long-term debt, net debt/EBITDA ≤
 4.5, EBITDA/interest ≥ 4, profitable.)
 
+### 2.6 Growth labels (2026-10-28)
+
+12 continuous candidates, 4,457 stock-years (business labels fewer: they need 6 annual
+reports). "Model" = out-of-sample rank correlation, 2016–2021 test years; "Quality + calm" =
+rank correlation of the fixed score in all 12 years; "Persistence" = correlation of the
+label with itself 5 years later; "Volatile winners" = average percentile given to top-fifth
+returners that fell >15 points deeper than the index (lower = penalises them more).
+
+| Label | What it measures | Model (GB) | Years > 0 | Quality + calm | Persistence | Volatile winners |
+|---|---|---|---|---|---|---|
+| `trend_growth` | growth rate of the fitted line, %/yr | 0.00 | 3/6 | 0.13 | 0.13 | 0.84 |
+| `excess_trend` | trend growth minus the S&P 500's | 0.00 | 3/6 | 0.13 | 0.13 | 0.84 |
+| `trend_r2` | steadiness (R² of the line) | 0.14 | 6/6 | 0.21 | 0.19 | 0.63 |
+| **`k_ratio`** | **trend growth per unit of wobble** | **0.16** | **6/6** | **0.23** | **0.22** | **0.66** |
+| `steady_growth` | trend growth × R² | 0.04 | 5/6 | 0.17 | 0.16 | 0.79 |
+| `win_12m` | share of 12-month periods with a gain | 0.17 | 6/6 | 0.23 | 0.23 | 0.65 |
+| `worst_12m` | worst 12-month return | 0.40 | 6/6 | 0.28 | 0.36 | 0.44 |
+| `underwater` | share of days >10% below the peak (lower better) | 0.39 | 6/6 | −0.28 | 0.40 | 0.52 |
+| `eps_cagr_fwd` | EPS growth, next 5 fiscal years | 0.46 | 6/6 | −0.13 | −0.15 | 0.72 |
+| `revenue_cagr_fwd` | revenue growth, next 5 fiscal years | 0.43 | 6/6 | 0.09 | 0.20 | 0.68 |
+| `eps_r2_fwd` | steadiness of EPS growth | 0.19 | 6/6 | 0.08 | 0.19 | 0.64 |
+| `eps_down_years` | years EPS fell, of 5 (lower better) | 0.30 | 6/6 | −0.11 | 0.15 | 0.60 |
+| `cagr` (reference) | raw return | 0.02 | 4/6 | 0.14 | 0.11 | 0.90 |
+| `martin` (reference) | return per unit of drawdown pain | 0.10 | 5/6 | 0.21 | 0.17 | 0.76 |
+
+`worst_12m` and `underwater` are the most predictable but measure risk only (a stock that
+went nowhere calmly scores well); the K-ratio is the most predictable label that needs
+growth too (rank correlation with raw return 0.83).
+
+**Medians by Quality + calm fifth (all 12 years):**
+
+| Fifth | Trend growth | Steadiness R² | K-ratio | Worst 12 months | Years up (12m) | Time >10% below peak | Return/yr | Revenue growth |
+|---|---|---|---|---|---|---|---|---|
+| 1 (lowest) | 8.7% | 0.46 | 0.78 | −33.5% | 63% | 57% | 8.1% | 3.3% |
+| 2 | 9.7% | 0.58 | 0.98 | −28.2% | 65% | 49% | 9.2% | 4.2% |
+| 3 | 11.1% | 0.61 | 1.17 | −26.2% | 69% | 47% | 10.5% | 4.2% |
+| 4 | 12.1% | 0.67 | 1.39 | −22.6% | 73% | 42% | 11.8% | 4.7% |
+| 5 (highest) | 12.0% | 0.72 | 1.59 | −21.0% | 76% | 38% | 12.1% | 5.8% |
+
+Fixed-score correlation with the K-ratio by cohort: 2010 0.30, 2011 0.26, 2012 0.25,
+2013 0.21, 2014 0.22, 2015 0.25, 2016 0.36, 2017 0.35, 2018 0.32, 2019 0.19, 2020 0.05,
+2021 0.01. Gradient boosting by test year: 0.30, 0.29, 0.19, 0.05, 0.06, 0.08 (2016–2021).
+
+What predicts the K-ratio (within-year rank correlation): low 1-year volatility (−0.29),
+small 3-year drawdown (−0.28), price near its 52-week high (+0.18), low beta (−0.18),
+size (+0.15, all 12 years), few big EPS drops (−0.15), operating margin (+0.12, all 12 years).
+
+What predicts revenue growth: EV/EBITDA (+0.36), P/E (+0.34), price-to-sales (+0.30): the
+fast growers were already expensive. Lynch's PEG idea follows: the edge would be growth
+beyond what the P/E implied, a label worth testing next.
+
 ## 3. Analysis
 
 ### 3.1 Why this label
@@ -275,7 +327,8 @@ not change much between 10 and 20 points.
 
 ### 3.4 Next steps
 
-1. Babak to confirm the label (`good`, margin 15 points) and the companion score.
+1. Babak to confirm the K-ratio as the label (read with trend growth, R² and worst
+   12 months); test "growth beyond what the P/E priced" (a PEG-style label) next.
 2. Add trailing-12-month figures from 10-Qs and Yahoo adjusted EPS history, then rerun.
 3. Extend the universe to the Russell 1000 or US + Europe > $1bn (more rows, more variety);
    quarterly decision dates would add rows but not independent periods.
@@ -291,7 +344,7 @@ uv run python analysis/predict.py models   # experiments only, ~3 minutes
 ```
 
 Every table above is in `data/predict/results/` (`label_*.csv`, `ic_*.csv`, `quintiles_*.csv`,
-`wf_summary_*.csv`, `fixed_scores_y5*.csv`, `strict_screen_y5.csv`, `leavers_y5.csv`,
+`wf_summary_*.csv`, `growth_labels.csv`, `growth_by_quality_calm.csv`, `fixed_scores_y5*.csv`, `strict_screen_y5.csv`, `leavers_y5.csv`,
 `coverage.csv`); the panel is `data/predict/panel.csv.gz`.
 
 *Nothing in this report is investment advice.*

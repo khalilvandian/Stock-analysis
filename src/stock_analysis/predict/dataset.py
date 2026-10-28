@@ -140,3 +140,45 @@ def add_cross_sectional(panel: pd.DataFrame) -> pd.DataFrame:
     )
     out["ey_vs_own_median"] = out["earnings_yield"] - hist
     return out.sort_values(["date", "ticker"]).reset_index(drop=True)
+
+
+def _growth_rows(job, ctx) -> list[dict]:
+    from stock_analysis.predict import growth
+
+    rows = job
+    spy, years, today = ctx
+    out = []
+    facts_cache: dict = {}
+    for r in rows:
+        p = _load_prices(r["yahoo"])
+        lab = growth.price_growth(p, spy, r["date"], years)
+        if r["cik"] not in facts_cache:
+            facts_cache[r["cik"]] = _load_facts(r["cik"])
+        fa = facts_cache[r["cik"]]
+        if fa is not None:
+            lab.update(growth.business_growth(fa, p.splits, r["date"], years, today))
+        out.append(
+            {"date": r["date"], "ticker": r["ticker"], **{f"y5_{k}": v for k, v in lab.items()}}
+        )
+    return out
+
+
+def add_growth_labels(panel: pd.DataFrame, cfg: dict | None = None, workers: int = 4):
+    """Add the growth labels (stock_analysis.predict.growth) for rows with a 5-year outcome."""
+    from stock_analysis.predict import growth
+
+    cfg = cfg or load_config()
+    spy = _load_prices(cfg["labels"]["benchmark"])
+    years = cfg["labels"]["horizon_years"]
+    todo = panel[panel.has_prices & panel.y5_cagr.notna()][["date", "ticker", "yahoo", "cik"]]
+    jobs = [g.to_dict("records") for _, g in todo.groupby("date")]
+    today = pd.Timestamp.today().normalize()
+    with ProcessPoolExecutor(workers) as ex:
+        parts = list(ex.map(_growth_rows, jobs, [(spy, years, today)] * len(jobs)))
+    lab = pd.DataFrame([r for part in parts for r in part])
+    out = panel.drop(columns=[f"y5_{k}" for k in growth.ALL], errors="ignore")
+    out = out.merge(lab, on=["date", "ticker"], how="left")
+    for k in growth.ALL:
+        col = f"y5_{k}"
+        out[f"{col}_pct"] = out[col].where(out.usable).groupby(out.cohort).rank(pct=True)
+    return out

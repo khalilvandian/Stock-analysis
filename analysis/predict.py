@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from stock_analysis.predict import DATA, ROOT, load_config, models, study
-from stock_analysis.predict.dataset import build
+from stock_analysis.predict.dataset import add_growth_labels, build
 from stock_analysis.predict.download import download_all, resolve_universe
 
 PANEL = DATA / "panel.csv.gz"
@@ -65,6 +65,15 @@ def run_study(panel: pd.DataFrame) -> None:
             }
         )
     _save(pd.DataFrame(rows), "label_margin_sensitivity", index=False)
+
+    # growth labels (Babak, 2026-10-28: the goal is long-term predictable growth)
+    fixed = models.fixed_score(u, models.FIXED_SCORES["Quality + calm"])
+    _save(study.growth_label_study(u, fixed), "growth_labels", index=False)
+    q = fixed.groupby(u.cohort).transform(
+        lambda s: pd.qcut(s.rank(method="first"), 5, labels=False) + 1
+    )
+    cols = [f"y5_{c}" for c in study.GROWTH_LABELS]
+    _save(u.groupby(q)[cols].median().rename_axis("quality_calm_fifth"), "growth_by_quality_calm")
 
 
 def run_models(panel: pd.DataFrame, cfg: dict) -> None:
@@ -110,6 +119,7 @@ def run_models(panel: pd.DataFrame, cfg: dict) -> None:
         ("y5_excess_cagr", u5, 5, "regression"),
         ("y1_good", u1, 1, "classification"),
         ("y1_excess_cagr", u1, 1, "regression"),
+        ("y5_k_ratio", u5, 5, "regression"),
     ]
     for lab, df, h, kind in jobs:
         with warnings.catch_warnings():
@@ -305,7 +315,7 @@ def main() -> None:
     if args.step in ("download", "all"):
         download_all(pd.read_csv(ROOT / cfg["universe"]["resolved"]), cfg)
     if args.step in ("build", "all"):
-        panel = build(cfg)
+        panel = add_growth_labels(build(cfg), cfg)
         panel.to_csv(PANEL, index=False, float_format="%.6g")
         print(f"panel: {len(panel)} rows, {int(panel.usable.sum())} usable -> {PANEL}")
     if args.step in ("study", "all"):

@@ -172,3 +172,32 @@ def test_resolve_detects_rename_and_keeps_current():
     assert out.loc["AAPL", "method"] == "sec_current"
     assert out.loc["FB", "method"] == "rename:META"
     assert out.loc["FB", "yahoo"] == "META"
+
+
+def test_log_trend_straight_line_and_k_ratio_prefers_steady_path():
+    from stock_analysis.predict import growth
+
+    days = pd.date_range("2015-01-01", periods=60, freq="ME")
+    line = pd.Series(np.exp(0.1 * np.arange(60) / 12), index=days)
+    slope, r2, _ = growth.log_trend(line)
+    assert slope == pytest.approx(0.1, rel=0.02)
+    assert r2 == pytest.approx(1.0, abs=1e-4)
+    wobble = line * np.exp(0.3 * np.sin(np.arange(60) / 3))
+    assert (
+        growth.log_trend(wobble)[2] < growth.log_trend(line * (1 + 1e-3 * np.cos(np.arange(60))))[2]
+    )
+
+
+def test_price_growth_labels_on_a_steady_climb():
+    from stock_analysis.predict import growth
+
+    days = pd.bdate_range("2014-01-01", "2020-12-31")
+    yrs = (days - days[0]).days / 365.25
+    stock = Prices(_chart(days, 10 * np.exp(0.12 * yrs)))
+    spy = Prices(_chart(days, 100 * np.exp(0.08 * yrs)))
+    out = growth.price_growth(stock, spy, "2015-06-30", 5)
+    assert out["trend_growth"] == pytest.approx(np.exp(0.12) - 1, rel=0.01)
+    assert out["excess_trend"] == pytest.approx(np.exp(0.12) - np.exp(0.08), rel=0.02)
+    assert out["trend_r2"] == pytest.approx(1.0, abs=1e-4)
+    assert out["win_12m"] == 1.0 and out["underwater"] == 0.0
+    assert out["worst_12m"] > 0.1

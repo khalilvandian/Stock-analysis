@@ -133,3 +133,68 @@ def learnability(df: pd.DataFrame, key: str = "y5", horizon: int = 5) -> pd.Data
                 }
             )
     return pd.DataFrame(rows)
+
+
+GROWTH_LABELS = {
+    "trend_growth": "Trend growth of the investment (%/yr)",
+    "excess_trend": "Trend growth minus the S&P 500's",
+    "trend_r2": "Steadiness of the climb (R2 of the trend)",
+    "k_ratio": "K-ratio: trend growth per unit of wobble",
+    "steady_growth": "Trend growth x steadiness",
+    "win_12m": "Share of 12-month periods with a gain",
+    "worst_12m": "Worst 12-month return",
+    "underwater": "Share of days >10% below the peak (lower is better)",
+    "eps_cagr_fwd": "EPS growth, next 5 fiscal years",
+    "revenue_cagr_fwd": "Revenue growth, next 5 fiscal years",
+    "eps_r2_fwd": "Steadiness of EPS growth (R2)",
+    "eps_down_years": "Years EPS fell, of 5 (lower is better)",
+    "cagr": "Raw total return (for comparison)",
+    "martin": "Martin ratio (for comparison)",
+}
+
+
+def growth_label_study(df: pd.DataFrame, fixed: pd.Series) -> pd.DataFrame:
+    """For each growth label: out-of-sample learnability (Ridge, gradient boosting),
+    rank correlation with a fixed score in every year, persistence, how it ranks volatile
+    winners, and how closely it follows raw return."""
+    top = df.y5_cagr.groupby(df.cohort).rank(pct=True) > 0.8
+    vw = top & (df.y5_dd_vs_index > 0.15)
+    rows = []
+    for lab, desc in GROWTH_LABELS.items():
+        col = f"y5_{lab}"
+        d = df[df[col].notna()]
+        ms = models.regressors(7)
+        ms = {k: ms[k] for k in ("Ridge", "Gradient boosting")}
+        sc, _ = models.walk_forward(d, col, 5, "regression", models=ms)
+        ics = np.array(
+            [spearmanr(fixed[g.index], g[col]).statistic for _, g in d.groupby("cohort")]
+        )
+        a = d[["cohort", "cik", col]]
+        b = a.assign(cohort=a.cohort - 5).rename(columns={col: "later"})
+        m = a.merge(b, on=["cohort", "cik"])
+        pers = [spearmanr(g[col], g.later).statistic for _, g in m.groupby("cohort") if len(g) > 30]
+        pct = d[col].groupby(d.cohort).rank(pct=True)
+        if lab in ("underwater", "eps_down_years"):
+            pct = 1 - pct
+        rows.append(
+            {
+                "label": lab,
+                "description": desc,
+                "rows": len(d),
+                "ic_ridge": sc[sc.model == "Ridge"].ic.mean(),
+                "ic_gradient_boosting": sc[sc.model == "Gradient boosting"].ic.mean(),
+                "gb_positive_years": (sc[sc.model == "Gradient boosting"].ic > 0).mean(),
+                "ic_quality_calm_all_years": ics.mean(),
+                "quality_calm_positive_years": (ics > 0).mean(),
+                "persistence": float(np.mean(pers)) if pers else np.nan,
+                "volatile_winners_avg_percentile": float(
+                    pct[vw.reindex(d.index, fill_value=False)].mean()
+                ),
+                "corr_with_raw_return": float(
+                    np.mean(
+                        [spearmanr(g[col], g.y5_cagr).statistic for _, g in d.groupby("cohort")]
+                    )
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
