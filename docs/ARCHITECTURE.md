@@ -141,6 +141,7 @@ flowchart TD
 | `screen_common.py` | Paths, settings loader and US-dollar columns shared by Stage 1 and Stage 2. |
 | `stage1.py` | Screener Stage 1: universe, gap filling, Lynch category, rules per category or business type. Writes `data/screener/stage1.csv` and `.cache/screener/stage1_full.pkl`. |
 | `stage2.py` | Screener Stage 2: reads only Stage 1's output, sets each survivor's cheap price, ranks, adds technicals and the SEC cross-check. Writes `data/screener/top.csv`. |
+| `lynch_compare.py` | Report 16: classifies Stage 1's companies again with the proposed Lynch rules and shows who moves and which pass/fail results change. Reads `stage1_full.pkl`; changes nothing. |
 | `screener.py` | Runs Stage 1 then Stage 2 and writes the dated `data/screener/YYYY-MM-DD.csv`. `run()` is called by the evening run. |
 | `watchlist.py` | The evening run's driver: runs the screener and the market report, then one PDF per watch-list stock and a summary PDF; records `runs.csv`, rebuilds the dated lists, writes the email body. |
 | `market.py` | The whole-market PDF: indices, sectors, breadth, and the screener's top 3 per sector from `data/screener/top.csv`. |

@@ -76,6 +76,10 @@ Lynch's own ranges: fast growers 20-25% a year, stalwarts 10-12%, slow growers a
 economy's 2-4%. The 8% and 20% cut-offs fill the gaps between his ranges; they are judgement
 calls listed in the methods doc for review.
 
+[Report 16](../reports/16-lynch-categories.md) compares these tests with Lynch's own numbers
+and published quant versions (Validea, AAII) and proposes a revision, not adopted yet.
+`uv run python analysis/lynch_compare.py` shows how today's companies would move.
+
 ## Stage 1 rules
 
 A stock must pass **every** rule of its rule set. A rule with missing data makes the stock
