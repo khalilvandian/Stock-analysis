@@ -86,6 +86,15 @@ The recommendation (report 15, 2026-10-28): **the within-year percentile of `k_r
 the primary label**, read with trend growth, R² and worst 12 months. `good` (yes/no) and
 the Martin ratio remain as references.
 
+### Behaviour of 5-year holdings (`behaviour.py`)
+
+`analysis/predict.py behaviour` describes the outcomes themselves: the distribution of each
+measure, wealth bands, how concentrated the gains were, and a shape per path from its
+month-end values (steady climb: gained, R² ≥ 0.8, worst fall ≤ 30%; bumpy climb: gained,
+ended within 10% of its high; rose then faded: gained, ended lower than that; round trip:
+up ≥ 20% at some point, ended with a loss; decline: lost money, never up 20%), by start
+year, by sector and from one window to the next. Results in `data/predict/results/behaviour_*`.
+
 ## 4. Features (the inputs)
 
 Names follow `config/metrics.toml` (issue #8) where the metric exists there. Every

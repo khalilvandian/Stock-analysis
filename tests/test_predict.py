@@ -201,3 +201,23 @@ def test_price_growth_labels_on_a_steady_climb():
     assert out["trend_r2"] == pytest.approx(1.0, abs=1e-4)
     assert out["win_12m"] == 1.0 and out["underwater"] == 0.0
     assert out["worst_12m"] > 0.1
+
+
+def test_behaviour_shapes_and_paths():
+    from stock_analysis.predict import behaviour
+
+    up = np.linspace(1, 2, 61)
+    assert behaviour.shape(up, 0.95, 0.1) == "steady_climb"
+    assert behaviour.shape(up, 0.5, 0.4) == "bumpy_climb"
+    assert (
+        behaviour.shape(np.r_[np.linspace(1, 2, 40), np.linspace(2, 1.3, 21)], 0.5, 0.35) == "faded"
+    )
+    assert behaviour.shape(np.r_[np.linspace(1, 1.5, 30), np.linspace(1.5, 0.8, 31)], 0.1, 0.5) == (
+        "round_trip"
+    )
+    assert behaviour.shape(np.linspace(1, 0.6, 61), 0.9, 0.4) == "decline"
+
+    days = pd.bdate_range("2014-01-01", "2020-12-31")
+    p = Prices(_chart(days, np.linspace(10, 30, len(days))))
+    v = behaviour.path(p, "2015-06-30")
+    assert len(v) == 61 and v.iloc[0] == 1.0 and v.is_monotonic_increasing

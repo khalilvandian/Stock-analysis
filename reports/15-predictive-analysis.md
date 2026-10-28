@@ -32,6 +32,15 @@ perfectly straight climb) and the worst 12-month return the holder sat through.
 - **Weak spot:** the 2020 and 2021 cohorts (correlation 0.01–0.08), when speculative
   stocks led.
 
+**How 5-year holdings actually behave (section 2.7).** Of 4,457 five-year holdings, the
+median stock made 10.4% a year (the S&P 500 13%), 18% lost money, 38% beat the index, and
+the median stock fell 42% from a peak at some point (index 24%). Only 16% were a "steady
+climb" (straight path, never down 30%), and that share swings with the market: 40% for
+2010–2012 starts, 2–7% for 2015–2019 starts, whose windows all contained the 2020 crash.
+The best 10% of holdings made 40% of all the gains. Business growth was almost the same in
+steady, bumpy and faded climbs (revenue ~5%, EPS ~9–10% a year): what separated the shapes
+was mostly the market and the valuation, and only the losers had weak businesses.
+
 Earlier recommendation, kept for reference: the yes/no label `good` (beat the S&P 500
 without a fall more than 15 points deeper than the index's). It ranks stocks much like the
 K-ratio but throws away how much better or worse a stock did.
@@ -237,6 +246,114 @@ What predicts revenue growth: EV/EBITDA (+0.36), P/E (+0.34), price-to-sales (+0
 fast growers were already expensive. Lynch's PEG idea follows: the edge would be growth
 beyond what the P/E implied, a label worth testing next.
 
+### 2.7 How 5-year holdings behave (2026-10-28)
+
+Each of the 4,457 labelled member-years is one holding: $1 bought on June 30 and held
+5 years with dividends reinvested. The S&P 500 over the same windows is the reference.
+
+![Every 5-year path](figures/15/behaviour_fan.png)
+
+**Distribution** (`behaviour_distribution.csv`):
+
+| Measure | 5% | 10% | 25% | Median | 75% | 90% | 95% |
+|---|---|---|---|---|---|---|---|
+| Total return per year | −12.6% | −6.0% | 3.1% | 10.4% | 17.5% | 25.1% | 29.7% |
+| Value of $1 after 5 years | $0.51 | $0.74 | $1.16 | $1.64 | $2.24 | $3.06 | $3.67 |
+| Return minus the S&P 500, per year | −25.7% | −19.5% | −10.3% | −3.3% | 4.0% | 10.8% | 15.6% |
+| Worst fall from a peak | 19% | 23% | 31% | 42% | 55% | 71% | 80% |
+| Worst fall minus the S&P 500's (points) | −3 | 0 | 6 | 15 | 28 | 44 | 52 |
+| Volatility per year | 16% | 17% | 21% | 26% | 33% | 41% | 48% |
+| Steadiness of the climb (R²) | 0.01 | 0.05 | 0.27 | 0.61 | 0.83 | 0.92 | 0.94 |
+| K-ratio | −0.98 | −0.50 | 0.28 | 1.15 | 2.18 | 3.41 | 4.13 |
+| Worst 12-month return | −64% | −54% | −39% | −26% | −15% | −6% | −2% |
+| Share of days >10% below the peak | 10% | 15% | 28% | 46% | 66% | 82% | 90% |
+| Revenue growth per year (business) | −7.1% | −3.6% | 0.7% | 4.6% | 8.5% | 14.0% | 19.2% |
+| EPS growth per year (business) | −17.6% | −9.2% | 1.0% | 8.6% | 16.8% | 27.4% | 37.4% |
+
+Value of $1 after 5 years: lost half or more 5%, lost up to half 13%, $1–1.5 25%,
+$1.5–2 23%, $2–3 23%, $3–5 9%, over $5 2%. With $1 in every holding, the best 1% made
+10% of the total gain, the best 10% made 40%, and the bottom half 5%.
+
+![Distributions](figures/15/behaviour_distributions.png)
+
+The return distribution is roughly symmetric around 10% a year; the falls are not: the
+typical stock fell 15 points deeper than the index along the way, and one in four fell
+more than 55%. Steadiness is split in two: a large group climbed in a nearly straight line
+(R² > 0.8) and another had no trend at all (R² near 0).
+
+**Five shapes** (`behaviour_shapes.csv`). Each path is put in one plain shape:
+
+| Shape | Rule | Share | Return/yr | Beat S&P 500 | Worst fall | Worst 12 months | Revenue growth | EPS growth |
+|---|---|---|---|---|---|---|---|---|
+| Steady climb | gained, R² ≥ 0.8, never fell 30% | 16% | 18.2% | 77% | 22% | −6% | 4.8% | 9.8% |
+| Bumpy climb | gained, ended within 10% of its high | 33% | 14.5% | 51% | 39% | −22% | 4.9% | 9.1% |
+| Rose then faded | gained, ended >10% below its high | 34% | 8.0% | 25% | 45% | −30% | 5.4% | 9.6% |
+| Round trip | was up ≥20%, ended with a loss | 10% | −4.8% | 0% | 65% | −48% | 2.6% | 3.5% |
+| Decline | lost money, never up 20% | 8% | −10.5% | 0% | 70% | −52% | 0.9% | −3.9% |
+
+![Five shapes](figures/15/behaviour_shapes.png)
+
+**By start year** (`behaviour_by_cohort.csv`, `behaviour_shapes_by_cohort.csv`):
+
+| Start | Holdings | Median return/yr | S&P 500 | Lost money | Beat S&P 500 | Median worst fall | S&P 500 worst fall | Steady climbs |
+|---|---|---|---|---|---|---|---|---|
+| 2010 | 227 | 15.9% | 17.2% | 4% | 44% | 31% | 19% | 40% |
+| 2011 | 300 | 11.9% | 12.0% | 11% | 49% | 32% | 18% | 39% |
+| 2012 | 330 | 15.3% | 14.5% | 9% | 52% | 30% | 13% | 40% |
+| 2013 | 341 | 11.7% | 13.3% | 11% | 45% | 32% | 13% | 32% |
+| 2014 | 350 | 9.2% | 10.6% | 19% | 44% | 35% | 19% | 24% |
+| 2015 | 365 | 6.6% | 10.6% | 30% | 36% | 48% | 34% | 6% |
+| 2016 | 390 | 13.3% | 17.5% | 11% | 35% | 46% | 34% | 7% |
+| 2017 | 407 | 8.0% | 11.2% | 19% | 38% | 48% | 34% | 5% |
+| 2018 | 419 | 7.8% | 12.2% | 21% | 32% | 49% | 34% | 3% |
+| 2019 | 423 | 8.4% | 15.0% | 20% | 25% | 49% | 34% | 2% |
+| 2020 | 448 | 12.1% | 16.6% | 17% | 35% | 42% | 25% | 11% |
+| 2021 | 457 | 6.4% | 13.3% | 30% | 28% | 44% | 25% | 10% |
+
+![Shapes by start year](figures/15/behaviour_by_cohort.png)
+
+**By sector** (median, all years; `behaviour_by_sector.csv`):
+
+| Sector | Holdings | Return/yr | Beat S&P 500 | Worst fall | Steadiness R² | K-ratio | Steady climbs |
+|---|---|---|---|---|---|---|---|
+| Utilities | 301 | 9.2% | 26% | 31% | 0.71 | 1.56 | 28% |
+| Technology | 600 | 15.6% | 55% | 42% | 0.69 | 1.46 | 16% |
+| Consumer staples | 361 | 9.8% | 34% | 32% | 0.69 | 1.37 | 27% |
+| Industrials | 721 | 12.2% | 44% | 41% | 0.65 | 1.32 | 15% |
+| Health care | 444 | 10.7% | 41% | 39% | 0.69 | 1.31 | 21% |
+| Financials | 615 | 11.2% | 37% | 44% | 0.59 | 1.18 | 16% |
+| Consumer discretionary | 583 | 9.7% | 38% | 49% | 0.58 | 0.97 | 12% |
+| Communication | 72 | 4.9% | 21% | 38% | 0.51 | 0.85 | 14% |
+| Materials | 261 | 8.1% | 32% | 48% | 0.46 | 0.78 | 10% |
+| Real estate | 254 | 6.4% | 19% | 44% | 0.42 | 0.75 | 11% |
+| Energy | 191 | 4.2% | 23% | 66% | 0.37 | 0.24 | 4% |
+
+**Does a shape repeat?** For the same company, the shape of the next non-overlapping
+5 years (`behaviour_shape_persistence.csv`): after a steady climb, 9% climbed steadily again
+against 6% for all holdings starting 2015 or later; after a round trip, only 2% did. The
+shape carries over a little, but the market in the window matters more.
+
+What it means for long-term predictable growth:
+
+- **A steady climb is rare and mostly a gift of the period.** In the 2010–2012 starts 40%
+  of members climbed steadily; once the 2020 crash fell inside every window, almost none
+  did, because the index itself fell 34%. Judge steadiness against the index of the same
+  years (as the K-ratio percentile does), not in absolute terms.
+- **The business grew at about the same pace in the three winning shapes** (revenue ~5%,
+  EPS ~9–10% a year). Whether the price climbed steadily, bumped or faded depended on the
+  starting valuation and the market; only the two losing shapes had weak businesses
+  (EPS −4% to +4%). Avoiding the losers is about the business; getting the steady climb is
+  about the price paid and the period.
+- **The gains are concentrated:** the top 10% of holdings made 40% of the gains, so a few
+  big winners drive any average. A steady-growth approach gives up some of those in return
+  for far fewer of the 18% that lost money.
+- **Sectors differ in steadiness more than in return:** utilities and staples were the
+  steadiest but trailed the index; technology was both fast and fairly steady in this
+  decade; energy was the least steady by far.
+
+Caveat: holdings of companies later delisted (mostly acquired) are missing, so the
+losing shapes are probably undercounted and the winning ones slightly flattered.
+
 ## 3. Analysis
 
 ### 3.1 Why this label
@@ -341,10 +458,11 @@ not change much between 10 and 20 points.
 ```
 uv run python analysis/predict.py all      # ~25 minutes the first time
 uv run python analysis/predict.py models   # experiments only, ~3 minutes
+uv run python analysis/predict.py behaviour  # distributions and path shapes, ~1 minute
 ```
 
 Every table above is in `data/predict/results/` (`label_*.csv`, `ic_*.csv`, `quintiles_*.csv`,
-`wf_summary_*.csv`, `growth_labels.csv`, `growth_by_quality_calm.csv`, `fixed_scores_y5*.csv`, `strict_screen_y5.csv`, `leavers_y5.csv`,
+`wf_summary_*.csv`, `growth_labels.csv`, `growth_by_quality_calm.csv`, `behaviour_*.csv`, `fixed_scores_y5*.csv`, `strict_screen_y5.csv`, `leavers_y5.csv`,
 `coverage.csv`); the panel is `data/predict/panel.csv.gz`.
 
 *Nothing in this report is investment advice.*

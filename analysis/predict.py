@@ -7,6 +7,7 @@ Steps (each one caches its result, so later steps can be rerun alone):
   build     point-in-time panel of features and labels (data/predict/panel.csv.gz)
   study     compare the candidate labels (data/predict/results/label_*.csv)
   models    correlations and walk-forward models (data/predict/results/*.csv, figures)
+  behaviour how the 5-year holdings were distributed, and the shapes of their paths
   all       everything above
 
 Usage: uv run python analysis/predict.py all
@@ -20,8 +21,8 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from stock_analysis.predict import DATA, ROOT, load_config, models, study
-from stock_analysis.predict.dataset import add_growth_labels, build
+from stock_analysis.predict import DATA, ROOT, behaviour, load_config, models, study
+from stock_analysis.predict.dataset import _load_prices, add_growth_labels, build
 from stock_analysis.predict.download import download_all, resolve_universe
 
 PANEL = DATA / "panel.csv.gz"
@@ -30,6 +31,7 @@ FIGURES = ROOT / "reports/figures/15"
 
 # reference palette (dataviz skill): blue, orange, aqua; text and surface
 BLUE, ORANGE, AQUA, GREY = "#2a78d6", "#eb6834", "#1baf7a", "#a3a29c"
+YELLOW, MAGENTA = "#eda100", "#e87ba4"
 INK, INK2, SURFACE = "#0b0b0b", "#52514e", "#fcfcfb"
 
 
@@ -210,7 +212,7 @@ def run_models(panel: pd.DataFrame, cfg: dict) -> None:
     figures(panel)
 
 
-def figures(panel: pd.DataFrame) -> None:
+def _plt():
     import matplotlib
 
     matplotlib.use("Agg")
@@ -233,6 +235,11 @@ def figures(panel: pd.DataFrame) -> None:
             "grid.linewidth": 0.6,
         }
     )
+    return plt
+
+
+def figures(panel: pd.DataFrame) -> None:
+    plt = _plt()
 
     # learnability by label
     L = pd.read_csv(RESULTS / "label_learnability.csv")
@@ -304,9 +311,198 @@ def figures(panel: pd.DataFrame) -> None:
     plt.close(fig)
 
 
+def run_behaviour(panel: pd.DataFrame, cfg: dict) -> None:
+    """How the 5-year holdings behaved: distributions, path shapes, cohorts, sectors."""
+    u = panel[panel.usable & panel.y5_cagr.notna()].copy()
+    paths = behaviour.paths(u, _load_prices)
+    u = u.loc[paths.index]
+    u["shape"] = [
+        behaviour.shape(paths.loc[i].to_numpy(), u.at[i, "y5_trend_r2"], u.at[i, "y5_max_dd"])
+        for i in u.index
+    ]
+    spy = _load_prices(cfg["labels"]["benchmark"])
+    spy_paths = pd.DataFrame(
+        {
+            c: behaviour.path(spy, pd.Timestamp(d))
+            for c, d in u.groupby("cohort").date.first().items()
+        }
+    ).T
+    _save(behaviour.distribution(u), "behaviour_distribution", index=False)
+    _save(behaviour.wealth_bands(u), "behaviour_wealth_bands")
+    _save(
+        behaviour.concentration(u).rename("share_of_total_gain").to_frame(),
+        "behaviour_concentration",
+    )
+    _save(behaviour.by_cohort(u), "behaviour_by_cohort")
+    _save(behaviour.by_sector(u), "behaviour_by_sector")
+    _save(behaviour.shape_table(u), "behaviour_shapes")
+    _save(
+        pd.crosstab(u.cohort, u["shape"], normalize="index")[list(behaviour.SHAPES)],
+        "behaviour_shapes_by_cohort",
+    )
+    _save(behaviour.persistence_of_shape(u), "behaviour_shape_persistence")
+    u[["cohort", "ticker", "name", "sector", "shape"]].to_csv(
+        RESULTS / "behaviour_holdings.csv", index=False
+    )
+    behaviour_figures(u, paths, spy_paths)
+
+
+def behaviour_figures(u: pd.DataFrame, paths: pd.DataFrame, spy_paths: pd.DataFrame) -> None:
+    plt = _plt()
+    months = paths.columns.to_numpy()
+
+    # 1. fan chart of every 5-year path
+    fig, ax = plt.subplots(figsize=(8, 4.8))
+    q = paths.quantile([0.1, 0.25, 0.5, 0.75, 0.9]).T
+    ax.fill_between(months, q[0.1], q[0.9], color=BLUE, alpha=0.15, linewidth=0, label="middle 80%")
+    ax.fill_between(
+        months, q[0.25], q[0.75], color=BLUE, alpha=0.3, linewidth=0, label="middle 50%"
+    )
+    ax.plot(months, q[0.5], color=BLUE, linewidth=2, label="median stock")
+    ax.plot(
+        months, spy_paths.median(), color=ORANGE, linewidth=2, label="S&P 500 (median start year)"
+    )
+    ax.set_yscale("log")
+    ticks = [0.5, 0.75, 1, 1.5, 2, 3]
+    ax.set_yticks(ticks, [f"${t:g}" for t in ticks])
+    ax.minorticks_off()
+    ax.set_xticks(range(0, 61, 12), [f"year {k}" for k in range(6)])
+    ax.set_ylabel("Value of $1 (log scale)")
+    ax.legend(frameon=False, loc="upper left")
+    ax.set_title(
+        f"Every 5-year holding of an S&P 500 member, 2010-2021 starts ({len(paths):,})",
+        loc="left",
+        color=INK,
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(FIGURES / "behaviour_fan.png", dpi=150)
+    plt.close(fig)
+
+    # 2. distributions of the main measures, with the S&P 500 (median over start years)
+    spy = {
+        "y5_cagr": (u.y5_cagr - u.y5_excess_cagr).groupby(u.cohort).median().median(),
+        "y5_max_dd": (u.y5_max_dd - u.y5_dd_vs_index).groupby(u.cohort).median().median(),
+    }
+    panels = [
+        ("y5_cagr", "Total return per year", 100, (-0.4, 0.6)),
+        ("y5_max_dd", "Worst fall from a peak", 100, (0, 1)),
+        ("y5_worst_12m", "Worst 12-month return", 100, (-0.9, 0.3)),
+        ("y5_trend_r2", "Steadiness of the climb (R²)", 1, (0, 1)),
+        ("y5_k_ratio", "K-ratio (growth per unit of wobble)", 1, (-3, 7)),
+        ("y5_revenue_cagr_fwd", "Revenue growth per year", 100, (-0.2, 0.4)),
+    ]
+    fig, axes = plt.subplots(2, 3, figsize=(10, 5.6))
+    for ax, (col, title, scale, lim) in zip(axes.ravel(), panels, strict=True):
+        s = u[col].dropna().clip(*lim)
+        ax.hist(s * scale, bins=40, color=BLUE, edgecolor=SURFACE, linewidth=0.5)
+        med = u[col].median()
+        ax.axvline(med * scale, color=INK, linewidth=1.2)
+        ax.text(
+            med * scale,
+            ax.get_ylim()[1] * 0.95,
+            f" median {med * scale:.{0 if scale == 100 else 2}f}{'%' if scale == 100 else ''}",
+            color=INK,
+            fontsize=8,
+            va="top",
+        )
+        if col in spy:
+            ax.axvline(spy[col] * scale, color=ORANGE, linewidth=1.5, linestyle="--")
+            ax.text(
+                spy[col] * scale,
+                ax.get_ylim()[1] * 0.6,
+                f" S&P 500 {spy[col] * 100:.0f}%",
+                color=INK2,
+                fontsize=8,
+                va="top",
+            )
+        ax.set_title(title + (" (%)" if scale == 100 else ""), loc="left", fontsize=10, color=INK)
+        ax.set_yticks([])
+        ax.grid(False)
+    fig.suptitle(
+        "How the 4,457 five-year holdings were distributed (end bars hold values beyond the axis)",
+        x=0.01,
+        ha="left",
+        color=INK,
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(FIGURES / "behaviour_distributions.png", dpi=150)
+    plt.close(fig)
+
+    # 3. the five shapes: median path and middle half
+    fig, axes = plt.subplots(1, 5, figsize=(12, 3.4), sharey=True)
+    names = {
+        "steady_climb": "Steady climb",
+        "bumpy_climb": "Bumpy climb",
+        "faded": "Rose then faded",
+        "round_trip": "Round trip",
+        "decline": "Decline",
+    }
+    for ax, k in zip(axes, behaviour.SHAPES, strict=True):
+        pk = paths[u["shape"] == k]
+        q = pk.quantile([0.25, 0.5, 0.75]).T
+        ax.fill_between(months, q[0.25], q[0.75], color=BLUE, alpha=0.25, linewidth=0)
+        ax.plot(months, q[0.5], color=BLUE, linewidth=2)
+        ax.plot(months, spy_paths.median(), color=ORANGE, linewidth=1.2, linestyle="--")
+        ax.axhline(1, color=INK2, linewidth=0.6)
+        ax.set_yscale("log")
+        ax.set_yticks(ticks, [f"${t:g}" for t in ticks])
+        ax.minorticks_off()
+        ax.set_xticks(range(0, 61, 12), [str(k) for k in range(6)])
+        ax.set_title(
+            f"{names[k]}\n{len(pk) / len(paths):.0%} of holdings",
+            loc="left",
+            fontsize=10,
+            color=INK,
+        )
+        ax.set_xlabel("years")
+    axes[0].set_ylabel("Value of $1 (median, middle half)")
+    fig.suptitle(
+        "Five shapes of a 5-year holding (dashed: S&P 500)",
+        x=0.01,
+        ha="left",
+        color=INK,
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(FIGURES / "behaviour_shapes.png", dpi=150)
+    plt.close(fig)
+
+    # 4. shapes by start year
+    t = pd.crosstab(u.cohort, u["shape"], normalize="index")[list(behaviour.SHAPES)]
+    fig, ax = plt.subplots(figsize=(9, 4.2))
+    bottom = np.zeros(len(t))
+    for k, c in zip(behaviour.SHAPES, [AQUA, BLUE, YELLOW, MAGENTA, ORANGE], strict=True):
+        ax.bar(
+            t.index,
+            t[k],
+            bottom=bottom,
+            color=c,
+            width=0.8,
+            label=names[k],
+            edgecolor=SURFACE,
+            linewidth=1,
+        )
+        bottom += t[k].to_numpy()
+    ax.set_xticks(t.index)
+    ax.set_ylabel("Share of holdings")
+    ax.yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    ax.legend(frameon=False, ncol=5, loc="upper center", bbox_to_anchor=(0.5, -0.1), fontsize=9)
+    ax.set_title(
+        "Shape of the next 5 years, by start year (June 30)", loc="left", color=INK, fontsize=11
+    )
+    ax.grid(False)
+    fig.tight_layout()
+    fig.savefig(FIGURES / "behaviour_by_cohort.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("step", choices=["resolve", "download", "build", "study", "models", "all"])
+    ap.add_argument(
+        "step", choices=["resolve", "download", "build", "study", "models", "behaviour", "all"]
+    )
     args = ap.parse_args()
     cfg = load_config()
     if args.step in ("resolve", "all"):
@@ -324,6 +520,8 @@ def main() -> None:
         np.random.seed(cfg["experiments"]["seed"])
         run_models(load_panel(), cfg)
         print(f"results -> {RESULTS}, figures -> {FIGURES}")
+    if args.step in ("behaviour", "all"):
+        run_behaviour(load_panel(), cfg)
 
 
 if __name__ == "__main__":
