@@ -116,12 +116,15 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Weighted screen: cheapness score](#cheap-score) | mean(percentile ranks, reversed) | higher | derived |
 | [Weighted screen: total](#total-score) | 0.5 x debt_score + 0.25 x quality_score + 0.25 x cheap_score | higher | derived |
 
-**Valuation (needs the price)** (18)
+**Valuation (needs the price)** (21)
 
 | Metric | Formula | Better | Vector |
 |---|---|---|---|
 | [P/E, trailing GAAP](#pe-ttm) | price / eps_ttm | lower | candidate |
 | [P/E, trailing adjusted](#pe-adj) | price / eps_adj_ttm | lower | core |
+| [EPS, core (without stake marks)](#eps-core-ex-marks) | eps_ttm - after-tax per-share effect of gains on equity securities (the company's own figure) + one-offs per share | higher | candidate |
+| [Equity stakes after tax, per share](#stakes-after-tax-per-share) | (non-marketable equity at carrying value + listed equity stakes at market - 21% x unrealized gains) / shares outstanding | none | candidate |
+| [P/E, core ex-stakes (AI-adjusted)](#pe-core-ex-stakes) | (price - stakes_after_tax_per_share) / eps_core_ex_marks | lower | candidate |
 | [P/E, forward](#pe-fwd) | price / eps_fwd | lower | candidate |
 | [Expected P/E change](#pe-change-expected) | pe_fwd / pe_ttm - 1 | lower | candidate |
 | [Own P/E, 10-year median](#pe-median-10y) | median(avg price_y / adjusted eps_y, last 10 years) | none | context |
@@ -989,6 +992,45 @@ Price against adjusted EPS: Babak's 'true' P/E.
 - **Used in:** watch list; entry price
 - **Example (BSX, 2026-10-27):** 14.02x = 45.02 / 3.21
 - **Vector:** core
+
+<a id="eps-core-ex-marks"></a>
+#### EPS, core (without stake marks) (`eps_core_ex_marks`)
+
+GAAP EPS without the after-tax gains and losses on equity stakes (realized and unrealized) and one-off items. For companies whose earnings carry big marks on AI stakes (Anthropic, SpaceX).
+
+- **Formula:** eps_ttm - after-tax per-share effect of gains on equity securities (the company's own figure) + one-offs per share
+- **Unit:** $; **better:** higher; **period:** ttm
+- **Source:** sec: `8-K earnings release: 'net effect of the gain on equity securities' per quarter; EquitySecuritiesFvNiGainLoss`
+- **Used in:** AI-adjusted P/E (report 17)
+- **Example (GOOGL, 2026-09-30):** $11.09 = 19.16 - 8.21 (marks, Q4 2025 to Q3 2026) + 0.14 (Waymo charge)
+- **Vector:** candidate
+- **Note:** Use the company's own per-share effect where it gives one (Alphabet does); otherwise tax the gain at 21%.
+
+<a id="stakes-after-tax-per-share"></a>
+#### Equity stakes after tax, per share (`stakes_after_tax_per_share`)
+
+Value of the company's equity stakes in other companies, less tax on their unrealized gains, per share.
+
+- **Formula:** (non-marketable equity at carrying value + listed equity stakes at market - 21% x unrealized gains) / shares outstanding
+- **Unit:** $; **better:** none; **period:** fq
+- **Source:** sec: `10-Q Note 3: marketable equity securities, non-marketable securities, cumulative upward and downward adjustments`
+- **Used in:** AI-adjusted P/E (report 17); entry price
+- **Example (GOOGL, 2026-10-29):** $14.93 = (128.2 + 71.8 SpaceX at $143.99 + 15.2 - 31.6 tax) / 12.294bn shares
+- **Vector:** candidate
+- **Note:** Private stakes sit at the last funding-round price, not a market price.
+
+<a id="pe-core-ex-stakes"></a>
+#### P/E, core ex-stakes (AI-adjusted) (`pe_core_ex_stakes`)
+
+What you pay for the operating business against what it earns: the stakes come out of the price and their marks out of the earnings.
+
+- **Formula:** (price - stakes_after_tax_per_share) / eps_core_ex_marks
+- **Unit:** x; **better:** lower; **period:** now
+- **Source:** sec: `see eps_core_ex_marks and stakes_after_tax_per_share`
+- **Used in:** AI-adjusted P/E (report 17); entry price
+- **Example (GOOGL, 2026-10-29):** 24.50x = (286.55 - 14.93) / 11.09
+- **Vector:** candidate
+- **Note:** Circular revenue (customers paid with the company's own investment) is checked separately, not deducted; for Alphabet it is about 1% of core EPS.
 
 <a id="pe-fwd"></a>
 #### P/E, forward (`pe_fwd`)

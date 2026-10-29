@@ -1021,6 +1021,51 @@ example = { symbol = "BSX", value = 14.02, as_of = "2026-10-27", working = "45.0
 vector = "core"
 
 [[metric]]
+id = "eps_core_ex_marks"
+name = "EPS, core (without stake marks)"
+group = "valuation"
+unit = "$"
+better = "higher"
+period = "ttm"
+definition = "GAAP EPS without the after-tax gains and losses on equity stakes (realized and unrealized) and one-off items. For companies whose earnings carry big marks on AI stakes (Anthropic, SpaceX)."
+formula = "eps_ttm - after-tax per-share effect of gains on equity securities (the company's own figure) + one-offs per share"
+sources = { sec = "8-K earnings release: 'net effect of the gain on equity securities' per quarter; EquitySecuritiesFvNiGainLoss" }
+used_in = ["AI-adjusted P/E (report 17)"]
+example = { symbol = "GOOGL", value = 11.09, as_of = "2026-09-30", working = "19.16 - 8.21 (marks, Q4 2025 to Q3 2026) + 0.14 (Waymo charge)" }
+vector = "candidate"
+notes = "Use the company's own per-share effect where it gives one (Alphabet does); otherwise tax the gain at 21%."
+
+[[metric]]
+id = "stakes_after_tax_per_share"
+name = "Equity stakes after tax, per share"
+group = "valuation"
+unit = "$"
+better = "none"
+period = "fq"
+definition = "Value of the company's equity stakes in other companies, less tax on their unrealized gains, per share."
+formula = "(non-marketable equity at carrying value + listed equity stakes at market - 21% x unrealized gains) / shares outstanding"
+sources = { sec = "10-Q Note 3: marketable equity securities, non-marketable securities, cumulative upward and downward adjustments" }
+used_in = ["AI-adjusted P/E (report 17)", "entry price"]
+example = { symbol = "GOOGL", value = 14.93, as_of = "2026-10-29", working = "(128.2 + 71.8 SpaceX at $143.99 + 15.2 - 31.6 tax) / 12.294bn shares" }
+vector = "candidate"
+notes = "Private stakes sit at the last funding-round price, not a market price."
+
+[[metric]]
+id = "pe_core_ex_stakes"
+name = "P/E, core ex-stakes (AI-adjusted)"
+group = "valuation"
+unit = "x"
+better = "lower"
+period = "now"
+definition = "What you pay for the operating business against what it earns: the stakes come out of the price and their marks out of the earnings."
+formula = "(price - stakes_after_tax_per_share) / eps_core_ex_marks"
+sources = { sec = "see eps_core_ex_marks and stakes_after_tax_per_share" }
+used_in = ["AI-adjusted P/E (report 17)", "entry price"]
+example = { symbol = "GOOGL", value = 24.5, as_of = "2026-10-29", working = "(286.55 - 14.93) / 11.09" }
+vector = "candidate"
+notes = "Circular revenue (customers paid with the company's own investment) is checked separately, not deducted; for Alphabet it is about 1% of core EPS."
+
+[[metric]]
 id = "pe_fwd"
 name = "P/E, forward"
 group = "valuation"
