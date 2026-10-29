@@ -7,7 +7,9 @@ Each stock on the watch list ([config/watchlist.toml](../config/watchlist.toml))
 | BSX | [2026-10-28 20:54 CET](BSX/2026-10-28_2054.pdf) | $42.35 | 13.3x | 25.2x | 13x | $41.47 | -2.1% | [list](BSX/README.md) |
 | BKNG | [2026-10-28 20:54 CET](BKNG/2026-10-28_2054.pdf) | $148.46 | 15.4x | 21.2x | 15x | $144.15 | -2.9% | [list](BKNG/README.md) |
 | NFLX | [2026-10-28 20:54 CET](NFLX/2026-10-28_2054.pdf) | $61.91 | 21.2x | 61.3x | 20x | $58.40 | -5.7% | [list](NFLX/README.md) |
+| GOOGL | [2026-10-29 16:55 CET](GOOGL/2026-10-29_1655.pdf) | $286.35 | 26.2x | 23.7x | 20x | $219.00 | -23.5% | [list](GOOGL/README.md) |
+| UBER | [2026-10-29 16:55 CET](UBER/2026-10-29_1655.pdf) | $65.40 | 22.6x | 22.3x | 20x | $57.80 | -11.6% | [list](UBER/README.md) |
 
 **Market report**, newest first: [2026-10-28_2054](market/2026-10-28_2054.pdf), [2026-10-28_0000](market/2026-10-28_0000.pdf), [2026-10-27_2055](market/2026-10-27_2055.pdf), [2026-10-27_1657](market/2026-10-27_1657.pdf), [2026-10-27_1627](market/2026-10-27_1627.pdf)
 
-**Watch list summary**, newest first: [2026-10-28_2054](summaries/2026-10-28_2054.pdf), [2026-10-28_0000](summaries/2026-10-28_0000.pdf), [2026-10-27_2055](summaries/2026-10-27_2055.pdf), [2026-10-27_1657](summaries/2026-10-27_1657.pdf), [2026-10-27_1627](summaries/2026-10-27_1627.pdf)
+**Watch list summary**, newest first: [2026-10-29_1655](summaries/2026-10-29_1655.pdf), [2026-10-28_2054](summaries/2026-10-28_2054.pdf), [2026-10-28_0000](summaries/2026-10-28_0000.pdf), [2026-10-27_2055](summaries/2026-10-27_2055.pdf), [2026-10-27_1657](summaries/2026-10-27_1657.pdf), [2026-10-27_1627](summaries/2026-10-27_1627.pdf)
