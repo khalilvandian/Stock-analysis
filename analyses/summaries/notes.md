@@ -10,4 +10,4 @@ The evening run copies these sections into the watch list summary PDF.
 
 ## Analysis
 
-Each stock's verdict and key points follow. The entry prices are proposals until Babak confirms the target multiples (13x BSX, 15x BKNG, 20x NFLX).
+Each stock's verdict and key points follow. The entry prices are proposals until Babak confirms the target multiples (13x BSX, 15x BKNG, 20x NFLX, 20x GOOGL, 20x UBER). Alphabet and Uber joined the watch list on 2026-10-29; both trade above their proposed entry prices (about 23% and 12%).

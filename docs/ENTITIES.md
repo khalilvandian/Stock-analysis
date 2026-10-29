@@ -73,8 +73,9 @@ Report 14 explains the open choices; [`DECISIONS.md`](DECISIONS.md) records the 
 | `target_note` | Yes | Where the target comes from and whether Babak has confirmed it |
 | `eps_override` | No | One-off corrections: `{ reported = "YYYY-MM-DD", eps = 0.73, reason = "..." }` replaces the adjusted EPS of the quarter reported that day |
 
-Current stocks: BSX (target 13x), BKNG (15x) and NFLX (20x). The BKNG and NFLX targets are
-marked "not yet confirmed by Babak".
+Current stocks: BSX (target 13x), BKNG (15x), NFLX (20x), GOOGL (20x) and UBER (20x). The
+BKNG, NFLX, GOOGL and UBER targets are marked "not yet confirmed by Babak". GOOGL and UBER
+have `eps_override` entries that take out equity-stake revaluations (and UBER's tax release).
 
 ## Peter Lynch's categories
 

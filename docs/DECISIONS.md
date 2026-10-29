@@ -69,10 +69,11 @@ their date.
 - **Why:** Babak reads the verdict first, checks the numbers they rely on, and then reads the
   reasoning. Applied first to report 11 (BSX) and then everywhere.
 
-### The watch list: BKNG, BSX and NFLX, every evening at 21:00 Europe/Rome
+### The watch list: BKNG, BSX, NFLX, GOOGL and UBER, every evening at 21:00 Europe/Rome
 
 - **Who:** Babak.
-- **Decision:** `config/watchlist.toml` lists BSX, BKNG and NFLX. A scheduled Claude session
+- **Decision:** `config/watchlist.toml` lists BSX, BKNG and NFLX, and since 2026-10-29
+  GOOGL and UBER. A scheduled Claude session
   analyses them every evening at 21:00 Italy time and saves dated PDFs.
 - **Why:** A daily, dated record of each stock against its entry price, without asking for it.
 

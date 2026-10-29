@@ -35,3 +35,27 @@ eps_override = [
   { reported = "2025-10-21", eps = 0.73, reason = "excludes the Brazilian tax charge of about $619m (about $0.14 a share)." },
   { reported = "2026-04-16", eps = 0.69, reason = "excludes the $2.8bn Warner Bros. Discovery termination fee (about $0.54 a share after an estimated 18% tax); Claude's estimate." },
 ]
+
+[[stock]]
+symbol = "GOOGL"
+peers = ["MSFT", "META", "AMZN", "AAPL", "ORCL", "IBM", "PINS", "SNAP", "TTD"]
+target_pe = 20
+target_note = "Proposed 2026-10-29, not yet confirmed by Babak: about the 5-year median (about 20x) and the decade low, a discount for the heavy AI capital spending (about $130bn a year) squeezing free cash flow."
+eps_override = [
+  { reported = "2026-02-04", eps = 2.67, reason = "excludes the $2.3bn gain on equity securities ($0.15 a share, Alphabet's figure)." },
+  { reported = "2026-04-29", eps = 2.76, reason = "excludes the $36.9bn gain on equity securities ($2.35 a share, Alphabet's figure)." },
+  { reported = "2026-07-22", eps = 2.85, reason = "excludes the $99.0bn gain on equity securities, mainly SpaceX ($6.26 a share, Alphabet's figure)." },
+  { reported = "2026-10-28", eps = 2.67, reason = "excludes the $8.7bn loss on equity securities ($0.55 a share, Alphabet's figure)." },
+]
+
+[[stock]]
+symbol = "UBER"
+peers = ["LYFT", "DASH", "GRAB", "CART", "DIDIY"]
+target_pe = 20
+target_note = "Proposed 2026-10-29, not yet confirmed by Babak: Uber has been profitable only since 2023 and its GAAP EPS is swung by tax releases and equity revaluations, so its own P/E history says little; 20x non-GAAP EPS, a discount for robotaxi risk to a business growing EPS 35-45% a year."
+eps_override = [
+  { reported = "2025-11-04", eps = 0.65, reason = "excludes the $4.9bn tax valuation release and $1.5bn equity revaluation gain; the analysts' comparable figure, Claude's estimate until Uber's Q3 2026 release gives its own." },
+  { reported = "2026-02-04", eps = 0.71, reason = "Uber's non-GAAP EPS: excludes the $1.6bn equity revaluation loss." },
+  { reported = "2026-05-06", eps = 0.72, reason = "Uber's non-GAAP EPS: excludes the $1.5bn equity revaluation loss." },
+  { reported = "2026-08-05", eps = 0.81, reason = "Uber's non-GAAP EPS: excludes the $1.6bn equity revaluation gain (Delivery Hero, Aurora)." },
+]
