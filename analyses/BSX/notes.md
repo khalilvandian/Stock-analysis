@@ -1,12 +1,12 @@
 # Boston Scientific (BSX): Claude's notes
 
-Updated: 2026-10-28
+Updated: 2026-10-30
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
 ## Verdict
 
-**Q3 (Oct 28) missed on earnings and the year's outlook was cut a fourth time: sales grew only 1.5% and are guided to fall in Q4. The stock is cheap (about 13x) and now about 2% above the $41.5 entry, but growth has stalled rather than slowed. View: a small first position only at or below $41.5; wait for the 2027 outlook (late January) before adding.**
+**Q3 (Oct 28) missed on earnings and the year's outlook was cut a fourth time: sales grew only 1.5% and are guided to fall in Q4. The stock is cheap (about 13x) and now about 1% above the $41.5 entry, but growth has stalled rather than slowed. View: a small first position only at or below $41.5; wait for the 2027 outlook (late January) before adding.**
 
 ## Summary
 
@@ -28,6 +28,7 @@ Boston Scientific makes devices for heart, vascular, digestive and urology proce
 
 ## News
 
+- 2026-10-30: about $42.0, about 1% above the $41.5 entry, holding up on a day the S&P 500 fell 1.8%. No new company news.
 - 2026-10-28: Q3 sales $5.14bn (+1.5%, just above the $5.12bn estimate); adjusted EPS $0.73 against $0.75 expected and $0.75 a year ago. Full-year adjusted EPS cut to $3.16–3.18 (was $3.34–3.41); Q4 guided to $0.77–0.79 (consensus $0.83) with sales down 1–3%. The release gives no figures for electrophysiology or Watchman, and no 2027 outlook. The stock fell about 6% to about $42.3. The cyberattack's cost is not quantified, so adjusted EPS here still includes it.
 - 2026-10-27 (evening): closed about $45.0 ahead of tomorrow's report. Stifel cut its target from $60 to $55 on Oct 26 but kept Buy.
 - 2026: the stock is down about half from its 2025 high after three guidance cuts.

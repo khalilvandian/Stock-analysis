@@ -1,6 +1,6 @@
 # Netflix (NFLX): Claude's notes
 
-Updated: 2026-10-28
+Updated: 2026-10-30
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -28,6 +28,7 @@ Netflix is the largest paid streaming service, earning almost all its revenue fr
 
 ## News
 
+- 2026-10-30: about $62.1, about 6% above the $58 entry; steady while the Nasdaq fell about 3%. No new company news.
 - 2026-10-28: about $61.9, drifting lower; about 6% above the $58 entry. No new company news.
 - 2026-10-26/27: the stock broke below $65 and closed about $62.6 after a Bloomberg report that viewers spend less time on the service; Huatai downgraded it to Hold.
 - 2026-10-20: Q3 results beat on EPS, but soft Q4 guidance sent the stock down about 6% after hours. Free cash flow guidance was lowered to about $12bn, mainly because of a real-estate transaction.

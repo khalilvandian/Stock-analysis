@@ -1,6 +1,6 @@
 # Uber (UBER): Claude's notes
 
-Updated: 2026-10-29
+Updated: 2026-10-30
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -28,6 +28,7 @@ Uber runs ride-hailing (Mobility), food and grocery delivery (Delivery) and Frei
 
 ## News
 
+- 2026-10-30: about $65.3, near a fresh 52-week low on robotaxi fears, ahead of Wednesday's (Nov 4) report. Consensus non-GAAP EPS is about $0.86-0.94 against guidance of $0.84-0.88; revenue is expected near $14.7bn.
 - 2026-08-05: Q2 results: revenue about $14.2bn (just below the estimate), non-GAAP EPS of $0.81 in line; GAAP EPS of $1.17 included a $1.6bn revaluation gain. Q3 non-GAAP EPS guidance of $0.84-0.88 was below the $0.89 consensus.
 - 2026-05-06: Q1 non-GAAP EPS of $0.72, up 44%; GAAP EPS of $0.13 after a $1.5bn revaluation loss.
 
