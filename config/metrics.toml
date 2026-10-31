@@ -403,6 +403,37 @@ clip = { upper = 50.0 }
 notes = "Open choice: a fairer version of the first must-have for companies that keep little cash (BSX passes this, fails the strict one)."
 
 [[metric]]
+id = "cash_plus_fcf_to_short_term_debt"
+name = "(Cash + free cash flow) / short-term debt"
+group = "debt"
+unit = "x"
+better = "higher"
+period = "fq"
+definition = "Whether cash on hand plus a year of free cash flow (after capex) pays the debt due within a year."
+formula = "(cash + free_cf) / short_term_debt"
+sources = { growth = "short_term_debt_cover" }
+used_in = ["growth screener (>= 1)"]
+example = { symbol = "DPZ", value = 0.80, as_of = "2026-10-31", working = "(0.468 + 0.636) / 1.373 (TradingView)" }
+vector = "candidate"
+clip = { upper = 50.0 }
+notes = "Stricter than the operating cash flow version (capex comes off), looser than cash alone."
+
+[[metric]]
+id = "net_debt_to_fcf"
+name = "Net debt / free cash flow"
+group = "debt"
+unit = "x"
+better = "lower"
+period = "ttm"
+definition = "Years of free cash flow needed to repay the net debt. 0 for net cash; infinite for net debt with no free cash flow."
+formula = "(total_debt - cash) / free_cf"
+sources = { growth = "net_debt_to_fcf" }
+used_in = ["growth screener (<= 5 years)"]
+example = { symbol = "DPZ", value = 7.32, as_of = "2026-10-31", working = "4.653 / 0.636 (TradingView)" }
+vector = "candidate"
+clip = { lower = 0.0, upper = 50.0 }
+
+[[metric]]
 id = "cash_to_long_term_debt"
 name = "Cash / long-term debt"
 group = "debt"

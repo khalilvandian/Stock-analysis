@@ -208,7 +208,20 @@ min_eps_cagr = 0.0             # diluted EPS growth a year, compounded (buybacks
 sector_margin = "mean"         # "mean", "median", or "" for the fixed `min_net_margin` only
 min_net_margin = 0.10
 min_sector_size = 5
-still_growing = true           # 12-month revenue and net income not below the latest year
+still_growing = true
+# Debt it can pay (Babak, 2026-10-31, on Domino's: "free cash flow is so much lower than their
+# debt ... companies that are massively in debt in comparison to the cash they have ... filter
+# them out as well in the first level before the P/E"). Latest quarter's debt and cash,
+# 12-month free cash flow:
+#   net debt (debt - cash) repaid by at most `max_net_debt_to_fcf` years of free cash flow
+#   (net cash passes; net debt with no free cash flow fails), and
+#   cash + 12-month free cash flow at least `min_short_term_debt_cover` times the debt due
+#   within a year (none due passes).
+# Banks and insurers skip both, as in Stage 1. Today's screen only (the backtest has no
+# yearly free cash flow).
+max_net_debt_to_fcf = 5.0
+min_short_term_debt_cover = 1.0
+debt_rules_skip = ["banks", "insurers"]           # 12-month revenue and net income not below the latest year
 # Yearly P/Es above this are left out of the stock's own history: they come from years of
 # near-zero earnings (Insulet's median was 1,140, Salesforce's 131) and would make any
 # P/E look historically low. 100 is the usual "not meaningful" cut-off.

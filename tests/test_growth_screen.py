@@ -40,9 +40,17 @@ def test_as_of_year_cuts_every_history_list():
     assert h.loc["short", "total_revenue_fy_h"] == []
 
 
-def _stock(rev, ni, eps, rev_ttm, ni_ttm, sector="Tech"):
+def _stock(rev, ni, eps, rev_ttm, ni_ttm, sector="Tech", debt=(0.0, 10.0, 0.0, 5.0)):
+    """`debt` = (total debt, cash, debt due within a year, 12-month free cash flow)."""
+    total, cash, short, fcf = debt
     return {
         "sector": sector,
+        "type": "general",
+        "total_debt_fq": total,
+        "net_debt_fq": total - cash,
+        "cash_n_short_term_invest_fq": cash,
+        "short_term_debt_fq": short,
+        "free_cash_flow_ttm": fcf,
         "fiscal_period_fy_h": YEARS,
         "total_revenue_fy_h": rev,
         "net_income_fy_h": ni,
@@ -108,6 +116,40 @@ def test_low_margin_sector_and_small_sector_fallback():
     assert "net margin" in d.loc["rival", "failed"]
     assert d.loc["alone", "margin_floor"] == cfg["min_net_margin"]  # one company: 10%
     assert d.loc["alone", "status"] == "pass"
+
+
+def test_debt_rules():
+    cfg = load_config()["growth"] | {"min_sector_size": 99}
+    grow = [160, 150, 130, 120, 110, 100, 90, 80, 70, 60]
+    profit = [x * 0.2 for x in grow]
+
+    def stock(debt, kind="general"):
+        return _stock(grow, profit, profit, 165, 33, debt=debt) | {"type": kind}
+
+    d = pd.DataFrame.from_dict(
+        {
+            # Domino's on 2026-10-31: debt 5.12, cash 0.47, due in a year 1.37, FCF 0.64
+            "pizza": stock((5.12, 0.47, 1.37, 0.64)),
+            "payable": stock((10.0, 2.0, 1.0, 2.0)),  # 4 years of FCF, 4.0x cover
+            "slow_payer": stock((14.0, 2.0, 1.0, 2.0)),  # 6 years
+            "due_now": stock((5.0, 0.5, 3.0, 2.0)),  # cash + FCF 2.5 < 3.0 due
+            "no_fcf": stock((5.0, 1.0, 0.0, -1.0)),
+            "net_cash": stock((1.0, 5.0, 1.0, -1.0)),  # nothing to repay
+            "bank": stock((50.0, 1.0, 40.0, np.nan), kind="banks"),
+        },
+        orient="index",
+    )
+    gs.growth_measures(d, cfg["years"])
+    gs.apply_rules(d, cfg, ttm=True)
+    assert "debt payback" in d.loc["pizza", "failed"]
+    assert "short-term debt covered" in d.loc["pizza", "failed"]
+    assert d.loc["payable", "net_debt_to_fcf"] == 4
+    assert d.loc["payable", "status"] == "pass"
+    assert d.loc["slow_payer", "failed"] == "debt payback; "
+    assert d.loc["due_now", "failed"] == "short-term debt covered; "
+    assert "debt payback" in d.loc["no_fcf", "failed"]
+    assert "debt payback" not in d.loc["net_cash", "failed"]
+    assert d.loc["bank", "status"] == "pass"
 
 
 def test_flags_one_off_and_lumpy_profit():

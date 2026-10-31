@@ -189,5 +189,9 @@ their date.
      fewer than 5 companies).
   5. **Low P/E means historically low:** against the stock's own yearly P/E median, not the
      lowest P/E in the market. Yearly P/Es above 100 are left out of the history.
+  6. **Debt it can pay, in the same first step** (Babak, after Domino's: "free cash flow is so
+     much lower than their debt ... filter them out as well in the first level before the
+     P/E"): net debt at most 5 years of free cash flow, and cash plus a year of free cash
+     flow covering the debt due within a year. Banks and insurers skip it, as in Stage 1.
 - **Why:** Growth, profit and margin show a good business; the stock's own history says
   whether its price is low for that business.

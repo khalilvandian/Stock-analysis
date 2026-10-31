@@ -14,6 +14,10 @@ results in report 15.
        - diluted EPS: compound growth above 0
        - net margin (12 months) above its sector's average (10% in sectors of under 5)
        - still growing: 12-month revenue and net income not below the latest fiscal year
+       - debt it can pay: net debt at most 5 years of free cash flow, and cash plus a
+         year of free cash flow covers the debt due within a year (not for banks and
+         insurers, whose deposits and float make debt rules meaningless). Debt, cash and
+         free cash flow blank on TradingView are filled from Yahoo, as in Stage 1 and 2
      Missing data = "incomplete", not a pass. The price plays no part in this step.
   3. Ranking, only of what step 2 left: today's P/E against the stock's own P/E history
      (yearly P/E over up to 10 fiscal years: average monthly price over the year / that
@@ -162,6 +166,21 @@ def flags(d: pd.DataFrame, n: int, ttm: bool = True) -> None:
     d["flags"] = out
 
 
+def debt_measures(d: pd.DataFrame) -> None:
+    """How many years of free cash flow repay the net debt, and whether cash plus a year of
+    free cash flow covers the debt due within a year. Statement currency, latest quarter's
+    balance sheet, 12-month free cash flow."""
+    cash, fcf = d["cash_n_short_term_invest_fq"], d["free_cash_flow_ttm"]
+    net = d["net_debt_fq"].fillna(d["total_debt_fq"] - cash)
+    years = (net / fcf).where(fcf > 0)
+    years = years.mask(net <= 0, 0.0)  # net cash: nothing to repay
+    years = years.mask((net > 0) & (fcf <= 0), np.inf)  # debt and no cash coming in
+    d["net_debt_to_fcf"] = years
+    st = d["short_term_debt_fq"]
+    cover = ((cash + fcf) / st).where(st > 0)
+    d["short_term_debt_cover"] = cover.mask(st == 0, np.inf)
+
+
 def sector_margin(d: pd.DataFrame, min_size: int, stat: str = "mean") -> pd.Series:
     """Each company's sector average ("mean") or "median" net margin, blank for sectors
     with too few companies."""
@@ -219,6 +238,19 @@ def apply_rules(d: pd.DataFrame, g: dict, ttm: bool = True) -> None:
             (d["total_revenue_ttm"] >= d["revenue_fy"])
             & (d["net_income_ttm"] >= d["net_income_fy"]),
             d["total_revenue_ttm"] + d["net_income_ttm"] + d["revenue_fy"] + d["net_income_fy"],
+        )
+    if ttm and "max_net_debt_to_fcf" in g:
+        # banks and insurers pass: their deposits and float aren't debt in the usual sense
+        debt_measures(d)
+        skip = d["type"].isin(g.get("debt_rules_skip", []))
+        years, cover = d["net_debt_to_fcf"], d["short_term_debt_cover"]
+        rules["debt payback"] = (
+            skip | (years <= g["max_net_debt_to_fcf"]),
+            years.where(~skip, 0.0),
+        )
+        rules["short-term debt covered"] = (
+            skip | (cover >= g["min_short_term_debt_cover"]),
+            cover.where(~skip, np.inf),
         )
     failed = pd.Series("", index=d.index)
     missing = pd.Series("", index=d.index)
@@ -303,11 +335,32 @@ def universe(cfg: dict, every: bool = False, refresh: bool = False) -> pd.DataFr
     return stage1.prepare(stage1.fetch_universe(cfg, today, refresh), cfg, ecb.usd_per_unit())
 
 
+DEBT_RULES = ("debt payback", "short-term debt covered")
+
+
+def fill_debt_gaps(d: pd.DataFrame) -> pd.Index:
+    """Fill debt, cash and free cash flow from Yahoo for the stocks held back only by
+    missing debt data (blank on TradingView), the same fills as Stage 1 and Stage 2.
+    Returns the rows filled."""
+    only_debt = d["missing"].map(
+        lambda m: bool(m) and all(r.strip() in DEBT_RULES for r in m.split(";") if r.strip())
+    )
+    rows = d.index[(d["failed"] == "") & only_debt]
+    if len(rows):
+        sub = stage1.fill_gaps(d.loc[rows].copy(), date.today().isoformat())
+        stage2.fill_cash_flows(sub, sub.index)
+        for c in sub.columns:
+            d.loc[rows, c] = sub[c]
+    return rows
+
+
 def screen_today(d: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     g = cfg["growth"]
     d = d.copy()
     growth_measures(d, g["years"])
     apply_rules(d, g, ttm=True)
+    if len(fill_debt_gaps(d)):
+        apply_rules(d, g, ttm=True)
     flags(d, g["years"])
     passed = d.index[d["status"] == "pass"]
     syms = d.loc[passed, "yahoo"].dropna().tolist()
@@ -404,6 +457,8 @@ GROWTH = [
     "net_margin",
     "sector_net_margin",
     "net_margin_change",
+    "net_debt_to_fcf",
+    "short_term_debt_cover",
 ]
 PE = ["pe_now", "pe_median", "pe_low", "pe_years", "pe_vs_median", "pe_percentile"]
 SAVE = [
@@ -417,6 +472,7 @@ SAVE = [
     "missing",
     "rank",
     "flags",
+    "filled",
     *ABSOLUTE,
     *GROWTH,
     *PE,

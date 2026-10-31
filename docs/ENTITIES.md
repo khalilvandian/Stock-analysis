@@ -261,7 +261,9 @@ Columns: `description`, `region`, `sector`, `industry`, `type`, `status` (pass, 
 incomplete), `failed`, `missing`, `rank`, `flags`, the absolute values (as in `top.csv`),
 `revenue_cagr`, `revenue_up_years`, `net_income_cagr`, `net_income_up_years`, `eps_cagr`,
 `eps_cagr_3y`, `net_margin` (12 months), `sector_net_margin`, `net_margin_change` (latest
-fiscal year minus 5 years before), `pe_now`, `pe_median`, `pe_low`, `pe_years`,
+fiscal year minus 5 years before), `net_debt_to_fcf` (years of free cash flow to repay net
+debt; 0 = net cash), `short_term_debt_cover` ((cash + free cash flow) / debt due within a
+year), `filled` (values filled from Yahoo), `pe_now`, `pe_median`, `pe_low`, `pe_years`,
 `pe_vs_median` (the ranking measure), `pe_percentile`.
 
 `data/screener/growth_backtest.csv`: one row per backtest pick: `fiscal_year`, `entry`,

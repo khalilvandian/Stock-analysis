@@ -49,12 +49,14 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Free cash flow](#free-cf) | operating_cf + capex | higher | context |
 | [Cash flow before growth (DCF base)](#fcff-before-growth) | operating_cf - d_and_a + interest_expense x (1 - 21% tax) | higher | candidate |
 
-**Debt and liquidity ratios** (9)
+**Debt and liquidity ratios** (11)
 
 | Metric | Formula | Better | Vector |
 |---|---|---|---|
 | [Cash / short-term debt](#cash-to-short-term-debt) | cash / short_term_debt (no short-term debt = passes) | higher | core |
 | [(Cash + operating cash flow) / short-term debt](#cash-plus-ocf-to-short-term-debt) | (cash + max(operating_cf, 0)) / short_term_debt | higher | candidate |
+| [(Cash + free cash flow) / short-term debt](#cash-plus-fcf-to-short-term-debt) | (cash + free_cf) / short_term_debt | higher | candidate |
+| [Net debt / free cash flow](#net-debt-to-fcf) | (total_debt - cash) / free_cf | lower | candidate |
 | [Cash / long-term debt](#cash-to-long-term-debt) | cash / long_term_debt | higher | core |
 | [Cash / total debt](#cash-to-total-debt) | cash / total_debt | higher | candidate |
 | [Net debt / EBITDA](#net-debt-to-ebitda) | net_debt / ebitda (net cash always passes; EBITDA <= 0 fails) | lower | core |
@@ -460,6 +462,33 @@ Same test, counting a year's operating cash flow as well as cash on hand.
 - **Vector:** candidate
 - **Clipped in the vector:** upper 50.00x
 - **Note:** Open choice: a fairer version of the first must-have for companies that keep little cash (BSX passes this, fails the strict one).
+
+<a id="cash-plus-fcf-to-short-term-debt"></a>
+#### (Cash + free cash flow) / short-term debt (`cash_plus_fcf_to_short_term_debt`)
+
+Whether cash on hand plus a year of free cash flow (after capex) pays the debt due within a year.
+
+- **Formula:** (cash + free_cf) / short_term_debt
+- **Unit:** x; **better:** higher; **period:** fq
+- **Source:** growth: `short_term_debt_cover`
+- **Used in:** growth screener (>= 1)
+- **Example (DPZ, 2026-10-31):** 0.80x = (0.468 + 0.636) / 1.373 (TradingView)
+- **Vector:** candidate
+- **Clipped in the vector:** upper 50.00x
+- **Note:** Stricter than the operating cash flow version (capex comes off), looser than cash alone.
+
+<a id="net-debt-to-fcf"></a>
+#### Net debt / free cash flow (`net_debt_to_fcf`)
+
+Years of free cash flow needed to repay the net debt. 0 for net cash; infinite for net debt with no free cash flow.
+
+- **Formula:** (total_debt - cash) / free_cf
+- **Unit:** x; **better:** lower; **period:** ttm
+- **Source:** growth: `net_debt_to_fcf`
+- **Used in:** growth screener (<= 5 years)
+- **Example (DPZ, 2026-10-31):** 7.32x = 4.653 / 0.636 (TradingView)
+- **Vector:** candidate
+- **Clipped in the vector:** lower 0.00x, upper 50.00x
 
 <a id="cash-to-long-term-debt"></a>
 #### Cash / long-term debt (`cash_to_long_term_debt`)

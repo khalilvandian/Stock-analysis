@@ -296,6 +296,14 @@ rank what is left by P/E against the stock's own history. P/E never removes a st
 | EPS growth | Compound diluted EPS growth above 0 | `min_eps_cagr = 0.0` |
 | net margin | 12-month net income / revenue above the sector average (sectors of 5+ companies; smaller sectors: above 10%) | `sector_margin = "mean"`, `min_net_margin = 0.10`, `min_sector_size = 5` |
 | still growing | 12-month revenue and net income at or above the latest fiscal year | `still_growing = true` |
+| debt payback | Net debt (total debt - cash) at most 5 years of 12-month free cash flow; net cash passes, net debt with no free cash flow fails | `max_net_debt_to_fcf = 5.0` |
+| short-term debt covered | Cash + 12-month free cash flow at least the debt due within a year (none due passes) | `min_short_term_debt_cover = 1.0` |
+
+Banks and insurers skip both debt rules, as in Stage 1 (`debt_rules_skip`). Debt, cash and
+free cash flow blank on TradingView are filled from Yahoo for the stocks held back only by
+that (Stage 1's `fill_gaps` and Stage 2's `fill_cash_flows`; named in `filled`). The debt
+rules were added at Babak's request after Domino's (2026-10-31: "free cash flow is so much
+lower than their debt ... filter them out as well in the first level before the P/E").
 
 A missing year of history makes the stock "incomplete" rather than a pass. The sector average
 is the mean margin of every company screened in the sector (TradingView's sectors), losses
@@ -323,7 +331,8 @@ fixed `min_net_margin`.
 For each of the 6 fiscal years before the latest: the history lists are cut so that year is
 the latest, the filter runs on fiscal-year figures (margin from the fiscal year, no "still
 growing" check), P/E = price at the end of April the next year / that year's EPS against the
-P/Es before then, and the 10 lowest are "bought" then. Price returns (no dividends) after 1
+P/Es before then, and the 10 lowest are "bought" then. The debt rules are not applied
+(TradingView's yearly history has no free cash flow). Price returns (no dividends) after 1
 year and to today, against the average of every passing stock, every screened stock and the
 S&P 500 index (`^GSPC`). The universe is today's, so survivorship flatters the results.
 

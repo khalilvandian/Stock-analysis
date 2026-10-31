@@ -8,10 +8,12 @@ Universe: the S&P 500 (497 companies, `[universe]` in `config/screeners.toml`).
 Babak asked for a screener to test (2026-10-31): revenue growing, net profit growing, a high
 net margin, EPS growing, and among these the stocks whose P/E is low **against their own
 history**. A high margin means a net margin above the average of the company's sector
-(Babak's choice, replacing an earlier 10% floor plus the sector median). 108 of 497 S&P 500
-companies pass the growth and margin rules. 56 of them trade below their own median P/E.
-The 20 furthest below it are listed below. Half of those 20 carry a flag (a likely one-off
-gain or lumpy profit) that makes the P/E less reliable.
+(Babak's choice, replacing an earlier 10% floor plus the sector median). Babak then added a
+debt test to the same first step: net debt repaid by at most 5 years of free cash flow, and
+cash plus a year of free cash flow covering the debt due within a year. 83 of 497 S&P 500
+companies pass the growth, margin and debt rules. 39 of them trade below their own median
+P/E. The 20 nearest the top of the ranking are listed below; 7 of them carry a flag (a
+likely one-off gain or lumpy profit) that makes the P/E less reliable.
 
 A backtest on six past years (fiscal 2019 to 2024, bought at the end of April after each)
 gives a mixed result. Over 1 year the top 10 rose 23.8% on average, against 17.4% for the
@@ -27,26 +29,26 @@ businesses that compound. It is a starting list for study, not a buy list.
 
 | Symbol | Company | Price | Mkt value | Debt | Net debt | ST debt | LT debt | Cash | Revenue | EBITDA | Net income | EPS | OCF | Capex | FCF |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| MKC | McCormick & Company | 47.29 | 12.73 | 5.02 | 4.69 | 2.11 | 2.91 | 0.33 | 7.69 | 1.58 | 1.49 | 5.53 | 1.14 | -0.21 | 0.93 |
 | ADBE | Adobe | 250.23 | 97.39 | 6.76 | 1.12 | 1.69 | 5.08 | 5.64 | 25.97 | 10.22 | 7.28 | 17.93 | 10.81 | -0.21 | 10.59 |
 | PTC | PTC | 195.54 | 21.24 | 1.61 | 1.26 | 0.05 | 1.56 | 0.35 | 2.95 | 1.31 | 1.23 | 10.34 | 0.95 | -0.02 | 0.93 |
 | NFLX | Netflix | 62.08 | 254.92 | 17.38 | 9.16 | 2.91 | 14.47 | 8.23 | 50.00 | 33.76 | 14.77 | 3.46 | 12.31 | -0.93 | 11.38 |
 | INTU | Intuit | 341.09 | 91.15 | 8.42 | 1.22 | 1.33 | 7.09 | 7.20 | 21.45 | 7.02 | 4.57 | 16.50 | 8.84 | -0.22 | 8.62 |
-| FICO | Fair Isaac | 711.23 | 15.36 | 5.60 | 5.35 | 0.30 | 5.30 | 0.25 | 2.39 | 1.26 | 0.81 | 34.61 | 1.00 | -0.04 | 0.94 |
 | ROP | Roper Technologies | 466.60 | 46.15 | 9.72 | 9.41 | 1.42 | 8.30 | 0.31 | 8.43 | 3.29 | 2.59 | 25.33 | 2.62 | -0.11 | 2.58 |
-| AMT | American Tower | 187.78 | 87.09 | 45.29 | 43.29 | 6.01 | 39.28 | 2.01 | 11.01 | 6.96 | 3.31 | 7.10 | 5.71 | -1.75 | 3.96 |
-| UDR | UDR | 35.52 | 11.41 | 5.99 | 5.96 | 1.29 | 4.70 | 0.04 | 1.72 | 0.99 | 0.52 | 1.57 | 1.13 | -0.26 | 0.88 |
-| MLM | Martin Marietta Materials | 540.41 | 38.38 | 6.34 | 6.22 | 0.93 | 5.42 | 0.12 | 6.69 | 2.06 | 2.46 | 40.69 | 1.52 | -0.71 | 0.81 |
-| DPZ | Domino's Pizza | 313.71 | 10.32 | 5.12 | 4.65 | 1.37 | 3.75 | 0.47 | 5.07 | 1.08 | 0.61 | 18.15 | 0.76 | -0.12 | 0.64 |
 | XYL | Xylem | 92.40 | 21.19 | 3.03 | 2.32 | 0.66 | 2.37 | 0.71 | 9.05 | 2.00 | 1.08 | 4.53 | 1.27 | -0.39 | 0.88 |
 | RMD | ResMed | 229.94 | 32.34 | 0.61 | -0.42 | 0.19 | 0.42 | 1.03 | 5.73 | 2.18 | 1.59 | 10.98 | 1.77 | -0.18 | 1.61 |
 | GOOG | Alphabet | 278.22 | 3,411.53 | 146.64 | -118.46 | 2.07 | 144.57 | 265.10 | 471.14 | 185.94 | 235.69 | 19.15 | 179.55 | -159.80 | 19.75 |
 | DECK | Deckers Outdoor | 81.99 | 10.94 | 0.54 | -0.67 | 0.08 | 0.46 | 1.21 | 5.57 | 1.38 | 1.06 | 7.55 | 1.13 | -0.08 | 1.05 |
 | BKNG | Booking | 148.13 | 111.30 | 20.69 | 3.19 | 2.00 | 18.69 | 17.51 | 28.24 | 10.65 | 7.21 | 9.04 | 9.86 | -0.32 | 9.54 |
-| FRT | Federal Realty Investment Trust | 110.19 | 9.63 | 5.17 | 5.06 | 0.20 | 4.97 | 0.11 | 1.35 | 0.86 | 0.44 | 5.00 | 0.66 | -0.31 | 0.34 |
 | SCHW | Charles Schwab | 88.05 | 152.27 | 40.00 | -28.50 | 16.20 | 23.80 | 68.50 | 30.50 | 17.13 | 10.64 | 5.86 |  |  |  |
 | AON | Aon | 321.67 | 68.24 | 28.95 | 13.63 | 1.90 | 27.05 | 15.32 | 17.68 | 5.94 | 3.93 | 18.26 | 3.57 | -0.31 | 3.27 |
 | CPRT | Copart | 30.13 | 27.91 | 0.09 | -4.40 | 0.02 | 0.07 | 4.49 | 4.67 | 1.88 | 1.48 | 1.55 | 1.60 | -0.34 | 1.27 |
+| GEN | Gen Digital | 29.13 | 17.28 | 8.12 | 7.53 | 1.08 | 7.04 | 0.59 | 5.23 | 2.73 | 1.21 | 1.98 | 1.78 | -0.02 | 1.76 |
+| NVDA | NVIDIA | 204.64 | 4,931.82 | 38.86 | -60.51 | 1.51 | 37.35 | 99.37 | 302.97 | 201.26 | 192.88 | 7.91 | 134.36 | -7.35 | 127.01 |
+| SYK | Stryker | 291.86 | 111.95 | 15.43 | 12.16 | 0.91 | 14.52 | 3.27 | 26.30 | 7.67 | 3.62 | 9.39 | 5.45 | -0.87 | 4.57 |
+| IDXX | IDEXX Laboratories | 551.21 | 43.42 | 1.10 | 0.90 | 0.70 | 0.40 | 0.20 | 4.55 | 1.62 | 1.14 | 14.23 | 1.37 | -0.13 | 1.25 |
+| FDS | FactSet Research Systems | 329.57 | 11.62 | 1.54 | 1.27 | 0.53 | 1.01 | 0.27 | 2.48 | 0.97 | 0.53 | 14.55 | 0.82 | -0.11 | 0.71 |
+| STE | STERIS plc | 227.12 | 22.14 | 2.04 | 1.56 | 0.28 | 1.77 | 0.48 | 6.04 | 1.67 | 0.81 | 8.18 | 1.29 | -0.36 | 0.93 |
+| MDT | Medtronic Plc | 96.54 | 123.49 | 28.15 | 19.33 | 2.54 | 25.62 | 8.82 | 37.54 | 10.42 | 5.23 | 4.06 | 8.04 | -1.90 | 6.13 |
 
 Revenue, EBITDA, net income, EPS and cash flows are the last 12 months; debt and cash are the
 latest quarter. Schwab's cash flows are blank on TradingView (a broker's cash flow statement
@@ -54,28 +56,28 @@ is not comparable).
 
 ### Growth, margin and P/E against own history (5 fiscal years, lowest P/E against history first)
 
-| Symbol | # | Sector | Rev CAGR % | Rev up | NI CAGR % | NI up | EPS CAGR % | Margin % | Sector margin % | P/E | Own median P/E | Own low P/E | Years | vs median % | Flags |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| MKC | 1 | Consumer Non-Durables | 4.10 | 5/5 | 1.10 | 3/5 | 1.10 | 19.40 | 11.60 | 8.55 | 27.72 | 16.82 | 10 | -69.20 | one-off? |
-| ADBE | 2 | Technology Services | 13.10 | 5/5 | 6.30 | 3/5 | 9.00 | 28.10 | 20.70 | 13.96 | 41.85 | 23.00 | 10 | -66.60 |  |
-| PTC | 3 | Technology Services | 13.40 | 5/5 | 41.20 | 3/5 | 40.20 | 41.70 | 20.70 | 18.90 | 49.66 | 30.28 | 6 | -61.90 | one-off? lumpy |
-| NFLX | 4 | Technology Services | 12.60 | 5/5 | 31.80 | 4/5 | 33.00 | 29.50 | 20.70 | 17.94 | 43.73 | 27.92 | 7 | -59.00 |  |
-| INTU | 5 | Technology Services | 17.40 | 5/5 | 17.20 | 5/5 | 16.90 | 21.30 | 20.70 | 20.67 | 44.10 | 30.09 | 10 | -53.10 |  |
-| FICO | 6 | Commercial Services | 9.00 | 5/5 | 22.50 | 4/5 | 27.40 | 34.10 | 18.10 | 20.55 | 42.50 | 30.12 | 10 | -51.60 |  |
-| ROP | 7 | Technology Services | 10.20 | 4/5 | 10.10 | 4/5 | 9.60 | 30.70 | 20.70 | 18.42 | 37.48 | 20.60 | 10 | -50.90 | one-off? |
-| AMT | 8 | Finance | 5.80 | 4/5 | 8.40 | 3/5 | 7.30 | 30.10 | 19.00 | 26.46 | 51.33 | 37.21 | 10 | -48.50 | lumpy |
-| UDR | 9 | Finance | 6.60 | 5/5 | 42.50 | 3/5 | 40.80 | 30.40 | 19.00 | 22.63 | 43.44 | 29.35 | 6 | -47.90 | lumpy |
-| MLM | 10 | Non-Energy Minerals | 5.40 | 4/5 | 9.60 | 3/5 | 10.20 | 36.70 | 18.00 | 13.28 | 24.67 | 17.43 | 10 | -46.20 | one-off? lumpy |
-| DPZ | 11 | Consumer Services | 3.70 | 4/5 | 4.10 | 4/5 | 7.20 | 12.00 | 11.50 | 17.28 | 29.97 | 24.03 | 10 | -42.30 |  |
-| XYL | 12 | Producer Manufacturing | 13.10 | 5/5 | 30.40 | 4/5 | 22.80 | 12.00 | 6.60 | 20.40 | 35.27 | 23.98 | 10 | -42.20 |  |
-| RMD | 13 | Health Technology | 12.10 | 5/5 | 26.30 | 5/5 | 26.30 | 27.80 | 10.50 | 20.94 | 36.14 | 23.19 | 10 | -42.10 |  |
-| GOOG | 14 | Technology Services | 17.20 | 5/5 | 26.80 | 4/5 | 29.80 | 50.00 | 20.70 | 14.52 | 24.52 | 20.13 | 10 | -40.80 | one-off? |
-| DECK | 15 | Consumer Non-Durables | 16.40 | 5/5 | 21.80 | 5/5 | 25.60 | 19.00 | 11.60 | 10.87 | 17.98 | 13.99 | 9 | -39.60 |  |
-| BKNG | 16 | Consumer Services | 31.70 | 5/5 | 146.80 | 4/5 | 158.60 | 25.50 | 11.50 | 16.38 | 26.85 | 16.76 | 9 | -39.00 |  |
-| FRT | 17 | Finance | 9.60 | 5/5 | 25.70 | 4/5 | 23.50 | 32.50 | 19.00 | 22.02 | 35.10 | 21.13 | 10 | -37.20 | lumpy |
-| SCHW | 18 | Finance | 18.00 | 5/5 | 21.80 | 4/5 | 17.00 | 34.90 | 19.00 | 15.02 | 22.46 | 16.35 | 10 | -33.10 |  |
-| AON | 19 | Finance | 9.40 | 5/5 | 13.40 | 3/5 | 15.00 | 22.20 | 19.00 | 17.62 | 25.88 | 20.63 | 10 | -31.90 | lumpy |
-| CPRT | 20 | Retail Trade | 11.60 | 5/5 | 9.60 | 4/5 | 9.80 | 31.80 | 9.40 | 19.43 | 28.41 | 17.43 | 10 | -31.60 |  |
+| Symbol | # | Sector | Rev CAGR % | Rev up | NI CAGR % | NI up | EPS CAGR % | Margin % | Sector margin % | Net debt / FCF (yrs) | P/E | Own median P/E | Own low P/E | Years | vs median % | Flags |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ADBE | 1 | Technology Services | 13.10 | 5/5 | 6.30 | 3/5 | 9.00 | 28.10 | 20.70 | 0.11 | 13.96 | 41.85 | 23.00 | 10 | -66.60 |  |
+| PTC | 2 | Technology Services | 13.40 | 5/5 | 41.20 | 3/5 | 40.20 | 41.70 | 20.70 | 1.34 | 18.90 | 49.66 | 30.28 | 6 | -61.90 | one-off? lumpy |
+| NFLX | 3 | Technology Services | 12.60 | 5/5 | 31.80 | 4/5 | 33.00 | 29.50 | 20.70 | 0.81 | 17.94 | 43.73 | 27.92 | 7 | -59.00 |  |
+| INTU | 4 | Technology Services | 17.40 | 5/5 | 17.20 | 5/5 | 16.90 | 21.30 | 20.70 | 0.14 | 20.67 | 44.10 | 30.09 | 10 | -53.10 |  |
+| ROP | 5 | Technology Services | 10.20 | 4/5 | 10.10 | 4/5 | 9.60 | 30.70 | 20.70 | 3.65 | 18.42 | 37.48 | 20.60 | 10 | -50.90 | one-off? |
+| XYL | 6 | Producer Manufacturing | 13.10 | 5/5 | 30.40 | 4/5 | 22.80 | 12.00 | 6.60 | 2.62 | 20.40 | 35.27 | 23.98 | 10 | -42.20 |  |
+| RMD | 7 | Health Technology | 12.10 | 5/5 | 26.30 | 5/5 | 26.30 | 27.80 | 10.50 | 0.00 | 20.94 | 36.14 | 23.19 | 10 | -42.10 |  |
+| GOOG | 8 | Technology Services | 17.20 | 5/5 | 26.80 | 4/5 | 29.80 | 50.00 | 20.70 | 0.00 | 14.52 | 24.52 | 20.13 | 10 | -40.80 | one-off? |
+| DECK | 9 | Consumer Non-Durables | 16.40 | 5/5 | 21.80 | 5/5 | 25.60 | 19.00 | 11.60 | 0.00 | 10.87 | 17.98 | 13.99 | 9 | -39.60 |  |
+| BKNG | 10 | Consumer Services | 31.70 | 5/5 | 146.80 | 4/5 | 158.60 | 25.50 | 11.50 | 0.33 | 16.38 | 26.85 | 16.76 | 9 | -39.00 |  |
+| SCHW | 11 | Finance | 18.00 | 5/5 | 21.80 | 4/5 | 17.00 | 34.90 | 19.00 | 0.00 | 15.02 | 22.46 | 16.35 | 10 | -33.10 |  |
+| AON | 12 | Finance | 9.40 | 5/5 | 13.40 | 3/5 | 15.00 | 22.20 | 19.00 | 4.17 | 17.62 | 25.88 | 20.63 | 10 | -31.90 | lumpy |
+| CPRT | 13 | Retail Trade | 11.60 | 5/5 | 9.60 | 4/5 | 9.80 | 31.80 | 9.40 | 0.00 | 19.43 | 28.41 | 17.43 | 10 | -31.60 |  |
+| GEN | 14 | Technology Services | 14.40 | 5/5 | 11.90 | 4/5 | 11.20 | 23.10 | 20.70 | 4.27 | 14.68 | 19.74 | 10.22 | 8 | -25.60 | lumpy |
+| NVDA | 15 | Electronic Technology | 66.90 | 5/5 | 94.30 | 4/5 | 95.30 | 63.70 | 19.80 | 0.00 | 25.87 | 34.71 | 24.74 | 9 | -25.50 | one-off? lumpy |
+| SYK | 16 | Health Technology | 11.80 | 5/5 | 15.20 | 4/5 | 14.80 | 13.80 | 10.50 | 2.66 | 31.09 | 41.30 | 17.89 | 10 | -24.70 |  |
+| IDXX | 17 | Health Technology | 9.70 | 5/5 | 12.70 | 4/5 | 14.30 | 25.00 | 10.50 | 0.72 | 38.74 | 50.78 | 39.14 | 10 | -23.70 |  |
+| FDS | 18 | Commercial Services | 9.20 | 5/5 | 5.90 | 3/5 | 7.10 | 21.50 | 18.10 | 1.80 | 22.65 | 29.53 | 17.66 | 10 | -23.30 |  |
+| STE | 19 | Health Technology | 13.80 | 4/5 | 14.50 | 3/5 | 11.40 | 13.30 | 10.50 | 1.69 | 27.76 | 35.23 | 25.45 | 9 | -21.20 | lumpy |
+| MDT | 20 | Health Technology | 3.80 | 4/5 | 5.90 | 3/5 | 7.00 | 13.90 | 10.50 | 3.15 | 23.77 | 29.56 | 23.80 | 10 | -19.60 |  |
 
 CAGR = compound growth a year over 5 fiscal years. "Up" = years of the 5 in which the
 figure rose. Margin = 12-month net income / revenue. P/E = price / 12-month diluted EPS.
@@ -83,16 +85,28 @@ Own median and low P/E = median and lowest of the yearly P/Es over up to 10 fisc
 Flags: *one-off?* = 12-month net income is more than 1.5 times the latest fiscal year;
 *lumpy* = net income fell more than 30% in one of the 5 years.
 
-The full list of 108 survivors, and why each of the other 389 failed or was incomplete, is in
+The full list of 83 survivors, and why each of the other 414 failed or was incomplete, is in
 `data/screener/growth.csv`.
 
 **What fails.** A company can fail several rules: net margin 264, net income growth 176,
-EPS growth 169, profit every year 137, still growing 130, revenue up 4 of 5 years 130, net
-income up 3 of 5 years 125, revenue growth 30. Six are incomplete because they have less
-than 6 years of history (recent spin-offs: GE Vernova, Sandisk, Solventum and others).
+EPS growth 169, debt payback 148, profit every year 137, still growing 130, revenue up 4 of 5
+years 130, net income up 3 of 5 years 125, short-term debt covered 67, revenue growth 30.
+Six are incomplete: five recent spin-offs with too little history (GE Vernova, Sandisk,
+Honeywell Aerospace and others), and Extra Space Storage, whose free cash flow neither
+TradingView nor Yahoo has. Debt, cash and free cash flow blank on TradingView were filled
+from Yahoo for BlackRock, Monolithic Power and Blackstone (column `filled`).
 
-**Survivors by sector:** Finance 20, Technology Services 16, Health Technology 14,
-Producer Manufacturing 13, Electronic Technology 10, Commercial Services 6, the rest 29.
+**What the debt rules removed** (all passed growth and margin before): Domino's (net debt
+$4.65bn = 7.3 years of its $0.64bn free cash flow; $1.37bn due within a year against $0.47bn
+cash), McCormick, Fair Isaac (5.7 years), Yum! Brands, McDonald's (6.9 years), Martin
+Marietta, Sherwin-Williams (due within a year $4.39bn against cash $0.26bn plus free cash
+flow $3.08bn), Oracle and the utilities NextEra, Duke and American Water (negative free cash
+flow while carrying debt), and the REITs American Tower, UDR, Federal Realty, Regency,
+Realty Income and Prologis (7.6 to 14.7 years).
+
+**Survivors by sector:** Technology Services 15, Health Technology 14, Producer
+Manufacturing 12, Finance 11, Electronic Technology 10, Commercial Services 5, Retail Trade 5,
+the rest 11.
 Four survivors have a margin under 10%, in sectors whose average is low: Avery Dennison
 (7.6%, sector 5.0%), Ferguson (6.8%, 4.4%), TJX (9.7%, 9.4%), Grainger (9.9%, 4.4%).
 
@@ -126,7 +140,8 @@ Electronic Technology), a few very profitable companies push it up.
 
 ### Backtest: the same rules in past years
 
-Each fiscal year Y from 2019 to 2024: the rules applied to the yearly figures up to Y, P/E =
+The backtest was run before the debt rules were added and does not include them (TradingView's
+yearly history has no free cash flow). Each fiscal year Y from 2019 to 2024: the rules applied to the yearly figures up to Y, P/E =
 price at the end of April Y+1 / EPS for Y, ranked against the P/Es before then; the 10 lowest
 bought at the end of April Y+1. Price returns (no dividends).
 
@@ -175,6 +190,19 @@ alone and ranks them by it. P/E never removes a stock; it only orders the ones s
   companies only, would be steadier (`sector_margin = "median"` in the config).
 - **Still growing:** 12-month revenue and net income at or above the latest fiscal year, so a
   slowdown since the last annual report is caught.
+- **Debt it can pay** (Babak, after looking at Domino's: "their free cash flow is so much lower
+  than their debt ... filter them out as well in the first level before the P/E"). Two rules,
+  latest quarter's debt and cash against 12-month free cash flow:
+  - *Debt payback:* net debt (total debt minus cash) at most 5 years of free cash flow. Net
+    cash passes; net debt with zero or negative free cash flow fails. Five years is a common
+    rule of thumb for debt a business can repay from its own cash; 3 would be stricter
+    (it would also remove Medtronic, Aon, MSCI, Gen Digital and Roper).
+  - *Short-term debt covered:* cash plus a year of free cash flow at least equal to the debt
+    due within a year, so the company can meet this year's repayments without new borrowing.
+    Stage 1's stricter version asks cash alone to cover it.
+  - Banks and insurers skip both, as in Stage 1 (deposits and float are not debt in the
+    usual sense). This includes exchanges and brokers that TradingView files as investment
+    banks (CME, Cboe, ICE, Schwab). Blanks on TradingView are filled from Yahoo.
 - **Historically low P/E:** today's P/E (price / 12-month diluted EPS) against the median of
   the stock's own yearly P/Es over up to 10 fiscal years (average monthly price over each
   fiscal year / that year's diluted EPS, the same history as Stage 2 of the market
@@ -187,18 +215,21 @@ alone and ranks them by it. P/E never removes a stock; it only orders the ones s
 ### Findings
 
 1. **Today's list leans to software and data businesses that de-rated** (Adobe, PTC,
-   Netflix, Intuit, FICO, Roper): margins of 21-42%, revenue up every year, P/E 14-21
-   against their own medians of 37-50. Intuit, FICO, ResMed, Deckers and Copart are the
-   cleanest cases, with no flags, profit up in 4 or 5 of 5 years and margins well above their
-   sector.
-2. **The top name is a false positive.** McCormick's 12-month net income ($1.49bn) is nearly
-   double its latest fiscal year ($0.79bn), probably a one-off gain. Its real P/E on the latest
-   fiscal year is about 16, not 8.5. PTC, Roper, Martin Marietta and Alphabet carry the same
-   flag. For Alphabet that is likely gains on investments: 12-month net income of $236bn
-   against $132bn in fiscal 2025.
-3. **Lumpy profit passes too easily.** UDR (a REIT) shows 42% a year net income growth from
-   property-sale gains: $0.09bn, $0.44bn, $0.09bn, $0.38bn in successive years. The flag
-   catches it, but the rules do not.
+   Netflix, Intuit, Roper): margins of 21-42%, revenue up every year, P/E 14-21 against
+   their own medians of 37-50. Intuit, ResMed, Deckers and Copart are the cleanest cases:
+   no flags, profit up in 4 or 5 of 5 years, margins well above their sector, and net cash
+   or debt repaid in under a year of free cash flow.
+2. **The debt rules remove a fifth of the survivors** (108 to 83), mostly companies that
+   borrow heavily on purpose: restaurant franchisors (Domino's, McDonald's, Yum!), REITs,
+   utilities and serial acquirers (McCormick, Fair Isaac). Several of these were near the top
+   of the ranking: McCormick was first (its low P/E was also a one-off gain), Fair Isaac
+   sixth and Domino's eleventh.
+3. **Flags still matter.** PTC, Roper and Alphabet show 12-month net income more than 1.5
+   times their latest fiscal year, probably one-off gains (for Alphabet, likely gains on
+   investments: $236bn against $132bn in fiscal 2025), so their P/E looks lower than it is.
+   Before the debt rules, the REIT UDR passed with 42% a year net income growth from
+   property-sale gains ($0.09bn, $0.44bn, $0.09bn, $0.38bn in successive years); lumpy profit
+   still passes the growth rules, and only the flag catches it.
 4. **The backtest beats the index over 1 year and falls behind over longer holding.** Over
    1 year the top 10 beat the S&P 500 in 3 of 6 years and averaged 23.8% against 17.4%.
    2019 was luck: fiscal 2019 figures bought cruise lines at their April 2020 lows. Without
@@ -254,7 +285,8 @@ to the 6 years the filter checks, are options 1 and 6 below.
    business whose profit is shrinking relative to sales doesn't look cheap.
 3. Require recent growth too (3-year EPS growth above 0, the latest year up), to drop
    companies whose growth has already stopped (the "cheap because declining" picks).
-4. Combine with Stage 1's debt rules. AMT and UDR carry net debt above 6x EBITDA.
+4. Tighten the debt rules: 3 years of free cash flow instead of 5, or cash alone covering
+   the debt due within a year (Stage 1's rule).
 5. Run the screener on the whole US and Europe (`--all`) for more candidates.
 6. Take the P/E history over the same 6 fiscal years the filter checks (every one of them
    profitable and growing) rather than 10.
