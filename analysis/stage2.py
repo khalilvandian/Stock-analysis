@@ -118,9 +118,14 @@ def fill_cash_flows(d: pd.DataFrame, rows: pd.Index) -> None:
 # --- step 4: cheap price -------------------------------------------------------------
 
 
-def monthly_prices(symbols: list[str], today: str, years: int) -> pd.DataFrame:
-    """Monthly closes (split-adjusted) for many symbols, cached for the day."""
-    cache = CACHE / f"prices_{today}.pkl"
+def monthly_prices(
+    symbols: list[str], today: str, years: int, name: str = "prices"
+) -> pd.DataFrame:
+    """Monthly closes (split-adjusted) for many symbols, cached for the day.
+
+    `name` keeps caches of different lengths apart (the growth screener asks for more years).
+    """
+    cache = CACHE / f"{name}_{today}.pkl"
     have = pd.read_pickle(cache) if cache.exists() else pd.DataFrame()
     todo = [s for s in symbols if s not in have.columns]
     frames = [have]

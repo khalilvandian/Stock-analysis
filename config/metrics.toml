@@ -21,7 +21,8 @@
 #               (data/sector/*.csv, data/peers/*.csv, Yahoo); `stage1` = column in
 #               data/screener/stage1.csv (analysis/stage1.py, TradingView, PR #7);
 #               `watchlist` = key from analysis/watchlist.py key_numbers(); `stage2` =
-#               column in data/screener/top.csv; `tradingview`, `yahoo` and `sec` name the
+#               column in data/screener/top.csv; `growth` = column in
+#               data/screener/growth.csv (analysis/growth_screen.py); `tradingview`, `yahoo` and `sec` name the
 #               raw field, statement line or XBRL tag. A source can be {column, scale} when
 #               the column's unit differs (TradingView gives percentages as 15.5, not 0.155).
 #   used_in     where the project uses it
@@ -567,6 +568,20 @@ example = { symbol = "BSX", value = 0.0337, as_of = "FY2022-FY2025", working = "
 vector = "candidate"
 
 [[metric]]
+id = "sector_net_margin"
+name = "Sector median net margin"
+group = "profitability"
+unit = "fraction"
+better = "none"
+period = "ttm"
+definition = "Median 12-month net margin of every screened company in the same TradingView sector (sectors of 5 or more). The growth screener's margin floor when above 10%."
+formula = "median(net_margin) over the sector"
+sources = { growth = "sector_net_margin" }
+used_in = ["growth screener (net margin >= max(10%, sector median))"]
+example = { symbol = "BSX", value = 0.144, as_of = "2026-10-31", working = "Health Technology, S&P 500 members" }
+vector = "derived"
+
+[[metric]]
 id = "roe"
 name = "Return on equity"
 group = "profitability"
@@ -696,6 +711,77 @@ formula = "(eps_FY0 / eps_FY-3) ^ (1/3) - 1"
 sources = { sector = "eps_cagr_3y", stage1 = "eps_growth_3y" }
 used_in = ["Stage 1 fast grower (>= 20%)", "sector table"]
 example = { symbol = "BSX", value = 0.632, as_of = "FY2022-FY2025", working = "(1.939 / 0.446) ^ (1/3) - 1" }
+vector = "candidate"
+
+[[metric]]
+id = "revenue_cagr_5y"
+name = "Revenue growth, 5-year compound"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Yearly growth rate that turns revenue 5 fiscal years ago into revenue in the latest fiscal year."
+formula = "(revenue_FY0 / revenue_FY-5) ^ (1/5) - 1"
+sources = { growth = "revenue_cagr", tradingview = "total_revenue_fy_h" }
+used_in = ["growth screener (> 0)"]
+example = { symbol = "BSX", value = 0.152, as_of = "FY2020-FY2025", working = "(20.074 / 9.913) ^ (1/5) - 1 (TradingView, 2026-10-31)" }
+vector = "candidate"
+
+[[metric]]
+id = "revenue_up_years_5y"
+name = "Years revenue rose, of the last 5"
+group = "growth"
+unit = "count"
+better = "higher"
+period = "history"
+definition = "In how many of the last 5 fiscal years revenue was above the year before: how steady the growth is."
+formula = "count(revenue_y > revenue_y-1, last 5 years)"
+sources = { growth = "revenue_up_years", tradingview = "total_revenue_fy_h" }
+used_in = ["growth screener (>= 4)"]
+example = { symbol = "BSX", value = 5, as_of = "FY2020-FY2025", working = "9.9, 11.9, 12.7, 14.2, 16.7, 20.1 ($bn): up every year" }
+vector = "candidate"
+
+[[metric]]
+id = "net_income_cagr_5y"
+name = "Net income growth, 5-year compound"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Yearly growth rate that turns net income 5 fiscal years ago into net income in the latest fiscal year. Blank when either end is a loss."
+formula = "(net_income_FY0 / net_income_FY-5) ^ (1/5) - 1"
+sources = { growth = "net_income_cagr", tradingview = "net_income_fy_h" }
+used_in = ["growth screener (> 0)"]
+example = { symbol = "INTU", value = 0.172, as_of = "FY2021-FY2026", working = "(4.566 / 2.062) ^ (1/5) - 1 (TradingView, 2026-10-31)" }
+vector = "candidate"
+notes = "BSX is blank: a loss in FY2020 (-$0.08bn)."
+
+[[metric]]
+id = "net_income_up_years_5y"
+name = "Years net income rose, of the last 5"
+group = "growth"
+unit = "count"
+better = "higher"
+period = "history"
+definition = "In how many of the last 5 fiscal years net income was above the year before."
+formula = "count(net_income_y > net_income_y-1, last 5 years)"
+sources = { growth = "net_income_up_years", tradingview = "net_income_fy_h" }
+used_in = ["growth screener (>= 3)"]
+example = { symbol = "INTU", value = 5, as_of = "FY2021-FY2026", working = "2.06, 2.07, 2.38, 2.96, 3.87, 4.57 ($bn)" }
+vector = "candidate"
+
+[[metric]]
+id = "eps_cagr_5y"
+name = "EPS growth, 5-year compound"
+group = "growth"
+unit = "fraction"
+better = "higher"
+period = "history"
+definition = "Compound yearly GAAP diluted EPS growth over the last 5 fiscal years. Above net income growth when the company buys back shares."
+formula = "(eps_FY0 / eps_FY-5) ^ (1/5) - 1"
+sources = { growth = "eps_cagr", tradingview = "earnings_per_share_diluted_fy_h" }
+used_in = ["growth screener (> 0)"]
+example = { symbol = "INTU", value = 0.169, as_of = "FY2021-FY2026", working = "(16.48 / 7.55) ^ (1/5) - 1" }
 vector = "candidate"
 
 [[metric]]

@@ -63,7 +63,7 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Debt / equity](#debt-to-equity) | total_debt / book_equity | lower | candidate |
 | [Net cash / market value](#net-cash-to-market-cap) | -net_debt / market_cap | higher | candidate |
 
-**Profitability** (5)
+**Profitability** (6)
 
 | Metric | Formula | Better | Vector |
 |---|---|---|---|
@@ -71,9 +71,10 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Net margin, average of fiscal years](#net-margin-avg) | mean(net income / revenue per fiscal year) | higher | candidate |
 | [Net margin change, average](#margin-change-avg) | mean(margin_y - margin_y-1) | higher | candidate |
 | [Net margin change, median](#margin-change-median) | median(margin_y - margin_y-1) | higher | candidate |
+| [Sector median net margin](#sector-net-margin) | median(net_margin) over the sector | none | derived |
 | [Return on equity](#roe) | net_income / average book_equity | higher | candidate |
 
-**Growth** (13)
+**Growth** (18)
 
 | Metric | Formula | Better | Vector |
 |---|---|---|---|
@@ -85,6 +86,11 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [EPS growth, average year](#eps-growth-avg) | mean(eps_y / eps_y-1 - 1), years with eps_y-1 > 0 | higher | candidate |
 | [EPS growth, median year](#eps-growth-median) | median(eps_y / eps_y-1 - 1) | higher | core |
 | [EPS growth, 3-year compound](#eps-cagr-3y) | (eps_FY0 / eps_FY-3) ^ (1/3) - 1 | higher | candidate |
+| [Revenue growth, 5-year compound](#revenue-cagr-5y) | (revenue_FY0 / revenue_FY-5) ^ (1/5) - 1 | higher | candidate |
+| [Years revenue rose, of the last 5](#revenue-up-years-5y) | count(revenue_y > revenue_y-1, last 5 years) | higher | candidate |
+| [Net income growth, 5-year compound](#net-income-cagr-5y) | (net_income_FY0 / net_income_FY-5) ^ (1/5) - 1 | higher | candidate |
+| [Years net income rose, of the last 5](#net-income-up-years-5y) | count(net_income_y > net_income_y-1, last 5 years) | higher | candidate |
+| [EPS growth, 5-year compound](#eps-cagr-5y) | (eps_FY0 / eps_FY-5) ^ (1/5) - 1 | higher | candidate |
 | [Earnings growth, latest quarter](#earnings-growth-yoy) | eps_Q / eps_Q-4 - 1 | higher | candidate |
 | [Operating cash flow growth, average year](#ocf-growth-avg) | mean(ocf_y / ocf_y-1 - 1) | higher | candidate |
 | [Operating cash flow growth, median year](#ocf-growth-median) | median(ocf_y / ocf_y-1 - 1) | higher | core |
@@ -598,6 +604,18 @@ Median yearly change in net margin: the typical year, less swayed by one jump.
 - **Example (BSX, FY2022-FY2025):** +3.4 pp = median(+5.7, -0.1, +3.3) pp
 - **Vector:** candidate
 
+<a id="sector-net-margin"></a>
+#### Sector median net margin (`sector_net_margin`)
+
+Median 12-month net margin of every screened company in the same TradingView sector (sectors of 5 or more). The growth screener's margin floor when above 10%.
+
+- **Formula:** median(net_margin) over the sector
+- **Unit:** fraction; **better:** none; **period:** ttm
+- **Source:** growth: `sector_net_margin`
+- **Used in:** growth screener (net margin >= max(10%, sector median))
+- **Example (BSX, 2026-10-31):** +14.4% = Health Technology, S&P 500 members
+- **Vector:** derived
+
 <a id="roe"></a>
 #### Return on equity (`roe`)
 
@@ -710,6 +728,67 @@ Compound yearly GAAP EPS growth over the last 3 fiscal years. Lynch: a fast grow
 - **Source:** sector: `eps_cagr_3y`; stage1: `eps_growth_3y`
 - **Used in:** Stage 1 fast grower (>= 20%); sector table
 - **Example (BSX, FY2022-FY2025):** +63.2% = (1.939 / 0.446) ^ (1/3) - 1
+- **Vector:** candidate
+
+<a id="revenue-cagr-5y"></a>
+#### Revenue growth, 5-year compound (`revenue_cagr_5y`)
+
+Yearly growth rate that turns revenue 5 fiscal years ago into revenue in the latest fiscal year.
+
+- **Formula:** (revenue_FY0 / revenue_FY-5) ^ (1/5) - 1
+- **Unit:** fraction; **better:** higher; **period:** history
+- **Source:** growth: `revenue_cagr`; tradingview: `total_revenue_fy_h`
+- **Used in:** growth screener (> 0)
+- **Example (BSX, FY2020-FY2025):** +15.2% = (20.074 / 9.913) ^ (1/5) - 1 (TradingView, 2026-10-31)
+- **Vector:** candidate
+
+<a id="revenue-up-years-5y"></a>
+#### Years revenue rose, of the last 5 (`revenue_up_years_5y`)
+
+In how many of the last 5 fiscal years revenue was above the year before: how steady the growth is.
+
+- **Formula:** count(revenue_y > revenue_y-1, last 5 years)
+- **Unit:** count; **better:** higher; **period:** history
+- **Source:** growth: `revenue_up_years`; tradingview: `total_revenue_fy_h`
+- **Used in:** growth screener (>= 4)
+- **Example (BSX, FY2020-FY2025):** 5 = 9.9, 11.9, 12.7, 14.2, 16.7, 20.1 ($bn): up every year
+- **Vector:** candidate
+
+<a id="net-income-cagr-5y"></a>
+#### Net income growth, 5-year compound (`net_income_cagr_5y`)
+
+Yearly growth rate that turns net income 5 fiscal years ago into net income in the latest fiscal year. Blank when either end is a loss.
+
+- **Formula:** (net_income_FY0 / net_income_FY-5) ^ (1/5) - 1
+- **Unit:** fraction; **better:** higher; **period:** history
+- **Source:** growth: `net_income_cagr`; tradingview: `net_income_fy_h`
+- **Used in:** growth screener (> 0)
+- **Example (INTU, FY2021-FY2026):** +17.2% = (4.566 / 2.062) ^ (1/5) - 1 (TradingView, 2026-10-31)
+- **Vector:** candidate
+- **Note:** BSX is blank: a loss in FY2020 (-$0.08bn).
+
+<a id="net-income-up-years-5y"></a>
+#### Years net income rose, of the last 5 (`net_income_up_years_5y`)
+
+In how many of the last 5 fiscal years net income was above the year before.
+
+- **Formula:** count(net_income_y > net_income_y-1, last 5 years)
+- **Unit:** count; **better:** higher; **period:** history
+- **Source:** growth: `net_income_up_years`; tradingview: `net_income_fy_h`
+- **Used in:** growth screener (>= 3)
+- **Example (INTU, FY2021-FY2026):** 5 = 2.06, 2.07, 2.38, 2.96, 3.87, 4.57 ($bn)
+- **Vector:** candidate
+
+<a id="eps-cagr-5y"></a>
+#### EPS growth, 5-year compound (`eps_cagr_5y`)
+
+Compound yearly GAAP diluted EPS growth over the last 5 fiscal years. Above net income growth when the company buys back shares.
+
+- **Formula:** (eps_FY0 / eps_FY-5) ^ (1/5) - 1
+- **Unit:** fraction; **better:** higher; **period:** history
+- **Source:** growth: `eps_cagr`; tradingview: `earnings_per_share_diluted_fy_h`
+- **Used in:** growth screener (> 0)
+- **Example (INTU, FY2021-FY2026):** +16.9% = (16.48 / 7.55) ^ (1/5) - 1
 - **Vector:** candidate
 
 <a id="earnings-growth-yoy"></a>

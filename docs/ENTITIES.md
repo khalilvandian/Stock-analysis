@@ -254,6 +254,20 @@ Key columns:
 | `sec_eps` | SEC EDGAR diluted EPS for the latest fiscal year (US only) |
 | `why` | One line: P/E against the cheap multiple, 10-year median, leverage, growth, trend |
 
+### `data/screener/growth.csv`
+
+The growth screener's full table (report 15): every company, passes first in rank order.
+Columns: `description`, `region`, `sector`, `industry`, `type`, `status` (pass, fail,
+incomplete), `failed`, `missing`, `rank`, `flags`, the absolute values (as in `top.csv`),
+`revenue_cagr`, `revenue_up_years`, `net_income_cagr`, `net_income_up_years`, `eps_cagr`,
+`eps_cagr_3y`, `net_margin` (12 months), `sector_net_margin`, `net_margin_change` (latest
+fiscal year minus 5 years before), `pe_now`, `pe_median`, `pe_low`, `pe_years`,
+`pe_vs_median` (the ranking measure), `pe_percentile`.
+
+`data/screener/growth_backtest.csv`: one row per backtest pick: `fiscal_year`, `entry`,
+symbol, company, sector, rank, the growth and margin measures, P/E against own median, and
+`return_1y` and `return_to_date` (price only).
+
 ### `data/screener/YYYY-MM-DD.csv`
 
 Every company of the day's run with both stages' columns (no yearly lists). `market.py` and

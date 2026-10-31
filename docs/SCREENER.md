@@ -275,6 +275,60 @@ scores, technicals) changes the ranking.
 - **Cash flows.** Blank 12-month operating cash flow, capex or free cash flow of a listed name
   is filled from Yahoo's last four quarters and named in `filled`.
 
+## The growth screener
+
+A separate screener (`analysis/growth_screen.py`, settings `[growth]` in
+`config/screeners.toml`, results in [report 15](../reports/15-growth-screener.md)) for
+testing Babak's growth idea (2026-10-31). Same universe and market-value floor as the
+market screener; only TradingView for the figures and Yahoo for the prices. It runs in two
+steps, in this order: **filter** on growth and margin with no price involved, **then**
+rank what is left by P/E against the stock's own history. P/E never removes a stock.
+
+### Step 1: filter (5 fiscal years, `years = 5`)
+
+| Rule | Test | Setting |
+|---|---|---|
+| revenue growth | Compound revenue growth over 5 years above 0 | `min_revenue_cagr = 0.0` |
+| revenue up years | Revenue up in at least 4 of the 5 years | `min_revenue_up_years = 4` |
+| net income growth | Compound net income growth above 0 (a loss at either end fails) | `min_net_income_cagr = 0.0` |
+| net income up years | Net income up in at least 3 of the 5 years | `min_net_income_up_years = 3` |
+| profit every year | Net income above 0 in all 6 fiscal years | |
+| EPS growth | Compound diluted EPS growth above 0 | `min_eps_cagr = 0.0` |
+| net margin | 12-month net income / revenue at least 10% **and** at least the sector median (sectors of 5+ companies; smaller sectors: 10% only) | `min_net_margin = 0.10`, `margin_vs_sector = true`, `min_sector_size = 5` |
+| still growing | 12-month revenue and net income at or above the latest fiscal year | `still_growing = true` |
+
+A missing year of history makes the stock "incomplete" rather than a pass. The sector median
+is taken over every company screened (TradingView's sectors). Why the sector median: margins
+differ by business. On 2026-10-31 S&P 500 sector medians ran from 2.1% (Distribution
+Services) to 21.0% (Technology Services), so one fixed number either lets every software
+company through or shuts out every retailer.
+
+### Step 2: P/E against own history (survivors only)
+
+- `pe_now` = price / 12-month diluted EPS.
+- The stock's yearly P/Es over up to `history_years` (10) fiscal years, as in Stage 2
+  (average monthly price over the fiscal year / that year's diluted EPS). Yearly P/Es above
+  `max_history_pe` (100) are left out (years of near-zero earnings).
+- `pe_vs_median` = `pe_now` / median own P/E - 1: the ranking measure, lowest first.
+  `pe_percentile` = share of past yearly P/Es below today's.
+- Fewer than `min_history_years` (6) yearly P/Es: listed after the ranked stocks.
+- Flags, not rules: `12m profit 1.5x+ latest year (one-off?)` and `net income fell 30%+ in
+  a year` (lumpy profit). Both make the P/E or the growth rate less reliable.
+
+### Backtest (`--backtest`)
+
+For each of the 6 fiscal years before the latest: the history lists are cut so that year is
+the latest, the filter runs on fiscal-year figures (margin from the fiscal year, no "still
+growing" check), P/E = price at the end of April the next year / that year's EPS against the
+P/Es before then, and the 10 lowest are "bought" then. Price returns (no dividends) after 1
+year and to today, against the average of every passing stock, every screened stock and the
+S&P 500 index (`^GSPC`). The universe is today's, so survivorship flatters the results.
+
+Outputs: `data/screener/growth.csv` (every company: status, failed and missing rules,
+flags, absolute values, growth measures, P/E against own history, rank) and
+`data/screener/growth_backtest.csv` (each backtest pick and its returns). Neither is part of
+the evening run.
+
 ## Judgement calls
 
 | Call | What the code does | Why |

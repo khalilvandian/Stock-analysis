@@ -92,6 +92,7 @@ COLUMNS = [
     "fiscal_period_end_fy",
     "earnings_per_share_diluted_fy_h",
     "total_revenue_fy_h",
+    "net_income_fy_h",
     "ebitda_fy_h",
     "dps_common_stock_prim_issue_fy_h",
     "dividend_payout_ratio_ttm",

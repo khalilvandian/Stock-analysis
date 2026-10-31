@@ -48,6 +48,10 @@ Ratios and scores hide important information, so they come after, never instead.
   close-to-cheap survivors per sector against each stock's own cheap P/E. The evening run
   reruns it, and the market report, the site's Screener page and the email show its top 3
   per sector.
+- Growth screener (report 15, `[growth]` in `config/screeners.toml`):
+  `uv run python analysis/growth_screen.py [--backtest]`. First filters on growth (revenue,
+  net income, EPS) and net margin (at least 10% and the sector median), then ranks only the
+  survivors by P/E against their own history. Separate from the evening run.
 - Other tools, in the usual order after step 1: `analysis/screen.py` (strict and weighted
   screens), `analysis/peer_screen.py` (the same screens on a hand-picked peer group), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,
   `analysis/valuation.py`, `analysis/debt_to_ebitda.py`.

@@ -169,3 +169,23 @@ their date.
   9. **Cash-balance growth:** drop it (it jumps with deals and debt raises).
 - **Why:** The vector work can go on while Babak reviews; each default is the one Claude
   recommended in report 14 and can be changed in `config/metrics.toml`.
+
+## 2026-10-31
+
+### The growth screener: filter on growth first, then historically low P/E
+
+- **Who:** Babak; thresholds proposed by Claude (report 15).
+- **Decisions:**
+  1. **A separate screener for testing** (`analysis/growth_screen.py`), not part of the
+     evening run or the two-stage market screener.
+  2. **Filter first, P/E after.** Babak: "first filter with the growth and the positive
+     revenue, net margin, and then based on what's left apply the P/E". Step 1 uses no price.
+  3. **Growth must be positive:** revenue, net income and EPS compound growth over 5 years
+     above 0, with revenue up in 4 of 5 years and net income in 3 of 5.
+  4. **High margin = at least 10% and at least the sector median.** Babak suggested 10% and
+     asked for a better way if there is one; margins differ so much by business (2% to 21%
+     sector medians) that the sector median is added on top of the 10% floor.
+  5. **Low P/E means historically low:** against the stock's own yearly P/E median, not the
+     lowest P/E in the market. Yearly P/Es above 100 are left out of the history.
+- **Why:** Growth, profit and margin show a good business; the stock's own history says
+  whether its price is low for that business.

@@ -142,6 +142,7 @@ flowchart TD
 | `stage1.py` | Screener Stage 1: universe, gap filling, Lynch category, rules per category or business type. Writes `data/screener/stage1.csv` and `.cache/screener/stage1_full.pkl`. |
 | `stage2.py` | Screener Stage 2: reads only Stage 1's output, sets each survivor's cheap price, ranks, adds technicals and the SEC cross-check. Writes `data/screener/top.csv`. |
 | `screener.py` | Runs Stage 1 then Stage 2 and writes the dated `data/screener/YYYY-MM-DD.csv`. `run()` is called by the evening run. |
+| `growth_screen.py` | The growth screener (report 15): filters on revenue, net income and EPS growth and net margin, then ranks the survivors by P/E against their own history; `--backtest` tests it on past years. Writes `data/screener/growth.csv` and `growth_backtest.csv`. Reuses Stage 1's universe and Stage 2's P/E history. |
 | `watchlist.py` | The evening run's driver: runs the screener and the market report, then one PDF per watch-list stock and a summary PDF; records `runs.csv`, rebuilds the dated lists, writes the email body. |
 | `market.py` | The whole-market PDF: indices, sectors, breadth, and the screener's top 3 per sector from `data/screener/top.csv`. |
 | `site.py` | Builds the public GitHub Pages site from `analyses/` and `data/screener/` (standard library only). |
@@ -160,7 +161,8 @@ top-level `README.md`).
 `test_absolute.py` (config columns exist in the saved data), `test_fmp.py` (FMP client with
 `respx`), `test_metrics.py` (dictionary complete, `docs/METRICS.md` up to date),
 `test_screener.py` (TradingView paging and ECB rates with `respx`, categories, rules, cheap
-price, ranking, the Stage 1 to Stage 2 contract), `test_watchlist.py` (adjusted EPS, P/E
+price, ranking, the Stage 1 to Stage 2 contract), `test_growth_screen.py` (growth
+measures, filter rules, sector margin floor, flags, P/E against own history), `test_watchlist.py` (adjusted EPS, P/E
 history, split adjustment, notes, PDFs never overwritten), `test_pipeline_units.py`
 (missing values, splits, currencies, outliers and cross-checks between sources, on the saved
 responses in `tests/fixtures/`; tests marked `xfail(strict=True)` document known bugs).
@@ -190,7 +192,7 @@ responses in `tests/fixtures/`; tests marked `xfail(strict=True)` document known
 | `data/<SYMBOL>/` | Yes | One company's saved Yahoo data | `stock_analysis.fetch` |
 | `data/sector/` | Yes | Utilities screen, yearly history, absolute-values tables | `sector.py`, `history.py`, `absolute.py` |
 | `data/peers/` | Yes | Peer-group tables | `peer_screen.py` |
-| `data/screener/` | Yes, every evening (`stage1.csv`, `top.csv`, the dated CSV) | Stage 1 results, Stage 2 top per sector, the dated full table | `stage1.py`, `stage2.py`, `screener.py` |
+| `data/screener/` | Yes, every evening (`stage1.csv`, `top.csv`, the dated CSV) | Stage 1 results, Stage 2 top per sector, the dated full table; the growth screener's `growth.csv` and `growth_backtest.csv` (by hand) | `stage1.py`, `stage2.py`, `screener.py`, `growth_screen.py` |
 | `.cache/sec/` | No | Raw SEC company facts, about 250 MB for the utilities | `history.py`, `watchlist.py` |
 | `.cache/screener/` | No | Day caches of TradingView, Yahoo fills and prices; `stage1_full.pkl` for Stage 2 | `stage1.py`, `stage2.py` |
 | `.cache/watchlist/` | No | `email.html` and `last_run.json` of the last run | `watchlist.py` |

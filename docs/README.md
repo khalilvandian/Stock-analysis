@@ -25,7 +25,7 @@ it is the way it is. The project rules every Claude session follows are in
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | The design: layers, module map, data flow, where state lives, design principles |
 | [`ENTITIES.md`](ENTITIES.md) | Data sources, absolute values, metrics, watch list, Lynch categories, screener types, reports, dated analyses, site, email, schedule, file formats |
 | [`PROCESSES.md`](PROCESSES.md) | Every process step by step with the exact commands |
-| [`SCREENER.md`](SCREENER.md) | Full reference of the two-stage market screener: every rule, threshold and source |
+| [`SCREENER.md`](SCREENER.md) | Full reference of the two-stage market screener and the growth screener: every rule, threshold and source |
 | [`DECISIONS.md`](DECISIONS.md) | Dated decision log: what was decided, by whom and why |
 | [`OPERATIONS.md`](OPERATIONS.md) | Running and changing things, troubleshooting, test policy, the pre-commit check |
 | [`SETUP.md`](SETUP.md) | Setting up a Claude Code on the web workspace for this repository |

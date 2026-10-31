@@ -194,6 +194,26 @@ threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the ful
     names are filled from Yahoo's last four quarters; then the ranking is redone.
 11. **Save.** `top.csv`; `screener.py` also writes the dated full table.
 
+### The growth screener (`analysis/growth_screen.py`)
+
+A separate screener for testing (report 15; reference in
+[`SCREENER.md`](SCREENER.md#the-growth-screener)):
+
+```bash
+uv run python analysis/growth_screen.py              # today's list -> data/screener/growth.csv
+uv run python analysis/growth_screen.py --backtest   # and the backtest -> growth_backtest.csv
+uv run python analysis/growth_screen.py --all        # every US and European company above $1bn
+```
+
+1. **Universe** as in Stage 1 (`stage1.fetch_universe` and `stage1.prepare`, same cache).
+2. **Filter** (no price): revenue, net income and EPS growth over 5 fiscal years, profit
+   every year, net margin at least 10% and its sector's median, still growing in the last 12
+   months.
+3. **Rank the survivors** by P/E against their own yearly P/E history (Yahoo monthly prices,
+   cached as `.cache/screener/prices_long_<date>.pkl`, 19 years for the backtest).
+4. **Check the flags** before trusting a P/E (one-off gain, lumpy profit), then show the
+   absolute values first, as for every analysis.
+
 ## 6. Metrics vectors
 
 ```bash
