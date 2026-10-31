@@ -18,7 +18,8 @@ What it checks:
     adjusted EPS far from diluted, extreme EPS growth, infinite ratios.
   - Dated analyses (analyses/*/runs.csv): they parse, run times are in order and match
     the file names, every listed PDF exists and is a non-empty PDF, the newest PDF of
-    every folder is non-empty, entry price = target P/E x adjusted EPS, every watch list
+    every folder is non-empty, entry price = target P/E x adjusted EPS (+ equity stakes
+    per share where set), every watch list
     stock has notes.md; .cache/watchlist/last_run.json lists files that exist.
 
 WARN = worth a look (known data differences between sources); FAIL = the outputs are broken.
@@ -489,8 +490,12 @@ def check_runs(folder: Path) -> list[Check]:
         out.append(_pass(name, f"{len(runs)} runs, latest {runs['run'].iloc[-1]}"))
     if {"price", "eps_adj_ttm", "pe_adj", "target_pe", "entry_price", "to_entry"} <= set(runs):
         r = runs.astype({c: float for c in ("price", "eps_adj_ttm", "target_pe")})
-        entry = (r["target_pe"] * r["eps_adj_ttm"]).where(r["eps_adj_ttm"] > 0)
-        pe = (r["price"] / r["eps_adj_ttm"]).where(r["eps_adj_ttm"] > 0)
+        # stakes_per_share (equity stakes kept out of the P/E) is blank in older rows
+        stakes = pd.to_numeric(
+            r.get("stakes_per_share", pd.Series(0.0, index=r.index)), errors="coerce"
+        ).fillna(0.0)
+        entry = (r["target_pe"] * r["eps_adj_ttm"] + stakes).where(r["eps_adj_ttm"] > 0)
+        pe = ((r["price"] - stakes) / r["eps_adj_ttm"]).where(r["eps_adj_ttm"] > 0)
         to_entry = entry / r["price"] - 1
         wrong = (
             off(entry, r["entry_price"], 1e-3)

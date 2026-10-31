@@ -72,6 +72,7 @@ def load_watchlist(path: Path = CONFIG) -> dict:
         s["symbol"] = s["symbol"].upper()
         s.setdefault("peers", [])
         s.setdefault("eps_override", [])
+        s.setdefault("stakes_per_share", 0.0)
     return cfg
 
 
@@ -249,7 +250,10 @@ def key_numbers(d: dict) -> dict:
     eps = float(ttm.iloc[-1]) if not ttm.empty else np.nan
     yearly = yearly_pe(prices, ttm)
     median = float(yearly["pe"].median()) if not yearly.empty else np.nan
-    entry = stock["target_pe"] * eps if eps > 0 else np.nan
+    # Equity stakes (stakes_per_share) are kept out of the P/E: the price paid for the
+    # business is the price less the stakes, and the entry price adds them back.
+    stakes = float(stock.get("stakes_per_share", 0.0))
+    entry = stock["target_pe"] * eps + stakes if eps > 0 else np.nan
     q = d["quarters"]
     eps_next = (
         eps - float(q.iloc[-4]) + d["next_estimate"]
@@ -260,7 +264,7 @@ def key_numbers(d: dict) -> dict:
         "price": price,
         "price_date": prices.index[-1].date().isoformat(),
         "eps_adj_ttm": eps,
-        "pe_adj": price / eps if eps > 0 else np.nan,
+        "pe_adj": (price - stakes) / eps if eps > 0 else np.nan,
         "pe_median_10y": median,
         "pe_median_5y": float(yearly["pe"].tail(5).median()) if not yearly.empty else np.nan,
         "pe_low_10y": float(yearly["pe"].min()) if not yearly.empty else np.nan,
@@ -270,7 +274,8 @@ def key_numbers(d: dict) -> dict:
         "to_entry": entry / price - 1 if np.isfinite(entry) else np.nan,
         "next_report": d["next_report"].date().isoformat() if d["next_report"] is not None else "",
         "next_estimate": d["next_estimate"],
-        "entry_after_next": stock["target_pe"] * eps_next if eps_next > 0 else np.nan,
+        "stakes_per_share": stakes,
+        "entry_after_next": stock["target_pe"] * eps_next + stakes if eps_next > 0 else np.nan,
     }
 
 
@@ -574,6 +579,11 @@ def render(d: dict, k: dict, run_label: str) -> str:
         if np.isfinite(gap)
         else "–"
     )
+    stakes_text = (
+        f" plus {money(k['stakes_per_share'])} a share of equity stakes (kept out of the P/E)"
+        if k.get("stakes_per_share")
+        else ""
+    )
     nxt = (
         f"Next report {k['next_report']} (EPS estimate {money(k['next_estimate'])}); "
         f"if met, the entry price becomes {money(k['entry_after_next'])}."
@@ -609,7 +619,8 @@ Claude's notes updated {html.escape(updated or "never")}.</div>
 <h3>Adjusted P/E against its own 10-year history</h3>
 {pe_history_html(d, k)}
 <h3>Entry price</h3>
-<p>At {k["target_pe"]:g}x trailing adjusted EPS of {money(k["eps_adj_ttm"])}, the entry price is
+<p>At {k["target_pe"]:g}x trailing adjusted EPS of {money(k["eps_adj_ttm"])}{stakes_text},
+the entry price is
 <b>{money(k["entry_price"])}</b>, {gap_text}. The 10-year range of yearly P/E is
 {times(k["pe_low_10y"])} to {times(k["pe_high_10y"])} (years of collapsed earnings, such as 2020,
 show very high P/Es). {nxt}</p>
@@ -746,6 +757,7 @@ RUN_COLUMNS = [
     "entry_price",
     "to_entry",
     "verdict",
+    "stakes_per_share",
 ]
 
 

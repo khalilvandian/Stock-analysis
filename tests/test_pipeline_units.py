@@ -192,6 +192,14 @@ def test_key_numbers_entry_price_from_target_pe_and_adjusted_eps():
     assert k["entry_after_next"] == 15 * 4.5
 
 
+def test_key_numbers_keeps_equity_stakes_out_of_the_pe_and_adds_them_to_the_entry():
+    d = _key_inputs(next_estimate=1.5)
+    d["stock"]["stakes_per_share"] = 20.0
+    k = watchlist.key_numbers(d)
+    assert k["pe_adj"] == 20.0  # (100 - 20) / 4
+    assert k["entry_price"] == 80.0 and k["entry_after_next"] == 15 * 4.5 + 20
+
+
 def test_key_numbers_without_eps_history_is_blank_not_an_error():
     no_eps = pd.Series(dtype=float, index=pd.DatetimeIndex([]))
     k = watchlist.key_numbers(_key_inputs(q=no_eps))

@@ -8,6 +8,8 @@
 # peers       Sector-appropriate peers for the ratios and the strict and weighted screens.
 # target_pe   Entry multiple: entry price = target_pe x trailing 12-month adjusted EPS.
 # target_note Where the target comes from and whether Babak has confirmed it.
+# stakes_per_share  Optional after-tax value of equity stakes per share: kept out of the
+#               P/E (price - stakes) and added back to the entry price.
 # eps_override  Optional one-off corrections to a quarter's adjusted EPS, by report date,
 #               when Yahoo's figure still includes a one-off (e.g. a tax charge).
 
@@ -39,8 +41,9 @@ eps_override = [
 [[stock]]
 symbol = "GOOGL"
 peers = ["MSFT", "META", "AMZN", "AAPL", "ORCL", "IBM", "PINS", "SNAP", "TTD"]
-target_pe = 20
-target_note = "Proposed 2026-10-29, not yet confirmed by Babak: about the 5-year median (about 20x) and the decade low, a discount for the heavy AI capital spending (about $130bn a year) squeezing free cash flow."
+target_pe = 22
+stakes_per_share = 14.93
+target_note = "Report 17 (2026-10-29), not yet confirmed by Babak: 22x core EPS ex-stakes, the 2023-2025 level with a discount for the capex and the dilution; the after-tax equity stakes (Anthropic, SpaceX, others: $14.93 a share at 30 Sep 2026) are added back, so the entry is about $259."
 eps_override = [
   { reported = "2026-02-04", eps = 2.67, reason = "excludes the $2.3bn gain on equity securities ($0.15 a share, Alphabet's figure)." },
   { reported = "2026-04-29", eps = 2.76, reason = "excludes the $36.9bn gain on equity securities ($2.35 a share, Alphabet's figure)." },
