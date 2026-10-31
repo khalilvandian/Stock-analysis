@@ -569,17 +569,18 @@ vector = "candidate"
 
 [[metric]]
 id = "sector_net_margin"
-name = "Sector median net margin"
+name = "Sector average net margin"
 group = "profitability"
 unit = "fraction"
 better = "none"
 period = "ttm"
-definition = "Median 12-month net margin of every screened company in the same TradingView sector (sectors of 5 or more). The growth screener's margin floor when above 10%."
-formula = "median(net_margin) over the sector"
+definition = "Average (mean) 12-month net margin of every screened company in the same TradingView sector, losses included (sectors of 5 or more). The growth screener's margin bar."
+formula = "mean(net_margin) over the sector"
 sources = { growth = "sector_net_margin" }
-used_in = ["growth screener (net margin >= max(10%, sector median))"]
-example = { symbol = "BSX", value = 0.144, as_of = "2026-10-31", working = "Health Technology, S&P 500 members" }
+used_in = ["growth screener (net margin > sector average)"]
+example = { symbol = "BSX", value = 0.105, as_of = "2026-10-31", working = "Health Technology, 42 S&P 500 members (median 0.144)" }
 vector = "derived"
+notes = "Losses pull the mean down and one-off gains push it up; the screener can use the median instead (sector_margin = \"median\")."
 
 [[metric]]
 id = "roe"

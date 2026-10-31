@@ -200,12 +200,13 @@ min_revenue_up_years = 4       # and up in at least 4 of the 5 years
 min_net_income_cagr = 0.0      # net income growth a year, compounded, above this
 min_net_income_up_years = 3    # and up in at least 3 of the 5 years, profit in all 6
 min_eps_cagr = 0.0             # diluted EPS growth a year, compounded (buybacks count)
-# High margin: net income / revenue over 12 months at least 10% (Babak: "above 10%") AND
-# at least the median of its sector, so a 10% grocer (sector median ~3%) is rewarded and a
-# 10% software company (sector median ~20%) is not. Sector medians are taken over the whole
-# universe screened, from sectors with at least `min_sector_size` companies.
+# High margin: net income / revenue over 12 months above the average (mean) of its sector
+# (Babak, 2026-10-31: "let's set net profit as more than the average of the sector"; it
+# replaces "at least 10% and at least the sector median"). The average is taken over every
+# company screened in the sector, losses included. Sectors with fewer than
+# `min_sector_size` companies use `min_net_margin` instead.
+sector_margin = "mean"         # "mean", "median", or "" for the fixed `min_net_margin` only
 min_net_margin = 0.10
-margin_vs_sector = true
 min_sector_size = 5
 still_growing = true           # 12-month revenue and net income not below the latest year
 # Yearly P/Es above this are left out of the stock's own history: they come from years of

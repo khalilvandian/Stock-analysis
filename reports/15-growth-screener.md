@@ -7,16 +7,19 @@ Universe: the S&P 500 (497 companies, `[universe]` in `config/screeners.toml`).
 
 Babak asked for a screener to test (2026-10-31): revenue growing, net profit growing, a high
 net margin, EPS growing, and among these the stocks whose P/E is low **against their own
-history**. 108 of 497 S&P 500 companies pass the growth and margin rules. 56 of them trade
-below their own median P/E. The 20 furthest below it are listed below. Half of those 20
-carry a flag (a likely one-off gain or lumpy profit) that makes the P/E less reliable.
+history**. A high margin means a net margin above the average of the company's sector
+(Babak's choice, replacing an earlier 10% floor plus the sector median). 108 of 497 S&P 500
+companies pass the growth and margin rules. 56 of them trade below their own median P/E.
+The 20 furthest below it are listed below. Half of those 20 carry a flag (a likely one-off
+gain or lumpy profit) that makes the P/E less reliable.
 
 A backtest on six past years (fiscal 2019 to 2024, bought at the end of April after each)
-gives a mixed result. Over 1 year the top 10 rose 22.0% on average, against 17.4% for the
+gives a mixed result. Over 1 year the top 10 rose 23.8% on average, against 17.4% for the
 S&P 500 and 23.4% for an equal-weighted average of all the screened stocks. They beat the
-S&P 500 in 4 of the 6 years. **Held to today, every one of the six yearly portfolios is
-behind the S&P 500.** As built, the screen finds stocks that bounce over a year more often
-than businesses that compound. It is a starting list for study, not a buy list.
+S&P 500 in 3 of the 6 years. **Held to today, five of the six yearly portfolios are behind
+the S&P 500.** The sixth (fiscal 2019) is ahead only because of one stock, Comfort Systems,
+up 37-fold. As built, the screen finds stocks that bounce over a year more often than
+businesses that compound. It is a starting list for study, not a buy list.
 
 ## The numbers
 
@@ -35,13 +38,13 @@ than businesses that compound. It is a starting list for study, not a buy list.
 | UDR | UDR | 35.52 | 11.41 | 5.99 | 5.96 | 1.29 | 4.70 | 0.04 | 1.72 | 0.99 | 0.52 | 1.57 | 1.13 | -0.26 | 0.88 |
 | MLM | Martin Marietta Materials | 540.41 | 38.38 | 6.34 | 6.22 | 0.93 | 5.42 | 0.12 | 6.69 | 2.06 | 2.46 | 40.69 | 1.52 | -0.71 | 0.81 |
 | DPZ | Domino's Pizza | 313.71 | 10.32 | 5.12 | 4.65 | 1.37 | 3.75 | 0.47 | 5.07 | 1.08 | 0.61 | 18.15 | 0.76 | -0.12 | 0.64 |
+| XYL | Xylem | 92.40 | 21.19 | 3.03 | 2.32 | 0.66 | 2.37 | 0.71 | 9.05 | 2.00 | 1.08 | 4.53 | 1.27 | -0.39 | 0.88 |
 | RMD | ResMed | 229.94 | 32.34 | 0.61 | -0.42 | 0.19 | 0.42 | 1.03 | 5.73 | 2.18 | 1.59 | 10.98 | 1.77 | -0.18 | 1.61 |
 | GOOG | Alphabet | 278.22 | 3,411.53 | 146.64 | -118.46 | 2.07 | 144.57 | 265.10 | 471.14 | 185.94 | 235.69 | 19.15 | 179.55 | -159.80 | 19.75 |
 | DECK | Deckers Outdoor | 81.99 | 10.94 | 0.54 | -0.67 | 0.08 | 0.46 | 1.21 | 5.57 | 1.38 | 1.06 | 7.55 | 1.13 | -0.08 | 1.05 |
 | BKNG | Booking | 148.13 | 111.30 | 20.69 | 3.19 | 2.00 | 18.69 | 17.51 | 28.24 | 10.65 | 7.21 | 9.04 | 9.86 | -0.32 | 9.54 |
 | FRT | Federal Realty Investment Trust | 110.19 | 9.63 | 5.17 | 5.06 | 0.20 | 4.97 | 0.11 | 1.35 | 0.86 | 0.44 | 5.00 | 0.66 | -0.31 | 0.34 |
 | SCHW | Charles Schwab | 88.05 | 152.27 | 40.00 | -28.50 | 16.20 | 23.80 | 68.50 | 30.50 | 17.13 | 10.64 | 5.86 |  |  |  |
-| PEP | PepsiCo | 137.34 | 187.16 | 51.88 | 40.72 | 9.22 | 42.66 | 11.16 | 98.24 | 19.97 | 10.90 | 7.96 | 14.57 | -4.10 | 10.47 |
 | AON | Aon | 321.67 | 68.24 | 28.95 | 13.63 | 1.90 | 27.05 | 15.32 | 17.68 | 5.94 | 3.93 | 18.26 | 3.57 | -0.31 | 3.27 |
 | CPRT | Copart | 30.13 | 27.91 | 0.09 | -4.40 | 0.02 | 0.07 | 4.49 | 4.67 | 1.88 | 1.48 | 1.55 | 1.60 | -0.34 | 1.27 |
 
@@ -53,26 +56,26 @@ is not comparable).
 
 | Symbol | # | Sector | Rev CAGR % | Rev up | NI CAGR % | NI up | EPS CAGR % | Margin % | Sector margin % | P/E | Own median P/E | Own low P/E | Years | vs median % | Flags |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| MKC | 1 | Consumer Non-Durables | 4.1 | 5/5 | 1.1 | 3/5 | 1.1 | 19.4 | 11.1 | 8.55 | 27.72 | 16.82 | 10 | -69.2 | one-off? |
-| ADBE | 2 | Technology Services | 13.1 | 5/5 | 6.3 | 3/5 | 9.0 | 28.1 | 21.0 | 13.96 | 41.85 | 23.00 | 10 | -66.6 |  |
-| PTC | 3 | Technology Services | 13.4 | 5/5 | 41.2 | 3/5 | 40.2 | 41.7 | 21.0 | 18.90 | 49.66 | 30.28 | 6 | -61.9 | one-off? lumpy |
-| NFLX | 4 | Technology Services | 12.6 | 5/5 | 31.8 | 4/5 | 33.0 | 29.5 | 21.0 | 17.94 | 43.73 | 27.92 | 7 | -59.0 |  |
-| INTU | 5 | Technology Services | 17.4 | 5/5 | 17.2 | 5/5 | 16.9 | 21.3 | 21.0 | 20.67 | 44.10 | 30.09 | 10 | -53.1 |  |
-| FICO | 6 | Commercial Services | 9.0 | 5/5 | 22.5 | 4/5 | 27.4 | 34.1 | 15.8 | 20.55 | 42.50 | 30.12 | 10 | -51.6 |  |
-| ROP | 7 | Technology Services | 10.2 | 4/5 | 10.1 | 4/5 | 9.6 | 30.7 | 21.0 | 18.42 | 37.48 | 20.60 | 10 | -50.9 | one-off? |
-| AMT | 8 | Finance | 5.8 | 4/5 | 8.4 | 3/5 | 7.3 | 30.1 | 17.4 | 26.46 | 51.33 | 37.21 | 10 | -48.5 | lumpy |
-| UDR | 9 | Finance | 6.6 | 5/5 | 42.5 | 3/5 | 40.8 | 30.4 | 17.4 | 22.63 | 43.44 | 29.35 | 6 | -47.9 | lumpy |
-| MLM | 10 | Non-Energy Minerals | 5.4 | 4/5 | 9.6 | 3/5 | 10.2 | 36.7 | 13.2 | 13.28 | 24.67 | 17.43 | 10 | -46.2 | one-off? lumpy |
-| DPZ | 11 | Consumer Services | 3.7 | 4/5 | 4.1 | 4/5 | 7.2 | 12.0 | 9.6 | 17.28 | 29.97 | 24.03 | 10 | -42.3 |  |
-| RMD | 12 | Health Technology | 12.1 | 5/5 | 26.3 | 5/5 | 26.3 | 27.8 | 14.4 | 20.94 | 36.14 | 23.19 | 10 | -42.1 |  |
-| GOOG | 13 | Technology Services | 17.2 | 5/5 | 26.8 | 4/5 | 29.8 | 50.0 | 21.0 | 14.52 | 24.52 | 20.13 | 10 | -40.8 | one-off? |
-| DECK | 14 | Consumer Non-Durables | 16.4 | 5/5 | 21.8 | 5/5 | 25.6 | 19.0 | 11.1 | 10.87 | 17.98 | 13.99 | 9 | -39.6 |  |
-| BKNG | 15 | Consumer Services | 31.7 | 5/5 | 146.8 | 4/5 | 158.6 | 25.5 | 9.6 | 16.38 | 26.85 | 16.76 | 9 | -39.0 |  |
-| FRT | 16 | Finance | 9.6 | 5/5 | 25.7 | 4/5 | 23.5 | 32.5 | 17.4 | 22.02 | 35.10 | 21.13 | 10 | -37.2 | lumpy |
-| SCHW | 17 | Finance | 18.0 | 5/5 | 21.8 | 4/5 | 17.0 | 34.9 | 17.4 | 15.02 | 22.46 | 16.35 | 10 | -33.1 |  |
-| PEP | 18 | Consumer Non-Durables | 5.9 | 5/5 | 3.0 | 4/5 | 3.2 | 11.1 | 11.1 | 17.26 | 25.72 | 12.65 | 10 | -32.9 |  |
-| AON | 19 | Finance | 9.4 | 5/5 | 13.4 | 3/5 | 15.0 | 22.2 | 17.4 | 17.62 | 25.88 | 20.63 | 10 | -31.9 | lumpy |
-| CPRT | 20 | Retail Trade | 11.6 | 5/5 | 9.6 | 4/5 | 9.8 | 31.8 | 8.0 | 19.43 | 28.41 | 17.43 | 10 | -31.6 |  |
+| MKC | 1 | Consumer Non-Durables | 4.10 | 5/5 | 1.10 | 3/5 | 1.10 | 19.40 | 11.60 | 8.55 | 27.72 | 16.82 | 10 | -69.20 | one-off? |
+| ADBE | 2 | Technology Services | 13.10 | 5/5 | 6.30 | 3/5 | 9.00 | 28.10 | 20.70 | 13.96 | 41.85 | 23.00 | 10 | -66.60 |  |
+| PTC | 3 | Technology Services | 13.40 | 5/5 | 41.20 | 3/5 | 40.20 | 41.70 | 20.70 | 18.90 | 49.66 | 30.28 | 6 | -61.90 | one-off? lumpy |
+| NFLX | 4 | Technology Services | 12.60 | 5/5 | 31.80 | 4/5 | 33.00 | 29.50 | 20.70 | 17.94 | 43.73 | 27.92 | 7 | -59.00 |  |
+| INTU | 5 | Technology Services | 17.40 | 5/5 | 17.20 | 5/5 | 16.90 | 21.30 | 20.70 | 20.67 | 44.10 | 30.09 | 10 | -53.10 |  |
+| FICO | 6 | Commercial Services | 9.00 | 5/5 | 22.50 | 4/5 | 27.40 | 34.10 | 18.10 | 20.55 | 42.50 | 30.12 | 10 | -51.60 |  |
+| ROP | 7 | Technology Services | 10.20 | 4/5 | 10.10 | 4/5 | 9.60 | 30.70 | 20.70 | 18.42 | 37.48 | 20.60 | 10 | -50.90 | one-off? |
+| AMT | 8 | Finance | 5.80 | 4/5 | 8.40 | 3/5 | 7.30 | 30.10 | 19.00 | 26.46 | 51.33 | 37.21 | 10 | -48.50 | lumpy |
+| UDR | 9 | Finance | 6.60 | 5/5 | 42.50 | 3/5 | 40.80 | 30.40 | 19.00 | 22.63 | 43.44 | 29.35 | 6 | -47.90 | lumpy |
+| MLM | 10 | Non-Energy Minerals | 5.40 | 4/5 | 9.60 | 3/5 | 10.20 | 36.70 | 18.00 | 13.28 | 24.67 | 17.43 | 10 | -46.20 | one-off? lumpy |
+| DPZ | 11 | Consumer Services | 3.70 | 4/5 | 4.10 | 4/5 | 7.20 | 12.00 | 11.50 | 17.28 | 29.97 | 24.03 | 10 | -42.30 |  |
+| XYL | 12 | Producer Manufacturing | 13.10 | 5/5 | 30.40 | 4/5 | 22.80 | 12.00 | 6.60 | 20.40 | 35.27 | 23.98 | 10 | -42.20 |  |
+| RMD | 13 | Health Technology | 12.10 | 5/5 | 26.30 | 5/5 | 26.30 | 27.80 | 10.50 | 20.94 | 36.14 | 23.19 | 10 | -42.10 |  |
+| GOOG | 14 | Technology Services | 17.20 | 5/5 | 26.80 | 4/5 | 29.80 | 50.00 | 20.70 | 14.52 | 24.52 | 20.13 | 10 | -40.80 | one-off? |
+| DECK | 15 | Consumer Non-Durables | 16.40 | 5/5 | 21.80 | 5/5 | 25.60 | 19.00 | 11.60 | 10.87 | 17.98 | 13.99 | 9 | -39.60 |  |
+| BKNG | 16 | Consumer Services | 31.70 | 5/5 | 146.80 | 4/5 | 158.60 | 25.50 | 11.50 | 16.38 | 26.85 | 16.76 | 9 | -39.00 |  |
+| FRT | 17 | Finance | 9.60 | 5/5 | 25.70 | 4/5 | 23.50 | 32.50 | 19.00 | 22.02 | 35.10 | 21.13 | 10 | -37.20 | lumpy |
+| SCHW | 18 | Finance | 18.00 | 5/5 | 21.80 | 4/5 | 17.00 | 34.90 | 19.00 | 15.02 | 22.46 | 16.35 | 10 | -33.10 |  |
+| AON | 19 | Finance | 9.40 | 5/5 | 13.40 | 3/5 | 15.00 | 22.20 | 19.00 | 17.62 | 25.88 | 20.63 | 10 | -31.90 | lumpy |
+| CPRT | 20 | Retail Trade | 11.60 | 5/5 | 9.60 | 4/5 | 9.80 | 31.80 | 9.40 | 19.43 | 28.41 | 17.43 | 10 | -31.60 |  |
 
 CAGR = compound growth a year over 5 fiscal years. "Up" = years of the 5 in which the
 figure rose. Margin = 12-month net income / revenue. P/E = price / 12-month diluted EPS.
@@ -83,13 +86,43 @@ Flags: *one-off?* = 12-month net income is more than 1.5 times the latest fiscal
 The full list of 108 survivors, and why each of the other 389 failed or was incomplete, is in
 `data/screener/growth.csv`.
 
-**What fails.** A company can fail several rules: net margin 263, net income growth 176,
+**What fails.** A company can fail several rules: net margin 264, net income growth 176,
 EPS growth 169, profit every year 137, still growing 130, revenue up 4 of 5 years 130, net
 income up 3 of 5 years 125, revenue growth 30. Six are incomplete because they have less
 than 6 years of history (recent spin-offs: GE Vernova, Sandisk, Solventum and others).
 
-**Survivors by sector:** Finance 23, Technology Services 16, Electronic Technology 14,
-Health Technology 10, Producer Manufacturing 9, Commercial Services 7, the rest 29.
+**Survivors by sector:** Finance 20, Technology Services 16, Health Technology 14,
+Producer Manufacturing 13, Electronic Technology 10, Commercial Services 6, the rest 29.
+Four survivors have a margin under 10%, in sectors whose average is low: Avery Dennison
+(7.6%, sector 5.0%), Ferguson (6.8%, 4.4%), TJX (9.7%, 9.4%), Grainger (9.9%, 4.4%).
+
+**Sector average net margins (12 months, every S&P 500 company in the sector):**
+
+| Sector | Companies | Average | Median |
+|---|---|---|---|
+| Technology Services | 47 | 20.7% | 21.0% |
+| Electronic Technology | 56 | 19.8% | 15.9% |
+| Finance | 95 | 19.0% | 17.4% |
+| Commercial Services | 14 | 18.1% | 15.7% |
+| Non-Energy Minerals | 7 | 18.0% | 13.3% |
+| Energy Minerals | 13 | 15.0% | 14.7% |
+| Utilities | 33 | 14.8% | 13.5% |
+| Industrial Services | 11 | 12.0% | 10.3% |
+| Consumer Non-Durables | 27 | 11.6% | 11.1% |
+| Consumer Services | 25 | 11.5% | 9.6% |
+| Transportation | 14 | 11.2% | 5.8% |
+| Health Technology | 42 | 10.5% | 14.4% |
+| Retail Trade | 23 | 9.4% | 8.0% |
+| Consumer Durables | 11 | 8.5% | 8.7% |
+| Producer Manufacturing | 33 | 6.6% | 13.6% |
+| Health Services | 11 | 6.0% | 6.3% |
+| Process Industries | 19 | 5.0% | 3.8% |
+| Distribution Services | 9 | 4.5% | 2.1% |
+| Communications | 4 | (too few: 10% used) | 11.0% |
+
+Where the average is well below the median (Producer Manufacturing, Health Technology), a few
+large losses pull it down and the bar is lower; where it is above (Transportation,
+Electronic Technology), a few very profitable companies push it up.
 
 ### Backtest: the same rules in past years
 
@@ -99,17 +132,17 @@ bought at the end of April Y+1. Price returns (no dividends).
 
 | Fiscal year | Bought | Passed | Top 10, 1 year | All passed, 1 year | All screened, 1 year | S&P 500, 1 year | Top 10, to today | All passed, to today | All screened, to today | S&P 500, to today |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 2019 | 2020-04-30 | 119 | +66.2% | +55.2% | +58.6% | +43.6% | +135.7% | +157.8% | +211.9% | +160.3% |
-| 2020 | 2021-04-30 | 103 | -0.6% | -3.6% | +1.4% | -1.2% | +44.9% | +72.0% | +89.6% | +81.3% |
-| 2021 | 2022-04-30 | 119 | +18.4% | +7.7% | +1.6% | +0.9% | +80.9% | +70.8% | +93.6% | +83.5% |
-| 2022 | 2023-04-30 | 118 | +11.2% | +18.1% | +24.8% | +20.8% | +39.9% | +65.0% | +103.9% | +81.8% |
-| 2023 | 2024-04-30 | 108 | +21.6% | +11.3% | +9.8% | +10.6% | +21.4% | +29.4% | +53.3% | +50.5% |
-| 2024 | 2025-04-30 | 111 | +15.3% | +11.3% | +44.0% | +29.4% | +22.3% | +17.0% | +49.9% | +36.1% |
-| **Average** | | | **+22.0%** | +16.7% | +23.4% | +17.4% | **+57.5%** | +68.7% | +100.4% | +82.2% |
-| Average without 2019 | | | +13.2% | +9.0% | +16.3% | +12.1% | +41.9% | +50.8% | +78.1% | +66.6% |
+| 2019 | 2020-04-30 | 125 | +72.8% | +57.1% | +58.6% | +43.6% | +474.9% | +210.5% | +211.9% | +160.3% |
+| 2020 | 2021-04-30 | 111 | -3.5% | -3.9% | +1.4% | -1.2% | +42.1% | +83.6% | +89.6% | +81.3% |
+| 2021 | 2022-04-30 | 118 | +18.3% | +8.2% | +1.6% | +0.9% | +77.0% | +70.6% | +93.6% | +83.5% |
+| 2022 | 2023-04-30 | 125 | +11.2% | +18.3% | +24.8% | +20.8% | +39.9% | +61.5% | +103.9% | +81.8% |
+| 2023 | 2024-04-30 | 112 | +28.4% | +9.7% | +9.8% | +10.6% | +28.3% | +25.8% | +53.3% | +50.5% |
+| 2024 | 2025-04-30 | 110 | +15.3% | +11.2% | +44.0% | +29.4% | +22.3% | +16.6% | +49.9% | +36.1% |
+| **Average** | | | **+23.8%** | +16.8% | +23.4% | +17.4% | **+114.1%** | +78.1% | +100.4% | +82.2% |
+| Average without 2019 | | | +13.9% | +8.7% | +16.3% | +12.1% | +41.9% | +51.6% | +78.1% | +66.6% |
 
-The 60 picks are in `data/screener/growth_backtest.csv`. 65% of them rose in their first year.
-Most were Finance (21 of 60, mostly REITs and insurers) and Health Technology (11).
+The 60 picks are in `data/screener/growth_backtest.csv`. 67% of them rose in their first year.
+Most were Finance (19 of 60, mostly REITs and insurers) and Health Technology (11).
 
 ## Claude's analysis
 
@@ -129,14 +162,17 @@ alone and ranks them by it. P/E never removes a stock; it only orders the ones s
   naturally lumpier.
 - **EPS growing:** diluted EPS compound growth above 0. EPS can grow faster than net income
   through buybacks (Booking: 147% vs 159% a year, from its loss-hit 2020 base).
-- **High margin, 10% and the sector median.** Babak suggested 10% and asked for a better way
-  if there is one. A fixed number is unfair across industries: S&P 500 sector median net
-  margins on this data run from 2.1% (Distribution Services) and 3.8% (Process Industries) to
-  17.4% (Finance) and 21.0% (Technology Services). The rule is net margin of at least 10%
-  **and** at least the sector's median (over every S&P 500 company in that sector). So a
-  software company needs 21%, and a restaurant chain needs the 10% floor because its sector
-  median is 9.6%. Sector medians need 5 companies or more. Below that only the 10% applies
-  (Communications, with 4 companies).
+- **High margin: above the sector average.** Babak first suggested 10% and asked for a
+  better way if there is one. A fixed number is unfair across industries: S&P 500 sector
+  average net margins run from 4.5% (Distribution Services) to 20.7% (Technology Services).
+  A first version required at least 10% *and* the sector median. Babak then chose "net
+  profit more than the average of the sector": the 12-month net margin must be above the
+  mean of every S&P 500 company in the same TradingView sector, losses included. Sectors with
+  fewer than 5 companies use 10% instead (Communications, with 4). In practice this mostly
+  raises the bar: a software company needs 20.7%. It lowers it in low-margin sectors, so four
+  survivors have margins under 10% (Grainger, Ferguson, Avery Dennison, TJX). The average is
+  pulled down by losses and up by one-off gains; the median, or the average of profitable
+  companies only, would be steadier (`sector_margin = "median"` in the config).
 - **Still growing:** 12-month revenue and net income at or above the latest fiscal year, so a
   slowdown since the last annual report is caught.
 - **Historically low P/E:** today's P/E (price / 12-month diluted EPS) against the median of
@@ -164,12 +200,13 @@ alone and ranks them by it. P/E never removes a stock; it only orders the ones s
    property-sale gains: $0.09bn, $0.44bn, $0.09bn, $0.38bn in successive years. The flag
    catches it, but the rules do not.
 4. **The backtest beats the index over 1 year and falls behind over longer holding.** Over
-   1 year the top 10 beat the S&P 500 in 4 of 6 years (by 1 to 18 percentage points) and
-   averaged 22.0% against 17.4%. 2019 was luck: fiscal 2019 figures bought airlines and cruise
-   lines at their April 2020 lows. Without 2019 the edge is about 1 point a year (13.2% vs
-   12.1%). Held to today, every cohort trails the S&P 500. The worst picks were "cheap"
-   because the business was turning down: Align, PayPal, Lululemon, Crown Castle, SBA, Comcast.
-   Five years of past growth did not mean the growth would go on.
+   1 year the top 10 beat the S&P 500 in 3 of 6 years and averaged 23.8% against 17.4%.
+   2019 was luck: fiscal 2019 figures bought cruise lines at their April 2020 lows. Without
+   2019 the edge is about 2 points a year (13.9% vs 12.1%). Held to today, five of six
+   cohorts trail the S&P 500. The 2019 cohort leads only because Comfort Systems (FIX) rose
+   37-fold; without it that cohort is about +43%, far behind the index's +160%. The worst
+   picks were "cheap" because the business was turning down: Align, Charter, Lululemon,
+   Crown Castle, Comcast. Five years of past growth did not mean the growth would go on.
 5. **One-off gains distort the backtest too.** Cooper (fiscal 2021) and Public Storage (fiscal
    2022) passed with net margins above 100% from one-off gains, which also made their P/E
    look very low. Both did badly afterwards.

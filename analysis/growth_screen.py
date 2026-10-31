@@ -12,7 +12,7 @@ results in report 15.
        - net income: compound growth above 0, up in at least 3 of the 5 years, a profit in
          all 6 years
        - diluted EPS: compound growth above 0
-       - net margin (12 months) at least 10% and at least its sector's median
+       - net margin (12 months) above its sector's average (10% in sectors of under 5)
        - still growing: 12-month revenue and net income not below the latest fiscal year
      Missing data = "incomplete", not a pass. The price plays no part in this step.
   3. Ranking, only of what step 2 left: today's P/E against the stock's own P/E history
@@ -162,11 +162,11 @@ def flags(d: pd.DataFrame, n: int, ttm: bool = True) -> None:
     d["flags"] = out
 
 
-def sector_margin(d: pd.DataFrame, min_size: int) -> pd.Series:
-    """Each company's sector median net margin, blank for sectors with too few companies."""
+def sector_margin(d: pd.DataFrame, min_size: int, stat: str = "mean") -> pd.Series:
+    """Each company's sector average ("mean") or "median" net margin, blank for sectors
+    with too few companies."""
     g = d.groupby("sector")["net_margin"]
-    med = g.transform("median")
-    return med.where(g.transform("count") >= min_size)
+    return g.transform(stat).where(g.transform("count") >= min_size)
 
 
 # --- rules ---------------------------------------------------------------------------
@@ -184,11 +184,13 @@ def apply_rules(d: pd.DataFrame, g: dict, ttm: bool = True) -> None:
         if ttm
         else d["net_margin_fy"]
     )
-    d["sector_net_margin"] = sector_margin(d, g["min_sector_size"])
-    margin_floor = d["sector_net_margin"].where(
-        g["margin_vs_sector"] & (d["sector_net_margin"] > g["min_net_margin"]),
-        g["min_net_margin"],
-    )
+    stat = g.get("sector_margin", "mean")
+    if stat:
+        d["sector_net_margin"] = sector_margin(d, g["min_sector_size"], stat)
+        margin_floor = d["sector_net_margin"].fillna(g["min_net_margin"])
+    else:
+        d["sector_net_margin"] = np.nan
+        margin_floor = pd.Series(g["min_net_margin"], index=d.index)
     d["margin_floor"] = margin_floor
     # A loss at either end leaves a compound rate blank: a fail, not missing data. Data is
     # missing only when a year of the history is.
@@ -210,7 +212,7 @@ def apply_rules(d: pd.DataFrame, g: dict, ttm: bool = True) -> None:
         ),
         "profit every year": (d["net_income_positive_years"] == n + 1, d["net_income_up_years"]),
         "EPS growth": (d["eps_cagr"] > g["min_eps_cagr"], eps_have),
-        "net margin": (d["net_margin"] >= margin_floor, d["net_margin"]),
+        "net margin": (d["net_margin"] > margin_floor, d["net_margin"]),
     }
     if ttm and g.get("still_growing"):
         rules["still growing"] = (

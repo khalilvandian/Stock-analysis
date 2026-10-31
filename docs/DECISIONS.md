@@ -182,9 +182,11 @@ their date.
      revenue, net margin, and then based on what's left apply the P/E". Step 1 uses no price.
   3. **Growth must be positive:** revenue, net income and EPS compound growth over 5 years
      above 0, with revenue up in 4 of 5 years and net income in 3 of 5.
-  4. **High margin = at least 10% and at least the sector median.** Babak suggested 10% and
-     asked for a better way if there is one; margins differ so much by business (2% to 21%
-     sector medians) that the sector median is added on top of the 10% floor.
+  4. **High margin = above the sector average.** Babak first suggested 10% and asked for a
+     better way if there is one; Claude proposed at least 10% and the sector median, since
+     margins differ so much by business. Babak then chose "net profit more than the average
+     of the sector": the 12-month net margin above the mean of its sector (10% in sectors of
+     fewer than 5 companies).
   5. **Low P/E means historically low:** against the stock's own yearly P/E median, not the
      lowest P/E in the market. Yearly P/Es above 100 are left out of the history.
 - **Why:** Growth, profit and margin show a good business; the stock's own history says

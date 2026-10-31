@@ -71,7 +71,7 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Net margin, average of fiscal years](#net-margin-avg) | mean(net income / revenue per fiscal year) | higher | candidate |
 | [Net margin change, average](#margin-change-avg) | mean(margin_y - margin_y-1) | higher | candidate |
 | [Net margin change, median](#margin-change-median) | median(margin_y - margin_y-1) | higher | candidate |
-| [Sector median net margin](#sector-net-margin) | median(net_margin) over the sector | none | derived |
+| [Sector average net margin](#sector-net-margin) | mean(net_margin) over the sector | none | derived |
 | [Return on equity](#roe) | net_income / average book_equity | higher | candidate |
 
 **Growth** (18)
@@ -605,16 +605,17 @@ Median yearly change in net margin: the typical year, less swayed by one jump.
 - **Vector:** candidate
 
 <a id="sector-net-margin"></a>
-#### Sector median net margin (`sector_net_margin`)
+#### Sector average net margin (`sector_net_margin`)
 
-Median 12-month net margin of every screened company in the same TradingView sector (sectors of 5 or more). The growth screener's margin floor when above 10%.
+Average (mean) 12-month net margin of every screened company in the same TradingView sector, losses included (sectors of 5 or more). The growth screener's margin bar.
 
-- **Formula:** median(net_margin) over the sector
+- **Formula:** mean(net_margin) over the sector
 - **Unit:** fraction; **better:** none; **period:** ttm
 - **Source:** growth: `sector_net_margin`
-- **Used in:** growth screener (net margin >= max(10%, sector median))
-- **Example (BSX, 2026-10-31):** +14.4% = Health Technology, S&P 500 members
+- **Used in:** growth screener (net margin > sector average)
+- **Example (BSX, 2026-10-31):** +10.5% = Health Technology, 42 S&P 500 members (median 0.144)
 - **Vector:** derived
+- **Note:** Losses pull the mean down and one-off gains push it up; the screener can use the median instead (sector_margin = "median").
 
 <a id="roe"></a>
 #### Return on equity (`roe`)

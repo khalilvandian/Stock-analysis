@@ -50,7 +50,7 @@ Ratios and scores hide important information, so they come after, never instead.
   per sector.
 - Growth screener (report 15, `[growth]` in `config/screeners.toml`):
   `uv run python analysis/growth_screen.py [--backtest]`. First filters on growth (revenue,
-  net income, EPS) and net margin (at least 10% and the sector median), then ranks only the
+  net income, EPS) and net margin (above its sector's average), then ranks only the
   survivors by P/E against their own history. Separate from the evening run.
 - Other tools, in the usual order after step 1: `analysis/screen.py` (strict and weighted
   screens), `analysis/peer_screen.py` (the same screens on a hand-picked peer group), `analysis/dcf_firm.py` / `analysis/dcf.py` (DCF), `analysis/compare.py`,

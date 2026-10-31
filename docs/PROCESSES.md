@@ -207,7 +207,7 @@ uv run python analysis/growth_screen.py --all        # every US and European com
 
 1. **Universe** as in Stage 1 (`stage1.fetch_universe` and `stage1.prepare`, same cache).
 2. **Filter** (no price): revenue, net income and EPS growth over 5 fiscal years, profit
-   every year, net margin at least 10% and its sector's median, still growing in the last 12
+   every year, net margin above its sector's average, still growing in the last 12
    months.
 3. **Rank the survivors** by P/E against their own yearly P/E history (Yahoo monthly prices,
    cached as `.cache/screener/prices_long_<date>.pkl`, 19 years for the backtest).

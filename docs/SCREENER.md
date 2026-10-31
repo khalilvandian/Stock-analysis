@@ -294,14 +294,17 @@ rank what is left by P/E against the stock's own history. P/E never removes a st
 | net income up years | Net income up in at least 3 of the 5 years | `min_net_income_up_years = 3` |
 | profit every year | Net income above 0 in all 6 fiscal years | |
 | EPS growth | Compound diluted EPS growth above 0 | `min_eps_cagr = 0.0` |
-| net margin | 12-month net income / revenue at least 10% **and** at least the sector median (sectors of 5+ companies; smaller sectors: 10% only) | `min_net_margin = 0.10`, `margin_vs_sector = true`, `min_sector_size = 5` |
+| net margin | 12-month net income / revenue above the sector average (sectors of 5+ companies; smaller sectors: above 10%) | `sector_margin = "mean"`, `min_net_margin = 0.10`, `min_sector_size = 5` |
 | still growing | 12-month revenue and net income at or above the latest fiscal year | `still_growing = true` |
 
-A missing year of history makes the stock "incomplete" rather than a pass. The sector median
-is taken over every company screened (TradingView's sectors). Why the sector median: margins
-differ by business. On 2026-10-31 S&P 500 sector medians ran from 2.1% (Distribution
-Services) to 21.0% (Technology Services), so one fixed number either lets every software
-company through or shuts out every retailer.
+A missing year of history makes the stock "incomplete" rather than a pass. The sector average
+is the mean margin of every company screened in the sector (TradingView's sectors), losses
+included (Babak, 2026-10-31: "net profit more than the average of the sector"). Why the
+sector: margins differ by business. On 2026-10-31 S&P 500 sector averages ran from 4.5%
+(Distribution Services) to 20.7% (Technology Services), so one fixed number either lets
+every software company through or shuts out every retailer. `sector_margin = "median"` uses
+the median instead (steadier: losses and one-off gains move the mean); `""` uses only the
+fixed `min_net_margin`.
 
 ### Step 2: P/E against own history (survivors only)
 

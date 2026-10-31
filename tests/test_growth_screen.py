@@ -77,16 +77,37 @@ def test_rules_pass_fail_and_incomplete():
     assert d.loc["short", "status"] == "incomplete"
 
 
-def test_margin_floor_is_sector_median_when_higher():
+def test_margin_must_beat_sector_average():
     cfg = load_config()["growth"] | {"min_sector_size": 2}
+    assert cfg["sector_margin"] == "mean"
     d = _universe()
     gs.growth_measures(d, cfg["years"])
     gs.apply_rules(d, cfg, ttm=True)
-    # sector median margin of the five is 0.2: the floor rises from 10% to 20%
-    assert round(d.loc["good", "margin_floor"], 2) == 0.2
-    d.loc["good", "net_income_ttm"] = 25  # 15% margin: above 10%, below its sector
+    # margins 0.20, 0.05, 0.20, 0.22, 0.20: the sector average is 0.174
+    assert round(d.loc["good", "margin_floor"], 3) == 0.174
+    assert d.loc["good", "status"] == "pass"
+    d.loc["good", "net_income_ttm"] = 27  # 16.4% margin: above 10%, below its sector
     gs.apply_rules(d, cfg, ttm=True)
     assert "net margin" in d.loc["good", "failed"]
+
+
+def test_low_margin_sector_and_small_sector_fallback():
+    cfg = load_config()["growth"] | {"min_sector_size": 2}
+    grow = [160, 150, 130, 120, 110, 100, 90, 80, 70, 60]
+    d = pd.DataFrame.from_dict(
+        {
+            "grocer": _stock(grow, [x * 0.07 for x in grow], grow, 165, 11.55, "Retail"),
+            "rival": _stock(grow, [x * 0.03 for x in grow], grow, 165, 4.95, "Retail"),
+            "alone": _stock(grow, [x * 0.12 for x in grow], grow, 165, 19.8, "Telecom"),
+        },
+        orient="index",
+    )
+    gs.growth_measures(d, cfg["years"])
+    gs.apply_rules(d, cfg, ttm=True)
+    assert d.loc["grocer", "status"] == "pass"  # 7% beats the sector's 5% average
+    assert "net margin" in d.loc["rival", "failed"]
+    assert d.loc["alone", "margin_floor"] == cfg["min_net_margin"]  # one company: 10%
+    assert d.loc["alone", "status"] == "pass"
 
 
 def test_flags_one_off_and_lumpy_profit():

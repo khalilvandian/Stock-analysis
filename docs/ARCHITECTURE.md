@@ -162,7 +162,7 @@ top-level `README.md`).
 `respx`), `test_metrics.py` (dictionary complete, `docs/METRICS.md` up to date),
 `test_screener.py` (TradingView paging and ECB rates with `respx`, categories, rules, cheap
 price, ranking, the Stage 1 to Stage 2 contract), `test_growth_screen.py` (growth
-measures, filter rules, sector margin floor, flags, P/E against own history), `test_watchlist.py` (adjusted EPS, P/E
+measures, filter rules, sector-average margin, flags, P/E against own history), `test_watchlist.py` (adjusted EPS, P/E
 history, split adjustment, notes, PDFs never overwritten), `test_pipeline_units.py`
 (missing values, splits, currencies, outliers and cross-checks between sources, on the saved
 responses in `tests/fixtures/`; tests marked `xfail(strict=True)` document known bugs).
