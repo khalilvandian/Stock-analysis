@@ -40,10 +40,11 @@ def test_as_of_year_cuts_every_history_list():
     assert h.loc["short", "total_revenue_fy_h"] == []
 
 
-def _stock(rev, ni, eps, rev_ttm, ni_ttm, sector="Tech", debt=(0.0, 10.0, 0.0, 5.0)):
+def _stock(rev, ni, eps, rev_ttm, ni_ttm, sector="Tech", debt=(0.0, 10.0, 0.0, 5.0), assets=np.nan):
     """`debt` = (total debt, cash, debt due within a year, 12-month free cash flow)."""
     total, cash, short, fcf = debt
     return {
+        "total_assets_fq": assets,
         "sector": sector,
         "type": "general",
         "total_debt_fq": total,
@@ -123,8 +124,8 @@ def test_debt_rules():
     grow = [160, 150, 130, 120, 110, 100, 90, 80, 70, 60]
     profit = [x * 0.2 for x in grow]
 
-    def stock(debt, kind="general"):
-        return _stock(grow, profit, profit, 165, 33, debt=debt) | {"type": kind}
+    def stock(debt, kind="general", assets=np.nan):
+        return _stock(grow, profit, profit, 165, 33, debt=debt, assets=assets) | {"type": kind}
 
     d = pd.DataFrame.from_dict(
         {
@@ -136,6 +137,9 @@ def test_debt_rules():
             "no_fcf": stock((5.0, 1.0, 0.0, -1.0)),
             "net_cash": stock((1.0, 5.0, 1.0, -1.0)),  # nothing to repay
             "bank": stock((50.0, 1.0, 40.0, np.nan), kind="banks"),
+            # Domino's assets 1.77 < debt 5.12: still fails; a landlord's 30 > 14 passes
+            "pizza_assets": stock((5.12, 0.47, 1.37, 0.64), assets=1.77),
+            "landlord": stock((14.0, 0.5, 3.0, 1.0), assets=30.0),
         },
         orient="index",
     )
@@ -150,6 +154,12 @@ def test_debt_rules():
     assert "debt payback" in d.loc["no_fcf", "failed"]
     assert "debt payback" not in d.loc["net_cash", "failed"]
     assert d.loc["bank", "status"] == "pass"
+    assert "debt payback" in d.loc["pizza_assets", "failed"]
+    assert d.loc["landlord", "assets_minus_debt"] == 16
+    assert d.loc["landlord", "status"] == "pass"  # 13.5 years of FCF, but assets cover it
+    cfg_off = cfg | {"assets_cover_debt": False}
+    gs.apply_rules(d, cfg_off, ttm=True)
+    assert "debt payback" in d.loc["landlord", "failed"]
 
 
 def test_flags_one_off_and_lumpy_profit():

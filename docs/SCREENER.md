@@ -299,6 +299,12 @@ rank what is left by P/E against the stock's own history. P/E never removes a st
 | debt payback | Net debt (total debt - cash) at most 5 years of 12-month free cash flow; net cash passes, net debt with no free cash flow fails | `max_net_debt_to_fcf = 5.0` |
 | short-term debt covered | Cash + 12-month free cash flow at least the debt due within a year (none due passes) | `min_short_term_debt_cover = 1.0` |
 
+A company whose total assets are worth more than its total debt passes both anyway
+(`assets_cover_debt = true`; Babak, 2026-11-01: "it's okay if a company has assets that are
+worth more than the debt ... but if that value is negative, that's a problem"). This is a
+loose test: total assets include goodwill, and other liabilities have a claim on them too.
+On 2026-11-01 it let back every company that failed on cash flow except Domino's, Yum! and
+Fair Isaac; tangible assets or book equity instead would have changed only McDonald's.
 Banks and insurers skip both debt rules, as in Stage 1 (`debt_rules_skip`). Debt, cash and
 free cash flow blank on TradingView are filled from Yahoo for the stocks held back only by
 that (Stage 1's `fill_gaps` and Stage 2's `fill_cash_flows`; named in `filled`). The debt

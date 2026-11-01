@@ -188,6 +188,7 @@ def annual_history(
         "net_income": line(ia, "Net Income", "Net Income Common Stockholders"),
         "eps": _get(ia, "Diluted EPS", "Basic EPS") * fx,
         "total_debt": line(ba, "Total Debt"),
+        "total_assets": line(ba, "Total Assets"),
         "short_term_debt": line(ba, "Current Debt And Capital Lease Obligation", "Current Debt"),
         "long_term_debt": line(ba, "Long Term Debt And Capital Lease Obligation", "Long Term Debt"),
         "cash": line(
@@ -271,6 +272,7 @@ def analyse(quote: dict) -> dict:
         )
     )
     equity_book = bn(_latest(bq, ba, "Stockholders Equity", "Common Stock Equity"))
+    total_assets = bn(_latest(bq, ba, "Total Assets"))
     # cash including short-term investments, and debt split by maturity
     liquid = bn(
         _latest(
@@ -341,6 +343,7 @@ def analyse(quote: dict) -> dict:
         "market_cap": mcap,
         # debt
         "total_debt": debt,
+        "total_assets": total_assets,
         "cash": liquid,
         "short_term_debt": short_debt,
         "long_term_debt": long_debt,

@@ -100,6 +100,7 @@ FLOW_TAGS = {
     ],
 }
 INSTANT_TAGS = {
+    "total_assets": ["Assets", "ifrs:Assets"],
     "cash": [
         "CashAndCashEquivalentsAtCarryingValue",
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
@@ -289,6 +290,7 @@ def sec_history(symbol: str, facts: dict) -> pd.DataFrame:
         "long_term_debt": usd(lt_non),
         "short_term_debt": usd(short),
         "total_debt": usd(lt_non.add(short, fill_value=0).where(lt_non.notna())),
+        "total_assets": usd(inst["total_assets"]),
     }
     rows["net_debt"] = rows["total_debt"] - rows["cash"]
     rows["_shares"] = flows["diluted_shares"]

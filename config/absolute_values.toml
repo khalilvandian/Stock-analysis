@@ -23,6 +23,7 @@ values = [
   { column = "short_term_debt", label = "Short-term debt", unit = "$bn" },
   { column = "long_term_debt", label = "Long-term debt", unit = "$bn" },
   { column = "cash", label = "Cash", unit = "$bn" },
+  { column = "total_assets", label = "Total assets", unit = "$bn" },
 ]
 
 [[group]]

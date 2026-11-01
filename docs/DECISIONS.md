@@ -193,5 +193,9 @@ their date.
      much lower than their debt ... filter them out as well in the first level before the
      P/E"): net debt at most 5 years of free cash flow, and cash plus a year of free cash
      flow covering the debt due within a year. Banks and insurers skip it, as in Stage 1.
+  7. **Assets can stand in for cash** (Babak, 2026-11-01: "it's okay if a company has assets
+     that are worth more than the debt ... if that value is negative, that's a problem"):
+     total assets above total debt pass the debt rules. Total assets became an absolute
+     value (`config/absolute_values.toml`).
 - **Why:** Growth, profit and margin show a good business; the stock's own history says
   whether its price is low for that business.

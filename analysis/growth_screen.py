@@ -15,9 +15,10 @@ results in report 15.
        - net margin (12 months) above its sector's average (10% in sectors of under 5)
        - still growing: 12-month revenue and net income not below the latest fiscal year
        - debt it can pay: net debt at most 5 years of free cash flow, and cash plus a
-         year of free cash flow covers the debt due within a year (not for banks and
-         insurers, whose deposits and float make debt rules meaningless). Debt, cash and
-         free cash flow blank on TradingView are filled from Yahoo, as in Stage 1 and 2
+         year of free cash flow covers the debt due within a year; or else total assets
+         worth more than total debt (not for banks and insurers, whose deposits and float
+         make debt rules meaningless). Debt, cash and free cash flow blank on
+         TradingView are filled from Yahoo, as in Stage 1 and 2
      Missing data = "incomplete", not a pass. The price plays no part in this step.
   3. Ranking, only of what step 2 left: today's P/E against the stock's own P/E history
      (yearly P/E over up to 10 fiscal years: average monthly price over the year / that
@@ -179,6 +180,11 @@ def debt_measures(d: pd.DataFrame) -> None:
     st = d["short_term_debt_fq"]
     cover = ((cash + fcf) / st).where(st > 0)
     d["short_term_debt_cover"] = cover.mask(st == 0, np.inf)
+    # what the company owns against what it owes its lenders (statement currency)
+    d["assets_minus_debt"] = d["total_assets_fq"] - d["total_debt_fq"]
+    fx = d["fx_fund"] if "fx_fund" in d else 1.0
+    d["total_assets_usd_bn"] = d["total_assets_fq"] * fx / 1e9
+    d["assets_minus_debt_usd_bn"] = d["assets_minus_debt"] * fx / 1e9
 
 
 def sector_margin(d: pd.DataFrame, min_size: int, stat: str = "mean") -> pd.Series:
@@ -243,6 +249,10 @@ def apply_rules(d: pd.DataFrame, g: dict, ttm: bool = True) -> None:
         # banks and insurers pass: their deposits and float aren't debt in the usual sense
         debt_measures(d)
         skip = d["type"].isin(g.get("debt_rules_skip", []))
+        # assets worth more than the debt also pass (Babak: "it's okay if a company has
+        # assets worth more than the debt ... if that value is negative, that's a problem")
+        if g.get("assets_cover_debt"):
+            skip = skip | (d["assets_minus_debt"] > 0).fillna(False)
         years, cover = d["net_debt_to_fcf"], d["short_term_debt_cover"]
         rules["debt payback"] = (
             skip | (years <= g["max_net_debt_to_fcf"]),
@@ -459,6 +469,8 @@ GROWTH = [
     "net_margin_change",
     "net_debt_to_fcf",
     "short_term_debt_cover",
+    "total_assets_usd_bn",
+    "assets_minus_debt_usd_bn",
 ]
 PE = ["pe_now", "pe_median", "pe_low", "pe_years", "pe_vs_median", "pe_percentile"]
 SAVE = [

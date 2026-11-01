@@ -219,6 +219,10 @@ still_growing = true
 #   within a year (none due passes).
 # Banks and insurers skip both, as in Stage 1. Today's screen only (the backtest has no
 # yearly free cash flow).
+# A company whose total assets are worth more than its total debt passes both anyway
+# (Babak, 2026-11-01: "it's okay if a company has assets that are worth more than the debt
+# ... but if that value is negative, that's a problem"). Latest quarter, TradingView.
+assets_cover_debt = true
 max_net_debt_to_fcf = 5.0
 min_short_term_debt_cover = 1.0
 debt_rules_skip = ["banks", "insurers"]           # 12-month revenue and net income not below the latest year

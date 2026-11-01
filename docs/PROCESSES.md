@@ -209,7 +209,8 @@ uv run python analysis/growth_screen.py --all        # every US and European com
 2. **Filter** (no price): revenue, net income and EPS growth over 5 fiscal years, profit
    every year, net margin above its sector's average, still growing in the last 12
    months, net debt at most 5 years of free cash flow and cash plus free cash flow covering
-   the debt due within a year (debt data blank on TradingView filled from Yahoo first).
+   the debt due within a year, or else total assets above total debt (debt data blank on
+   TradingView filled from Yahoo first).
 3. **Rank the survivors** by P/E against their own yearly P/E history (Yahoo monthly prices,
    cached as `.cache/screener/prices_long_<date>.pkl`, 19 years for the backtest).
 4. **Check the flags** before trusting a P/E (one-off gain, lumpy profit), then show the

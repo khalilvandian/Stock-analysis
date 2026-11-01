@@ -16,11 +16,13 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Market value](#market-cap) | price x shares outstanding | none | context |
 | [Enterprise value](#enterprise-value) | market_cap + net_debt | none | context |
 
-**Balance sheet (absolute)** (6)
+**Balance sheet (absolute)** (8)
 
 | Metric | Formula | Better | Vector |
 |---|---|---|---|
 | [Total debt](#total-debt) | short_term_debt + long_term_debt | lower | candidate |
+| [Total assets](#total-assets) | Balance sheet total assets | none | context |
+| [Total assets minus total debt](#assets-minus-debt) | total_assets - total_debt | higher | candidate |
 | [Short-term debt](#short-term-debt) | current debt + current lease liabilities; if blank, total_debt - long_term_debt | lower | candidate |
 | [Long-term debt](#long-term-debt) | non-current debt + non-current lease liabilities | lower | candidate |
 | [Cash and short-term investments](#cash) | cash and equivalents + short-term investments | higher | candidate |
@@ -217,6 +219,32 @@ All borrowings, short and long term, including leases.
 - **Example (BSX, 2026-09-30):** $12.6bn = 1.709 short-term + 10.915 long-term
 - **Vector:** candidate
 - **Note:** Includes lease liabilities since 2019 (ASC 842 / IFRS 16), which makes older debt figures look lower. BSX will add about $11bn for Penumbra.
+
+<a id="total-assets"></a>
+#### Total assets (`total_assets`)
+
+Everything the company owns at book value: cash, receivables, inventory, property, investments, goodwill and other intangibles.
+
+- **Formula:** Balance sheet total assets
+- **Unit:** $bn; **better:** none; **period:** fq
+- **Source:** sector: `total_assets`; growth: `total_assets_usd_bn`; tradingview: `total_assets_fq`; yahoo: `Total Assets`; sec: `Assets`
+- **Used in:** absolute values; growth screener (assets - debt > 0 passes the debt rules)
+- **Example (NEE, 2026-09-30):** $245bn = Yahoo latest quarterly balance sheet
+- **Vector:** context
+- **Note:** Book values: goodwill and intangibles count in full, though they can't be sold to repay debt.
+
+<a id="assets-minus-debt"></a>
+#### Total assets minus total debt (`assets_minus_debt`)
+
+Whether what the company owns is worth more than what it owes its lenders (book values). Negative: the debt exceeds everything on the balance sheet.
+
+- **Formula:** total_assets - total_debt
+- **Unit:** $bn; **better:** higher; **period:** fq
+- **Source:** growth: `assets_minus_debt_usd_bn`
+- **Used in:** growth screener (> 0 passes the debt rules)
+- **Example (DPZ, 2026-10-31):** $-3.36bn = 1.77 - 5.12 (TradingView)
+- **Vector:** candidate
+- **Note:** Looser than book equity (assets - all liabilities): other liabilities also have a claim on the assets.
 
 <a id="short-term-debt"></a>
 #### Short-term debt (`short_term_debt`)

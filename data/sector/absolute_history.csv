@@ -1,18 +1,19 @@
-,,FY2020,FY2021,FY2022,FY2023,FY2024,FY2025,Latest 12m,symbol
-Price and value,Share price,–,–,$86.21,$116.89,$223.71,$353.27,$263.27,CEG
-Price and value,Market value,–,–,$28.36bn,$37.87bn,$70.47bn,$110.93bn,$93.28bn,CEG
-Price and value,DCF fair value,–,–,–,–,–,–,$206.51,CEG
-Price and value,Cash flow before growth (DCF base),-$2.79bn,-$5.66bn,-$4.58bn,-$7.47bn,-$5.16bn,$1.64bn,$4.82bn,CEG
-Debt and cash,Total debt,–,$7.88bn,$5.77bn,$9.26bn,$8.41bn,$8.99bn,$24.70bn,CEG
-Debt and cash,Net debt,–,$7.37bn,$5.35bn,$8.89bn,$5.39bn,$5.35bn,$24.00bn,CEG
-Debt and cash,Short-term debt,–,$3.30bn,$1.30bn,$1.76bn,$1.03bn,$1.74bn,$5.59bn,CEG
-Debt and cash,Long-term debt,–,$4.58bn,$4.47bn,$7.50bn,$7.38bn,$7.25bn,$19.11bn,CEG
-Debt and cash,Cash,$0.23bn,$0.50bn,$0.42bn,$0.37bn,$3.02bn,$3.64bn,$0.70bn,CEG
-Earnings,Revenue (12m),$17.60bn,$19.65bn,$24.44bn,$24.92bn,$23.57bn,$25.53bn,$31.27bn,CEG
-Earnings,EBITDA (12m),$3.89bn,$4.19bn,$2.92bn,$4.12bn,$7.05bn,$5.69bn,$8.23bn,CEG
-Earnings,Net income (12m),$0.59bn,-$0.20bn,-$0.16bn,$1.62bn,$3.75bn,$2.32bn,$3.46bn,CEG
-Earnings,EPS (12m),–,–,-$0.49,$5.01,$11.89,$7.40,$10.24,CEG
-Earnings,Forward EPS,–,–,–,–,–,–,$13.32,CEG
-Cash flow,Operating cash flow,$0.58bn,-$1.34bn,-$2.35bn,-$5.30bn,-$2.46bn,$4.24bn,$4.21bn,CEG
-Cash flow,Capex,-$1.75bn,-$1.33bn,-$1.69bn,-$2.42bn,-$2.56bn,-$2.95bn,-$3.90bn,CEG
-Cash flow,Free cash flow,-$1.16bn,-$2.67bn,-$4.04bn,-$7.72bn,-$5.03bn,$1.29bn,$0.31bn,CEG
+,,FY2016,FY2017,FY2018,FY2019,FY2020,FY2021,FY2022,FY2023,FY2024,FY2025,Latest 12m,symbol
+Price and value,Share price,$29.86,$39.05,$43.46,$60.54,$77.15,$93.36,$83.60,$60.74,$71.69,$80.28,$83.71,NEE
+Price and value,Market value,$55.64bn,$73.80bn,$82.91bn,$117.56bn,$151.89bn,$184.12bn,$165.41bn,$123.35bn,$147.62bn,$166.23bn,$175.57bn,NEE
+Price and value,DCF fair value,–,–,–,–,–,–,–,–,–,–,$44.15,NEE
+Price and value,Cash flow before growth (DCF base),$3.25bn,$4.10bn,$2.68bn,$3.94bn,$3.93bn,$3.63bn,$3.76bn,$5.42bn,$7.80bn,$5.91bn,$10.75bn,NEE
+Debt and cash,Total debt,$30.84bn,$35.02bn,$37.71bn,$42.58bn,$47.63bn,$54.13bn,$63.60bn,$72.96bn,$82.12bn,$95.01bn,$113.93bn,NEE
+Debt and cash,Net debt,$29.55bn,$33.31bn,$37.07bn,$41.98bn,$46.53bn,$53.49bn,$62.00bn,$70.27bn,$80.63bn,$92.20bn,$108.35bn,NEE
+Debt and cash,Short-term debt,$3.02bn,$3.62bn,$10.93bn,$5.04bn,$5.69bn,$3.17bn,$8.34bn,$11.55bn,$9.73bn,$5.46bn,$16.81bn,NEE
+Debt and cash,Long-term debt,$27.82bn,$31.41bn,$26.78bn,$37.54bn,$41.94bn,$50.96bn,$55.26bn,$61.41bn,$72.39bn,$89.56bn,$97.12bn,NEE
+Debt and cash,Cash,$1.29bn,$1.71bn,$0.64bn,$0.60bn,$1.10bn,$0.64bn,$1.60bn,$2.69bn,$1.49bn,$2.81bn,$5.58bn,NEE
+Debt and cash,Total assets,$90.47bn,$97.96bn,$103.70bn,$117.69bn,$127.68bn,$140.91bn,$158.94bn,$177.49bn,$190.14bn,$212.72bn,$245.05bn,NEE
+Earnings,Revenue (12m),$16.14bn,$17.17bn,$16.73bn,$19.20bn,$18.00bn,$18.80bn,$23.00bn,$28.11bn,$24.75bn,$27.41bn,$28.82bn,NEE
+Earnings,EBITDA (12m),$7.58bn,$7.53bn,$8.19bn,$9.57bn,$9.17bn,$6.84bn,$8.58bn,$16.12bn,$12.94bn,$14.86bn,$16.86bn,NEE
+Earnings,Net income (12m),$2.91bn,$5.38bn,$6.64bn,$3.77bn,$2.92bn,$3.57bn,$4.15bn,$7.31bn,$6.95bn,$6.83bn,$11.64bn,NEE
+Earnings,EPS (12m),$1.56,$2.85,$3.47,$1.94,$1.48,$1.81,$2.10,$3.60,$3.37,$3.30,$5.55,NEE
+Earnings,Forward EPS,–,–,–,–,–,–,–,–,–,–,$4.38,NEE
+Cash flow,Operating cash flow,$6.37bn,$6.46bn,$6.59bn,$8.15bn,$7.98bn,$7.55bn,$8.26bn,$11.30bn,$13.26bn,$12.48bn,$14.82bn,NEE
+Cash flow,Capex,–,–,–,–,–,–,-$9.74bn,-$9.55bn,-$8.51bn,-$9.27bn,-$10.73bn,NEE
+Cash flow,Free cash flow,–,–,–,–,–,–,-$1.48bn,$1.75bn,$4.75bn,$3.21bn,$4.09bn,NEE

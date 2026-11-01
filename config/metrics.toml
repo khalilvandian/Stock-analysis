@@ -120,6 +120,36 @@ vector = "candidate"
 notes = "Includes lease liabilities since 2019 (ASC 842 / IFRS 16), which makes older debt figures look lower. BSX will add about $11bn for Penumbra."
 
 [[metric]]
+id = "total_assets"
+name = "Total assets"
+group = "balance_sheet"
+unit = "$bn"
+better = "none"
+period = "fq"
+definition = "Everything the company owns at book value: cash, receivables, inventory, property, investments, goodwill and other intangibles."
+formula = "Balance sheet total assets"
+sources = { sector = "total_assets", growth = "total_assets_usd_bn", tradingview = "total_assets_fq", yahoo = "Total Assets", sec = "Assets" }
+used_in = ["absolute values", "growth screener (assets - debt > 0 passes the debt rules)"]
+example = { symbol = "NEE", value = 245.05, as_of = "2026-09-30", working = "Yahoo latest quarterly balance sheet" }
+vector = "context"
+notes = "Book values: goodwill and intangibles count in full, though they can't be sold to repay debt."
+
+[[metric]]
+id = "assets_minus_debt"
+name = "Total assets minus total debt"
+group = "balance_sheet"
+unit = "$bn"
+better = "higher"
+period = "fq"
+definition = "Whether what the company owns is worth more than what it owes its lenders (book values). Negative: the debt exceeds everything on the balance sheet."
+formula = "total_assets - total_debt"
+sources = { growth = "assets_minus_debt_usd_bn" }
+used_in = ["growth screener (> 0 passes the debt rules)"]
+example = { symbol = "DPZ", value = -3.36, as_of = "2026-10-31", working = "1.77 - 5.12 (TradingView)" }
+vector = "candidate"
+notes = "Looser than book equity (assets - all liabilities): other liabilities also have a claim on the assets."
+
+[[metric]]
 id = "short_term_debt"
 name = "Short-term debt"
 group = "balance_sheet"

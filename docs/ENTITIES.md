@@ -34,6 +34,7 @@ Screened first for every company, before any ratio or score (`config/absolute_va
 | | Short-term debt | `short_term_debt` | $bn | `short_term_debt` |
 | | Long-term debt | `long_term_debt` | $bn | `long_term_debt` |
 | | Cash | `cash` | $bn | `cash` |
+| | Total assets | `total_assets` | $bn | `total_assets` (SEC `Assets`, Yahoo "Total Assets") |
 | Earnings | Revenue (12m) | `revenue` | $bn | `revenue` |
 | | EBITDA (12m) | `ebitda` | $bn | `ebitda` |
 | | Net income (12m) | `net_income` | $bn | `net_income` |
@@ -263,7 +264,7 @@ incomplete), `failed`, `missing`, `rank`, `flags`, the absolute values (as in `t
 `eps_cagr_3y`, `net_margin` (12 months), `sector_net_margin`, `net_margin_change` (latest
 fiscal year minus 5 years before), `net_debt_to_fcf` (years of free cash flow to repay net
 debt; 0 = net cash), `short_term_debt_cover` ((cash + free cash flow) / debt due within a
-year), `filled` (values filled from Yahoo), `pe_now`, `pe_median`, `pe_low`, `pe_years`,
+year), `total_assets_usd_bn`, `assets_minus_debt_usd_bn` (total assets - total debt), `filled` (values filled from Yahoo), `pe_now`, `pe_median`, `pe_low`, `pe_years`,
 `pe_vs_median` (the ranking measure), `pe_percentile`.
 
 `data/screener/growth_backtest.csv`: one row per backtest pick: `fiscal_year`, `entry`,

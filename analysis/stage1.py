@@ -84,6 +84,8 @@ COLUMNS = [
     "enterprise_value_ebitda_ttm",
     "price_book_fq",
     "total_equity_fq",
+    "total_assets_fq",
+    "total_liabilities_fq",
     "book_tangible_per_share_fq",
     "dividends_yield",
     "earnings_per_share_forecast_next_fy",
