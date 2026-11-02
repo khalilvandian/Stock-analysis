@@ -1,12 +1,12 @@
 # Watch list summary: Claude's notes
 
-Updated: 2026-10-31
+Updated: 2026-11-02
 
 The evening run copies these sections into the watch list summary PDF.
 
 ## Verdict
 
-**Five stocks now. Three are within about 6% of their entry prices: Boston Scientific about 1% above $41.5, Booking about 3% above $144 before its Nov 3 report, Netflix about 6% above $58. The two new ones are further away: Alphabet about 9% above its $256 entry (report 17's 22x core earnings plus its equity stakes) after the AI-spending sell-off, Uber about 11% above $58 before its Nov 4 report.**
+**Five stocks, none at its entry price after Monday's rebound. Closest: Boston Scientific about 6% above $41.5, Booking about 7% above $144 and Netflix about 7% above $58. Further: Alphabet about 9% above $256 and Uber about 13% above $58. This week's key events are Booking's results (Nov 3, after the US close) and Uber's (Nov 4, before the open).**
 
 ## Analysis
 

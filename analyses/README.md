@@ -4,12 +4,12 @@ Each stock on the watch list ([config/watchlist.toml](../config/watchlist.toml))
 
 | Stock | Latest analysis | Price | Adjusted P/E | 10-yr median | Target | Entry price | vs price | All analyses |
 |---|---|---|---|---|---|---|---|---|
-| BSX | [2026-10-31 07:07 CET](BSX/2026-10-31_0707.pdf) | $41.98 | 13.2x | 25.2x | 13x | $41.47 | -1.2% | [list](BSX/README.md) |
-| BKNG | [2026-10-31 07:07 CET](BKNG/2026-10-31_0707.pdf) | $148.13 | 15.4x | 21.2x | 15x | $144.15 | -2.7% | [list](BKNG/README.md) |
-| NFLX | [2026-10-31 07:07 CET](NFLX/2026-10-31_0707.pdf) | $62.08 | 21.3x | 61.3x | 20x | $58.40 | -5.9% | [list](NFLX/README.md) |
-| GOOGL | [2026-10-31 07:07 CET](GOOGL/2026-10-31_0707.pdf) | $279.84 | 24.2x | 23.7x | 22x | $255.83 | -8.6% | [list](GOOGL/README.md) |
-| UBER | [2026-10-31 07:07 CET](UBER/2026-10-31_0707.pdf) | $65.25 | 22.6x | 22.3x | 20x | $57.80 | -11.4% | [list](UBER/README.md) |
+| BSX | [2026-11-02 20:52 CET](BSX/2026-11-02_2052.pdf) | $43.96 | 13.8x | 25.2x | 13x | $41.47 | -5.7% | [list](BSX/README.md) |
+| BKNG | [2026-11-02 20:52 CET](BKNG/2026-11-02_2052.pdf) | $154.18 | 16.0x | 21.2x | 15x | $144.15 | -6.5% | [list](BKNG/README.md) |
+| NFLX | [2026-11-02 20:52 CET](NFLX/2026-11-02_2052.pdf) | $62.60 | 21.4x | 61.3x | 20x | $58.40 | -6.7% | [list](NFLX/README.md) |
+| GOOGL | [2026-11-02 20:52 CET](GOOGL/2026-11-02_2052.pdf) | $282.01 | 24.4x | 23.7x | 22x | $255.83 | -9.3% | [list](GOOGL/README.md) |
+| UBER | [2026-11-02 20:52 CET](UBER/2026-11-02_2052.pdf) | $66.53 | 23.0x | 22.3x | 20x | $57.80 | -13.1% | [list](UBER/README.md) |
 
-**Market report**, newest first: [2026-10-31_0707](market/2026-10-31_0707.pdf), [2026-10-30_2149](market/2026-10-30_2149.pdf), [2026-10-28_2054](market/2026-10-28_2054.pdf), [2026-10-28_0000](market/2026-10-28_0000.pdf), [2026-10-27_2055](market/2026-10-27_2055.pdf), [2026-10-27_1657](market/2026-10-27_1657.pdf), [2026-10-27_1627](market/2026-10-27_1627.pdf)
+**Market report**, newest first: [2026-11-02_2052](market/2026-11-02_2052.pdf), [2026-10-31_0707](market/2026-10-31_0707.pdf), [2026-10-30_2149](market/2026-10-30_2149.pdf), [2026-10-28_2054](market/2026-10-28_2054.pdf), [2026-10-28_0000](market/2026-10-28_0000.pdf), [2026-10-27_2055](market/2026-10-27_2055.pdf), [2026-10-27_1657](market/2026-10-27_1657.pdf), [2026-10-27_1627](market/2026-10-27_1627.pdf)
 
-**Watch list summary**, newest first: [2026-10-31_0707](summaries/2026-10-31_0707.pdf), [2026-10-30_2149](summaries/2026-10-30_2149.pdf), [2026-10-28_2054](summaries/2026-10-28_2054.pdf), [2026-10-28_0000](summaries/2026-10-28_0000.pdf), [2026-10-27_2055](summaries/2026-10-27_2055.pdf), [2026-10-27_1657](summaries/2026-10-27_1657.pdf), [2026-10-27_1627](summaries/2026-10-27_1627.pdf)
+**Watch list summary**, newest first: [2026-11-02_2052](summaries/2026-11-02_2052.pdf), [2026-10-31_0707](summaries/2026-10-31_0707.pdf), [2026-10-30_2149](summaries/2026-10-30_2149.pdf), [2026-10-28_2054](summaries/2026-10-28_2054.pdf), [2026-10-28_0000](summaries/2026-10-28_0000.pdf), [2026-10-27_2055](summaries/2026-10-27_2055.pdf), [2026-10-27_1657](summaries/2026-10-27_1657.pdf), [2026-10-27_1627](summaries/2026-10-27_1627.pdf)

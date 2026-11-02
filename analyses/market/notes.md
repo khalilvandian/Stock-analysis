@@ -1,12 +1,12 @@
 # Market report: Claude's notes
 
-Updated: 2026-10-30
+Updated: 2026-11-02
 
 The evening run copies these sections into the market PDF. Keep it short.
 
 ## Verdict
 
-**October ended with a sharp tech sell-off: the S&P 500 fell 1.8% and the Nasdaq about 3% on Oct 30, their worst day since June, on doubts that heavy AI spending will pay off. The index is only about 3% below its high, so this is a pullback, not a panic; the bargains are still in the sold-off software and data names.**
+**After a rocky end to October (the S&P 500 -1.8% and the Nasdaq -2.9% on Oct 30, on doubts that AI spending will pay off), Monday was mixed: oil fell about 7% on Middle East ceasefire hopes and the Dow rose, while tech stayed weak. The S&P 500 is about 3% below its high and the VIX about 21: a pullback with more nerves, not a panic. The bargains are still in the sold-off software and data names.**
 
 ## Summary
 
@@ -17,7 +17,7 @@ The evening run copies these sections into the market PDF. Keep it short.
 
 ## What is driving the market
 
-On Oct 30 the S&P 500 fell about 1.8% to about 7,580 and the Nasdaq about 2.9%, the worst day for both since June; the Dow lost about 1.1%. Intel fell about 29%, its worst day since 1974, on weak fourth-quarter guidance, after Alphabet's results (Oct 28) and other tech reports raised doubts about the return on AI spending. Earlier in the week, on Oct 28, the S&P 500 was about 7,747, under 1% from its high. On Oct 27 the S&P 500 rose about 0.7% to about 7,730 and the Nasdaq about 1.3%, led by chips and Big Tech ahead of their earnings and this week's Fed meeting. Oil topped $100 a barrel in September on Middle East supply worries, and the 10-year yield broke 5% for the first time since 2023 on inflation fears and the chance of Fed rate rises. The index has held up because the largest companies keep growing earnings, but breadth is middling: a little under 60% of S&P 500 stocks are above their 200-day average.
+On Nov 2 (intraday, as Wall Street now closes at 22:00 Italy time) oil fell about 7% to about $97 on Middle East ceasefire hopes, the Dow rose about 0.6% and the S&P 500 slipped about 0.3% to about 7,560, with the Nasdaq down about 0.7%. The VIX rose to about 21. This week brings Apple's results (tonight), the US midterm elections, the monthly jobs report, and from the watch list Booking (Nov 3) and Uber (Nov 4). On Oct 30 the S&P 500 fell about 1.8% to about 7,580 and the Nasdaq about 2.9%, the worst day for both since June; the Dow lost about 1.1%. Intel fell about 29%, its worst day since 1974, on weak fourth-quarter guidance, after Alphabet's results (Oct 28) and other tech reports raised doubts about the return on AI spending. Earlier in the week, on Oct 28, the S&P 500 was about 7,747, under 1% from its high. On Oct 27 the S&P 500 rose about 0.7% to about 7,730 and the Nasdaq about 1.3%, led by chips and Big Tech ahead of their earnings and this week's Fed meeting. Oil topped $100 a barrel in September on Middle East supply worries, and the 10-year yield broke 5% for the first time since 2023 on inflation fears and the chance of Fed rate rises. The index has held up because the largest companies keep growing earnings, but breadth is middling: a little under 60% of S&P 500 stocks are above their 200-day average.
 
 ## Stocks to look at
 
