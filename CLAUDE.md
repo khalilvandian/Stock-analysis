@@ -63,7 +63,7 @@ builds a per-stock vector from any chosen set (report 14).
 ## Watch list and the evening run
 
 The watch list is `config/watchlist.toml` (symbol, sector peers, target P/E, one-off EPS
-corrections). Every evening at 21:00 Italy time a scheduled session follows
+corrections). Every weekday evening (Monday to Friday) at 21:00 Italy time a scheduled session follows
 `docs/EVENING_RUN.md`: it updates Claude's notes (`analyses/<SYMBOL>/notes.md`,
 `analyses/market/notes.md`, `analyses/summaries/notes.md`), runs
 `uv run python analysis/watchlist.py` (which reruns the market screener first), checks the

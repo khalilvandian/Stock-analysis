@@ -1,6 +1,6 @@
 # The evening run
 
-Every evening at 21:00 Italy time a scheduled Claude session runs these steps on `main`.
+Every weekday evening (Monday to Friday) at 21:00 Italy time a scheduled Claude session runs these steps on `main`.
 Babak approved committing the results straight to `main` (no pull request each night).
 
 1. **Set up:** `uv sync`. Check out `main` and pull.
