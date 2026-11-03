@@ -4,6 +4,7 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-03 20:53 CET | $43.67 | 13.7x | 25.2x | $41.47 | -5.0% | Q3 (Oct 28) missed on earnings and the year's outlook was cut a fourth time: sales grew only 1.5% and are guided to fall in Q4. | [2026-11-03_2053.pdf](2026-11-03_2053.pdf) |
 | 2026-11-02 20:52 CET | $43.96 | 13.8x | 25.2x | $41.47 | -5.7% | Q3 (Oct 28) missed on earnings and the year's outlook was cut a fourth time: sales grew only 1.5% and are guided to fall in Q4. | [2026-11-02_2052.pdf](2026-11-02_2052.pdf) |
 | 2026-10-31 07:07 CET | $41.98 | 13.2x | 25.2x | $41.47 | -1.2% | Q3 (Oct 28) missed on earnings and the year's outlook was cut a fourth time: sales grew only 1.5% and are guided to fall in Q4. | [2026-10-31_0707.pdf](2026-10-31_0707.pdf) |
 | 2026-10-30 21:49 CET | $41.98 | 13.2x | 25.2x | $41.47 | -1.2% | Q3 (Oct 28) missed on earnings and the year's outlook was cut a fourth time: sales grew only 1.5% and are guided to fall in Q4. | [2026-10-30_2149.pdf](2026-10-30_2149.pdf) |

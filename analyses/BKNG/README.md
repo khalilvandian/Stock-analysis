@@ -4,6 +4,7 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-03 20:53 CET | $152.38 | 15.9x | 21.2x | $144.15 | -5.4% | The strongest balance sheet and biggest cash generator in online travel, the cheapest it has been in a decade, sold off on fears that AI agents will bypass it. | [2026-11-03_2053.pdf](2026-11-03_2053.pdf) |
 | 2026-11-02 20:52 CET | $154.18 | 16.0x | 21.2x | $144.15 | -6.5% | The strongest balance sheet and biggest cash generator in online travel, the cheapest it has been in a decade, sold off on fears that AI agents will bypass it. | [2026-11-02_2052.pdf](2026-11-02_2052.pdf) |
 | 2026-10-31 07:07 CET | $148.13 | 15.4x | 21.2x | $144.15 | -2.7% | The strongest balance sheet and biggest cash generator in online travel, the cheapest it has been in a decade, sold off on fears that AI agents will bypass it. | [2026-10-31_0707.pdf](2026-10-31_0707.pdf) |
 | 2026-10-30 21:49 CET | $148.13 | 15.4x | 21.2x | $144.15 | -2.7% | The strongest balance sheet and biggest cash generator in online travel, the cheapest it has been in a decade, sold off on fears that AI agents will bypass it. | [2026-10-30_2149.pdf](2026-10-30_2149.pdf) |

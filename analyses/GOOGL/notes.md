@@ -1,6 +1,6 @@
 # Alphabet (GOOGL): Claude's notes
 
-Updated: 2026-11-02
+Updated: 2026-11-03
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
