@@ -57,8 +57,9 @@ peers = ["LYFT", "DASH", "GRAB", "CART", "DIDIY"]
 target_pe = 20
 target_note = "Proposed 2026-10-29, not yet confirmed by Babak: Uber has been profitable only since 2023 and its GAAP EPS is swung by tax releases and equity revaluations, so its own P/E history says little; 20x non-GAAP EPS, a discount for robotaxi risk to a business growing EPS 35-45% a year."
 eps_override = [
-  { reported = "2025-11-04", eps = 0.65, reason = "excludes the $4.9bn tax valuation release and $1.5bn equity revaluation gain; the analysts' comparable figure, Claude's estimate until Uber's Q3 2026 release gives its own." },
+  { reported = "2025-11-04", eps = 0.65, reason = "excludes the $4.9bn tax valuation release and $1.5bn equity revaluation gain; Uber's own comparable figure, confirmed by its Q3 2026 release (+35% to $0.88)." },
   { reported = "2026-02-04", eps = 0.71, reason = "Uber's non-GAAP EPS: excludes the $1.6bn equity revaluation loss." },
   { reported = "2026-05-06", eps = 0.72, reason = "Uber's non-GAAP EPS: excludes the $1.5bn equity revaluation loss." },
   { reported = "2026-08-05", eps = 0.81, reason = "Uber's non-GAAP EPS: excludes the $1.6bn equity revaluation gain (Delivery Hero, Aurora)." },
+  { reported = "2026-11-04", eps = 0.88, reason = "Uber's non-GAAP EPS: excludes the $476m equity revaluation loss, $484m of legal and regulatory reserves and $186m of restructuring (GAAP EPS $0.25)." },
 ]

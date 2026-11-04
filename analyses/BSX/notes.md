@@ -1,6 +1,6 @@
 # Boston Scientific (BSX): Claude's notes
 
-Updated: 2026-11-03
+Updated: 2026-11-04
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -28,6 +28,7 @@ Boston Scientific makes devices for heart, vascular, digestive and urology proce
 
 ## News
 
+- 2026-11-04: about $46 (intraday), up about 5% with the market's post-election rally; no company news.
 - 2026-11-02: about $43.9 (intraday: since the US clocks changed on Nov 1, Wall Street closes at 22:00 Italy time, after this run), up about 4.6% from Friday with the market's rebound; no company news. About 6% above the $41.5 entry again.
 - 2026-10-30: about $42.0, about 1% above the $41.5 entry, holding up on a day the S&P 500 fell 1.8%. No new company news.
 - 2026-10-28: Q3 sales $5.14bn (+1.5%, just above the $5.12bn estimate); adjusted EPS $0.73 against $0.75 expected and $0.75 a year ago. Full-year adjusted EPS cut to $3.16–3.18 (was $3.34–3.41); Q4 guided to $0.77–0.79 (consensus $0.83) with sales down 1–3%. The release gives no figures for electrophysiology or Watchman, and no 2027 outlook. The stock fell about 6% to about $42.3. The cyberattack's cost is not quantified, so adjusted EPS here still includes it.

@@ -1,6 +1,6 @@
 # Alphabet (GOOGL): Claude's notes
 
-Updated: 2026-11-03
+Updated: 2026-11-04
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -28,6 +28,7 @@ Alphabet owns Google Search and advertising, YouTube, Google Cloud, Android and 
 
 ## News
 
+- 2026-11-04: about $291.5 (intraday), up about 4.5% with the market; no company news.
 - 2026-11-02: about $281 (intraday: since the US clocks changed on Nov 1, Wall Street closes at 22:00 Italy time, after this run), little changed; no company news. About 9% above the $256 entry.
 - 2026-10-30: about $280 (-1.4%) as the Nasdaq fell about 3% on worries that AI spending will not pay off; a 52-week low is about $271. Wells Fargo cut its target from $417 to $371. Websites quoting a P/E near 14.5x use GAAP EPS, which includes the SpaceX gains; on adjusted EPS it is about 25.6x, or about 24x with the stakes taken out of the price.
 - 2026-10-28: Q3 results: revenue in line, GAAP EPS of $2.12 against a $3.01 estimate after an $8.7bn loss on equity securities; free cash flow negative. The stock fell about 8% after hours, to about $300, and is about $286 today.
