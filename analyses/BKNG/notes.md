@@ -1,6 +1,6 @@
 # Booking Holdings (BKNG): Claude's notes
 
-Updated: 2026-11-04
+Updated: 2026-11-05
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -27,6 +27,7 @@ Booking runs Booking.com, Priceline, Agoda, KAYAK and OpenTable. Most of its pro
 
 ## News
 
+- 2026-11-05: about $167.7 (intraday), down about 2% in the market sell-off, keeping most of yesterday's post-results jump. About 9% above the $154 entry.
 - 2026-11-04: the stock jumped about 12% to about $171 (intraday) after the Q3 report, despite the weak Q4 guide; analysts trimmed targets but most kept Buy.
 - 2026-11-03: Q3 results: adjusted EPS $4.66 (consensus $4.50, +17%); room nights +6.7% to 345m; gross bookings +9.6% to $54.5bn. Reported revenue of $8.89bn was cut by a $900m FTC-related charge (adjusted revenue about $9.79bn, above the $9.55bn estimate). Q4 guide: room nights +1-3%, gross bookings +2-4%, adjusted revenue 0-2%.
 - 2026-11-03: about $152 (intraday), about 5% above the $144 entry. Q3 results come tonight after the US close (22:00 Italy time), after this run; tomorrow's run will cover them.

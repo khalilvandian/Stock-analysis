@@ -4,6 +4,7 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-05 20:52 CET | $285.64 | 24.7x | 23.7x | $255.83 | -10.4% | The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. | [2026-11-05_2052.pdf](2026-11-05_2052.pdf) |
 | 2026-11-04 20:57 CET | $291.38 | 25.2x | 23.7x | $255.83 | -12.2% | The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. | [2026-11-04_2057.pdf](2026-11-04_2057.pdf) |
 | 2026-11-03 20:53 CET | $278.86 | 24.1x | 23.7x | $255.83 | -8.3% | The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. | [2026-11-03_2053.pdf](2026-11-03_2053.pdf) |
 | 2026-11-02 20:52 CET | $282.01 | 24.4x | 23.7x | $255.83 | -9.3% | The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. | [2026-11-02_2052.pdf](2026-11-02_2052.pdf) |

@@ -1,6 +1,6 @@
 # Uber (UBER): Claude's notes
 
-Updated: 2026-11-04
+Updated: 2026-11-05
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -28,6 +28,7 @@ Uber runs ride-hailing (Mobility), food and grocery delivery (Delivery) and Frei
 
 ## News
 
+- 2026-11-05: about $68.6 (intraday), down about 2% in the market sell-off. About 10% above the $62 entry.
 - 2026-11-04: Q3 results: revenue $14.77bn (about $0.1bn above estimates); gross bookings +20% to $59.8bn; trips +16%; non-GAAP EPS $0.88 (+35%, a cent above consensus). GAAP EPS was $0.25 after a $476m equity revaluation loss, $484m of legal and regulatory reserves and $186m of restructuring. Q4 guide: gross bookings $63.25-65.25bn (+18-22%), non-GAAP EPS $0.95-0.99. About 700 driverless vehicles on the platform by year-end, over 2,000 in 2027. Buybacks slowed to $750m. The stock rose about 5% to about $70 (intraday).
 - 2026-11-03: about $66.7 (intraday), little changed before tomorrow's report (Nov 4, before the US open).
 - 2026-11-02: about $66.5 (intraday: since the US clocks changed on Nov 1, Wall Street closes at 22:00 Italy time, after this run), ahead of Wednesday's report (Nov 4, before the US open). Consensus non-GAAP EPS about $0.86-0.94 against guidance of $0.84-0.88; gross bookings guided at $58.25-60.25bn (+18-22% in constant currency).

@@ -1,12 +1,12 @@
 # Watch list summary: Claude's notes
 
-Updated: 2026-11-04
+Updated: 2026-11-05
 
 The evening run copies these sections into the watch list summary PDF.
 
 ## Verdict
 
-**A strong day for the whole watch list: the post-election rally lifted every stock 4-12%, so none is near its entry now. Booking jumped about 12% to about $171 after its Q3 beat (entry now $154, 10% below); Uber rose about 5% after a solid Q3 (entry now $62, 11% below). Boston Scientific is 10% above $41.5, Netflix 12% above $58 and Alphabet 12% above $256.**
+**The watch list fell 2-4% in a sharp market sell-off, much less than the Nasdaq. Closest to entry: Boston Scientific about 7% above $41.5, then Booking about 9% above $154 and Uber about 10% above $62; Netflix and Alphabet are about 11% above theirs. If the sell-off continues, the first entries could come into reach.**
 
 ## Analysis
 
