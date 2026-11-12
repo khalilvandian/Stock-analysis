@@ -1,12 +1,12 @@
 # Alphabet (GOOGL): Claude's notes
 
-Updated: 2026-11-04
+Updated: 2026-11-12
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
 ## Verdict
 
-**The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. The GAAP P/E near 15x is an illusion: much of the last year's earnings are paper gains on the Anthropic and SpaceX stakes. On core earnings, with the stakes (about $15 a share after tax) taken out of the price, Alphabet trades at about 24x, in line with its 10-year median. View (report 17): wait, and buy below about $256 (22x core EPS plus the stakes), about 9% below today.**
+**The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. The GAAP P/E near 15x is an illusion: much of the last year's earnings are paper gains on the Anthropic and SpaceX stakes. On core earnings, with the stakes (about $15 a share after tax) taken out of the price, Alphabet trades at about 26x, above its 10-year median of about 24x. View (report 17): wait, and buy below about $256 (22x core EPS plus the stakes), about 14% below today.**
 
 ## Summary
 
@@ -28,6 +28,7 @@ Alphabet owns Google Search and advertising, YouTube, Google Cloud, Android and 
 
 ## News
 
+- 2026-11-12: about $299 (intraday), up about 3% since Nov 4 and close to $300. Its filing showed the $83.7bn SpaceX stake held and a new $0.5bn Qualcomm stake; a $15bn Malaysia data-centre plan (Nov 7); a class action filed (Nov 9) and a possible EU antitrust probe into news rankings in search. About 26x core earnings, 17% above the $256 entry.
 - 2026-11-04: about $291.5 (intraday), up about 4.5% with the market; no company news.
 - 2026-11-02: about $281 (intraday: since the US clocks changed on Nov 1, Wall Street closes at 22:00 Italy time, after this run), little changed; no company news. About 9% above the $256 entry.
 - 2026-10-30: about $280 (-1.4%) as the Nasdaq fell about 3% on worries that AI spending will not pay off; a 52-week low is about $271. Wells Fargo cut its target from $417 to $371. Websites quoting a P/E near 14.5x use GAAP EPS, which includes the SpaceX gains; on adjusted EPS it is about 25.6x, or about 24x with the stakes taken out of the price.

@@ -4,6 +4,7 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-12 21:32 CET | $62.97 | 21.6x | 61.3x | $58.40 | -7.3% | The leading streaming business, now at its lowest valuation in a decade after a run of soft guidance, while adjusted earnings still grow about 15% a year. | [2026-11-12_2132.pdf](2026-11-12_2132.pdf) |
 | 2026-11-04 20:57 CET | $66.53 | 22.8x | 61.3x | $58.40 | -12.2% | The leading streaming business, now at its lowest valuation in a decade after a run of soft guidance, while adjusted earnings still grow about 15% a year. | [2026-11-04_2057.pdf](2026-11-04_2057.pdf) |
 | 2026-11-03 20:53 CET | $63.06 | 21.6x | 61.3x | $58.40 | -7.4% | The leading streaming business, now at its lowest valuation in a decade after a run of soft guidance, while adjusted earnings still grow about 15% a year. | [2026-11-03_2053.pdf](2026-11-03_2053.pdf) |
 | 2026-11-02 20:52 CET | $62.60 | 21.4x | 61.3x | $58.40 | -6.7% | The leading streaming business, now at its lowest valuation in a decade after a run of soft guidance, while adjusted earnings still grow about 15% a year. | [2026-11-02_2052.pdf](2026-11-02_2052.pdf) |
