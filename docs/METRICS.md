@@ -1170,7 +1170,7 @@ The price at which the stock reaches Babak's target multiple.
 - **Used in:** watch list
 - **Example (BSX, 2026-10-27):** $41.73 = 13 x 3.21
 - **Vector:** derived
-- **Note:** Depends on a chosen target, so it belongs to the decision, not the vector.
+- **Note:** Depends on a chosen target, so it belongs to the decision, not the vector. Blank for a stock without a target (target_pe is optional; NFLX has none since 2026-11-12).
 
 <a id="price-vs-cheap"></a>
 #### Price against own cheap price (`price_vs_cheap`)

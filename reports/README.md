@@ -18,7 +18,7 @@ Each report covers one piece of analysis. It states the data date, the method, t
 | 12 | [Booking Holdings](12-bkng-fundamentals.md) | Summary, then BKNG absolute values, ratios and screens against 6 online-travel peers, then analysis (adjusted P/E vs its own history, entry prices) |
 | 13 | [Market screener](13-market-screener.md) | The S&P 500 (497 companies; the US and Europe above $1bn with one setting). Stage 1: Peter Lynch's six categories and financial-statement rules per category (banks, insurers, REITs by kind of business). Stage 2: each survivor's own cheap price, top 3 cheap or close-to-cheap names per sector, technicals for timing |
 | 14 | [Metrics dictionary](14-metrics-dictionary.md) | Every fundamental metric used so far, defined with formula, source and a worked example; the proposed first vector and the choices to make (issue #8) |
-| 19 | [Netflix](19-nflx-fundamentals.md) | Summary, then NFLX absolute values (with content commitments), ratios and screens against 8 media peers, a free-cash-flow DCF (the standard one double-counts content), then analysis (Lynch fast grower slowing, adjusted P/E vs its own history, entry prices) |
+| 19 | [Netflix](19-nflx-fundamentals.md) | Summary, then NFLX absolute values (with content commitments), ratios and screens against 8 media peers, a free-cash-flow DCF (the standard one double-counts content), then analysis (Lynch fast grower slowing, adjusted P/E vs its own history, price at its own P/E levels; no target set) |
 
 ## Writing a new report
 

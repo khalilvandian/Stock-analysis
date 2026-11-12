@@ -102,7 +102,10 @@ this order.
    trailing figure is the sum of four consecutive quarters. Each year's P/E is that year's
    average price over the trailing EPS at the first report after the year ends (the Q4
    report). Correct one-offs Yahoo still includes with `eps_override` in the watch list.
-7. **Entry price.** Entry price = target P/E x trailing adjusted EPS. Propose the target
+7. **Entry price.** Since 2026-11-12 Babak sets no targets unless they ask for one: show
+   the price at the stock's own P/E levels (lows and medians) instead, and leave
+   `target_pe` out of the watch list. Where a target exists, entry price = target P/E x
+   trailing adjusted EPS. Propose a target only when asked,
    against the stock's own history (decade low, 5- and 10-year medians) with a discount for
    what has changed, write the reasoning in `target_note`, and mark it "not yet confirmed by
    Babak" until they confirm it. Also give the entry price after the next report if the

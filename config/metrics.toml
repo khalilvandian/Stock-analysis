@@ -1230,7 +1230,7 @@ sources = { watchlist = "entry_price" }
 used_in = ["watch list"]
 example = { symbol = "BSX", value = 41.73, as_of = "2026-10-27", working = "13 x 3.21" }
 vector = "derived"
-notes = "Depends on a chosen target, so it belongs to the decision, not the vector."
+notes = "Depends on a chosen target, so it belongs to the decision, not the vector. Blank for a stock without a target (target_pe is optional; NFLX has none since 2026-11-12)."
 
 [[metric]]
 id = "price_vs_cheap"

@@ -6,7 +6,7 @@ The evening run copies these sections into the PDF. Update them when the story c
 
 ## Verdict
 
-**The leading streaming business, now at its lowest valuation in a decade after a run of soft guidance, while adjusted earnings still grow about 15% a year. View (full analysis, report 19): near the buy level. A small first position is reasonable; the proposed entry is 20x adjusted earnings, about $58 now and about $61 after the Q4 report.**
+**The leading streaming business, now at its lowest valuation in a decade after a run of soft guidance, while adjusted earnings still grow about 15% a year. View (full analysis, report 19): cheap against its own history, just above its 3-year low P/E of 21x; the open question is whether the slowdown stops. No target price is set (Babak's choice).**
 
 ## Summary
 
@@ -28,7 +28,7 @@ Netflix is the largest paid streaming service, earning almost all its revenue fr
 
 ## News
 
-- 2026-11-12: about $63.9. Full analysis written (report 19): a fast grower that is slowing; passes every debt rule; 20x entry kept.
+- 2026-11-12: about $63.9. Full analysis written (report 19): a fast grower that is slowing; passes every debt rule. Babak chose not to set a target, so the 20x entry was removed.
 - 2026-11-04: about $66.5 (intraday), up about 5% with the market; no company news.
 - 2026-11-02: about $62.6 (intraday: since the US clocks changed on Nov 1, Wall Street closes at 22:00 Italy time, after this run), little changed; no company news.
 - 2026-10-30: about $62.1, about 6% above the $58 entry; steady while the Nasdaq fell about 3%. No new company news.

@@ -6,7 +6,8 @@
 #
 # symbol      Yahoo ticker.
 # peers       Sector-appropriate peers for the ratios and the strict and weighted screens.
-# target_pe   Entry multiple: entry price = target_pe x trailing 12-month adjusted EPS.
+# target_pe   Optional entry multiple: entry price = target_pe x trailing 12-month adjusted EPS.
+#             Leave it out for no target and no entry price.
 # target_note Where the target comes from and whether Babak has confirmed it.
 # stakes_per_share  Optional after-tax value of equity stakes per share: kept out of the
 #               P/E (price - stakes) and added back to the entry price.
@@ -31,8 +32,7 @@ target_note = "Proposed 2026-10-25 (report 12), not yet confirmed by Babak: belo
 [[stock]]
 symbol = "NFLX"
 peers = ["DIS", "WBD", "CMCSA", "SPOT", "ROKU", "GOOGL", "META", "PSKY"]
-target_pe = 20
-target_note = "Report 19 (2026-11-12), not yet confirmed by Babak: the 10-year median (about 58x) reflects Netflix's early hyper-growth years, so the target is set against the last five years (about 41x median on daily data, 21x three-year low): 20x is a PEG of 1 on about 20% growth, discounted for the slowing revenue."
+target_note = "No target: Babak chose not to set one (2026-11-12). Report 19 shows the price at Netflix's own P/E levels instead."
 eps_override = [
   { reported = "2025-10-21", eps = 0.73, reason = "excludes the Brazilian tax charge of about $619m (about $0.14 a share)." },
   { reported = "2026-04-16", eps = 0.69, reason = "excludes the $2.8bn Warner Bros. Discovery termination fee (about $0.54 a share after an estimated 18% tax); Claude's estimate." },

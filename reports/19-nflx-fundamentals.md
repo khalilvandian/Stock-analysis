@@ -8,10 +8,10 @@ shareholder letter of 20 Oct and the 10-Q of 21 Oct). Written 2026-11-12.*
 **Netflix is a fast grower that is slowing down. Revenue growth fell from 17% to 12% this
 year and the stock is down about 45% from its high, so it now trades at about 22x adjusted
 earnings: the lowest outside the 2022 crash, against a 5-year median of about 41x. The
-balance sheet is strong and free cash flow is about $11–12bn a year. View: near the buy
-level. The proposed entry is 20x adjusted EPS, about $58 now and about $61 after the
-Q4 report on Jan 19. A small first position at today's price is reasonable; add below $52
-(17x).**
+balance sheet is strong and free cash flow is about $11–12bn a year. View: cheap
+against its own history, and the price only asks for modest growth; the open question is
+whether the slowdown stops. No target price is set (Babak, 2026-11-12); section 3 shows
+the price at Netflix's own P/E levels instead. The Q4 report on Jan 19 is the next test.**
 
 - **Cheap:** 21.9x adjusted EPS of $2.92, 16.9x 2027 consensus, PEG about 1.1. The market
   price implies about 8% a year free-cash-flow growth for ten years, against 12% revenue
@@ -22,7 +22,7 @@ Q4 report on Jan 19. A small first position at today's price is reasonable; add 
 - **Weak:** growth is slowing every quarter, advertising is behind plan ($2.7bn vs $3bn),
   viewing hours are flat, and $25bn of content commitments sit mostly off the balance sheet.
 - **Uncertain:** whether 2027 brings 10–11% revenue growth with rising margins (consensus:
-  EPS +24%) or a further slowdown that turns Netflix into a stalwart worth 18–20x.
+  EPS +24%) or a further slowdown that turns Netflix into a stalwart.
 
 ## 2. The numbers
 
@@ -256,33 +256,32 @@ of $133.91 (split-adjusted):
 The results themselves are good: Q3 operating income +37%, margin 34.6%, and member churn
 better than forecast.
 
-### Entry price
+### Price at Netflix's own P/E levels
 
-**Proposed: 20x adjusted EPS (unchanged from the watch list, still to be confirmed by
-Babak).** That is about $58.40 today, about 9% below the price, and about $60.80 after the
-Q4 report if EPS meets the $0.68 consensus. 20x is a PEG of 1 on 20% growth, below the
-21.2x three-year low and well above the 15x panic low of 2022.
+**No target or entry price is set: Babak chose not to set one (2026-11-12).** For
+reference, this is where the price would be at the P/E levels Netflix has actually traded
+at, on trailing adjusted EPS now, after Q4 if EPS meets the $0.68 consensus, and on the
+2027 consensus.
 
-| P/E | Entry now (EPS $2.92) | After Q4 (EPS ~$3.04) | On 2027 consensus ($3.77) |
-|---|---|---|---|
-| 15x | $43.80 | $45.60 | $56.55 |
-| 17x | $49.64 | $51.68 | $64.09 |
-| 18x | $52.56 | $54.72 | $67.86 |
-| 20x | $58.40 | $60.80 | $75.40 |
-| 22x | $64.24 | $66.88 | $82.94 |
-| 25x | $73.00 | $76.00 | $94.25 |
+| Own P/E level | P/E | On EPS now ($2.92) | After Q4 (~$3.04) | On 2027 consensus ($3.77) |
+|---|---|---|---|---|
+| 5-year low (May 2022, first subscriber loss) | 15.1x | $44.09 | $45.90 | $56.93 |
+| 3-year low (28 Oct 2026) | 21.2x | $61.90 | $64.45 | $79.92 |
+| Lowest yearly average (2022) | 28.8x | $84.10 | $87.55 | $108.58 |
+| 5-year median (daily) | 40.7x | $118.84 | $123.73 | $153.44 |
 
-**View.** Netflix is close to the buy level. A small first position at about $64 is
-reasonable, since the price already implies only 8% cash-flow growth; the main buy is at
-or below $58–61 (20x), and below about $52 (17x) if 2027 guidance disappoints. The case
-to wait is that growth has slowed for four quarters running and nothing yet shows it has
-stopped slowing.
+Today's $63.87 sits just above the 3-year low. Only the 2022 panic, when subscribers fell
+for the first time, priced Netflix lower.
+
+**View.** Netflix is cheap against its own history, and the price already implies only
+about 8% cash-flow growth a year, below what the business is doing now. The case to wait
+is that growth has slowed for four quarters running and nothing yet shows it has stopped
+slowing; the Q4 report and the 2027 outlook on Jan 19 are where that shows.
 
 ### Risks
 
 - **Slowing growth:** 2027 consensus has revenue +10.7% to $56.6bn. A guide below 10%
-  would make Netflix a stalwart, and 18x would then be a fair multiple (about $55 on 2026
-  EPS).
+  would make Netflix a stalwart, which usually trades at a lower P/E than today's.
 - **Engagement:** viewing hours are flat; Netflix argues price increases and churn show
   value, and wants view-hour growth back. YouTube (GOOGL) takes more TV time than Netflix
   in the US (Nielsen).

@@ -293,6 +293,8 @@ def badge(to_entry) -> str:
         d = float(to_entry)
     except (TypeError, ValueError):
         return ""
+    if d != d:  # NaN: no target set, so no entry price
+        return '<span class="badge">No target</span>'
     if d >= 0:
         return '<span class="badge good">At or below entry price</span>'
     if d > -0.10:

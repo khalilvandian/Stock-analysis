@@ -253,7 +253,9 @@ def key_numbers(d: dict) -> dict:
     # Equity stakes (stakes_per_share) are kept out of the P/E: the price paid for the
     # business is the price less the stakes, and the entry price adds them back.
     stakes = float(stock.get("stakes_per_share", 0.0))
-    entry = stock["target_pe"] * eps + stakes if eps > 0 else np.nan
+    # target_pe is optional: without one there is no entry price (Babak, 2026-11-12)
+    target = float(stock.get("target_pe") or np.nan)
+    entry = target * eps + stakes if eps > 0 and np.isfinite(target) else np.nan
     q = d["quarters"]
     eps_next = (
         eps - float(q.iloc[-4]) + d["next_estimate"]
@@ -269,13 +271,13 @@ def key_numbers(d: dict) -> dict:
         "pe_median_5y": float(yearly["pe"].tail(5).median()) if not yearly.empty else np.nan,
         "pe_low_10y": float(yearly["pe"].min()) if not yearly.empty else np.nan,
         "pe_high_10y": float(yearly["pe"].max()) if not yearly.empty else np.nan,
-        "target_pe": stock["target_pe"],
+        "target_pe": target,
         "entry_price": entry,
         "to_entry": entry / price - 1 if np.isfinite(entry) else np.nan,
         "next_report": d["next_report"].date().isoformat() if d["next_report"] is not None else "",
         "next_estimate": d["next_estimate"],
         "stakes_per_share": stakes,
-        "entry_after_next": stock["target_pe"] * eps_next + stakes if eps_next > 0 else np.nan,
+        "entry_after_next": target * eps_next + stakes if eps_next > 0 else np.nan,
     }
 
 
@@ -315,6 +317,23 @@ def times(v: float) -> str:
     return f"{v:.1f}x" if v is not None and np.isfinite(v) else "–"
 
 
+def target_text(v) -> str:
+    """'20x', or '–' for a stock without a target."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return "–"
+    return f"{v:g}x" if np.isfinite(v) else "–"
+
+
+def price_at(k: dict, multiple: str) -> str:
+    """Price at one of the stock's own P/E levels, on trailing adjusted EPS (+ stakes)."""
+    pe, eps = k[multiple], k["eps_adj_ttm"]
+    if not (np.isfinite(pe) and np.isfinite(eps)) or eps <= 0:
+        return "–"
+    return money(pe * eps + k.get("stakes_per_share", 0.0))
+
+
 def table(header: list[str], rows: list[list[str]], bold_row: int | None = None) -> str:
     th = "".join(f"<th>{html.escape(h)}</th>" for h in header)
     body = []
@@ -329,7 +348,10 @@ def md(text: str) -> str:
 
 
 def pe_chart(pe: pd.Series, median: float, target: float) -> str:
-    """Inline SVG of daily trailing adjusted P/E with the 10-year median and the target."""
+    """Inline SVG of daily trailing adjusted P/E with the 10-year median and the target.
+
+    The target line is left out when the stock has no target (target is NaN).
+    """
     pe = pe[pe.index >= pe.index.max() - pd.DateOffset(years=YEARS)]
     if pe.empty:
         return ""
@@ -337,7 +359,10 @@ def pe_chart(pe: pd.Series, median: float, target: float) -> str:
     points = pe.resample("2W").last().dropna()  # every two weeks keeps the PDF light
     # cap the axis so years of near-zero earnings (e.g. 2020) don't flatten the rest
     top = min(float(np.nanpercentile(points, 99)) * 1.1, median * 2.5)
-    top = max(top, median * 1.3, target * 1.3, float(points.iloc[-1]) * 1.2)
+    has_target = bool(np.isfinite(target))
+    top = max(top, median * 1.3, float(points.iloc[-1]) * 1.2)
+    if has_target:
+        top = max(top, target * 1.3)
     t0, t1 = points.index[0].value, points.index[-1].value
 
     def x(ts: pd.Timestamp) -> float:
@@ -358,14 +383,19 @@ def pe_chart(pe: pd.Series, median: float, target: float) -> str:
         ts = pd.Timestamp(f"{yr}-01-01")
         grid.append(f'<text x="{x(ts):.1f}" y="{h - pad + 16}" class="ax">{yr}</text>')
     last = points.iloc[-1]
+    target_line = (
+        f'<line x1="{pad}" x2="{w - pad}" y1="{y(target):.1f}" y2="{y(target):.1f}" class="tgt"/>'
+        f'<text x="{w - pad}" y="{y(target) + 13:.1f}" class="lab tgtl" text-anchor="end">'
+        f"target {target:g}x</text>"
+        if has_target
+        else ""
+    )
     return f"""<svg viewBox="0 0 {w} {h}" class="chart" xmlns="http://www.w3.org/2000/svg">
 {"".join(grid)}
 <line x1="{pad}" x2="{w - pad}" y1="{y(median):.1f}" y2="{y(median):.1f}" class="med"/>
 <text x="{w - pad}" y="{y(median) - 5:.1f}" class="lab" text-anchor="end">
 10-yr median {median:.0f}x</text>
-<line x1="{pad}" x2="{w - pad}" y1="{y(target):.1f}" y2="{y(target):.1f}" class="tgt"/>
-<text x="{w - pad}" y="{y(target) + 13:.1f}" class="lab tgtl" text-anchor="end">
-target {target:g}x</text>
+{target_line}
 <polyline points="{pts}" class="line"/>
 <circle cx="{x(points.index[-1]):.1f}" cy="{y(last):.1f}" r="4" class="dot"/>
 </svg>"""
@@ -573,6 +603,7 @@ def render(d: dict, k: dict, run_label: str) -> str:
     def note(section: str) -> str:
         return md(notes[section]) if section in notes else "<p class='note'>Not written yet.</p>"
 
+    has_target = bool(np.isfinite(k["target_pe"]))
     gap = k["to_entry"]
     gap_text = (
         f"{abs(gap):.0%} {'below' if gap < 0 else 'above'} today's price"
@@ -587,8 +618,29 @@ def render(d: dict, k: dict, run_label: str) -> str:
     nxt = (
         f"Next report {k['next_report']} (EPS estimate {money(k['next_estimate'])}); "
         f"if met, the entry price becomes {money(k['entry_after_next'])}."
-        if k["next_report"]
+        if k["next_report"] and has_target
         else ""
+    )
+    entry_box = (
+        f"<div><span>Entry at {k['target_pe']:g}x</span><b>{money(k['entry_price'])}</b>"
+        f"<span>{gap_text}</span></div>"
+        if has_target
+        else "<div><span>Entry price</span><b>no target</b></div>"
+    )
+    entry_section = (
+        f"""<p>At {k["target_pe"]:g}x trailing adjusted EPS of
+{money(k["eps_adj_ttm"])}{stakes_text}, the entry price is
+<b>{money(k["entry_price"])}</b>, {gap_text}. The 10-year range of yearly P/E is
+{times(k["pe_low_10y"])} to {times(k["pe_high_10y"])} (years of collapsed earnings, such as 2020,
+show very high P/Es). {nxt}</p>
+<p class="note">Target: {html.escape(stock.get("target_note", ""))}</p>"""
+        if has_target
+        else f"""<p>No target is set for this stock, so there is no entry price. For reference,
+the price at the yearly P/E of its own history: {price_at(k, "pe_low_10y")} at the 10-year low
+({times(k["pe_low_10y"])}), {price_at(k, "pe_median_5y")} at the 5-year median
+({times(k["pe_median_5y"])}) and {price_at(k, "pe_median_10y")} at the 10-year median
+({times(k["pe_median_10y"])}), on trailing adjusted EPS of {money(k["eps_adj_ttm"])}.</p>
+{f'<p class="note">{html.escape(stock["target_note"])}</p>' if stock.get("target_note") else ""}"""
     )
     return f"""<!doctype html><html><head><meta charset="utf-8"><style>{CSS}</style></head><body>
 <h1>{html.escape(name)} ({sym})</h1>
@@ -601,8 +653,7 @@ Claude's notes updated {html.escape(updated or "never")}.</div>
  <div><span>Price</span><b>{money(k["price"])}</b></div>
  <div><span>Adjusted P/E, 12m</span><b>{times(k["pe_adj"])}</b></div>
  <div><span>10-year median P/E</span><b>{times(k["pe_median_10y"])}</b></div>
- <div><span>Entry at {k["target_pe"]:g}x</span><b>{money(k["entry_price"])}</b>
-  <span>{gap_text}</span></div>
+ {entry_box}
 </div>
 {note("Summary")}
 
@@ -619,12 +670,7 @@ Claude's notes updated {html.escape(updated or "never")}.</div>
 <h3>Adjusted P/E against its own 10-year history</h3>
 {pe_history_html(d, k)}
 <h3>Entry price</h3>
-<p>At {k["target_pe"]:g}x trailing adjusted EPS of {money(k["eps_adj_ttm"])}{stakes_text},
-the entry price is
-<b>{money(k["entry_price"])}</b>, {gap_text}. The 10-year range of yearly P/E is
-{times(k["pe_low_10y"])} to {times(k["pe_high_10y"])} (years of collapsed earnings, such as 2020,
-show very high P/Es). {nxt}</p>
-<p class="note">Target: {html.escape(stock.get("target_note", ""))}</p>
+{entry_section}
 <h3>Business</h3>
 {note("Business")}
 <h3>Risks</h3>
@@ -655,18 +701,19 @@ def render_summary(results: list[tuple[dict, dict]], run_label: str) -> str:
                 money(k["price"]),
                 times(k["pe_adj"]),
                 times(k["pe_median_10y"]),
-                f"{k['target_pe']:g}x",
+                target_text(k["target_pe"]),
                 money(k["entry_price"]),
                 pct(k["to_entry"]),
                 k["next_report"] or "–",
             ]
         )
         gap = k["to_entry"]
-        where = (
-            "at or below its entry price"
-            if np.isfinite(gap) and gap >= 0
-            else f"{abs(gap):.0%} above its entry price of {money(k['entry_price'])}"
-        )
+        if not np.isfinite(k["target_pe"]):
+            where = f"adjusted P/E {times(k['pe_adj'])}, no target set"
+        elif np.isfinite(gap) and gap >= 0:
+            where = "at or below its entry price"
+        else:
+            where = f"{abs(gap):.0%} above its entry price of {money(k['entry_price'])}"
         lines.append(f"<li><b>{sym}</b> {money(k['price'])}: {where}.</li>")
         _, notes = read_notes(sym)
         parts.append(
@@ -699,8 +746,8 @@ def render_summary(results: list[tuple[dict, dict]], run_label: str) -> str:
 
 <h2>2. The numbers</h2>
 {head}
-<p class="note">Entry price = target multiple x trailing 12-month adjusted EPS. A negative
-"entry vs price" means the entry price is below today's price.</p>
+<p class="note">Entry price = target multiple x trailing 12-month adjusted EPS, for stocks
+with a target. A negative "entry vs price" means the entry price is below today's price.</p>
 
 <h2>3. Analysis</h2>
 {md(notes.get("Analysis", ""))}
@@ -827,7 +874,7 @@ def overview(cfg: dict) -> str:
         tag = "" if sym in on_list else " (off the list)"
         lines.append(
             f"| {sym}{tag} | [{r['run']}]({sym}/{r['file']}) | {money(r['price'])} "
-            f"| {times(r['pe_adj'])} | {times(r['pe_median_10y'])} | {r['target_pe']:g}x "
+            f"| {times(r['pe_adj'])} | {times(r['pe_median_10y'])} | {target_text(r['target_pe'])} "
             f"| {money(r['entry_price'])} | {pct(r['to_entry'])} | [list]({sym}/README.md) |"
         )
     lines.append("")
@@ -888,7 +935,8 @@ def main() -> None:
         print(
             f"{sym}: price {money(k['price'])}, adjusted EPS {money(k['eps_adj_ttm'])}, "
             f"P/E {times(k['pe_adj'])} vs 10-yr median {times(k['pe_median_10y'])}, "
-            f"entry {money(k['entry_price'])} at {k['target_pe']:g}x ({pct(k['to_entry'])}), "
+            f"entry {money(k['entry_price'])} at {target_text(k['target_pe'])} "
+            f"({pct(k['to_entry'])}), "
             f"next report {k['next_report'] or '–'}"
         )
         if args.numbers:
@@ -974,9 +1022,14 @@ def email_html(run_label: str, written: list[Path], results: list[tuple[dict, di
         verdict = first_sentence(read_notes(sym)[1].get("Verdict", ""))
         parts.append(
             f"<li><b>{sym}</b> {money(k['price'])}, adjusted P/E {times(k['pe_adj'])} "
-            f"(10-yr median {times(k['pe_median_10y'])}); entry {money(k['entry_price'])} at "
-            f"{k['target_pe']:g}x, {pct(k['to_entry'])} from today's price. "
-            f"{html.escape(verdict)}</li>"
+            f"(10-yr median {times(k['pe_median_10y'])}); "
+            + (
+                f"entry {money(k['entry_price'])} at {k['target_pe']:g}x, "
+                f"{pct(k['to_entry'])} from today's price. "
+                if np.isfinite(k["target_pe"])
+                else "no target set. "
+            )
+            + f"{html.escape(verdict)}</li>"
         )
     parts += ["</ul>", "<h3>The PDFs (attached, and online here)</h3>", "<ul>"]
     names = {"market": "Market report", "summaries": "Watch list summary"}
