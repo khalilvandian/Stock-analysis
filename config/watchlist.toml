@@ -32,7 +32,7 @@ target_note = "Proposed 2026-10-25 (report 12), not yet confirmed by Babak: belo
 symbol = "NFLX"
 peers = ["DIS", "WBD", "CMCSA", "SPOT", "ROKU", "GOOGL", "META", "PSKY"]
 target_pe = 20
-target_note = "Proposed 2026-10-27, not yet confirmed by Babak: the 10-year median (about 60x) reflects Netflix's early hyper-growth years, so the target is set against the last five years (about 34x median, 29x low), discounted for slower growth now."
+target_note = "Report 19 (2026-11-12), not yet confirmed by Babak: the 10-year median (about 58x) reflects Netflix's early hyper-growth years, so the target is set against the last five years (about 41x median on daily data, 21x three-year low): 20x is a PEG of 1 on about 20% growth, discounted for the slowing revenue."
 eps_override = [
   { reported = "2025-10-21", eps = 0.73, reason = "excludes the Brazilian tax charge of about $619m (about $0.14 a share)." },
   { reported = "2026-04-16", eps = 0.69, reason = "excludes the $2.8bn Warner Bros. Discovery termination fee (about $0.54 a share after an estimated 18% tax); Claude's estimate." },

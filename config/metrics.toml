@@ -219,7 +219,7 @@ sources = { sector = "ebitda", stage1 = "ebitda_usd_bn", tradingview = "ebitda_t
 used_in = ["absolute values", "net debt / EBITDA", "interest cover", "EV / EBITDA"]
 example = { symbol = "BSX", value = 5.637, as_of = "2026-09-30", working = "Yahoo; TradingView 5.991" }
 vector = "context"
-notes = "Yahoo and TradingView differ by how they treat one-offs (BSX: 5.64 vs 5.99)."
+notes = "Yahoo and TradingView differ by how they treat one-offs (BSX: 5.64 vs 5.99). For Netflix, Yahoo and TradingView add back content amortization ($17bn TTM), which Netflix pays in operating cash flow: $36.5bn instead of about $15.9bn (report 19). The SEC history uses ordinary D&A only."
 
 [[metric]]
 id = "net_income"
