@@ -297,7 +297,7 @@ Earnings before interest, tax, depreciation and amortization: operating cash ear
 - **Used in:** absolute values; net debt / EBITDA; interest cover; EV / EBITDA
 - **Example (BSX, 2026-09-30):** $5.64bn = Yahoo; TradingView 5.991
 - **Vector:** context
-- **Note:** Yahoo and TradingView differ by how they treat one-offs (BSX: 5.64 vs 5.99).
+- **Note:** Yahoo and TradingView differ by how they treat one-offs (BSX: 5.64 vs 5.99). For Netflix, Yahoo and TradingView add back content amortization ($17bn TTM), which Netflix pays in operating cash flow: $36.5bn instead of about $15.9bn (report 19). The SEC history uses ordinary D&A only.
 
 <a id="net-income"></a>
 #### Net income (`net_income`)
@@ -1170,7 +1170,7 @@ The price at which the stock reaches Babak's target multiple.
 - **Used in:** watch list
 - **Example (BSX, 2026-10-27):** $41.73 = 13 x 3.21
 - **Vector:** derived
-- **Note:** Depends on a chosen target, so it belongs to the decision, not the vector.
+- **Note:** Depends on a chosen target, so it belongs to the decision, not the vector. Blank for a stock without a target (target_pe is optional; NFLX has none since 2026-11-12).
 
 <a id="price-vs-cheap"></a>
 #### Price against own cheap price (`price_vs_cheap`)

@@ -55,6 +55,9 @@ their date.
   average price over that year's adjusted EPS, over 10 years (with the 5-year median shown
   next to it). The entry price is a target multiple times trailing adjusted EPS; Claude
   proposes the target and marks it "not yet confirmed by Babak" until they confirm it.
+  The target is optional: on 2026-11-12 Babak chose not to set one for Netflix ("I don't
+  know how to set the target"), so new analyses show the price at the stock's own P/E
+  levels (lows and medians) instead of proposing an entry price, unless Babak asks for one.
 - **Why:** Peer multiples depend on a hand-picked group; a company's own history shows what
   the market has been willing to pay for that business. Used in reports 11 and 12, the watch
   list and Stage 2.

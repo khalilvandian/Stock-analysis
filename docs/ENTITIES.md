@@ -69,13 +69,14 @@ Report 14 explains the open choices; [`DECISIONS.md`](DECISIONS.md) records the 
 | `[[stock]]` | One block per stock | |
 | `symbol` | Yes | Yahoo ticker |
 | `peers` | Yes (may be empty) | Sector peers for the ratios and the strict and weighted screens in the PDF |
-| `target_pe` | Yes | Entry multiple: entry price = `target_pe` x trailing 12-month adjusted EPS |
-| `target_note` | Yes | Where the target comes from and whether Babak has confirmed it |
+| `target_pe` | No | Entry multiple: entry price = `target_pe` x trailing 12-month adjusted EPS. Without it the stock has no entry price, and the PDF shows the price at its own P/E levels instead |
+| `target_note` | Yes | Where the target comes from and whether Babak has confirmed it, or why there is none |
 | `stakes_per_share` | No, default 0 | After-tax value of equity stakes per share. The P/E becomes (price - stakes) / adjusted EPS and the entry price `target_pe` x EPS + stakes (report 17's core P/E ex-stakes) |
 | `eps_override` | No | One-off corrections: `{ reported = "YYYY-MM-DD", eps = 0.73, reason = "..." }` replaces the adjusted EPS of the quarter reported that day |
 
-Current stocks: BSX (target 13x), BKNG (15x), NFLX (20x), GOOGL (22x ex-stakes, report 17) and UBER (20x). The
-BKNG, NFLX, GOOGL and UBER targets are marked "not yet confirmed by Babak". GOOGL and UBER
+Current stocks: BSX (target 13x), BKNG (15x), NFLX (no target: Babak chose not to set one,
+2026-11-12), GOOGL (22x ex-stakes, report 17) and UBER (20x). The BKNG, GOOGL and UBER
+targets are marked "not yet confirmed by Babak". GOOGL and UBER
 have `eps_override` entries that take out equity-stake revaluations (and UBER's tax release);
 GOOGL also sets `stakes_per_share` (Anthropic, SpaceX and other stakes, $14.93 after tax).
 

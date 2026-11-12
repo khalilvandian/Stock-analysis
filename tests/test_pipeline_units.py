@@ -200,6 +200,17 @@ def test_key_numbers_keeps_equity_stakes_out_of_the_pe_and_adds_them_to_the_entr
     assert k["entry_price"] == 80.0 and k["entry_after_next"] == 15 * 4.5 + 20
 
 
+def test_key_numbers_without_a_target_has_no_entry_price():
+    d = _key_inputs(next_estimate=1.5)
+    del d["stock"]["target_pe"]
+    k = watchlist.key_numbers(d)
+    assert k["pe_adj"] == 25.0
+    assert np.isnan(k["target_pe"]) and np.isnan(k["entry_price"])
+    assert np.isnan(k["to_entry"]) and np.isnan(k["entry_after_next"])
+    assert watchlist.target_text(k["target_pe"]) == "–"
+    assert watchlist.price_at(k, "pe_median_10y") == "$100.00"
+
+
 def test_key_numbers_without_eps_history_is_blank_not_an_error():
     no_eps = pd.Series(dtype=float, index=pd.DatetimeIndex([]))
     k = watchlist.key_numbers(_key_inputs(q=no_eps))
