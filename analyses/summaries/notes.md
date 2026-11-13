@@ -1,12 +1,12 @@
 # Watch list summary: Claude's notes
 
-Updated: 2026-11-12
+Updated: 2026-11-13
 
 The evening run copies these sections into the watch list summary PDF.
 
 ## Verdict
 
-**No stock is at its entry, but Booking is close: about $161, 4% above $154, after its post-results jump faded. Boston Scientific is 7% above $41.5, Netflix 8% above $58 and Uber 11% above $62. Alphabet has run to about $299, 26x core earnings and 17% above its $256 entry: the most expensive on the list.**
+**A quiet day for the watch list, and no stock is at its entry. Booking is still the closest: about $160, 3% above $154. Boston Scientific is 7% above $41.5, Netflix 7% above $58 and Uber 11% above $62. Alphabet, at about $295 and 25.6x core earnings, is 15% above its $256 entry.**
 
 ## Analysis
 

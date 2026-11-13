@@ -1,6 +1,6 @@
 # Netflix (NFLX): Claude's notes
 
-Updated: 2026-11-12
+Updated: 2026-11-13
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -28,6 +28,7 @@ Netflix is the largest paid streaming service, earning almost all its revenue fr
 
 ## News
 
+- 2026-11-13: about $62.2 (intraday), down about 1% with the Nasdaq; no company news. About 7% above the $58 entry.
 - 2026-11-12: about $63 (intraday), down from $66.5 on Nov 4 with the tech sell-off; no company news. About 8% above the $58 entry.
 - 2026-11-04: about $66.5 (intraday), up about 5% with the market; no company news.
 - 2026-11-02: about $62.6 (intraday: since the US clocks changed on Nov 1, Wall Street closes at 22:00 Italy time, after this run), little changed; no company news.

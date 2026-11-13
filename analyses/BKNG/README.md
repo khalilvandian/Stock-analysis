@@ -4,6 +4,7 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-13 20:53 CET | $159.59 | 15.5x | 21.2x | $154.35 | -3.3% | Q3 (Nov 3) beat on earnings (adjusted EPS $4.66, +17%; room nights +6.7%), but Q4 is guided much weaker (room nights +1-3%, revenue 0-2%). | [2026-11-13_2053.pdf](2026-11-13_2053.pdf) |
 | 2026-11-12 21:32 CET | $160.87 | 15.6x | 21.2x | $154.35 | -4.0% | Q3 (Nov 3) beat on earnings (adjusted EPS $4.66, +17%; room nights +6.7%), but Q4 is guided much weaker (room nights +1-3%, revenue 0-2%). | [2026-11-12_2132.pdf](2026-11-12_2132.pdf) |
 | 2026-11-04 20:57 CET | $170.83 | 16.6x | 21.2x | $154.35 | -9.7% | Q3 (Nov 3) beat on earnings (adjusted EPS $4.66, +17%; room nights +6.7%), but Q4 is guided much weaker (room nights +1-3%, revenue 0-2%). | [2026-11-04_2057.pdf](2026-11-04_2057.pdf) |
 | 2026-11-03 20:53 CET | $152.38 | 15.9x | 21.2x | $144.15 | -5.4% | The strongest balance sheet and biggest cash generator in online travel, the cheapest it has been in a decade, sold off on fears that AI agents will bypass it. | [2026-11-03_2053.pdf](2026-11-03_2053.pdf) |

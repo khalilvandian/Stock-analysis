@@ -1,12 +1,12 @@
 # Market report: Claude's notes
 
-Updated: 2026-11-12
+Updated: 2026-11-13
 
 The evening run copies these sections into the market PDF. Keep it short.
 
 ## Verdict
 
-**A quiet, slightly weaker market: the S&P 500 at about 7,590, down about 3% in the past month and 3% below its high, the Nasdaq 8% below its high as AI names such as Nvidia fall again. The VIX is back near 19 and the US 10-year yield above 5.1%. The sold-off software and data names (Adobe, Gartner, Intuit) are still the cheapest against their own history.**
+**Another soft day led by tech: the S&P 500 down about 0.6% to about 7,546 (3.5% below its high) and the Nasdaq down about 1% (9% below its high), as AI names keep sliding. The VIX is near 19 and the US 10-year yield about 5.15%. The sold-off software and data names (Adobe, Gartner, Intuit) are still the cheapest against their own history.**
 
 ## Summary
 
