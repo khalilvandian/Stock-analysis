@@ -255,6 +255,6 @@ their date.
   a script or Claude that can hold a database password.
 - **Cloud sessions (tested 2026-11-16):** a direct connection to port 5432 is refused, but
   Anthropic's proxy tunnels it (HTTP CONNECT), so `db/tunnel.py` routes database connections
-  through the proxy and the Azure firewall allows the proxy's exit address (rule
-  `claude-cloud`). Fallbacks if that stops working: a self-hosted Claude environment or a small
+  through the proxy and the Azure firewall allows Anthropic's published outbound
+  ranges (rules `claude-cloud`, `claude-cloud-2`). Fallbacks if that stops working: a self-hosted Claude environment or a small
   HTTPS layer.

@@ -130,10 +130,13 @@ exclude the host, `Database` starts a forwarder on 127.0.0.1 and psycopg connect
 (`hostaddr`), while TLS still runs end to end with the real host name. Nothing changes where no
 proxy is set; `STOCK_DB_PROXY=off` turns it off.
 
-The database then sees the proxy's exit address (160.79.106.144 on the first test), so the
-Azure firewall needs a rule for it: `allow-my-ip --rule claude-cloud --ip <address>`. `ping`
+The database then sees the proxy's exit address, which changes between sessions (160.79.106.144,
+then .145), so the Azure firewall allows Anthropic's published outbound ranges: rules
+`claude-cloud` (160.79.104.0/21) and `claude-cloud-2` (153.61.208.0/20), set with
+`allow-my-ip --rule NAME --ip RANGE`. Anyone on Anthropic's network can then reach the login;
+the passwords and TLS still guard it. `ping`
 in the session shows the route, whether PostgreSQL answered and the address the database sees.
-If the address changes, the session's `ping` fails at "PostgreSQL answer"; add the new one.
+If Anthropic changes its ranges, the session's `ping` fails at "PostgreSQL answer".
 
 ## The server (Azure)
 
@@ -154,7 +157,7 @@ If the address changes, the session's `ping` fails at "PostgreSQL answer"; add t
 
 ```bash
 uv run python -m stock_analysis.db allow-my-ip     # sets the firewall rule `home` to your current IP
-uv run python -m stock_analysis.db allow-my-ip --rule claude-cloud --ip 160.79.106.144   # another address
+uv run python -m stock_analysis.db allow-my-ip --rule claude-cloud --ip 160.79.104.0/21   # another address or range
 ```
 
 It uses the **Azure CLI** (`winget install Microsoft.AzureCLI`, then `az login` once with the

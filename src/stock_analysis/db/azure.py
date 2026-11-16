@@ -41,7 +41,11 @@ def allow_my_ip(target: str = "server", rule: str = "home", ip: str | None = Non
     server, group = settings.get("azure_server"), settings.get("azure_resource_group")
     if not server or not group:
         raise ValueError(f"Target {target!r} needs azure_server and azure_resource_group")
-    ip = str(ipaddress.ip_address(ip)) if ip else public_ip()
+    if ip:  # one address, or a range such as 160.79.104.0/21
+        network = ipaddress.ip_network(ip, strict=False)
+        ip, last = str(network[0]), str(network[-1])
+    else:
+        ip = last = public_ip()
     result = subprocess.run(
         [
             az_command(),
@@ -58,7 +62,7 @@ def allow_my_ip(target: str = "server", rule: str = "home", ip: str | None = Non
             "--start-ip-address",
             ip,
             "--end-ip-address",
-            ip,
+            last,
             "--output",
             "json",
         ],
@@ -70,4 +74,5 @@ def allow_my_ip(target: str = "server", rule: str = "home", ip: str | None = Non
         hint = " (run az login first)" if "az login" in result.stderr else ""
         raise RuntimeError(f"Azure CLI failed{hint}: {result.stderr.strip()[-500:]}")
     saved = json.loads(result.stdout or "{}")
-    return f"Firewall rule {saved.get('name', rule)!r} on {server} now allows {ip}"
+    allowed = ip if ip == last else f"{ip} to {last}"
+    return f"Firewall rule {saved.get('name', rule)!r} on {server} now allows {allowed}"

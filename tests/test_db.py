@@ -540,6 +540,10 @@ def test_allow_my_ip_builds_the_azure_command(monkeypatch) -> None:
     cmd = calls[1]
     assert cmd[cmd.index("--name") + 1] == "claude-cloud"
     assert cmd[cmd.index("--end-ip-address") + 1] == "198.51.100.9"
+    message = azure.allow_my_ip("server", "claude-cloud", "160.79.104.0/21")
+    assert calls[2][calls[2].index("--start-ip-address") + 1] == "160.79.104.0"
+    assert calls[2][calls[2].index("--end-ip-address") + 1] == "160.79.111.255"
+    assert message.endswith("160.79.104.0 to 160.79.111.255")
 
 
 def test_data_layer_reads_writes_and_safe_sql(con: Database) -> None:

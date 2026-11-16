@@ -112,9 +112,11 @@ To let a cloud session use it directly:
    **Allowed domains**). The session's traffic goes through Anthropic's HTTP proxy; the code
    tunnels PostgreSQL through it on its own (`db/tunnel.py`).
 3. **Setup script** (if `uv` is missing): `pip install uv && uv sync`.
-4. **Azure firewall** (once, from Babak's PC): allow the proxy's exit address, which the
-   session's `ping` prints as "public IP":
-   `uv run python -m stock_analysis.db allow-my-ip --target server --rule claude-cloud --ip <address>`.
+4. **Azure firewall** (once, from Babak's PC): allow Anthropic's published outbound ranges
+   (platform.claude.com/docs/en/api/ip-addresses); a session's exit address changes
+   (160.79.106.144, then .145):
+   `python -m stock_analysis.db allow-my-ip --target server --rule claude-cloud --ip 160.79.104.0/21`
+   and `… --rule claude-cloud-2 --ip 153.61.208.0/20`.
 5. **Test** in a new session: `uv run python -m stock_analysis.db ping --target server-reader`.
    - `INFO route` should say "through the HTTP proxy".
    - `FAIL TCP connect … refused the tunnel`: the proxy refuses the port (network setting).
