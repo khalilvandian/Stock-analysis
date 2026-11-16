@@ -40,6 +40,9 @@ STATEMENT_FILES = {
 }
 PRICE_COLUMNS = {
     "date": "date",
+    "Open": "open",
+    "High": "high",
+    "Low": "low",
     "Close": "close",
     "Volume": "volume",
     "Dividends": "dividends",
@@ -200,7 +203,7 @@ def load_prices(con: sqlite3.Connection, folder: Path) -> int:
         "raw_yahoo_price",
         df,
         ["symbol", "date"],
-        ["close", "volume", "dividends", "stock_splits"],
+        ["open", "high", "low", "close", "volume", "dividends", "stock_splits"],
         fetch_id,
     )
     finish_fetch(con, fetch_id, len(df), stored)

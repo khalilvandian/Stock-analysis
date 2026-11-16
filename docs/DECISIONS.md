@@ -169,3 +169,40 @@ their date.
   9. **Cash-balance growth:** drop it (it jumps with deals and debt raises).
 - **Why:** The vector work can go on while Babak reviews; each default is the one Claude
   recommended in report 14 and can be changed in `config/metrics.toml`.
+
+## 2026-11-16
+
+### One database behind an API; the apps are added only when they are built
+
+- **Who:** Babak, on Claude's proposal (issue #16).
+- **Decision:** The project's purpose is an analysis interface that shows each company's
+  fundamental and technical analysis, built from data gathered from several sources and
+  stored in one database, to help with investment decisions. The target layout:
+  - **db:** PostgreSQL. It is the single place the data lives, and it is never exposed
+    to the internet.
+  - **worker:** the loaders, the build and the analyses, run on a schedule. It writes
+    to the database.
+  - **api:** the only way in for every interface, served over HTTPS with a token.
+  - **ui:** the analysis interface. It reads through the API, as can the GitHub Pages
+    site and the evening run.
+
+  They will run as Docker Compose services on one Oracle Cloud machine, set up by us,
+  with the same Compose file used locally. `src/stock_analysis` stays the one shared
+  library that the worker and the API are thin layers over.
+- **Kept minimal on purpose:** the design is still being explored, so a folder, service or
+  file appears only when there is code for it. Today there is the database package
+  (`stock_analysis.db`), its migrations and `check`. No `apps/`, Compose file or API code
+  exists yet. The order when they come:
+  1. local Compose with PostgreSQL, with the loaders and build on SQLAlchemy
+  2. the API
+  3. the worker with the API loaders
+  4. the Oracle Cloud server
+  5. the evening run and the site reading the API
+  6. the UI
+- **Why:**
+  - Several interfaces will share the data, so one entry point (the API) keeps the
+    schema free to change and access control in one place.
+  - A private database removes the open question of whether the cloud session can reach
+    port 5432, because it calls the API over HTTPS instead.
+  - Compose gives the same setup on the PC and the server, and Kubernetes isn't needed
+    at this size.

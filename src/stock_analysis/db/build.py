@@ -147,7 +147,8 @@ def build_prices(con: sqlite3.Connection, companies: dict[str, int]) -> pd.DataF
         return pd.DataFrame(columns=["company_id", "date"])
     p = pd.concat(frames)
     p["split_ratio"] = p["stock_splits"].where(p["stock_splits"] > 0)
-    out = p[["company_id", "date", "close", "adj_close", "volume", "dividends", "split_ratio"]]
+    cols = ["company_id", "date", "open", "high", "low", "close", "adj_close", "volume"]
+    out = p[[*cols, "dividends", "split_ratio"]]
     out = out.rename(columns={"dividends": "dividend"}).copy()
     out["volume"] = out["volume"].astype("Int64")
     insert(con, "core_price_daily", out)
