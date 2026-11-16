@@ -92,3 +92,28 @@ A Project in the Claude chat app is useful for discussion, and for keeping the r
 
 - The FMP key pasted into the original chat should be replaced (see section 2).
 - An early commit of `analysis/history.py` included the owner's email address as the SEC contact. The current code reads it from `SEC_USER_AGENT` instead, but the old value remains in git history. Rewriting history can remove it if needed.
+
+## Database access from cloud sessions
+
+The project's data lives in the Azure PostgreSQL database `stock-db-bk` (docs/DATABASE.md).
+To let a cloud session use it directly:
+
+1. **Environment variables** (cloud environment → *Edit* → *Environment variables*):
+
+   ```
+   STOCK_DB_TARGET=server-writer
+   STOCK_READER_DB_PASSWORD=<from .env on Babak's PC>
+   STOCK_WRITER_DB_PASSWORD=<from .env on Babak's PC>
+   ```
+
+   Anyone who can use the environment can read these values. Only the reader and writer
+   passwords go here, never the admin one.
+2. **Network access:** *Limited* with `stock-db-bk.postgres.database.azure.com` under
+   **Allowed domains**. If the connection test fails at "TCP connect", try **Full**.
+3. **Setup script** (if `uv` is missing): `pip install uv && uv sync`.
+4. **Test** in a new session: `uv run python -m stock_analysis.db ping --target server-reader`.
+   - `FAIL TCP connect`: the session's network doesn't pass PostgreSQL traffic (see
+     docs/DATABASE.md for the alternatives).
+   - `FAIL login … no pg_hba.conf entry for host "x.x.x.x"`: the connection works; the Azure
+     firewall needs that address (Babak adds it from his PC).
+   - `PASS login`: done. `check --target server-reader` gives the full picture.

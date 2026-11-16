@@ -15,6 +15,8 @@ Analysis results go into the out layer:
 - data/screener/stage1.csv and top.csv (the latest screener run) -> out_screener_*
 - dcf_fair_value in data/sector/utilities.csv and data/peers/*.csv -> out_valuation
 - analyses/<SYMBOL>/runs.csv (the watch list's evening runs) -> out_watchlist_run
+- analyses/market/runs.csv (the market report's runs) -> out_market_run
+- analyses/*/notes.md (Claude's notes; a new version when the text changes) -> out_note
 
 The watch list itself (config/watchlist.toml, the master copy for now) is mirrored into the
 user layer: user_watchlist, user_watchlist_peer, user_eps_override.
@@ -103,11 +105,16 @@ def meta_time(folder: Path) -> str | None:
     return None
 
 
+REPO_ROOT = ROOT  # the checkout being imported; load_all sets it (the API imports a download)
+
+
 def repo_path(path: Path) -> str:
-    try:
-        return path.resolve().relative_to(ROOT).as_posix()
-    except ValueError:
-        return path.as_posix()
+    for root in (REPO_ROOT, ROOT):
+        try:
+            return path.resolve().relative_to(Path(root).resolve()).as_posix()
+        except ValueError:
+            continue
+    return path.as_posix()
 
 
 # ---------------------------------------------------------------- raw
@@ -427,11 +434,70 @@ def load_watchlist_runs(conn: Connection, analyses_dir: Path, timezone: str) -> 
     return scalar(conn, "SELECT COUNT(*) FROM out_watchlist_run") - before
 
 
+def rome_to_utc(values: pd.Series, timezone: str) -> pd.Series:
+    """'YYYY-MM-DD HH:MM CET' (local time) as UTC 'YYYY-MM-DDTHH:MM:SS'."""
+    local = pd.to_datetime(values.str[:16])
+    utc = local.dt.tz_localize(ZoneInfo(timezone), ambiguous="NaT").dt.tz_convert("UTC")
+    return utc.dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def load_market_runs(conn: Connection, path: Path, timezone: str) -> int:
+    """Every row of analyses/market/runs.csv."""
+    if not path.exists():
+        return 0
+    df = pd.read_csv(path)
+    cols = ["file", "sp500", "sp500_day", "vix", "above_200d", "stocks_to_look_at"]
+    cols += ["screener_date", "screener_passed", "screener_screened", "screener_listed"]
+    out = df.reindex(columns=cols).assign(run_at=rome_to_utc(df["run"], timezone))
+    for col in ("screener_passed", "screener_screened", "screener_listed"):
+        out[col] = pd.to_numeric(out[col], errors="coerce").astype("Int64")
+    out["screener_date"] = out["screener_date"].where(out["screener_date"].notna(), None)
+    out = out.dropna(subset=["run_at"]).drop_duplicates("run_at")
+    names = ["run_at", *cols]
+    before = scalar(conn, "SELECT COUNT(*) FROM out_market_run")
+    if not out.empty:
+        run(
+            conn,
+            f"INSERT INTO out_market_run ({', '.join(names)}) "
+            f"VALUES ({', '.join(':' + c for c in names)}) ON CONFLICT DO NOTHING",
+            records(out[names]),
+        )
+    return scalar(conn, "SELECT COUNT(*) FROM out_market_run") - before
+
+
+def load_notes(conn: Connection, analyses_dir: Path) -> int:
+    """analyses/<SUBJECT>/notes.md: a new version whenever the text differs from the latest."""
+    added = 0
+    for path in sorted(analyses_dir.glob("*/notes.md")):
+        subject, text = path.parent.name, path.read_text(encoding="utf-8")
+        latest = scalar(
+            conn,
+            "SELECT text FROM v_note_latest WHERE subject = :s",
+            {"s": subject},
+        )
+        if latest == text:
+            continue
+        run(
+            conn,
+            "INSERT INTO out_note (subject, updated_at, text, source) "
+            "VALUES (:s, :t, :text, :src) ON CONFLICT DO NOTHING",
+            {
+                "s": subject,
+                "t": file_time(path)[:19],
+                "text": text,
+                "src": "file:" + repo_path(path),
+            },
+        )
+        added += 1
+    return added
+
+
 def load_all(db: Database, data_dir: Path | None = None) -> dict[str, int]:
     """Import every file under `data_dir` (default data/) plus the watch list (config/ and
     analyses/ next to it), in one transaction. Returns the rows added per table."""
+    global REPO_ROOT
     data_dir = Path(data_dir) if data_dir else ROOT / "data"
-    root = data_dir.parent
+    root = REPO_ROOT = data_dir.parent
     watchlist = root / "config" / "watchlist.toml"
     timezone = "Europe/Rome"
     if watchlist.exists():
@@ -446,6 +512,8 @@ def load_all(db: Database, data_dir: Path | None = None) -> dict[str, int]:
             "out_valuation",
             "user_watchlist",
             "out_watchlist_run",
+            "out_market_run",
+            "out_note",
         ],
         0,
     )
@@ -462,4 +530,8 @@ def load_all(db: Database, data_dir: Path | None = None) -> dict[str, int]:
         added["out_valuation"] += load_valuations(conn, data_dir)
         added["user_watchlist"] += load_watchlist(conn, watchlist)
         added["out_watchlist_run"] += load_watchlist_runs(conn, root / "analyses", timezone)
+        added["out_market_run"] += load_market_runs(
+            conn, root / "analyses" / "market" / "runs.csv", timezone
+        )
+        added["out_note"] += load_notes(conn, root / "analyses")
     return added

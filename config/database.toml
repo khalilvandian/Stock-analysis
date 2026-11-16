@@ -25,6 +25,28 @@ azure_server = "stock-db-bk"
 password_env = "STOCK_SERVER_DB_PASSWORD"
 azure_resource_group = "stock-rg"
 
+# The same databases as the working users (python -m stock_analysis.db create-roles):
+# stock_reader only reads; stock_writer adds data but can't change the schema.
+[targets.local-reader]
+url = "postgresql://stock_reader@127.0.0.1:5432/stock"
+password_env = "STOCK_READER_DB_PASSWORD"
+
+[targets.local-writer]
+url = "postgresql://stock_writer@127.0.0.1:5432/stock"
+password_env = "STOCK_WRITER_DB_PASSWORD"
+
+[targets.server-reader]
+url = "postgresql://stock_reader@stock-db-bk.postgres.database.azure.com:5432/stock?sslmode=require"
+password_env = "STOCK_READER_DB_PASSWORD"
+azure_server = "stock-db-bk"
+azure_resource_group = "stock-rg"
+
+[targets.server-writer]
+url = "postgresql://stock_writer@stock-db-bk.postgres.database.azure.com:5432/stock?sslmode=require"
+password_env = "STOCK_WRITER_DB_PASSWORD"
+azure_server = "stock-db-bk"
+azure_resource_group = "stock-rg"
+
 # What `python -m stock_analysis.db check` looks for in the selected database.
 [check]
 # Companies whose prices, fundamentals and absolute values must be there.

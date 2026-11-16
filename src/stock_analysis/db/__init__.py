@@ -43,12 +43,15 @@ def load_config(path: Path = CONFIG) -> dict:
 
 
 def target_settings(target: str | None = None, config: dict | None = None) -> dict:
-    """The url (and password_env) of a target: --target, else DATABASE_URL, else selected."""
+    """The url (and password_env) of a target: --target, else DATABASE_URL, else
+    STOCK_DB_TARGET, else `selected` in config/database.toml."""
     config = config or load_config()
     if target is None and os.environ.get("DATABASE_URL"):
         check_url(os.environ["DATABASE_URL"])
         return {"name": "DATABASE_URL", "url": os.environ["DATABASE_URL"]}
-    name = target or config.get("selected", "local")
+    # STOCK_DB_TARGET picks the default target per machine (e.g. server-writer in Claude's
+    # cloud environment) without editing the config.
+    name = target or os.environ.get("STOCK_DB_TARGET") or config.get("selected", "local")
     targets = config.get("targets", {})
     if name not in targets:
         raise ValueError(f"No target {name!r} in config/database.toml (have: {', '.join(targets)})")

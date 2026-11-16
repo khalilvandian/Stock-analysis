@@ -536,3 +536,41 @@ def test_allow_my_ip_builds_the_azure_command(monkeypatch) -> None:
     assert cmd[cmd.index("--name") + 1] == "home"
     assert cmd[cmd.index("--start-ip-address") + 1] == "203.0.113.7"
     assert message.endswith("now allows 203.0.113.7")
+
+
+def test_data_layer_reads_writes_and_safe_sql(con: Database) -> None:
+    from stock_analysis.data import DbData
+
+    build(con)
+    data = DbData(con, con)
+    assert data.watchlist()["symbol"].tolist() == ["AAA", "BBB"]
+    assert data.annual("AAA").loc[0, "fiscal_year"] == 2024
+    assert len(data.prices("AAA", start="2026-09-01")) == 22
+    assert set(data.screener(stage=2)["symbol"]) == {"AAA", "BBB"}
+    assert data.status()["schema_version"] == migrations()[-1][0]
+    assert data.save_note("AAA", "## Thesis\ncheap") == 1
+    assert data.notes("AAA").loc[0, "text"].startswith("## Thesis")
+    run_row = {"symbol": "AAA", "run_at": "2026-11-20T20:00:00", "price": 9.0, "verdict": "x"}
+    assert data.save_watchlist_run(run_row) == 1
+    assert len(data.watchlist_runs("AAA")) == 3
+    with pytest.raises(ValueError, match="Unknown fields"):
+        data.save_watchlist_run({"symbol": "AAA", "run_at": "2026-11-21", "oops": 1})
+    assert data.sql("SELECT symbol FROM core_company ORDER BY symbol", limit=1)[
+        "symbol"
+    ].tolist() == ["AAA"]
+    for bad in ("DELETE FROM out_note", "SELECT 1; DROP TABLE out_note"):
+        with pytest.raises(ValueError):
+            data.sql(bad)
+    # Even a SELECT that writes (a function call) runs in a read-only transaction.
+    with pytest.raises(Exception, match="read-only"):
+        data.sql("SELECT nextval('out_screener_run_run_id_seq')")
+
+
+def test_ping_diagnoses_a_working_connection(pg_url: str, capsys, monkeypatch) -> None:
+    from stock_analysis.db.ping import ping
+
+    password = os.environ.get(PASSWORD_ENV, "")
+    monkeypatch.setenv("DATABASE_URL", pg_url.replace("stock@", f"stock:{password}@", 1))
+    assert ping() == 0
+    out = capsys.readouterr().out
+    assert "PASS  TCP connect" in out and "PASS  login" in out

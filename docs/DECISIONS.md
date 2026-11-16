@@ -242,3 +242,17 @@ their date.
 - **Later:** after 12 months the free services end and the server would use the student
   credit (about $19 a month at list price). Decide then whether to keep, shrink or move it;
   a `pg_dump` moves it anywhere.
+
+### No API for now: scripts and Claude connect straight to the database
+
+- **Who:** Babak.
+- **Decision:** Analyses, scripts and Claude read and write the PostgreSQL database directly,
+  with two working users: `stock_reader` (read only) and `stock_writer` (data, not schema). Claude's
+  cloud environment gets their passwords as environment variables. The API planned earlier is
+  dropped until an interface needs it. The existing files stay as they are, so Claude can still use
+  them.
+- **Why:** an API is extra code, hosting and upkeep, which isn't needed while every user of the data is
+  a script or Claude that can hold a database password.
+- **Open point:** whether cloud sessions can reach PostgreSQL through Anthropic's proxy has to
+  be tested (docs/SETUP.md). If they can't, a self-hosted Claude environment or a small HTTPS
+  layer is the fallback.

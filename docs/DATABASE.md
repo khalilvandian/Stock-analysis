@@ -1,6 +1,6 @@
 # Database
 
-Status: **schema version 3** (migrations `001` to `003`), 2026-11-16. **PostgreSQL 16**,
+Status: **schema version 4** (migrations `001` to `004`), 2026-11-16. **PostgreSQL 16**,
 locally in Docker (`compose.yaml`) and on the server: **Azure Database for PostgreSQL**
 (`stock-db-bk`, Italy North, Azure for Students). SQLite was dropped on 2026-11-16 (see
 `docs/DECISIONS.md`). It holds the data already in `data/` and the watch
@@ -68,6 +68,58 @@ SELECT * FROM v_watchlist ORDER BY position;                              -- wat
   `stock`. Without a reachable PostgreSQL the database tests are skipped, and the rest of
   the suite still runs. To create the test database once:
   `docker compose exec db psql -U stock -c "CREATE DATABASE stock_test"`.
+
+## Users and how everything connects
+
+There is **no API for now**: scripts and Claude connect **straight to the database** (decision of
+2026-11-16 in `docs/DECISIONS.md`).
+
+| User | Rights | Used by | Password |
+|---|---|---|---|
+| `stock_admin` (Azure) / `stock` (local) | Owner: migrations, `create-roles` | Your PC only | `STOCK_SERVER_DB_PASSWORD` / `STOCK_DB_PASSWORD` |
+| `stock_writer` | Read, add and change data, rebuild core. Can't change the schema or `schema_version`, can't delete or change raw data (append only, except `raw_fetch` row counts) | `load-files`, `build`, scripts that save results, Claude when it writes | `STOCK_WRITER_DB_PASSWORD` |
+| `stock_reader` | Read only | Analyses, viewers, Claude when it reads | `STOCK_READER_DB_PASSWORD` |
+
+`python -m stock_analysis.db create-roles --target server` (as the owner) creates both users or
+updates their passwords and rights; missing passwords are generated into `.env` first.
+
+Targets: `server-reader` and `server-writer` (and `local-reader`, `local-writer`) in
+`config/database.toml`. `STOCK_DB_TARGET` sets the default target on a machine without editing
+the config (e.g. `server-writer` in Claude's cloud environment).
+
+**Reading and writing from Python** (`stock_analysis.data`, reads as `stock_reader`, writes as
+`stock_writer`):
+
+```python
+from stock_analysis.data import Data
+
+data = Data.open()                      # server-reader / server-writer by default
+data.watchlist(); data.annual("NEE"); data.daily("NEE", start="2025-01-01")
+data.prices("NEE"); data.screener(stage=2); data.notes("NFLX"); data.quality()
+data.sql("SELECT symbol, revenue FROM v_annual WHERE fiscal_year = 2025")   # read-only, 50,000 rows
+data.save_note("NFLX", "..."); data.save_watchlist_run({...}); data.set_watchlist([...])
+```
+
+`data.sql()` accepts one SELECT or WITH statement and runs it in a read-only transaction with a
+20-second limit.
+
+**Diagnosing a connection** from a new place:
+
+```bash
+uv run python -m stock_analysis.db ping --target server-reader
+```
+
+It prints this machine's public IP and proxy settings, then DNS, a plain TCP connection to port
+5432, and a real login that shows the address the database sees. A `no pg_hba.conf entry for host
+"x.x.x.x"` answer means the Azure firewall needs that address.
+
+### Claude's cloud sessions (to be tested)
+
+Cloud sessions send their outbound traffic through Anthropic's HTTP/HTTPS proxy, and their
+network levels are defined by domain. Whether a PostgreSQL connection (its own protocol, port
+5432) gets through is **not documented and must be tested** (docs/SETUP.md, "Database access
+from cloud sessions"). If it doesn't, the options are a self-hosted Claude environment (runs on a
+machine whose network we control) or a small HTTPS layer after all.
 
 ## The server (Azure)
 
