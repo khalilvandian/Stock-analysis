@@ -9,3 +9,7 @@ dist/
 .ipynb_checkpoints/
 .cache/
 _site/
+
+# Project database (docs/DATABASE.md); built locally, not committed
+data/stock.db
+data/stock.db-*

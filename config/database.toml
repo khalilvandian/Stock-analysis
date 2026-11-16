@@ -1,0 +1,31 @@
+# Which database the project's tools connect to (docs/DATABASE.md).
+#
+# `selected` names one of the [targets]. Two things override it: the DATABASE_URL environment
+# variable, and `--target NAME` on the command line (python -m stock_analysis.db ... --target
+# server).
+#
+# Never write a password here. A target reads it from the environment variable named in
+# `password_env` (set it in the shell, in .env, which git ignores, or in the cloud
+# environment's settings).
+
+selected = "local"
+
+[targets.local]
+# The SQLite file built from data/ (git ignores it). Load and build run on SQLite for now.
+url = "sqlite:///data/stock.db"
+
+[targets.server]
+# PostgreSQL on the server (issue #16). Not set up yet: fill in the URL when it exists, e.g.
+# "postgresql://stock_reader@db.example.com:5432/stock?sslmode=require". Reading needs the
+# optional driver: uv sync --extra server.
+url = ""
+password_env = "STOCK_DB_PASSWORD"
+
+# What `python -m stock_analysis.db check` looks for in the selected database.
+[check]
+# Companies whose prices, fundamentals and absolute values must be there.
+sample_symbols = ["NEE", "DUK", "SO"]
+# Warn when the newest price, S&P 500 snapshot or screener run is older than this.
+max_age_days = 7
+# Warn when fewer than this share of current S&P 500 members have prices / fundamentals.
+min_coverage = 0.95

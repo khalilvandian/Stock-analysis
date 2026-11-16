@@ -30,6 +30,7 @@ it is the way it is. The project rules every Claude session follows are in
 | [`OPERATIONS.md`](OPERATIONS.md) | Running and changing things, troubleshooting, test policy, the pre-commit check |
 | [`SETUP.md`](SETUP.md) | Setting up a Claude Code on the web workspace for this repository |
 | [`EVENING_RUN.md`](EVENING_RUN.md) | The steps the scheduled 21:00 session follows every evening |
+| [`DATABASE.md`](DATABASE.md) | The SQLite database (issue #16): commands, contents, raw and core layers, UML diagram, items, build rules |
 | [`METRICS.md`](METRICS.md) | The metrics dictionary, generated from `config/metrics.toml` (do not edit by hand) |
 
 Nothing in this repository is investment advice.

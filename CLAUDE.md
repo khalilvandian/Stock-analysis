@@ -10,6 +10,12 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
 - Setup for new sessions and environments: `docs/SETUP.md`. The full documentation
   (architecture, entities, every process, the screener rules, decisions, operations) starts
   at `docs/README.md`; keep it matching the code when either changes.
+- Database (issue #16): `config/database.toml` selects the target (`local` = SQLite
+  `data/stock.db`, gitignored and never committed; `server` = PostgreSQL, password from
+  `STOCK_DB_PASSWORD`). Raw, core and out layers; schema and rules in `docs/DATABASE.md`,
+  items in `config/db_items.toml`. `uv run python -m stock_analysis.db load-files`, then
+  `build`; `check [--target server]` verifies connection, schema and data. Analyses still
+  read the files.
 - Tests must not hit the network; mock HTTP with `respx`.
 - Before committing: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
 

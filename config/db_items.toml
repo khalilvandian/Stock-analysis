@@ -1,0 +1,178 @@
+# The standard items of the database's core layer (docs/DATABASE.md) and the source fields that
+# feed each one. The build (`python -m stock_analysis.db build`) loads this file into
+# core_item and core_item_tag on every run.
+#
+# For each item, the fields are tried in the order listed and the first one present wins.
+# Sources are ranked: SEC company facts first (`sec`, loader still to come), then the
+# project's own SEC-based history file (`history`, data/sector/history.csv), then the Yahoo
+# statements (`yahoo`, data/<SYMBOL>/*.csv).
+#
+# kind: "flow" (measured over a period) or "instant" (measured at a date).
+# derive: "a + b" computes the item from other items wherever they all exist for a period;
+#   the reported fields are then only a fallback.
+# history_scale: history.csv keeps money in billions of US dollars, so those values are
+#   multiplied by 1e9. Per-share values are kept as they are.
+# capex is stored as a negative number, the same sign as history.csv and Yahoo.
+# A `sec` tag without a prefix is us-gaap; "dei:" marks the cover-page taxonomy.
+
+[[items]]
+item = "revenue"
+label = "Revenue"
+kind = "flow"
+unit = "USD"
+sec = ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
+       "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet",
+       "RegulatedAndUnregulatedOperatingRevenue"]
+history = ["revenue"]
+history_scale = 1e9
+yahoo = ["Total Revenue", "Operating Revenue"]
+
+[[items]]
+item = "net_income"
+label = "Net income"
+kind = "flow"
+unit = "USD"
+sec = ["NetIncomeLoss", "NetIncomeLossAvailableToCommonStockholdersBasic", "ProfitLoss"]
+history = ["net_income"]
+history_scale = 1e9
+yahoo = ["Net Income", "Net Income Common Stockholders"]
+
+[[items]]
+item = "eps_diluted"
+label = "Diluted EPS"
+kind = "flow"
+unit = "USD/share"
+sec = ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"]
+history = ["eps"]
+history_scale = 1
+yahoo = ["Diluted EPS"]
+
+[[items]]
+item = "operating_cf"
+label = "Operating cash flow"
+kind = "flow"
+unit = "USD"
+sec = ["NetCashProvidedByUsedInOperatingActivities",
+       "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]
+history = ["operating_cf"]
+history_scale = 1e9
+yahoo = ["Operating Cash Flow", "Cash Flow From Continuing Operating Activities"]
+
+[[items]]
+item = "capex"
+label = "Capital expenditure (negative)"
+kind = "flow"
+unit = "USD"
+sec = ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"]
+history = ["capex"]
+history_scale = 1e9
+yahoo = ["Capital Expenditure"]
+
+[[items]]
+item = "operating_income"
+label = "Operating income"
+kind = "flow"
+unit = "USD"
+sec = ["OperatingIncomeLoss"]
+yahoo = ["Operating Income", "Total Operating Income As Reported"]
+
+[[items]]
+item = "d_and_a"
+label = "Depreciation and amortization"
+kind = "flow"
+unit = "USD"
+sec = ["DepreciationDepletionAndAmortization", "DepreciationAndAmortization",
+       "DepreciationAmortizationAndAccretionNet", "Depreciation"]
+yahoo = ["Reconciled Depreciation", "Depreciation And Amortization",
+         "Depreciation Amortization Depletion"]
+
+[[items]]
+item = "ebitda"
+label = "EBITDA (operating income + D&A, as in analysis/history.py)"
+kind = "flow"
+unit = "USD"
+derive = "operating_income + d_and_a"
+history = ["ebitda"]
+history_scale = 1e9
+yahoo = ["EBITDA"]
+
+[[items]]
+item = "interest_expense"
+label = "Interest expense"
+kind = "flow"
+unit = "USD"
+sec = ["InterestExpense", "InterestExpenseDebt", "InterestExpenseLongTermDebt"]
+yahoo = ["Interest Expense", "Interest Expense Non Operating"]
+
+[[items]]
+item = "cash"
+label = "Cash and equivalents"
+kind = "instant"
+unit = "USD"
+sec = ["CashAndCashEquivalentsAtCarryingValue",
+       "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"]
+history = ["cash"]
+history_scale = 1e9
+yahoo = ["Cash And Cash Equivalents"]
+
+[[items]]
+item = "short_term_debt"
+label = "Short-term debt"
+kind = "instant"
+unit = "USD"
+sec = ["DebtCurrent"]
+history = ["short_term_debt"]
+history_scale = 1e9
+yahoo = ["Current Debt", "Current Debt And Capital Lease Obligation"]
+
+[[items]]
+item = "long_term_debt"
+label = "Long-term debt"
+kind = "instant"
+unit = "USD"
+sec = ["LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"]
+history = ["long_term_debt"]
+history_scale = 1e9
+yahoo = ["Long Term Debt", "Long Term Debt And Capital Lease Obligation"]
+
+[[items]]
+item = "total_debt"
+label = "Total debt"
+kind = "instant"
+unit = "USD"
+derive = "short_term_debt + long_term_debt"
+history = ["total_debt"]
+history_scale = 1e9
+yahoo = ["Total Debt"]
+
+[[items]]
+item = "total_assets"
+label = "Total assets"
+kind = "instant"
+unit = "USD"
+sec = ["Assets"]
+yahoo = ["Total Assets"]
+
+[[items]]
+item = "total_liabilities"
+label = "Total liabilities"
+kind = "instant"
+unit = "USD"
+sec = ["Liabilities"]
+yahoo = ["Total Liabilities Net Minority Interest"]
+
+[[items]]
+item = "equity"
+label = "Shareholders' equity"
+kind = "instant"
+unit = "USD"
+sec = ["StockholdersEquity"]
+yahoo = ["Stockholders Equity"]
+
+[[items]]
+item = "shares_outstanding"
+label = "Shares outstanding"
+kind = "instant"
+unit = "shares"
+sec = ["dei:EntityCommonStockSharesOutstanding", "WeightedAverageNumberOfDilutedSharesOutstanding"]
+yahoo = ["Ordinary Shares Number", "Share Issued"]

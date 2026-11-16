@@ -13,6 +13,10 @@ dependencies = [
     "yfinance>=1.7.0",
 ]
 
+[project.optional-dependencies]
+# Reading the PostgreSQL server (python -m stock_analysis.db check --target server).
+server = ["psycopg[binary]>=3.1"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
