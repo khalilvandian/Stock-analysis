@@ -138,6 +138,25 @@ the passwords and TLS still guard it. `ping`
 in the session shows the route, whether PostgreSQL answered and the address the database sees.
 If Anthropic changes its ranges, the session's `ping` fails at "PostgreSQL answer".
 
+## The web API (test)
+
+Claude's cloud sessions can't reach PostgreSQL (their proxy only carries web traffic; tested
+2026-11-16), so a minimal API runs on Azure next to the database: `api/app.py` (FastAPI),
+deployed to the App Service `stock-api-bk` (Linux, free F1 plan `stock-api-plan`, Italy North,
+HTTPS only) at https://stock-api-bk.azurewebsites.net. It reads as `stock_reader`
+(app setting `DATABASE_URL`); every route but `/health` needs `X-API-Key: <STOCK_API_KEY>`.
+The database firewall allows the app's outbound addresses (rules `stock-api`, `stock-api-2`).
+
+| Route | Returns |
+|---|---|
+| `GET /health` | `{"ok": true}` |
+| `GET /annual/{symbol}` | the latest row of `v_annual` |
+
+Cloud sessions get the key as a **network secret** (host `stock-api-bk.azurewebsites.net`,
+header `X-API-Key`, no prefix), so it never enters the session. Redeploy after a change:
+zip `app.py` and `requirements.txt`, then `az webapp deploy --name stock-api-bk
+--resource-group stock-rg --src-path api.zip --type zip`.
+
 ## The server (Azure)
 
 | | |
