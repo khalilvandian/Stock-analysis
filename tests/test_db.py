@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -662,3 +663,92 @@ def test_ping_reports_a_proxy_that_refuses(pg_url: str, monkeypatch, capsys) -> 
     assert ping() == 1
     out = capsys.readouterr().out
     assert "FAIL  TCP connect" in out and "403 Forbidden" in out
+
+
+@pytest.fixture
+def api(pg_url: str, monkeypatch):
+    """The web API app (api/app.py) on the test database, called in-process."""
+    import importlib.util
+
+    from fastapi.testclient import TestClient
+
+    password = os.environ.get(PASSWORD_ENV, "")
+    url = pg_url.replace("stock@", f"stock:{password}@", 1)
+    monkeypatch.setenv("DATABASE_URL", url)
+    monkeypatch.setenv("DATABASE_WRITER_URL", url)
+    monkeypatch.setenv("STOCK_API_KEY", "test-key")
+    spec = importlib.util.spec_from_file_location("stock_api_app", ROOT / "api" / "app.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["stock_api_app"] = module
+    spec.loader.exec_module(module)
+    client = TestClient(module.app)
+    yield client
+    for setting in ("DATABASE_URL", "DATABASE_WRITER_URL"):
+        module.engine(setting).dispose()
+
+
+def test_api_needs_the_key_and_one_read_statement(con: Database, api) -> None:
+    assert api.get("/health").json() == {"ok": True}
+    assert api.post("/query", json={"sql": "SELECT 1"}).status_code == 401
+    bad = api.post("/query", json={"sql": "SELECT 1"}, headers={"X-API-Key": "wrong"})
+    assert bad.status_code == 401
+    key = {"X-API-Key": "test-key"}
+    for sql in ("DELETE FROM out_note", "SELECT 1; SELECT 2", "DROP TABLE out_note"):
+        answer = api.post("/query", json={"sql": sql}, headers=key)
+        assert answer.status_code == 400, sql
+    sneaky = "WITH d AS (DELETE FROM out_note RETURNING *) SELECT * FROM d"
+    answer = api.post("/query", json={"sql": sneaky}, headers=key)
+    assert answer.status_code == 400 and "read-only" in answer.json()["detail"]
+    answer = api.post("/execute", json={"steps": [{"sql": "DROP TABLE out_note"}]}, headers=key)
+    assert answer.status_code == 400
+
+
+def test_api_data_matches_the_database(con: Database, api) -> None:
+    from stock_analysis.data import ApiData, DbData
+
+    build(con)
+    api.headers["X-API-Key"] = "test-key"
+    via_api, direct = ApiData("http://testserver", client=api), DbData(con, con)
+    for name in ("watchlist", "companies", "quality", "status"):
+        pd.testing.assert_frame_equal(via_api.read(name), direct.read(name), check_dtype=False)
+    pd.testing.assert_frame_equal(
+        via_api.prices("AAA", start="2026-09-01"),
+        direct.prices("AAA", start="2026-09-01"),
+        check_dtype=False,
+    )
+    assert via_api.sql("SELECT symbol FROM core_company ORDER BY symbol", limit=1)[
+        "symbol"
+    ].tolist() == ["AAA"]
+    answer = api.post("/query", json={"sql": "SELECT * FROM core_company", "limit": 1})
+    assert answer.json()["truncated"] is True
+
+    assert via_api.save_note("AAA", "via the API") == 1
+    assert direct.notes("AAA")["text"].tolist() == ["via the API"]
+    stocks = [{"symbol": "BBB", "target_pe": 15, "peers": ["AAA"]}]
+    assert via_api.set_watchlist(stocks) == 2
+    assert direct.watchlist()["symbol"].tolist() == ["BBB"]
+
+    before = direct.notes()["text"].tolist()
+    with pytest.raises(RuntimeError, match="400"):
+        via_api.execute(
+            [
+                (
+                    "INSERT INTO out_note (subject, updated_at, text, source) VALUES "
+                    "('ZZZ', '2026-01-01T00:00:00', 'x', 'api')",
+                    [],
+                ),  # fmt: skip
+                ("INSERT INTO no_such_table VALUES (1)", []),
+            ]
+        )
+    assert direct.notes()["text"].tolist() == before  # all or nothing
+
+
+def test_data_open_picks_the_api_when_configured(monkeypatch) -> None:
+    from stock_analysis.data import ApiData, Data
+
+    monkeypatch.setenv("STOCK_API_URL", "https://example.test")
+    monkeypatch.setenv("STOCK_API_KEY", "k")
+    data = Data.open()
+    assert isinstance(data, ApiData)
+    assert data.client.headers["X-API-Key"] == "k"
+    assert str(data.client.base_url) == "https://example.test"

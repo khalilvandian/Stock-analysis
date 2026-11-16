@@ -1,5 +1,6 @@
 """One way for every script, and for Claude, to read and write the project's data: straight
-from the PostgreSQL database (reads as stock_reader, writes as stock_writer).
+from the PostgreSQL database (reads as stock_reader, writes as stock_writer), or through the web
+API (api/app.py) where PostgreSQL can't be reached, as in Claude's cloud sessions.
 
     from stock_analysis.data import Data
 
@@ -10,19 +11,22 @@ from the PostgreSQL database (reads as stock_reader, writes as stock_writer).
     data.sql("SELECT symbol, revenue FROM v_annual WHERE fiscal_year = 2025")
     data.save_note("NFLX", "## Thesis ...")
 
-The targets come from config/database.toml: STOCK_DATA_TARGET (default server-reader) for
-reads and STOCK_DATA_WRITE_TARGET (default server-writer) for writes. Every method returns a
-DataFrame with dates as ISO text.
+Backend: when STOCK_API_URL is set (the cloud environment sets it), the web API, with the key
+from STOCK_API_KEY if set (on a PC) or attached by the cloud's network secret. Otherwise the
+database targets in config/database.toml: STOCK_DATA_TARGET (default server-reader) for reads
+and STOCK_DATA_WRITE_TARGET (default server-writer) for writes. Both backends run the same SQL
+and return DataFrames with dates as ISO text.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import os
+import ssl
 
 import pandas as pd
 
-from .db import ROOT, Database, frame, records, run
+from .db import ROOT, Database, frame, run
 
 ROW_LIMIT = 50_000
 SQL_TIMEOUT_S = 20
@@ -91,10 +95,13 @@ class Data:
     """The interface; `Data.open()` returns the database backend."""
 
     @staticmethod
-    def open(read_target: str | None = None, write_target: str | None = None) -> DbData:
+    def open(read_target: str | None = None, write_target: str | None = None) -> Data:
         from dotenv import load_dotenv
 
         load_dotenv(ROOT / ".env")
+        api = os.environ.get("STOCK_API_URL")
+        if api and not (read_target or write_target):
+            return ApiData(api, os.environ.get("STOCK_API_KEY"))
         read_target = read_target or os.environ.get("STOCK_DATA_TARGET", "server-reader")
         write_target = write_target or os.environ.get("STOCK_DATA_WRITE_TARGET", "server-writer")
         reader = Database.open(read_target, read_only=True)
@@ -175,21 +182,60 @@ MARKET_RUN_COLUMNS = ["run_at", "file", "sp500", "sp500_day", "vix", "above_200d
 VALUATION_COLUMNS = ["symbol", "as_of", "method", "fair_value", "price", "detail_json", "source"]
 
 
-def insert_rows(conn, table: str, columns: list[str], rows: list[dict]) -> int:
-    """Insert the given columns of each row; existing keys are left alone."""
+def insert_sql(table: str, columns: list[str], rows: list[dict]) -> tuple[str, list[dict]]:
+    """The INSERT for the given columns of each row (existing keys are left alone)."""
     unknown = {k for r in rows for k in r} - set(columns)
     if unknown:
         raise ValueError(f"Unknown fields for {table}: {', '.join(sorted(unknown))}")
-    if not rows:
-        return 0
-    full = [{c: r.get(c) for c in columns} for r in rows]
-    res = run(
-        conn,
+    sql = (
         f"INSERT INTO {table} ({', '.join(columns)}) VALUES "
-        f"({', '.join(':' + c for c in columns)}) ON CONFLICT DO NOTHING",
-        full,
+        f"({', '.join(':' + c for c in columns)}) ON CONFLICT DO NOTHING"
     )
+    return sql, [{c: r.get(c) for c in columns} for r in rows]
+
+
+def insert_rows(conn, table: str, columns: list[str], rows: list[dict]) -> int:
+    sql, full = insert_sql(table, columns, rows)
+    if not full:
+        return 0
+    res = run(conn, sql, full)
     return res.rowcount if res.rowcount is not None and res.rowcount >= 0 else len(full)
+
+
+def note_row(subject: str, text: str) -> dict:
+    return {"subject": subject, "updated_at": now_utc(), "text": text, "source": "script"}
+
+
+def watchlist_rows(stocks: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
+    """set_watchlist's input as rows of user_watchlist, user_watchlist_peer, user_eps_override."""
+    w = [
+        {
+            "symbol": s["symbol"],
+            "position": i,
+            "target_pe": s.get("target_pe"),
+            "target_note": s.get("target_note"),
+            "stakes_per_share": s.get("stakes_per_share"),
+        }
+        for i, s in enumerate(stocks, start=1)
+    ]
+    peers = [
+        {"symbol": s["symbol"], "peer": p, "position": i}
+        for s in stocks
+        for i, p in enumerate(s.get("peers", []), start=1)
+    ]
+    overrides = [
+        {"symbol": s["symbol"], **{k: o.get(k) for k in ("reported", "eps", "reason")}}
+        for s in stocks
+        for o in s.get("eps_override", [])
+    ]
+    return w, peers, overrides
+
+
+WATCHLIST_TABLES = [
+    ("user_watchlist", ["symbol", "position", "target_pe", "target_note", "stakes_per_share"]),
+    ("user_watchlist_peer", ["symbol", "peer", "position"]),
+    ("user_eps_override", ["symbol", "reported", "eps", "reason"]),
+]
 
 
 class DbData(Data):
@@ -233,7 +279,7 @@ class DbData(Data):
                 conn,
                 "out_note",
                 ["subject", "updated_at", "text", "source"],
-                [{"subject": subject, "updated_at": now_utc(), "text": text, "source": "script"}],
+                [note_row(subject, text)],
             )
 
     def save_watchlist_run(self, row: dict) -> int:
@@ -251,34 +297,75 @@ class DbData(Data):
     def set_watchlist(self, stocks: list[dict]) -> int:
         """Replace the watch list: [{symbol, target_pe, target_note, stakes_per_share,
         peers: [...], eps_override: [{reported, eps, reason}]}]."""
-        w = pd.DataFrame(
-            [
-                {
-                    "symbol": s["symbol"],
-                    "position": i,
-                    "target_pe": s.get("target_pe"),
-                    "target_note": s.get("target_note"),
-                    "stakes_per_share": s.get("stakes_per_share"),
-                }
-                for i, s in enumerate(stocks, start=1)
-            ]
-        )
-        peers = [
-            {"symbol": s["symbol"], "peer": p, "position": i}
-            for s in stocks
-            for i, p in enumerate(s.get("peers", []), start=1)
-        ]
-        overrides = [
-            {"symbol": s["symbol"], **{k: o.get(k) for k in ("reported", "eps", "reason")}}
-            for s in stocks
-            for o in s.get("eps_override", [])
-        ]
+        tables = watchlist_rows(stocks)
         with self.writer.begin() as conn:
-            for table in ("user_eps_override", "user_watchlist_peer", "user_watchlist"):
+            for table, _ in reversed(WATCHLIST_TABLES):
                 run(conn, f"DELETE FROM {table}")
-            n = insert_rows(conn, "user_watchlist", list(w.columns), records(w))
-            n += insert_rows(conn, "user_watchlist_peer", ["symbol", "peer", "position"], peers)
-            n += insert_rows(
-                conn, "user_eps_override", ["symbol", "reported", "eps", "reason"], overrides
+            return sum(
+                insert_rows(conn, table, columns, rows)
+                for (table, columns), rows in zip(WATCHLIST_TABLES, tables, strict=True)
             )
-        return n
+
+
+class ApiData(Data):
+    """Through the web API (api/app.py): the same SQL as DbData, sent over HTTPS. For Claude's
+    cloud sessions, whose network only carries web traffic."""
+
+    def __init__(self, url: str, key: str | None = None, client=None):
+        import httpx
+
+        headers = {"X-API-Key": key} if key else {}
+        verify = os.environ.get("SSL_CERT_FILE") or ssl.create_default_context()
+        self.client = client or httpx.Client(
+            base_url=url.rstrip("/"), headers=headers, timeout=180, verify=verify
+        )
+
+    def _post(self, path: str, body: dict) -> dict:
+        response = self.client.post(path, json=body)
+        if response.status_code != 200:
+            try:
+                detail = response.json().get("detail", response.text)
+            except ValueError:
+                detail = response.text
+            raise RuntimeError(f"API {path} answered {response.status_code}: {detail}")
+        return response.json()
+
+    def query(self, sql: str, params: dict | None = None, limit: int = ROW_LIMIT) -> pd.DataFrame:
+        answer = self._post("/query", {"sql": sql, "params": params or {}, "limit": limit})
+        return pd.DataFrame(answer["rows"], columns=answer["columns"])
+
+    def execute(self, steps: list[tuple[str, list[dict]]]) -> list[int]:
+        """Write steps [(sql, rows), ...] in one transaction; returns the row count per step."""
+        body = {"steps": [{"sql": sql, "rows": rows} for sql, rows in steps]}
+        return self._post("/execute", body)["rowcounts"]
+
+    def read(self, name: str, **params) -> pd.DataFrame:
+        return self.query(READS[name], clean(params))
+
+    def sql(self, query: str, limit: int = ROW_LIMIT) -> pd.DataFrame:
+        return self.query(query, limit=max(1, min(int(limit), ROW_LIMIT)))
+
+    def _insert(self, table: str, columns: list[str], rows: list[dict]) -> int:
+        sql, full = insert_sql(table, columns, rows)
+        return sum(self.execute([(sql, full)])) if full else 0
+
+    def save_note(self, subject: str, text: str) -> int:
+        return self._insert(
+            "out_note", ["subject", "updated_at", "text", "source"], [note_row(subject, text)]
+        )
+
+    def save_watchlist_run(self, row: dict) -> int:
+        return self._insert("out_watchlist_run", WATCHLIST_RUN_COLUMNS, [row])
+
+    def save_market_run(self, row: dict) -> int:
+        return self._insert("out_market_run", MARKET_RUN_COLUMNS, [row])
+
+    def save_valuations(self, rows: list[dict]) -> int:
+        return self._insert("out_valuation", VALUATION_COLUMNS, rows)
+
+    def set_watchlist(self, stocks: list[dict]) -> int:
+        steps = [(f"DELETE FROM {t}", []) for t, _ in reversed(WATCHLIST_TABLES)]
+        for (table, columns), rows in zip(WATCHLIST_TABLES, watchlist_rows(stocks), strict=True):
+            if rows:
+                steps.append(insert_sql(table, columns, rows))
+        return sum(self.execute(steps)[len(WATCHLIST_TABLES) :])

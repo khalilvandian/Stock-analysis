@@ -138,24 +138,36 @@ the passwords and TLS still guard it. `ping`
 in the session shows the route, whether PostgreSQL answered and the address the database sees.
 If Anthropic changes its ranges, the session's `ping` fails at "PostgreSQL answer".
 
-## The web API (test)
+## The web API (for cloud sessions)
 
 Claude's cloud sessions can't reach PostgreSQL (their proxy only carries web traffic; tested
-2026-11-16), so a minimal API runs on Azure next to the database: `api/app.py` (FastAPI),
-deployed to the App Service `stock-api-bk` (Linux, free F1 plan `stock-api-plan`, Italy North,
-HTTPS only) at https://stock-api-bk.azurewebsites.net. It reads as `stock_reader`
-(app setting `DATABASE_URL`); every route but `/health` needs `X-API-Key: <STOCK_API_KEY>`.
-The database firewall allows the app's outbound addresses (rules `stock-api`, `stock-api-2`).
+2026-11-16), so a small, general API runs on Azure next to the database: `api/app.py`
+(FastAPI), deployed to the App Service `stock-api-bk` (Linux, free F1 plan `stock-api-plan`,
+Italy North, HTTPS only) at https://stock-api-bk.azurewebsites.net. It has no route per
+question: it runs SQL, and the database users' rights decide what is allowed.
 
-| Route | Returns |
-|---|---|
-| `GET /health` | `{"ok": true}` |
-| `GET /annual/{symbol}` | the latest row of `v_annual` |
+| Route | Runs as | Does |
+|---|---|---|
+| `GET /health` | | `{"ok": true}`, no key needed |
+| `POST /query` `{"sql", "params", "limit"}` | `stock_reader` | One SELECT or WITH statement in a read-only transaction, 30 s limit, at most 50,000 rows. Answer `{"columns", "rows", "truncated"}` |
+| `POST /execute` `{"steps": [{"sql", "rows"}]}` | `stock_writer` | INSERT, UPDATE, DELETE (or WITH, MERGE) steps in one transaction, all or nothing; each step runs once per row. Answer `{"rowcounts"}` |
 
-Cloud sessions get the key as a **network secret** (host `stock-api-bk.azurewebsites.net`,
-header `X-API-Key`, no prefix), so it never enters the session. Redeploy after a change:
-zip `app.py` and `requirements.txt`, then `az webapp deploy --name stock-api-bk
---resource-group stock-rg --src-path api.zip --type zip`.
+Parameters are `:name` placeholders. Every route but `/health` needs `X-API-Key:
+<STOCK_API_KEY>`. App settings: `DATABASE_URL` (stock_reader), `DATABASE_WRITER_URL`
+(stock_writer), `STOCK_API_KEY`. The database firewall allows the app's outbound addresses
+(rules `stock-api`, `stock-api-2`). Protection, in layers: the key; HTTPS; one statement per
+query or step; a read-only transaction for `/query`; and the users' rights (the writer can't
+change the schema or `schema_version`, or change or delete raw data).
+
+**From Python** nothing changes: `Data.open()` uses the API when `STOCK_API_URL` is set
+(`stock_analysis.data.ApiData`; `data.query(sql, params)` and `data.execute([(sql, rows)])` for
+anything the named reads and saves don't cover). In a cloud environment set
+`STOCK_API_URL=https://stock-api-bk.azurewebsites.net` as an environment variable and the key as
+a **network secret** (host `stock-api-bk.azurewebsites.net`, header `X-API-Key`, no prefix), so
+the key never enters the session. On a PC, `STOCK_API_KEY` in `.env` does the same.
+
+Redeploy after a change: zip `api/app.py` and `api/requirements.txt`, then
+`az webapp deploy --name stock-api-bk --resource-group stock-rg --src-path api.zip --type zip`.
 
 ## The server (Azure)
 

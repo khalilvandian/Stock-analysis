@@ -19,8 +19,9 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
   `docs/DATABASE.md`, items in `config/db_items.toml`. `uv run python -m stock_analysis.db
   load-files`, then `build`, then `check` (each takes `--target`; `ping` diagnoses a
   connection). To read or write data in a script or analysis, use `stock_analysis.data.Data.open()`
-  (reads as `stock_reader`, writes as `stock_writer`; `data.sql(...)` for any read-only query). No
-  API for now. The existing files stay, so older scripts keep working.
+  (reads as `stock_reader`, writes as `stock_writer`; `data.sql(...)` for any read-only query). On a
+  PC it connects to the database directly; in cloud sessions it goes through the web API
+  (`api/`, https://stock-api-bk.azurewebsites.net, used when `STOCK_API_URL` is set). The existing files stay, so older scripts keep working.
 - Tests must not hit the network; mock HTTP with `respx`. The database tests use the
   local Docker PostgreSQL (`stock_test` database) and skip when it isn't running.
 - Before committing: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
