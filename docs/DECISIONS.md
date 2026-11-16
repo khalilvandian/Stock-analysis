@@ -265,3 +265,53 @@ their date.
   `/query`, and the database users' rights (the writer can't change the schema or
   `schema_version`, or change or delete raw data). The database firewall admits only the
   API's addresses and the home PC.
+
+## 2026-11-17
+
+### The ingest job: a backfill to the request limits, then maintenance (issue #18)
+
+- **Who:** Babak asked for it; the settings below are Claude's proposal, to review.
+- **Decision:** One job, `python -m stock_analysis.db ingest`, fills the database from
+  TradingView, SEC EDGAR, Yahoo and the ECB. Each run works through a to-do list (`ops_task`,
+  one task per source and company), never-fetched tasks first, until each source's budget,
+  its rate limit or the run's time limit. It backfills until the S&P 500 is complete, then
+  maintains it with fewer calls. Details: `docs/INGEST.md`.
+- **What "complete" means** (`config/coverage.toml`, `docs/COVERAGE.md`):
+  - 2016 onwards (or since listing), every required item for each fiscal year and for the
+    last 8 quarters
+  - daily prices on 98% of trading days, current
+  - Yahoo's reported EPS for the last 8 reports
+  - interest and the three debt lines optional
+  - operating income, EBITDA, D&A and capex not required for banks, insurers and asset
+    managers; operating income and EBITDA not required for REITs
+  - backfill ends at 95% of companies covered
+- **Build:** SEC facts are now in the build, first-ranked, with their real filing dates.
+  - The fourth quarter is the year less three quarters.
+  - Every period is dated at its nearest month end, so SEC's 52/53-week dates and Yahoo's
+    month ends are the same period.
+  - SEC values start in 2015, because the splits before the price history are unknown.
+- **Why:** the free sources limit requests, not data. Yahoo throttles when called too often,
+  and SEC allows 10 requests a second. A queue that resumes where it stopped fills the
+  database over a few nights and then needs little.
+
+### The ingest job runs as an Azure Container Apps Job
+
+- **Who:** Babak, after comparing the options with Claude.
+- **Decision:** An Azure Container Apps **Job** (`stock-ingest`, Consumption environment
+  `stock-jobs-env`, schedule `30 22 * * *` UTC, 1 vCPU, 2 GiB). Its image is built from this
+  repository by GitHub Actions and kept on GitHub Container Registry. Each run lets itself
+  through the database firewall with its managed identity (rule `ingest-job`, deleted at the
+  end), so *Allow Azure services* stays off. When a run ends it starts the Pages workflow, so
+  the Data page updates within minutes; a daily schedule is the fallback.
+- **Why:** the job starts, runs for one to two hours and stops. A Container Apps Job is
+  billed per second while running and the free monthly grant covers it.
+- **Rejected:**
+  - **The API's App Service F1:** it only runs during requests, cuts each one off at 230
+    seconds, allows 60 CPU minutes a day shared with the API, and can't run scheduled jobs
+    without Always On (B1, paid).
+  - **Azure Functions:** the Consumption plan caps a run at 10 minutes, and Flex Consumption
+    would mean repackaging the code as a function app.
+  - **Azure Container Registry:** about $5 a month, while GitHub's registry is free for a
+    public repository.
+  - **Opening the firewall to all of Azure:** the database stays limited to listed
+    addresses.

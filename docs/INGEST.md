@@ -1,0 +1,116 @@
+# The ingest job
+
+Status: built and tested locally, 2026-11-17 ([issue #18](https://github.com/khalilvandian/Stock-analysis/issues/18)).
+The job fills the database ([`DATABASE.md`](DATABASE.md)) from every free source on a schedule,
+as much as each source allows per run. It runs in backfill mode until the S&P 500 is complete,
+then switches to maintenance mode, which keeps the data current with fewer calls. How
+"complete" is measured is in [`COVERAGE.md`](COVERAGE.md); the coverage page on the site shows it.
+
+```bash
+uv run python -m stock_analysis.db ingest                  # one run on the selected target
+uv run python -m stock_analysis.db ingest --limit 3        # a small test: 3 tasks per source
+uv run python -m stock_analysis.db ingest --sources yahoo_prices --no-build
+uv run python -m stock_analysis.db ingest --due-now sec_companyfacts   # refetch a source now
+uv run python -m stock_analysis.db tasks                   # the to-do list, by source and status
+uv run python -m stock_analysis.db coverage                # today's coverage (and the snapshot)
+```
+
+Every command takes `--target`. On Azure the job runs as `server-writer`.
+
+## One run
+
+1. **Lock.** A PostgreSQL advisory lock allows one run per database. A second run that starts
+   while one is going (a run that overran into the next schedule, or one started by hand)
+   stops at once with status `skipped`. A run still marked `running` from before was killed
+   part-way and is marked `failed`.
+2. **Plan.** It makes sure every task exists, in `ops_task`:
+   - the global tasks `tradingview` (the index members), `sec_tickers` (the CIKs) and
+     `ecb_rates`
+   - one task per S&P 500 member for `sec_companyfacts`, `yahoo_prices`, `yahoo_earnings` and
+     `yahoo_statements`
+
+   The members are the newest TradingView snapshot. A company that leaves the index keeps
+   its data, but its tasks become inactive. A new member gets its tasks and is fetched first.
+3. **Mode.** `backfill` while any task has never been fetched, or the last coverage snapshot
+   shows fewer than `covered_share_to_maintain` (95%) of the companies covered. Otherwise
+   `maintain`. `--mode` forces one.
+4. **Fetch.** The sources run in the `order` of `config/ingest.toml`. For each one it takes
+   the tasks that are due: never-fetched ones first, then the most overdue. Each task runs in
+   its own transaction, so a failure loses only that task. A source group stops when:
+   - its request **budget** for the run is used
+   - the source answers **"too many requests"** (HTTP 429, or SEC's 403)
+   - **15 failures in a row** (10 for SEC)
+   - the run has passed **`max_minutes`** (150)
+
+   After a success the task is due again after the source's `refresh_days` for that mode.
+   After a failure it's due after 6 hours, doubling with each further failure, up to a day.
+   "Nothing there" (a 404, a company without a CIK) is `empty` and is tried again after 7
+   days. A rate limit isn't a failure: the task stays due for the next run.
+5. **Build** the core layer, if anything new was stored ([`DATABASE.md`](DATABASE.md), "Build rules").
+6. **Coverage snapshot** of the day (`out_coverage_snapshot`).
+7. **Site.** It asks GitHub to rebuild the site (the Pages workflow, through `workflow_dispatch`),
+   so the Data page shows the new coverage a few minutes later. This needs
+   `GITHUB_DISPATCH_TOKEN`: a fine-grained personal access token for this repository only,
+   with "Actions: Read and write". Without it, the workflow's daily schedule (05:15 UTC)
+   rebuilds the page.
+8. The run is a row in `ops_run`: requests and results per source, what stopped each
+   source, the build, the coverage, and status `ok`, `partial` (something stopped or failed)
+   or `failed`.
+
+## Sources
+
+| Task | What it stores | Calls | Limit | Due again (backfill / maintain) |
+|---|---|---|---|---|
+| `tradingview` | The S&P 500 members (`raw_tv_constituent`): one scan of the US market, filtered to the index | 1 | None published | 1 / 1 day |
+| `sec_tickers` | Ticker to CIK (`raw_sec_ticker`) | 1 | 10 a second | 7 / 7 days |
+| `ecb_rates` | Exchange rates, last 10 days (`raw_ecb_rate`) | 1 | None | 1 / 1 day |
+| `sec_companyfacts` | Every filed value of the mapped tags (`raw_sec_fact`), with the real filing date | 1 per company | 10 a second; a `SEC_USER_AGENT` naming you is required | 30 / 7 days |
+| `yahoo_prices` | Daily prices (`raw_yahoo_price`): from 2015-12-01 the first time, then from 10 days before the newest stored day. A split in the new days fetches the whole history again (it rescales every price) | 1, or 2 after a split | Yahoo throttles; budget 4,000 / 1,200 calls per run | 1 / 1 day |
+| `yahoo_earnings` | Earnings dates with estimated and reported EPS (`raw_yahoo_earnings`) | 1 | as above | 30 / 7 days |
+| `yahoo_statements` | Six statements, annual and quarterly (`raw_yahoo_statement`) | 6 | as above | 30 / 7 days |
+
+Payloads seen before are not stored again, and only new or changed rows go into the raw
+tables. This follows the same rules as `load-files`: every row points to its `raw_fetch`. Only
+the SEC tags in `config/db_items.toml` are kept, about 4,700 facts per company. After adding
+a tag, run `ingest --due-now sec_companyfacts` to fetch them.
+
+How long a backfill takes: SEC needs about 500 calls (about 10 minutes) and Yahoo about 4,000
+(about an hour), so the S&P 500 can fill in one or two nights if Yahoo doesn't throttle.
+
+## Where it runs
+
+| | |
+|---|---|
+| **Service** | Azure Container Apps **Job** `stock-ingest`, in the Consumption environment `stock-jobs-env` (resource group `stock-rg`). Billed per second while it runs, inside the monthly free grant (180,000 vCPU-seconds, 360,000 GiB-seconds) |
+| **Schedule** | Every day at 22:30 UTC (`30 22 * * *`), after the US close. At most 3 hours, no retries: the next run carries on |
+| **Size** | 1 vCPU, 2 GiB |
+| **Image** | `ghcr.io/khalilvandian/stock-analysis-ingest:latest`, built from the `Dockerfile` by the workflow `ingest-image.yml` on every push to `main` that changes `src/`, `config/` or the dependencies. The job pulls it at every run |
+| **Settings** | `STOCK_DB_TARGET=server-writer`; secrets `STOCK_WRITER_DB_PASSWORD`, `SEC_USER_AGENT` and (optional) `GITHUB_DISPATCH_TOKEN`; `AZURE_SUBSCRIPTION_ID` |
+| **Database access** | The firewall admits only listed addresses, and the job's address changes. So each run uses the job's managed identity to set the firewall rule `ingest-job` to its own address, and deletes the rule at the end (`JobFirewall` in `src/stock_analysis/db/azure.py`). The identity is Contributor on the database server only |
+| **Deploy or update** | `powershell -ExecutionPolicy Bypass -File deploy\ingest-job.ps1` (add `-RunNow` to start a run). It also applies the migrations and the users' rights on the server |
+| **See the runs** | `az containerapp job execution list -n stock-ingest -g stock-rg -o table`, the logs in the job's Log Analytics workspace, `ops_run` in the database, and the coverage page |
+
+The same image runs locally against the Docker database:
+
+```bash
+docker build -t stock-ingest .
+docker run --rm -e DATABASE_URL=postgresql://stock_writer@host.docker.internal:5432/stock \
+  -e PGPASSWORD=<the writer password> stock-ingest ingest --limit 3
+```
+
+## Settings (`config/ingest.toml`)
+
+- `max_minutes`: when the run stops starting new tasks.
+- `[groups.*]`: the budget per mode, the pause between calls (`min_interval_s`) and the
+  failures in a row that stop the group (`stop_after_errors`).
+- `[sources.*]`:
+  - `group`
+  - `order`
+  - `requests` per task, which counts against the budget
+  - `refresh_days` per mode
+- `prices_from`, `price_overlap_days`, `error_retry_hours`, `empty_retry_days`.
+
+Code: `src/stock_analysis/ingest/` (`job.py` the queue and runs; `sec.py`, `yahoo.py` and
+`market.py` the sources; `common.py` the raw-layer helpers). Tests: `tests/test_ingest.py`
+(HTTP mocked with respx, Yahoo through a fake client, the database tests on the local Docker
+PostgreSQL).

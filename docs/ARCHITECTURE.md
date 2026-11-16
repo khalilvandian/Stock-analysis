@@ -5,8 +5,50 @@ companies, and turn the results into reports, dated PDFs, a public web page and 
 email. Claude runs the scripts in Claude Code sessions and writes the judgement (notes,
 verdicts, reports); the scripts produce the numbers.
 
-There is no server and no database. State is files in the repository (configuration, saved
-data, dated analyses, reports) plus a local cache that is never committed.
+It is one repository and one Python package (`src/stock_analysis`), with its settings in
+`config/`, run in five places. They meet in one PostgreSQL database
+([`DATABASE.md`](DATABASE.md)):
+
+| Piece | Runs on | Started by | Code |
+|---|---|---|---|
+| Ingest job | Azure Container Apps Job `stock-ingest` | A schedule (22:30 UTC daily) | `python -m stock_analysis.db ingest` ([`INGEST.md`](INGEST.md)) |
+| Database | Azure Database for PostgreSQL `stock-db-bk` (and Docker locally) | Always on | `src/stock_analysis/db/` |
+| Web API | Azure App Service `stock-api-bk` (F1) | An HTTPS request | `api/app.py` |
+| Evening run | A scheduled Claude Code session | Weekdays 21:00 Italy time | `analysis/watchlist.py` ([`EVENING_RUN.md`](EVENING_RUN.md)) |
+| Site | GitHub Actions + GitHub Pages | A push to `main`, the end of an ingest run, a daily schedule | `analysis/site.py` |
+| Analyses by hand | Your PC or a Claude session | You | `analysis/*.py`, `Data.open()` |
+
+```mermaid
+flowchart TD
+  subgraph Sources[Free data sources]
+    Y[Yahoo Finance]; S[SEC EDGAR]; T[TradingView]; E[ECB]
+  end
+  J[Ingest job<br/>Container Apps Job]
+  DB[(PostgreSQL stock-db-bk<br/>raw, core, out, user, ops)]
+  API[Web API<br/>App Service F1]
+  EV[Evening run<br/>Claude scheduled session]
+  PC[Your PC and Claude sessions]
+  F[Repository files<br/>config, data, analyses, reports]
+  GH[GitHub Actions]
+  P[GitHub Pages site<br/>incl. the Data page]
+  M[Evening email]
+  Y & S & T & E --> J --> DB
+  Y & S & T -.still fetched directly.-> EV
+  PC <--> DB
+  API <--> DB
+  EV --> F
+  F -.load-files.-> DB
+  F --> GH
+  J -.starts.-> GH
+  API --> GH
+  GH --> P
+  EV --> M
+```
+
+The dashed lines are what is still separate: the evening run and most analysis scripts still
+download their own data and read the files in `data/`. Moving them to the database
+(`Data.open()`) is the next step after issue #18; then only the ingest job calls the sources.
+The layers below describe the file-based analysis pipeline as it works today.
 
 ## Layers
 
@@ -123,7 +165,8 @@ flowchart TD
 | `ecb.py` | Latest ECB reference rates as US dollars per unit of each currency, plus GBX (pence). |
 | `data.py` | One way for scripts and Claude to read and write the database (`Data.open()`): named reads, read-only SQL, saving notes, runs and valuations. |
 | `metrics.py` | The metrics dictionary: loads `config/metrics.toml`, selects sets, builds per-stock vectors, standardizes them, and writes `docs/METRICS.md`. |
-| `db/` | The project database (`docs/DATABASE.md`), on PostgreSQL through SQLAlchemy and psycopg: `__init__.py` (targets from `config/database.toml`, `Database`, migrations), `migrations/` (numbered SQL files), `load_files.py` (imports the files in `data/`, no network; raw stores only new or changed rows), `build.py` (rebuilds core from raw), `check.py` (read-only PASS/WARN/FAIL report), `azure.py` (`allow-my-ip`: the Azure firewall rule for this computer's IP), `roles.py` (`create-roles`: `stock_reader`, `stock_writer`), `ping.py` (connection diagnosis), `tunnel.py` (PostgreSQL through an HTTP proxy, for Claude's cloud sessions), `python -m stock_analysis.db {init,load-files,build,status,check} [--target]`. Nothing else uses it yet. |
+| `db/` | The project database (`docs/DATABASE.md`), on PostgreSQL through SQLAlchemy and psycopg: `__init__.py` (targets from `config/database.toml`, `Database`, migrations), `migrations/` (numbered SQL files), `load_files.py` (imports the files in `data/`, no network; raw stores only new or changed rows), `build.py` (rebuilds core from raw), `check.py` (read-only PASS/WARN/FAIL report), `azure.py` (`allow-my-ip`: the Azure firewall rule for this computer's IP), `roles.py` (`create-roles`: `stock_reader`, `stock_writer`), `ping.py` (connection diagnosis), `tunnel.py` (PostgreSQL through an HTTP proxy, for Claude's cloud sessions), `coverage.py` (`coverage`: completeness and quality against `config/coverage.toml`, the daily snapshot), `python -m stock_analysis.db {init,load-files,build,status,check,ingest,coverage,tasks} [--target]`. `azure.py` also has `JobFirewall`, which lets an ingest run on Azure through the firewall. |
+| `ingest/` | The scheduled ingest job (`docs/INGEST.md`): `job.py` (the task queue, budgets, stops, the run log and lock), `sec.py` (ticker file and company facts), `yahoo.py` (prices, statements, earnings dates, through one client the tests replace), `market.py` (TradingView index members, ECB rates), `common.py` (raw-layer helpers), `notify.py` (starts the Pages workflow when a run ends). |
 
 ### `analysis/` (scripts, run with `uv run python analysis/<name>.py`)
 
@@ -194,7 +237,7 @@ core build rules, trailing twelve months, the daily as-of view, quality checks).
 | `data/sector/` | Yes | Utilities screen, yearly history, absolute-values tables | `sector.py`, `history.py`, `absolute.py` |
 | `data/peers/` | Yes | Peer-group tables | `peer_screen.py` |
 | `data/screener/` | Yes, every evening (`stage1.csv`, `top.csv`, the dated CSV) | Stage 1 results, Stage 2 top per sector, the dated full table | `stage1.py`, `stage2.py`, `screener.py` |
-| Azure Database for PostgreSQL `stock-db-bk` | No | The server copy of the same database (target `server`), filled with the same commands | `python -m stock_analysis.db ... --target server` |
+| Azure Database for PostgreSQL `stock-db-bk` | No | The server database (target `server`): everything the ingest job fetches, the cleaned core, the job's queue and run log, the daily coverage snapshots | The ingest job (`db ingest`), `load-files`, `build` |
 | Docker volume `stock-db` | No | The local PostgreSQL database (`compose.yaml`, target `local`): raw copies of the files in `data/`, the cleaned core layer, the watch list, screener results, valuations and watch list runs, quality issues | `python -m stock_analysis.db load-files` and `build` |
 | `.cache/sec/` | No | Raw SEC company facts, about 250 MB for the utilities | `history.py`, `watchlist.py` |
 | `.cache/screener/` | No | Day caches of TradingView, Yahoo fills and prices; `stage1_full.pkl` for Stage 2 | `stage1.py`, `stage2.py` |
@@ -204,6 +247,7 @@ core build rules, trailing twelve months, the daily as-of view, quality checks).
 | `docs/` | Yes | This documentation; `METRICS.md` is generated | Claude; `stock_analysis.metrics doc` |
 | `_site/` | No | The built web site | `site.py` (locally or in the Pages workflow) |
 | Cloud environment settings | No (never in the repository) | `FMP_API_KEY`, `SEC_USER_AGENT`, `BREVO_API_KEY`, `WATCHLIST_EMAIL_FROM`, `WATCHLIST_EMAIL_TO` | Babak, in the environment's settings |
+| Azure job secrets, GitHub repository secrets | No | The ingest job's database password, `SEC_USER_AGENT`, `GITHUB_DISPATCH_TOKEN`; `STOCK_API_KEY` for the Pages workflow | `deploy/ingest-job.ps1` from `.env`; Babak in GitHub's settings |
 
 ## Design principles
 

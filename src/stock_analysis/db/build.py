@@ -161,12 +161,70 @@ def all_splits(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
 # ---------------------------------------------------------------- fundamentals
 
 
+SEC_FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A", "10-KT", "10-KT/A", "20-F", "20-F/A"}
+SEC_FORMS |= {"40-F", "40-F/A"}
+SEC_UNITS = {"USD", "USD/shares", "shares"}
+QUARTER_DAYS, YEAR_DAYS = (80, 100), (350, 380)
+SEC_FIRST_PERIOD = "2015-01-01"
+
+
+def to_month_end(dates: pd.Series) -> pd.Series:
+    """Each date as the nearest month end (2026-09-26 and 2026-10-02 are both 2026-09-30), so a
+    52/53-week period reported by SEC on its real end and by Yahoo on the month end is one
+    period."""
+    m = month_index(dates)
+    first = pd.to_datetime({"year": m // 12, "month": m % 12 + 1, "day": 1})
+    return (first + pd.offsets.MonthEnd(0)).dt.strftime("%Y-%m-%d")
+
+
+def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.DataFrame:
+    """SEC company facts that map to an item: a quarter or fiscal-year flow, or an instant,
+    with its real filing date. Cover-page share counts (dei) are dated at the balance-sheet
+    date of their filing, not the cover date."""
+    sec = frame(
+        conn,
+        "SELECT f.raw_id, f.fetch_id, c.symbol, f.taxonomy, f.tag, f.unit, f.period_start, "
+        "f.period_end, f.value, f.form, f.filed, f.accn FROM raw_sec_fact f "
+        "JOIN core_company c ON c.cik = f.cik",
+    )
+    if sec.empty:
+        return sec
+    sec = sec[sec["form"].isin(SEC_FORMS) & sec["unit"].isin(SEC_UNITS)]
+    key = ["symbol", "taxonomy", "tag", "unit", "period_start", "period_end", "accn"]
+    sec = sec.sort_values("fetch_id").drop_duplicates(key, keep="last")
+    instant = sec["period_start"].isna()
+    balance_date = sec[instant & (sec["taxonomy"] != "dei")].groupby("accn")["period_end"].max()
+    dei = sec["taxonomy"] == "dei"
+    sec.loc[dei, "period_end"] = sec.loc[dei, "accn"].map(balance_date)
+    sec = sec.dropna(subset=["period_end"])
+    sec_tags = tags[~tags["taxonomy"].isin(["history", "yahoo"])]
+    sec = sec.merge(sec_tags, on=["taxonomy", "tag"])
+    if sec.empty:
+        return sec
+    days = (pd.to_datetime(sec["period_end"]) - pd.to_datetime(sec["period_start"])).dt.days + 1
+    flow_type = np.select(
+        [days.between(*QUARTER_DAYS), days.between(*YEAR_DAYS)], ["Q", "FY"], default=""
+    )
+    is_instant_item = sec["item"].map(kind) == "instant"
+    sec["period_type"] = np.where(
+        sec["period_start"].isna() | (is_instant_item & (flow_type != "")), "I", flow_type
+    )
+    # Before the price history starts the splits are unknown, so per-share values and share
+    # counts could not be put on today's basis: SEC values start a year before core does.
+    sec = sec[(sec["period_type"] != "") & (sec["period_end"] >= SEC_FIRST_PERIOD)]
+    return sec.assign(source="sec", raw_table="raw_sec_fact")
+
+
 def candidates(
     conn: Connection, companies: dict[str, int], items: pd.DataFrame, tags: pd.DataFrame
 ) -> pd.DataFrame:
-    """Every source value that maps to an item, with its period and (estimated) filing date."""
+    """Every source value that maps to an item, with its period and filing date (estimated
+    where the source has none)."""
     kind = items.set_index("item")["kind"]
     frames = []
+    sec = sec_candidates(conn, kind, tags)
+    if not sec.empty:
+        frames.append(sec[sec["symbol"].isin(companies)])
     yahoo = frame(conn, "SELECT * FROM raw_yahoo_statement")
     yahoo = yahoo[yahoo["symbol"].isin(companies)].merge(
         tags[tags["taxonomy"] == "yahoo"], left_on="line_item", right_on="tag"
@@ -187,6 +245,7 @@ def candidates(
     if not frames:
         return pd.DataFrame()
     c = pd.concat(frames, ignore_index=True)
+    c["period_end"] = to_month_end(c["period_end"])
     c["company_id"] = c["symbol"].map(companies)
     c["value"] = c["value"] * c["scale"]
     c["rank"] = c["source"].str.split(":").str[0].map(SOURCE_RANK)
@@ -214,9 +273,13 @@ def add_periods(c: pd.DataFrame) -> pd.DataFrame:
     c["fiscal_period"] = np.where(c["period_type"] == "FY", "FY", quarter)
     year_end = (c["period_type"] == "FY") | ((c["period_type"] == "I") & (offset == 0))
     lag = np.where(year_end, FILED_LAG_DAYS["year"], FILED_LAG_DAYS["quarter"])
-    filed = pd.to_datetime(c["period_end"]) + pd.to_timedelta(lag, unit="D")
-    c["filed"] = filed.dt.strftime("%Y-%m-%d")
-    c["filed_estimated"] = True
+    estimate = (pd.to_datetime(c["period_end"]) + pd.to_timedelta(lag, unit="D")).dt.strftime(
+        "%Y-%m-%d"
+    )
+    known = c["filed"].notna() if "filed" in c else pd.Series(False, index=c.index)
+    c["filed"] = c["filed"].where(known, estimate) if "filed" in c else estimate
+    c["filed"] = c["filed"].astype(str).str[:10]
+    c["filed_estimated"] = ~known
     return c
 
 
@@ -264,17 +327,52 @@ def derive(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
     return f
 
 
+def derive_q4(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
+    """SEC filings have no fourth quarter (the 10-K reports the year): for flows, Q4 = the
+    fiscal year less its first three quarters, in their latest versions, where all four are
+    from SEC and Q4 is not reported. Not for EPS (shares differ between quarters)."""
+    flows = set(items.loc[items["kind"] == "flow", "item"]) - {"eps_diluted"}
+    have = latest(f[f["item"].isin(flows) & (f["source"] == "sec")])
+    if have.empty:
+        return f
+    fy = have[have["period_type"] == "FY"]
+    q = have[(have["period_type"] == "Q") & have["fiscal_period"].isin(["Q1", "Q2", "Q3"])]
+    parts = q.groupby(["company_id", "item", "fiscal_year"]).agg(
+        n=("value", "size"), total=("value", "sum")
+    )
+    d = fy.merge(parts.reset_index(), on=["company_id", "item", "fiscal_year"])
+    d = d[d["n"] == 3]
+    reported = f[(f["period_type"] == "Q") & (f["fiscal_period"] == "Q4")][
+        ["company_id", "item", "period_end"]
+    ].drop_duplicates()
+    d = d.merge(reported, how="left", on=["company_id", "item", "period_end"], indicator=True)
+    d = d[d["_merge"] == "left_only"]
+    if d.empty:
+        return f
+    d = d.assign(
+        value=d["value"] - d["total"],
+        period_type="Q",
+        fiscal_period="Q4",
+        method="derived",
+        tag="FY - Q1 - Q2 - Q3",
+        raw_table=None,
+        raw_id=None,
+    )
+    return pd.concat([f, d[f.columns.intersection(d.columns)]], ignore_index=True)
+
+
 def add_split_factor(f: pd.DataFrame, splits: pd.DataFrame) -> pd.DataFrame:
     """Shares and per-share values filed before a split, on today's (split-adjusted) basis.
     history.csv is already adjusted."""
+    f = f.reset_index(drop=True)
     f["split_factor"] = 1.0
     todo = f["item"].isin(list(SPLIT_ITEMS)) & ~f["source"].str.startswith("history")
-    for i in f.index[todo]:
-        s = splits[
-            (splits["company_id"] == f.at[i, "company_id"]) & (splits["date"] > f.at[i, "filed"])
-        ]
-        if not s.empty:
-            f.at[i, "split_factor"] = float(s["ratio"].prod())
+    if todo.any() and not splits.empty:
+        rows = f.loc[todo, ["company_id", "filed"]].reset_index()
+        pairs = rows.merge(splits, on="company_id")
+        pairs = pairs[pairs["date"] > pairs["filed"]]
+        factor = pairs.groupby("index")["ratio"].prod()
+        f.loc[factor.index, "split_factor"] = factor.astype(float)
     how = f["item"].map(SPLIT_ITEMS)
     f["value_adj"] = np.where(
         how == "multiply",
@@ -290,7 +388,7 @@ def build_fundamentals(conn, companies, items, tags, splits) -> tuple[pd.DataFra
         return c, c
     f = choose(c)
     f["method"] = "reported"
-    f = add_split_factor(derive(f, items), splits)
+    f = add_split_factor(derive(derive_q4(f, items), items), splits)
     cols = [*KEY, "filed", "filed_estimated", "fiscal_year", "fiscal_period", "value"]
     cols += ["split_factor", "method", "source", "tag", "raw_table", "raw_id"]
     out = f[cols].copy()
@@ -410,9 +508,12 @@ def quality_checks(prices: pd.DataFrame, f: pd.DataFrame, c: pd.DataFrame) -> li
                      "a share split not applied to EPS?")
                 )  # fmt: skip
     if not c.empty:
-        hist = c[c["source"].str.startswith("history")].sort_values("priority")
+        # The best filed source (SEC, else history.csv), latest version, against Yahoo.
+        ref = c[c["rank"] < SOURCE_RANK["yahoo"]].sort_values(
+            ["rank", "priority", "filed"], ascending=[True, True, False]
+        )
         yahoo = c[c["source"] == "yahoo"].sort_values(["priority", "fetch_id"])
-        both = hist.drop_duplicates(KEY).merge(
+        both = ref.drop_duplicates(KEY).merge(
             yahoo.drop_duplicates(KEY), on=KEY, suffixes=("_h", "_y")
         )
         both = both[both["value_h"] != 0]
@@ -420,7 +521,16 @@ def quality_checks(prices: pd.DataFrame, f: pd.DataFrame, c: pd.DataFrame) -> li
         for _, r in both[diff > 0.02].iterrows():
             issues.append(
                 (r["company_id"], r["item"], r["period_end"], "sources_disagree", "info",
-                 f"history {r['value_h']:.4g} ({r['source_h']}) vs Yahoo {r['value_y']:.4g}")
+                 f"{r['source_h']} {r['value_h']:.4g} vs Yahoo {r['value_y']:.4g}")
+            )  # fmt: skip
+    if len(prices):
+        p = prices.sort_values(["company_id", "date"])
+        change = p.groupby("company_id")["close"].pct_change()
+        jump = (change.abs() > 0.5) & p["split_ratio"].isna()
+        for _, r in p[jump].iterrows():
+            issues.append(
+                (r["company_id"], None, r["date"], "price_jump", "warn",
+                 f"close moved {change[r.name]:+.0%} in a day with no split")
             )  # fmt: skip
     if len(prices):
         p = prices.assign(year=prices["date"].str[:4].astype(int))

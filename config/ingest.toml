@@ -1,0 +1,84 @@
+# The scheduled ingest job (python -m stock_analysis.db ingest, issue #18, docs/INGEST.md).
+#
+# Each run picks the due tasks (one per source and company), the never-fetched ones first,
+# and works through them until a source's request budget for the run is used, the source
+# says "too many requests" (HTTP 429), or `max_minutes` is reached. Then it rebuilds the core
+# layer and takes the day's coverage snapshot. A task that fails is retried on a later run.
+#
+# mode: "backfill" until the universe is complete (config/coverage.toml), then "maintain".
+# The two modes differ only in the budgets and in how often a fetched task is due again.
+
+universe = "SP:SPX"
+market = "america"             # TradingView market the constituents are read from
+max_minutes = 150              # stop starting new tasks after this long
+prices_from = "2015-12-01"     # a month before core starts, for the dividend adjustment
+price_overlap_days = 10        # refetch this many days before the newest stored price
+error_retry_hours = 6          # a failed task is due again after this (doubling per failure, at most a day)
+empty_retry_days = 7           # a source with nothing for the company (e.g. no SEC filings)
+
+# Sources share a budget by group: every Yahoo dataset counts against "yahoo".
+# requests = calls one task makes; min_interval_s = pause between calls in the group.
+[groups.yahoo]
+min_interval_s = 0.5
+budget = { backfill = 4000, maintain = 1200 }
+stop_after_errors = 15         # stop the group after this many failures in a row
+
+[groups.sec]
+min_interval_s = 0.15          # SEC allows 10 requests a second
+budget = { backfill = 2000, maintain = 800 }
+stop_after_errors = 10
+
+[groups.tradingview]
+min_interval_s = 2
+budget = { backfill = 5, maintain = 5 }
+stop_after_errors = 3
+
+[groups.ecb]
+min_interval_s = 1
+budget = { backfill = 3, maintain = 3 }
+stop_after_errors = 3
+
+# refresh_days: how long after a successful fetch the task is due again.
+# order: sources run in this order; tradingview and sec_tickers first, so the universe and
+# the CIKs are known before the per-company tasks are planned.
+[sources.tradingview]
+group = "tradingview"
+order = 1
+requests = 1
+refresh_days = { backfill = 1, maintain = 1 }
+
+[sources.sec_tickers]
+group = "sec"
+order = 2
+requests = 1
+refresh_days = { backfill = 7, maintain = 7 }
+
+[sources.ecb_rates]
+group = "ecb"
+order = 3
+requests = 1
+refresh_days = { backfill = 1, maintain = 1 }
+
+[sources.sec_companyfacts]
+group = "sec"
+order = 4
+requests = 1
+refresh_days = { backfill = 30, maintain = 7 }
+
+[sources.yahoo_prices]
+group = "yahoo"
+order = 5
+requests = 1
+refresh_days = { backfill = 1, maintain = 1 }
+
+[sources.yahoo_earnings]
+group = "yahoo"
+order = 6
+requests = 1
+refresh_days = { backfill = 30, maintain = 7 }
+
+[sources.yahoo_statements]
+group = "yahoo"
+order = 7
+requests = 6
+refresh_days = { backfill = 30, maintain = 7 }

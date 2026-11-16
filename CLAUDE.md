@@ -18,7 +18,10 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
   `config/watchlist.toml`) and out layers through SQLAlchemy; schema and rules in
   `docs/DATABASE.md`, items in `config/db_items.toml`. `uv run python -m stock_analysis.db
   load-files`, then `build`, then `check` (each takes `--target`; `ping` diagnoses a
-  connection). To read or write data in a script or analysis, use `stock_analysis.data.Data.open()`
+  connection). The ingest job (issue #18, `docs/INGEST.md`) fills it on a schedule: `db ingest`
+  (TradingView, SEC, Yahoo, ECB; backfill until the S&P 500 is complete, then maintenance),
+  running as the Azure Container Apps Job `stock-ingest`; `db coverage` measures completeness
+  against `config/coverage.toml` (`docs/COVERAGE.md`), shown on the site's Data page. To read or write data in a script or analysis, use `stock_analysis.data.Data.open()`
   (reads as `stock_reader`, writes as `stock_writer`; `data.sql(...)` for any read-only query). On a
   PC it connects to the database directly; in cloud sessions it goes through the web API
   (`api/`, https://stock-api-bk.azurewebsites.net, used when `STOCK_API_URL` is set). The existing files stay, so older scripts keep working.

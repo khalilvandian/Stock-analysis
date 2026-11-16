@@ -1,0 +1,399 @@
+"""The scheduled ingest (issue #18): the source parsers, the SEC facts and fourth quarters in
+the build, the job's queue, budgets and stops, and the coverage snapshot. HTTP is mocked with
+respx; Yahoo (yfinance, which respx can't reach) is a fake client. The database tests use the
+same local PostgreSQL as tests/test_db.py and skip without it."""
+
+from __future__ import annotations
+
+import json
+from datetime import date
+
+import httpx
+import pandas as pd
+import pytest
+import respx
+from test_db import empty_db, pg_url  # noqa: F401  (pg_url is a fixture)
+
+from stock_analysis import ecb, tradingview
+from stock_analysis.db import frame
+from stock_analysis.db.build import derive_q4, to_month_end
+from stock_analysis.db.coverage import month_index, snapshot
+from stock_analysis.ingest import job, market, sec, yahoo
+from stock_analysis.ingest.common import RateLimited
+
+TODAY = date(2026, 11, 17)
+SYMBOLS = ["AAA", "BBB"]
+CIKS = {"AAA": 1001, "BBB": 1002}
+
+
+# ---------------------------------------------------------------- fakes
+
+
+def tv_rows(symbols: list[str]) -> dict:
+    rows = []
+    for s in symbols:
+        d = [s, f"{s} Corp", "NYSE", "Utilities", "Electric Utilities", "United States", "USD",
+             2e10, "USD", [{"name": "S&P 500", "proname": "SP:SPX"}]]  # fmt: skip
+        rows.append({"s": f"NYSE:{s}", "d": d})
+    rows.append({"s": "NYSE:ZZZ", "d": ["ZZZ", "Not in it", "NYSE", "Finance", "Major Banks",
+                 "United States", "USD", 5e9, "USD", []]})  # fmt: skip
+    return {"totalCount": len(rows), "data": rows}
+
+
+def fact(start, end, val, filed, form="10-K", accn="a"):
+    x = {"end": end, "val": val, "filed": filed, "form": form, "accn": accn, "fy": int(end[:4])}
+    if start:
+        x["start"] = start
+    return x
+
+
+def companyfacts(cik: int) -> dict:
+    """Two fiscal years and three quarters of revenue, a balance sheet, cover shares."""
+    rev = [fact("2024-01-01", "2024-12-31", 400.0, "2025-02-20", accn="k24")]
+    rev += [fact("2025-01-01", "2025-12-31", 500.0, "2026-02-20", accn="k25")]
+    for i, (s, e) in enumerate(
+        [("2025-01-01", "2025-03-31"), ("2025-04-01", "2025-06-30"), ("2025-07-01", "2025-09-30")]
+    ):
+        rev.append(fact(s, e, 110.0 + i, f"2025-{5 + 3 * i:02d}-05", "10-Q", f"q{i}"))
+    rev.append(fact("2025-01-01", "2025-06-30", 221.0, "2025-08-05", "10-Q", "q1"))  # half year
+    assets = [fact(None, "2025-12-31", 900.0, "2026-02-20", accn="k25")]
+    shares = [fact(None, "2026-02-10", 50.0, "2026-02-20", accn="k25")]  # cover date
+    return {
+        "cik": cik,
+        "facts": {
+            "us-gaap": {
+                "Revenues": {"units": {"USD": rev}},
+                "Assets": {"units": {"USD": assets}},
+                "SomethingUnmapped": {"units": {"USD": [fact(None, "2025-12-31", 1, "x")]}},
+            },
+            "dei": {"EntityCommonStockSharesOutstanding": {"units": {"shares": shares}}},
+        },
+    }
+
+
+ECB_CSV = (
+    "KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE\n"
+    "x,D,USD,EUR,SP00,A,2026-11-13,1.10\nx,D,GBP,EUR,SP00,A,2026-11-13,0.88\n"
+    "x,D,USD,EUR,SP00,A,2026-11-16,1.12\nx,D,GBP,EUR,SP00,A,2026-11-16,0.875\n"
+)
+
+
+class FakeYahoo:
+    """Prices for every business day, two years of statements, eight earnings reports."""
+
+    def __init__(self, limit_after: int | None = None):
+        self.calls = 0
+        self.limit_after = limit_after
+
+    def _count(self):
+        self.calls += 1
+        if self.limit_after is not None and self.calls > self.limit_after:
+            raise RateLimited("Yahoo: too many requests")
+
+    def prices(self, symbol, start):
+        self._count()
+        days = pd.bdate_range(max(pd.Timestamp(start), pd.Timestamp("2015-12-01")), "2026-11-16")
+        return pd.DataFrame(
+            {"Open": 10.0, "High": 11.0, "Low": 9.0, "Close": 10.0, "Volume": 1000,
+             "Dividends": 0.0, "Stock Splits": 0.0},
+            index=days.tz_localize("America/New_York"),
+        )  # fmt: skip
+
+    def statement(self, symbol, attribute):
+        self._count()
+        if attribute == "quarterly_income_stmt":
+            cols = pd.to_datetime(["2025-12-31", "2025-09-30"])
+            return pd.DataFrame({c: {"Total Revenue": 130.0} for c in cols})
+        return pd.DataFrame()
+
+    def earnings(self, symbol):
+        self._count()
+        idx = pd.DatetimeIndex(
+            [pd.Timestamp("2026-10-28 16:00") - pd.DateOffset(months=3 * i) for i in range(9)]
+        ).tz_localize("America/New_York")
+        return pd.DataFrame(
+            {"EPS Estimate": 1.0, "Reported EPS": [None] + [1.1] * 8, "Surprise(%)": 10.0},
+            index=idx,
+        )
+
+
+def mock_sources(router: respx.MockRouter, symbols=SYMBOLS) -> None:
+    router.post(tradingview.SCAN_URL.format(market="america")).mock(
+        return_value=httpx.Response(200, json=tv_rows(symbols))
+    )
+    tickers = {str(i): {"cik_str": CIKS[s], "ticker": s, "title": s} for i, s in enumerate(CIKS)}
+    router.get(sec.TICKERS_URL).mock(return_value=httpx.Response(200, json=tickers))
+    for cik in CIKS.values():
+        router.get(sec.FACTS_URL.format(cik=cik)).mock(
+            return_value=httpx.Response(200, json=companyfacts(cik))
+        )
+    router.get(ecb.URL).mock(return_value=httpx.Response(200, text=ECB_CSV))
+
+
+def config(**budgets) -> dict:
+    cfg = job.load_config()
+    for g in cfg["groups"].values():
+        g["min_interval_s"] = 0
+    for name, n in budgets.items():
+        cfg["groups"][name]["budget"] = {"backfill": n, "maintain": n}
+    return cfg
+
+
+def context(cfg, yahoo_client=None) -> job.Context:
+    return job.Context(
+        cfg, httpx.Client(), httpx.Client(), yahoo_client or FakeYahoo(), sleep=lambda s: None
+    )
+
+
+@pytest.fixture()
+def fresh(pg_url: str):  # noqa: F811
+    db = empty_db(pg_url)
+    db.migrate()
+    yield db
+    db.close()
+
+
+# ---------------------------------------------------------------- parsers (no database)
+
+
+def test_companyfacts_keeps_only_mapped_tags() -> None:
+    keep = sec.mapped_tags()
+    assert ("us-gaap", "Revenues") in keep and ("dei", "EntityCommonStockSharesOutstanding") in keep
+    df = sec.facts_frame(companyfacts(1001), 1001, keep)
+    assert set(df["tag"]) == {"Revenues", "Assets", "EntityCommonStockSharesOutstanding"}
+    assert len(df[df["tag"] == "Revenues"]) == 6
+    assert df.loc[df["tag"] == "Assets", "period_start"].isna().all()
+
+
+def test_ecb_rates_are_dollars_per_unit() -> None:
+    r = market.rates_frame(ECB_CSV).set_index(["currency", "date"])["usd_per_unit"]
+    assert r[("USD", "2026-11-16")] == pytest.approx(1.0)
+    assert r[("EUR", "2026-11-16")] == pytest.approx(1.12)
+    assert r[("GBP", "2026-11-16")] == pytest.approx(1.12 / 0.875)
+
+
+def test_yahoo_frames() -> None:
+    y = FakeYahoo()
+    p = yahoo.price_frame(y.prices("AAA", "2026-11-10"), "AAA")
+    assert list(p["date"]) == ["2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-16"]
+    assert p["volume"].dtype == "Int64"
+    s = yahoo.statement_frame(y.statement("AAA", "quarterly_income_stmt"), "AAA", "income", "q")
+    assert set(s["period_end"]) == {"2025-09-30", "2025-12-31"}
+    e = yahoo.earnings_frame(y.earnings("AAA"), "AAA")
+    assert e["report_date"].iloc[-1] == "2026-10-28" and e["eps_reported"].isna().sum() == 1
+    assert yahoo.yahoo_symbol("BRK.B") == "BRK-B"
+
+
+def test_month_end_and_fourth_quarter() -> None:
+    ends = to_month_end(pd.Series(["2026-09-26", "2026-10-02", "2025-12-31", "2026-03-28"]))
+    assert list(ends) == ["2026-09-30", "2026-09-30", "2025-12-31", "2026-03-31"]
+    assert month_index("2026-09-26") == month_index("2026-10-02")
+    items = pd.DataFrame({"item": ["revenue", "eps_diluted"], "kind": ["flow", "flow"]})
+    base = {"company_id": 1, "source": "sec", "fiscal_year": 2025, "filed": "2026-02-20",
+            "method": "reported", "rank": 1, "tag": "Revenues"}  # fmt: skip
+    rows = [{**base, "item": "revenue", "period_type": "FY", "period_end": "2025-12-31",
+             "fiscal_period": "FY", "value": 500.0}]  # fmt: skip
+    for q, end, v in (("Q1", "2025-03-31", 110.0), ("Q2", "2025-06-30", 111.0),
+                      ("Q3", "2025-09-30", 112.0)):  # fmt: skip
+        rows.append({**base, "item": "revenue", "period_type": "Q", "period_end": end,
+                     "fiscal_period": q, "value": v})  # fmt: skip
+    out = derive_q4(pd.DataFrame(rows), items)
+    q4 = out[(out["period_type"] == "Q") & (out["fiscal_period"] == "Q4")]
+    assert len(q4) == 1 and q4["value"].iloc[0] == pytest.approx(167.0)
+    assert q4["period_end"].iloc[0] == "2025-12-31" and q4["method"].iloc[0] == "derived"
+
+
+# ---------------------------------------------------------------- the job (database)
+
+
+def rows(db, sql: str, params: dict | None = None) -> pd.DataFrame:
+    with db.connect() as conn:
+        return frame(conn, sql, params)
+
+
+@respx.mock(assert_all_called=False)
+def test_job_fills_the_database_and_reruns_store_nothing(fresh, respx_mock) -> None:
+    mock_sources(respx_mock)
+    cfg = config()
+    result = job.run_job(fresh, cfg, ctx=context(cfg))
+    assert result["status"] == "ok", result
+    assert result["mode"] == "backfill"
+    tasks = rows(fresh, "SELECT source, status, COUNT(*) AS n FROM ops_task GROUP BY 1, 2")
+    assert set(tasks["status"]) == {"ok"}
+    assert dict(zip(tasks["source"], tasks["n"], strict=True)) == {
+        "tradingview": 1, "sec_tickers": 1, "ecb_rates": 1, "sec_companyfacts": 2,
+        "yahoo_prices": 2, "yahoo_statements": 2, "yahoo_earnings": 2,
+    }  # fmt: skip
+    members = rows(fresh, "SELECT DISTINCT symbol FROM raw_tv_constituent")
+    assert sorted(members["symbol"]) == SYMBOLS  # ZZZ is not in the index
+    # cover-page shares are dated at the filing's balance-sheet date
+    shares = rows(
+        fresh,
+        "SELECT period_end, value FROM core_fundamental f JOIN core_company c USING (company_id) "
+        "WHERE c.symbol = 'AAA' AND item = 'shares_outstanding' AND source = 'sec'",
+    )
+    assert list(shares["period_end"]) == ["2025-12-31"]
+    q4 = rows(
+        fresh,
+        "SELECT value, method FROM core_fundamental f JOIN core_company c USING (company_id) "
+        "WHERE c.symbol = 'AAA' AND item = 'revenue' AND period_type = 'Q' "
+        "AND period_end = '2025-12-31'",
+    )
+    assert q4["value"].iloc[0] == pytest.approx(130.0)  # Yahoo reported Q4, so not derived
+    fy = rows(
+        fresh,
+        "SELECT value, filed, filed_estimated FROM core_fundamental f JOIN core_company c "
+        "USING (company_id) WHERE symbol = 'AAA' AND item = 'revenue' AND period_type = 'FY' "
+        "AND period_end = '2025-12-31'",
+    )
+    assert fy["value"].iloc[0] == 500.0 and not fy["filed_estimated"].iloc[0]
+    snap = rows(fresh, "SELECT companies, cells_present, detail_json FROM out_coverage_snapshot")
+    assert snap["companies"].iloc[0] == 2
+    detail = json.loads(snap["detail_json"].iloc[0])
+    assert detail["pipeline"]["never_fetched"] == 0
+    assert {c["symbol"] for c in detail["companies"]} == set(SYMBOLS)
+
+    before = rows(fresh, "SELECT COUNT(*) AS n FROM raw_sec_fact")["n"].iloc[0]
+    job.make_due(fresh, "sec_companyfacts")
+    again = job.run_job(fresh, cfg, ctx=context(cfg), do_coverage=False)
+    assert again["groups"]["sec"]["rows"] == 0  # same payloads: nothing stored twice
+    assert rows(fresh, "SELECT COUNT(*) AS n FROM raw_sec_fact")["n"].iloc[0] == before
+    assert again["groups"]["yahoo"]["requests"] == 0  # prices not due again yet
+
+
+@respx.mock(assert_all_called=False)
+def test_rate_limit_and_budget_stop_a_group(fresh, respx_mock) -> None:
+    mock_sources(respx_mock)
+    cfg = config(sec=2)  # tickers + one company
+    fake = FakeYahoo(limit_after=1)
+    result = job.run_job(fresh, cfg, ctx=context(cfg, fake), do_build=False, do_coverage=False)
+    assert result["groups"]["sec"]["stopped"] == "budget used"
+    assert result["groups"]["yahoo"]["stopped"].startswith("rate limited")
+    assert result["status"] == "partial"
+    pending = rows(
+        fresh,
+        "SELECT COUNT(*) AS n FROM ops_task WHERE status = 'pending' AND source LIKE 'yahoo%'",
+    )["n"].iloc[0]
+    assert pending == 5  # one of six Yahoo tasks ran; the rate-limited one is not a failure
+
+
+@respx.mock(assert_all_called=False)
+def test_failures_are_recorded_and_leavers_deactivated(fresh, respx_mock) -> None:
+    mock_sources(respx_mock)
+    respx_mock.get(sec.FACTS_URL.format(cik=1002)).mock(return_value=httpx.Response(500))
+    cfg = config()
+    result = job.run_job(fresh, cfg, ctx=context(cfg), do_build=False, do_coverage=False)
+    assert result["groups"]["sec"]["failed"] == 1
+    bad = rows(fresh, "SELECT status, attempts, last_error FROM ops_task WHERE request_key = 'BBB' "
+               "AND source = 'sec_companyfacts'")  # fmt: skip
+    assert bad["status"].iloc[0] == "error" and bad["attempts"].iloc[0] == 1
+    assert rows(fresh, "SELECT COUNT(*) AS n FROM raw_fetch WHERE status = 'error'")["n"][0] == 1
+
+    respx_mock.post(tradingview.SCAN_URL.format(market="america")).mock(
+        return_value=httpx.Response(200, json=tv_rows(["AAA"]))
+    )
+    job.make_due(fresh, "tradingview")
+    job.run_job(fresh, cfg, ctx=context(cfg), sources=["tradingview"], do_build=False,
+                do_coverage=False)  # fmt: skip
+    active = rows(fresh, "SELECT request_key, active FROM ops_task WHERE source = 'yahoo_prices'")
+    assert dict(zip(active["request_key"], active["active"], strict=True)) == {
+        "AAA": True, "BBB": False,
+    }  # fmt: skip
+
+
+@respx.mock(assert_all_called=False)
+def test_coverage_counts_cells_and_switches_mode(fresh, respx_mock) -> None:
+    mock_sources(respx_mock)
+    cfg = config()
+    job.run_job(fresh, cfg, ctx=context(cfg), do_coverage=False)
+    from stock_analysis.db.coverage import load_config
+
+    cov = load_config()
+    cov["first_fiscal_year"] = 2024
+    snap = snapshot(fresh, cov, today=TODAY)
+    d = snap["detail"]
+    aaa = next(c for c in d["companies"] if c["symbol"] == "AAA")
+    assert aaa["prices"]["ok"] and aaa["earnings"]["ok"]
+    assert aaa["annual"]["years"] == "2024-2025"
+    assert "revenue FY2024" not in aaa["missing"] and "revenue FY2025" not in aaa["missing"]
+    assert "net_income FY2025" in aaa["missing"]
+    assert not aaa["covered"] and d["mode"] == "backfill"
+    rev = next(i for i in d["items"] if i["item"] == "revenue")
+    assert rev["required"] == 4 and rev["present"] == 4  # 2 companies x 2 years
+    assert d["trend"][-1]["date"] == TODAY.isoformat()
+    # everything accepted by hand: covered, and the job may switch to maintenance
+    items = [i["item"] for i in d["items"]]
+    cov["explained"] = [{"symbol": s, "item": i, "reason": "test"} for s in SYMBOLS for i in items]
+    d2 = snapshot(fresh, cov, today=TODAY)["detail"]
+    assert d2["totals"]["companies_covered"] == 2 and d2["mode"] == "maintain"
+    assert len(rows(fresh, "SELECT * FROM out_coverage_snapshot")) == 1  # one row per day
+    with fresh.connect() as conn:
+        assert job.choose_mode(conn, 0.95) == "maintain"
+
+
+def test_only_one_run_at_a_time(fresh) -> None:
+    from sqlalchemy import text
+
+    with fresh.connect() as other:
+        other.execute(text("SELECT pg_advisory_lock(:k)"), {"k": job.LOCK_KEY})
+        cfg = config()
+        result = job.run_job(fresh, cfg, ctx=context(cfg))
+        assert result["status"] == "skipped"
+        other.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": job.LOCK_KEY})
+    assert rows(fresh, "SELECT COUNT(*) AS n FROM ops_run")["n"].iloc[0] == 0
+
+
+@respx.mock(assert_all_called=True)
+def test_job_opens_and_closes_its_firewall_rule(respx_mock, monkeypatch) -> None:
+    from stock_analysis.db import azure
+
+    monkeypatch.setenv("IDENTITY_ENDPOINT", "http://identity.local/token")
+    monkeypatch.setenv("IDENTITY_HEADER", "h")
+    monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "sub-1")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    respx_mock.get("http://identity.local/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "tok"})
+    )
+    respx_mock.get(azure.IP_SERVICE).mock(return_value=httpx.Response(200, text="20.1.2.3"))
+    url = azure._rule_url("sub-1", "stock-rg", "stock-db-bk", "ingest-job")
+    put = respx_mock.put(url).mock(
+        return_value=httpx.Response(202, headers={"Azure-AsyncOperation": "https://op.local/1"})
+    )
+    respx_mock.get("https://op.local/1").mock(
+        side_effect=[httpx.Response(200, json={"status": "InProgress"}),
+                     httpx.Response(200, json={"status": "Succeeded"}),
+                     httpx.Response(200, json={"status": "Succeeded"})]
+    )  # fmt: skip
+    delete = respx_mock.delete(url).mock(
+        return_value=httpx.Response(202, headers={"Azure-AsyncOperation": "https://op.local/1"})
+    )
+    with azure.JobFirewall("server-writer", http=httpx.Client(), sleep=lambda s: None) as ip:
+        assert ip == "20.1.2.3"
+        sent = json.loads(put.calls.last.request.content)
+        assert sent["properties"] == {"startIpAddress": "20.1.2.3", "endIpAddress": "20.1.2.3"}
+        assert put.calls.last.request.headers["Authorization"] == "Bearer tok"
+        assert not delete.called
+    assert delete.called
+
+
+def test_firewall_helper_does_nothing_outside_azure(monkeypatch) -> None:
+    from stock_analysis.db import azure
+
+    for name in ("IDENTITY_ENDPOINT", "IDENTITY_HEADER", "AZURE_SUBSCRIPTION_ID"):
+        monkeypatch.delenv(name, raising=False)
+    with azure.JobFirewall("local", http=httpx.Client()) as ip:
+        assert ip is None
+
+
+@respx.mock(assert_all_called=True)
+def test_a_finished_run_asks_github_to_rebuild_the_site(respx_mock, monkeypatch) -> None:
+    from stock_analysis.ingest import notify
+
+    monkeypatch.setenv("GITHUB_DISPATCH_TOKEN", "t0ken")
+    url = notify.DISPATCH_URL.format(repo=notify.REPOSITORY, workflow="pages.yml")
+    route = respx_mock.post(url).mock(return_value=httpx.Response(204))
+    assert "started" in notify.publish_site(httpx.Client())
+    assert json.loads(route.calls.last.request.content) == {"ref": "main"}
+    assert route.calls.last.request.headers["Authorization"] == "Bearer t0ken"
+    monkeypatch.delenv("GITHUB_DISPATCH_TOKEN")
+    assert "daily schedule" in notify.publish_site(httpx.Client())
