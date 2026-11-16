@@ -108,12 +108,16 @@ To let a cloud session use it directly:
 
    Anyone who can use the environment can read these values. Only the reader and writer
    passwords go here, never the admin one.
-2. **Network access:** *Limited* with `stock-db-bk.postgres.database.azure.com` under
-   **Allowed domains**. If the connection test fails at "TCP connect", try **Full**.
+2. **Network access:** *Full* (or *Limited* with `stock-db-bk.postgres.database.azure.com` under
+   **Allowed domains**). The session's traffic goes through Anthropic's HTTP proxy; the code
+   tunnels PostgreSQL through it on its own (`db/tunnel.py`).
 3. **Setup script** (if `uv` is missing): `pip install uv && uv sync`.
-4. **Test** in a new session: `uv run python -m stock_analysis.db ping --target server-reader`.
-   - `FAIL TCP connect`: the session's network doesn't pass PostgreSQL traffic (see
-     docs/DATABASE.md for the alternatives).
-   - `FAIL login … no pg_hba.conf entry for host "x.x.x.x"`: the connection works; the Azure
-     firewall needs that address (Babak adds it from his PC).
+4. **Azure firewall** (once, from Babak's PC): allow the proxy's exit address, which the
+   session's `ping` prints as "public IP":
+   `uv run python -m stock_analysis.db allow-my-ip --target server --rule claude-cloud --ip <address>`.
+5. **Test** in a new session: `uv run python -m stock_analysis.db ping --target server-reader`.
+   - `INFO route` should say "through the HTTP proxy".
+   - `FAIL TCP connect … refused the tunnel`: the proxy refuses the port (network setting).
+   - `FAIL PostgreSQL answer`: the tunnel opens but Azure drops the address; do step 4 with
+     the address shown.
    - `PASS login`: done. `check --target server-reader` gives the full picture.

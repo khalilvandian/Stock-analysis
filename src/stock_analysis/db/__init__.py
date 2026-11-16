@@ -21,11 +21,14 @@ import os
 import re
 import tomllib
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Connection, Engine
+
+from . import tunnel
 
 ROOT = Path(__file__).resolve().parents[3]
 MIGRATIONS = Path(__file__).with_name("migrations")
@@ -87,6 +90,10 @@ class Database:
             args["password"] = password
         if read_only:
             args["options"] = "-c default_transaction_read_only=on"
+        parsed = urlparse(url)
+        self.local_port = tunnel.route(parsed.hostname or "", parsed.port or 5432)
+        if self.local_port:  # through the HTTP proxy; TLS still checks the real host name
+            args.update(hostaddr="127.0.0.1", port=str(self.local_port))
         sa_url = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", url)
         self.engine: Engine = create_engine(sa_url, connect_args=args, pool_pre_ping=True)
 

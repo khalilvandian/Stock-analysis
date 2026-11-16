@@ -253,6 +253,8 @@ their date.
   them.
 - **Why:** an API is extra code, hosting and upkeep, which isn't needed while every user of the data is
   a script or Claude that can hold a database password.
-- **Open point:** whether cloud sessions can reach PostgreSQL through Anthropic's proxy has to
-  be tested (docs/SETUP.md). If they can't, a self-hosted Claude environment or a small HTTPS
-  layer is the fallback.
+- **Cloud sessions (tested 2026-11-16):** a direct connection to port 5432 is refused, but
+  Anthropic's proxy tunnels it (HTTP CONNECT), so `db/tunnel.py` routes database connections
+  through the proxy and the Azure firewall allows the proxy's exit address (rule
+  `claude-cloud`). Fallbacks if that stops working: a self-hosted Claude environment or a small
+  HTTPS layer.

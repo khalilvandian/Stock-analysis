@@ -31,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target", help="a target in config/database.toml (default: selected)")
     parser.add_argument("--data", help="load-files: folder to import from (default: data/)")
     parser.add_argument("--strict", action="store_true", help="check: exit 1 on WARN too")
+    parser.add_argument("--ip", help="allow-my-ip: allow this address instead of this PC's")
+    parser.add_argument("--rule", default="home", help="allow-my-ip: firewall rule name")
     args = parser.parse_args(argv)
     if args.command == "check":
         return check(args.target, args.strict)
@@ -41,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "allow-my-ip":
         from .azure import allow_my_ip
 
-        print(allow_my_ip(args.target or "server"))
+        print(allow_my_ip(args.target or "server", args.rule, args.ip))
         return 0
     db = Database.open(args.target)  # applies any new migrations
     print(f"Database: {db.target} ({db.where})")

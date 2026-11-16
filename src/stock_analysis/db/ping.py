@@ -13,13 +13,14 @@ from __future__ import annotations
 import os
 import re
 import socket
+import struct
 import urllib.request
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from sqlalchemy import text
 
-from . import ROOT, Database, hide_password, target_settings
+from . import ROOT, Database, hide_password, target_settings, tunnel
 
 
 def line(status: str, step: str, detail: str = "") -> None:
@@ -54,17 +55,39 @@ def ping(target: str | None = None) -> int:
         line("FAIL", "DNS", f"{host}: {exc} (no DNS: the network blocks lookups or the name)")
         return 1
 
+    proxy = tunnel.proxy_for(host)
+    how = "through the HTTP proxy (CONNECT tunnel)" if proxy else "direct"
+    line("INFO", "route", how)
     try:
-        with socket.create_connection((host, port), timeout=10):
-            line("PASS", "TCP connect", f"port {port} reachable")
+        sock = (
+            tunnel.open_tunnel(proxy, host, port)
+            if proxy
+            else socket.create_connection((host, port), timeout=10)
+        )
     except OSError as exc:
-        line("FAIL", "TCP connect", f"port {port}: {exc}")
+        line("FAIL", "TCP connect", f"port {port}, {how}: {exc}")
         print(
             "      A timeout or refusal here means the network between this machine and the\n"
             "      database blocks the connection: the database firewall (allowed IPs), or this\n"
-            "      machine's network (e.g. a proxy that only passes HTTP/HTTPS)."
+            "      machine's network (e.g. a proxy that refuses the port)."
         )
         return 1
+    # PostgreSQL's SSLRequest: a real server answers one byte, S or N.
+    try:
+        with sock:
+            sock.settimeout(10)
+            sock.sendall(struct.pack("!ii", 8, 80877103))
+            answer = sock.recv(1)
+    except OSError as exc:
+        answer = f"{type(exc).__name__}".encode()
+    if answer not in (b"S", b"N"):
+        line("FAIL", "PostgreSQL answer", f"none ({answer.decode(errors='replace') or 'closed'})")
+        print(
+            "      The connection opened but no PostgreSQL server answered. Usually the database\n"
+            "      firewall drops this machine's address (the public IP above): add it as a rule."
+        )
+        return 1
+    line("PASS", "TCP connect", f"port {port}, {how}; PostgreSQL answered")
 
     env = settings.get("password_env")
     if env and not os.environ.get(env):

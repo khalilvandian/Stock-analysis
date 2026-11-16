@@ -9,6 +9,7 @@ once with `az login`. No secrets are involved.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import shutil
 import subprocess
@@ -33,12 +34,14 @@ def public_ip() -> str:
         return response.read().decode().strip()
 
 
-def allow_my_ip(target: str = "server", rule: str = "home") -> str:
+def allow_my_ip(target: str = "server", rule: str = "home", ip: str | None = None) -> str:
+    """Create or update a firewall rule for this computer's public IP, or for `ip` (e.g. the
+    exit address of Claude's cloud proxy, rule `claude-cloud`)."""
     settings = target_settings(target)
     server, group = settings.get("azure_server"), settings.get("azure_resource_group")
     if not server or not group:
         raise ValueError(f"Target {target!r} needs azure_server and azure_resource_group")
-    ip = public_ip()
+    ip = str(ipaddress.ip_address(ip)) if ip else public_ip()
     result = subprocess.run(
         [
             az_command(),

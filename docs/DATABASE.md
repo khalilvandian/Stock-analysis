@@ -93,11 +93,18 @@ the config (e.g. `server-writer` in Claude's cloud environment).
 ```python
 from stock_analysis.data import Data
 
-data = Data.open()                      # server-reader / server-writer by default
-data.watchlist(); data.annual("NEE"); data.daily("NEE", start="2025-01-01")
-data.prices("NEE"); data.screener(stage=2); data.notes("NFLX"); data.quality()
-data.sql("SELECT symbol, revenue FROM v_annual WHERE fiscal_year = 2025")   # read-only, 50,000 rows
-data.save_note("NFLX", "..."); data.save_watchlist_run({...}); data.set_watchlist([...])
+data = Data.open()  # server-reader / server-writer by default
+data.watchlist()
+data.annual("NEE")
+data.daily("NEE", start="2025-01-01")
+data.prices("NEE")
+data.screener(stage=2)
+data.notes("NFLX")
+data.quality()
+data.sql("SELECT symbol, revenue FROM v_annual WHERE fiscal_year = 2025")  # read-only, 50,000 rows
+data.save_note("NFLX", "...")
+data.save_watchlist_run({...})
+data.set_watchlist([...])
 ```
 
 `data.sql()` accepts one SELECT or WITH statement and runs it in a read-only transaction with a
@@ -113,13 +120,20 @@ It prints this machine's public IP and proxy settings, then DNS, a plain TCP con
 5432, and a real login that shows the address the database sees. A `no pg_hba.conf entry for host
 "x.x.x.x"` answer means the Azure firewall needs that address.
 
-### Claude's cloud sessions (to be tested)
+### Claude's cloud sessions: through the proxy
 
-Cloud sessions send their outbound traffic through Anthropic's HTTP/HTTPS proxy, and their
-network levels are defined by domain. Whether a PostgreSQL connection (its own protocol, port
-5432) gets through is **not documented and must be tested** (docs/SETUP.md, "Database access
-from cloud sessions"). If it doesn't, the options are a self-hosted Claude environment (runs on a
-machine whose network we control) or a small HTTPS layer after all.
+Cloud sessions reach the internet only through Anthropic's HTTP proxy (`HTTPS_PROXY`). Tested
+2026-11-16: a direct connection to port 5432 is refused inside the container (even with network
+access *Full*), but the proxy accepts `CONNECT stock-db-bk…:5432`. PostgreSQL drivers don't use
+proxies, so `db/tunnel.py` does it for them: when `HTTPS_PROXY` is set and `NO_PROXY` doesn't
+exclude the host, `Database` starts a forwarder on 127.0.0.1 and psycopg connects to it
+(`hostaddr`), while TLS still runs end to end with the real host name. Nothing changes where no
+proxy is set; `STOCK_DB_PROXY=off` turns it off.
+
+The database then sees the proxy's exit address (160.79.106.144 on the first test), so the
+Azure firewall needs a rule for it: `allow-my-ip --rule claude-cloud --ip <address>`. `ping`
+in the session shows the route, whether PostgreSQL answered and the address the database sees.
+If the address changes, the session's `ping` fails at "PostgreSQL answer"; add the new one.
 
 ## The server (Azure)
 
@@ -140,6 +154,7 @@ machine whose network we control) or a small HTTPS layer after all.
 
 ```bash
 uv run python -m stock_analysis.db allow-my-ip     # sets the firewall rule `home` to your current IP
+uv run python -m stock_analysis.db allow-my-ip --rule claude-cloud --ip 160.79.106.144   # another address
 ```
 
 It uses the **Azure CLI** (`winget install Microsoft.AzureCLI`, then `az login` once with the

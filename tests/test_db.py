@@ -536,6 +536,10 @@ def test_allow_my_ip_builds_the_azure_command(monkeypatch) -> None:
     assert cmd[cmd.index("--name") + 1] == "home"
     assert cmd[cmd.index("--start-ip-address") + 1] == "203.0.113.7"
     assert message.endswith("now allows 203.0.113.7")
+    azure.allow_my_ip("server", "claude-cloud", "198.51.100.9")
+    cmd = calls[1]
+    assert cmd[cmd.index("--name") + 1] == "claude-cloud"
+    assert cmd[cmd.index("--end-ip-address") + 1] == "198.51.100.9"
 
 
 def test_data_layer_reads_writes_and_safe_sql(con: Database) -> None:
@@ -574,3 +578,83 @@ def test_ping_diagnoses_a_working_connection(pg_url: str, capsys, monkeypatch) -
     assert ping() == 0
     out = capsys.readouterr().out
     assert "PASS  TCP connect" in out and "PASS  login" in out
+
+
+class FakeProxy:
+    """A local HTTP proxy that answers CONNECT and tunnels to the requested host:port."""
+
+    def __init__(self, refuse: bool = False):
+        import socket
+        import threading
+
+        from stock_analysis.db import tunnel
+
+        self.requests: list[str] = []
+        self.refuse = refuse
+        self.server = socket.create_server(("127.0.0.1", 0))
+        self.url = f"http://user:secret@127.0.0.1:{self.server.getsockname()[1]}"
+
+        def handle(client):
+            head = b""
+            while b"\r\n\r\n" not in head:
+                head += client.recv(4096)
+            first = head.split(b"\r\n")[0].decode()
+            self.requests.append(first)
+            if self.refuse:
+                client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                client.close()
+                return
+            host, port = first.split(" ")[1].rsplit(":", 1)
+            upstream = socket.create_connection((host, int(port)))
+            client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            threading.Thread(target=tunnel.pipe, args=(client, upstream), daemon=True).start()
+            tunnel.pipe(upstream, client)
+
+        def serve():
+            while True:
+                client, _ = self.server.accept()
+                threading.Thread(target=handle, args=(client,), daemon=True).start()
+
+        threading.Thread(target=serve, daemon=True).start()
+
+
+def test_connections_go_through_the_http_proxy(pg_url: str, monkeypatch, capsys) -> None:
+    from stock_analysis.db.ping import ping
+
+    proxy = FakeProxy()
+    monkeypatch.setenv("HTTPS_PROXY", proxy.url)
+    monkeypatch.setenv("NO_PROXY", "api.anthropic.com")
+    monkeypatch.delenv("no_proxy", raising=False)
+    monkeypatch.delenv("STOCK_DB_PROXY", raising=False)
+    password = os.environ.get(PASSWORD_ENV, "")
+    url = pg_url.replace("stock@", f"stock:{password}@", 1)
+    db = Database(url, read_only=True)
+    try:
+        assert db.local_port
+        with db.connect() as conn:
+            assert conn.execute(text("SELECT 1")).scalar() == 1
+    finally:
+        db.close()
+    assert proxy.requests and proxy.requests[0].startswith("CONNECT 127.0.0.1:")
+
+    monkeypatch.setenv("DATABASE_URL", url)
+    assert ping() == 0
+    out = capsys.readouterr().out
+    assert "through the HTTP proxy" in out and "PostgreSQL answered" in out and "PASS  login" in out
+
+    monkeypatch.setenv("STOCK_DB_PROXY", "off")
+    direct = Database(url, read_only=True)
+    assert direct.local_port is None
+    direct.close()
+
+
+def test_ping_reports_a_proxy_that_refuses(pg_url: str, monkeypatch, capsys) -> None:
+    from stock_analysis.db.ping import ping
+
+    monkeypatch.setenv("HTTPS_PROXY", FakeProxy(refuse=True).url)
+    monkeypatch.setenv("NO_PROXY", "")
+    monkeypatch.delenv("no_proxy", raising=False)
+    monkeypatch.setenv("DATABASE_URL", pg_url)
+    assert ping() == 1
+    out = capsys.readouterr().out
+    assert "FAIL  TCP connect" in out and "403 Forbidden" in out
