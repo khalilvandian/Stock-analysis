@@ -243,18 +243,25 @@ their date.
   credit (about $19 a month at list price). Decide then whether to keep, shrink or move it;
   a `pg_dump` moves it anywhere.
 
-### No API for now: scripts and Claude connect straight to the database
+### Scripts connect straight to the database; cloud sessions go through a small, general API
 
 - **Who:** Babak.
-- **Decision:** Analyses, scripts and Claude read and write the PostgreSQL database directly,
-  with two working users: `stock_reader` (read only) and `stock_writer` (data, not schema). Claude's
-  cloud environment gets their passwords as environment variables. The API planned earlier is
-  dropped until an interface needs it. The existing files stay as they are, so Claude can still use
-  them.
-- **Why:** an API is extra code, hosting and upkeep, which isn't needed while every user of the data is
-  a script or Claude that can hold a database password.
-- **Cloud sessions (tested 2026-11-16):** a direct connection to port 5432 is refused, but
-  Anthropic's proxy tunnels it (HTTP CONNECT), so `db/tunnel.py` routes database connections
-  through the proxy and the Azure firewall allows Anthropic's published outbound
-  ranges (rules `claude-cloud`, `claude-cloud-2`). Fallbacks if that stops working: a self-hosted Claude environment or a small
-  HTTPS layer.
+- **Decision:** On a PC, scripts and Claude read and write PostgreSQL directly with two working
+  users: `stock_reader` (read only) and `stock_writer` (data, not schema). Claude's cloud
+  sessions use a small web API on Azure (`api/app.py`, App Service `stock-api-bk`, free F1)
+  with two general routes instead of one per question: `/query` (any single read-only
+  statement, as `stock_reader`) and `/execute` (write steps in one transaction, as
+  `stock_writer`). `Data.open()` picks the backend, so scripts are the same everywhere. The key
+  reaches cloud sessions as a network secret, never as a variable. The existing files stay, so
+  Claude can still use them.
+- **Why:** tested 2026-11-16: cloud sessions can't reach PostgreSQL in any way (direct
+  connections are refused; the proxy's CONNECT tunnel passes only web traffic), while HTTPS
+  works. Considered and rejected: a copy of the database per session (not the live database),
+  a remote MCP server (tools don't suit scripts that pull thousands of rows), moving to a
+  provider with an HTTP driver (Neon; unofficial Python drivers), a WebSocket tunnel
+  (unproven), self-hosted cloud environments (Team and Enterprise plans only). An API per
+  use case was rejected too: every new analysis would need a new route.
+- **Safety:** the key, HTTPS only, one statement per request, a read-only transaction for
+  `/query`, and the database users' rights (the writer can't change the schema or
+  `schema_version`, or change or delete raw data). The database firewall admits only the
+  API's addresses and the home PC.

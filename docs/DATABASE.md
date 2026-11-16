@@ -120,23 +120,14 @@ It prints this machine's public IP and proxy settings, then DNS, a plain TCP con
 5432, and a real login that shows the address the database sees. A `no pg_hba.conf entry for host
 "x.x.x.x"` answer means the Azure firewall needs that address.
 
-### Claude's cloud sessions: through the proxy
+### Claude's cloud sessions: through the web API
 
-Cloud sessions reach the internet only through Anthropic's HTTP proxy (`HTTPS_PROXY`). Tested
-2026-11-16: a direct connection to port 5432 is refused inside the container (even with network
-access *Full*), but the proxy accepts `CONNECT stock-db-bk…:5432`. PostgreSQL drivers don't use
-proxies, so `db/tunnel.py` does it for them: when `HTTPS_PROXY` is set and `NO_PROXY` doesn't
-exclude the host, `Database` starts a forwarder on 127.0.0.1 and psycopg connects to it
-(`hostaddr`), while TLS still runs end to end with the real host name. Nothing changes where no
-proxy is set; `STOCK_DB_PROXY=off` turns it off.
-
-The database then sees the proxy's exit address, which changes between sessions (160.79.106.144,
-then .145), so the Azure firewall allows Anthropic's published outbound ranges: rules
-`claude-cloud` (160.79.104.0/21) and `claude-cloud-2` (153.61.208.0/20), set with
-`allow-my-ip --rule NAME --ip RANGE`. Anyone on Anthropic's network can then reach the login;
-the passwords and TLS still guard it. `ping`
-in the session shows the route, whether PostgreSQL answered and the address the database sees.
-If Anthropic changes its ranges, the session's `ping` fails at "PostgreSQL answer".
+Cloud sessions reach the internet only through Anthropic's HTTP proxy. Tested 2026-11-16: a
+direct connection to port 5432 is refused, and although the proxy answers a CONNECT to port 5432
+(or 22) with "200", nothing but web traffic reaches the far end. So cloud sessions use the web
+API below. `db/tunnel.py` (PostgreSQL through an HTTP proxy's CONNECT tunnel, automatic when
+`HTTPS_PROXY` applies; `STOCK_DB_PROXY=off` turns it off) stays for proxies that do pass it,
+such as some company networks; it doesn't help on Anthropic's cloud.
 
 ## The web API (for cloud sessions)
 
@@ -188,7 +179,7 @@ Redeploy after a change: zip `api/app.py` and `api/requirements.txt`, then
 
 ```bash
 uv run python -m stock_analysis.db allow-my-ip     # sets the firewall rule `home` to your current IP
-uv run python -m stock_analysis.db allow-my-ip --rule claude-cloud --ip 160.79.104.0/21   # another address or range
+uv run python -m stock_analysis.db allow-my-ip --rule NAME --ip 203.0.113.0/24   # another address or range
 ```
 
 It uses the **Azure CLI** (`winget install Microsoft.AzureCLI`, then `az login` once with the

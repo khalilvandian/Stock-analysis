@@ -95,31 +95,17 @@ A Project in the Claude chat app is useful for discussion, and for keeping the r
 
 ## Database access from cloud sessions
 
-The project's data lives in the Azure PostgreSQL database `stock-db-bk` (docs/DATABASE.md).
-To let a cloud session use it directly:
+Cloud sessions can't connect to PostgreSQL (their network only carries web traffic), so they use
+the web API `stock-api-bk` (docs/DATABASE.md, "The web API"); `Data.open()` switches to it on
+its own. Per cloud environment, once:
 
-1. **Environment variables** (cloud environment → *Edit* → *Environment variables*):
-
-   ```
-   STOCK_DB_TARGET=server-writer
-   STOCK_READER_DB_PASSWORD=<from .env on Babak's PC>
-   STOCK_WRITER_DB_PASSWORD=<from .env on Babak's PC>
-   ```
-
-   Anyone who can use the environment can read these values. Only the reader and writer
-   passwords go here, never the admin one.
-2. **Network access:** *Full* (or *Limited* with `stock-db-bk.postgres.database.azure.com` under
-   **Allowed domains**). The session's traffic goes through Anthropic's HTTP proxy; the code
-   tunnels PostgreSQL through it on its own (`db/tunnel.py`).
-3. **Setup script** (if `uv` is missing): `pip install uv && uv sync`.
-4. **Azure firewall** (once, from Babak's PC): allow Anthropic's published outbound ranges
-   (platform.claude.com/docs/en/api/ip-addresses); a session's exit address changes
-   (160.79.106.144, then .145):
-   `python -m stock_analysis.db allow-my-ip --target server --rule claude-cloud --ip 160.79.104.0/21`
-   and `… --rule claude-cloud-2 --ip 153.61.208.0/20`.
-5. **Test** in a new session: `uv run python -m stock_analysis.db ping --target server-reader`.
-   - `INFO route` should say "through the HTTP proxy".
-   - `FAIL TCP connect … refused the tunnel`: the proxy refuses the port (network setting).
-   - `FAIL PostgreSQL answer`: the tunnel opens but Azure drops the address; do step 4 with
-     the address shown.
-   - `PASS login`: done. `check --target server-reader` gives the full picture.
+1. **Environment variable** (*Edit* → *Environment variables*):
+   `STOCK_API_URL=https://stock-api-bk.azurewebsites.net`
+2. **Network secret** (*Edit* → *Network secrets* → *Add secret*): allowed website
+   `stock-api-bk.azurewebsites.net`, header `X-API-Key`, no prefix, value `STOCK_API_KEY` from
+   `.env` on Babak's PC (also in the gitignored `.env.cloud`). The proxy attaches it outside the
+   session, so the key is never visible there. No database passwords go into the environment.
+3. **Test** in a new session:
+   `uv run python -c "from stock_analysis.data import Data; print(Data.open().status())"`
+   prints the schema version and company count; a `401` means the secret is missing or on
+   another environment.
