@@ -1,4 +1,4 @@
-"""Command line: python -m stock_analysis.db {init,load-files,build,status,check}."""
+"""Command line: python -m stock_analysis.db {init,load-files,build,status,check} [--target]."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 
-from . import connect, db_path, table_counts, target_settings
+from . import Database
 from .build import build
 from .check import check
 from .load_files import load_all
@@ -21,17 +21,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "check":
         return check(args.target, args.strict)
-    path = db_path(target_settings(args.target)["url"])
-    con = connect(path)
+    db = Database.open(args.target)  # applies any new migrations
+    print(f"Database: {db.target} ({db.where})")
     if args.command == "load-files":
-        print("Rows added:", json.dumps(load_all(con, args.data), indent=2))
+        print("Rows added:", json.dumps(load_all(db, args.data), indent=2))
     elif args.command == "build":
-        print("Build:", json.dumps(build(con), indent=2))
+        print("Build:", json.dumps(build(db), indent=2))
     else:
-        print(f"Database: {path}")
-        for name, n in table_counts(con).items():
+        for name, n in db.table_counts().items():
             print(f"{name:28} {n:>10,}")
-    con.close()
+    db.close()
     return 0
 
 

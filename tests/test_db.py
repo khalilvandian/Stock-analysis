@@ -4,14 +4,17 @@ No network."""
 from __future__ import annotations
 
 import json
+import os
+import re
 import sqlite3
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import pytest
+from sqlalchemy import text
 
-from stock_analysis.db import connect, db_path, migration_sql, migrations, target_settings
+from stock_analysis.db import Database, db_path, migration_sql, migrations, target_settings
 from stock_analysis.db.build import adjusted_close, build, build_ttm
 from stock_analysis.db.check import Reader, run_checks
 from stock_analysis.db.load_files import load_all
@@ -121,16 +124,48 @@ def data_dir(tmp_path: Path) -> Path:
     return data
 
 
+def opendb(path: Path) -> Database:
+    db = Database(f"sqlite:///{Path(path).as_posix()}")
+    db.migrate()
+    return db
+
+
+class Rows:
+    def __init__(self, rows, keys):
+        self.rows, self._keys = rows, list(keys)
+
+    def fetchone(self):
+        return self.rows[0] if self.rows else None
+
+    def fetchall(self):
+        return self.rows
+
+    def keys(self):
+        return self._keys
+
+    def __iter__(self):
+        return iter(self.rows)
+
+
+def q(db: Database, sql: str, *params) -> Rows:
+    """Run a query with ? placeholders and return its rows (closed connection)."""
+    names = iter(range(len(params)))
+    sql = re.sub(r"\?", lambda _: f":p{next(names)}", sql)
+    with db.connect() as conn:
+        res = conn.execute(text(sql), {f"p{i}": v for i, v in enumerate(params)})
+        return Rows([tuple(r) for r in res.fetchall()], res.keys())
+
+
 @pytest.fixture()
 def con(tmp_path: Path, data_dir: Path):
-    c = connect(tmp_path / "test.db")
-    load_all(c, data_dir)
-    yield c
-    c.close()
+    db = opendb(tmp_path / "test.db")
+    load_all(db, data_dir)
+    yield db
+    db.close()
 
 
 def one(con, sql: str, *params):
-    return con.execute(sql, params).fetchone()[0]
+    return q(con, sql, *params).fetchone()[0]
 
 
 def test_migrations_portable_and_recorded(con) -> None:
@@ -150,9 +185,9 @@ def test_existing_database_is_upgraded(tmp_path: Path) -> None:
     old.execute("INSERT INTO schema_version VALUES (?, '2026-11-16')", (first[0],))
     old.commit()
     old.close()
-    c = connect(tmp_path / "v1.db")
+    c = opendb(tmp_path / "v1.db")
     assert one(c, "SELECT MAX(version) FROM schema_version") == migrations()[-1][0]
-    columns = {r[1] for r in c.execute("PRAGMA table_info(core_price_daily)")}
+    columns = {r[1] for r in q(c, "PRAGMA table_info(core_price_daily)")}
     assert {"open", "high", "low"} <= columns
     c.close()
 
@@ -162,11 +197,11 @@ def test_old_file_is_refused(tmp_path: Path) -> None:
     old.execute("CREATE TABLE raw_fetch (fetch_id INTEGER)")
     old.close()
     with pytest.raises(RuntimeError, match="predates the migrations"):
-        connect(tmp_path / "old.db")
+        opendb(tmp_path / "old.db")
 
 
 def test_load_files_and_rerun(tmp_path: Path, data_dir: Path) -> None:
-    c = connect(tmp_path / "load.db")
+    c = opendb(tmp_path / "load.db")
     added = load_all(c, data_dir)
     assert added["raw_yahoo_price"] == len(prices_frame())
     assert added["raw_yahoo_statement"] == 4 * 5 + 4 * 7
@@ -191,15 +226,16 @@ def test_companies_membership_and_prices(con) -> None:
     build(con)
     assert one(con, "SELECT COUNT(*) FROM core_company WHERE symbol = 'ZZZ'") == 0
     spells = dict(
-        con.execute(
+        q(
+            con,
             "SELECT c.symbol, m.end_date FROM core_index_member m "
-            "JOIN core_company c ON c.company_id = m.company_id"
+            "JOIN core_company c ON c.company_id = m.company_id",
         ).fetchall()
     )
     assert spells == {"AAA": None, "BBB": None, "CCC": "2026-11-12"}
     assert one(con, "SELECT MIN(date) FROM core_price_daily") >= "2016-01-01"
     ohlc = "SELECT open, high, low, close FROM core_price_daily LIMIT 1"
-    assert tuple(con.execute(ohlc).fetchone()) == (10.0, 11.0, 9.0, 10.0)
+    assert tuple(q(con, ohlc).fetchone()) == (10.0, 11.0, 9.0, 10.0)
     before = one(con, "SELECT adj_close FROM core_price_daily WHERE date = '2026-02-27'")
     after = one(con, "SELECT adj_close FROM core_price_daily WHERE date = '2026-03-02'")
     assert before == pytest.approx(10.0 * (1 - 0.5 / 10.0))
@@ -229,15 +265,17 @@ def test_fundamentals(con) -> None:
     assert value("revenue", "Q", "2025-03-31") == 100.0
     assert value("total_debt", "I", "2025-03-31") == 50.0  # 5 + 45, not Yahoo's 60
     assert value("ebitda", "Q", "2025-03-31") == 25.0  # 20 + 5, not Yahoo's 99
-    row = con.execute(
+    row = q(
+        con,
         "SELECT filed, filed_estimated, fiscal_period, raw_table, raw_id FROM core_fundamental "
-        "WHERE item = 'revenue' AND period_type = 'FY' AND period_end = '2025-12-31'"
+        "WHERE item = 'revenue' AND period_type = 'FY' AND period_end = '2025-12-31'",
     ).fetchone()
     assert tuple(row)[:4] == ("2026-03-31", 1, "FY", "raw_project_history")
     assert row[4] is not None
-    q1 = con.execute(
+    q1 = q(
+        con,
         "SELECT filed, fiscal_year, fiscal_period FROM core_fundamental "
-        "WHERE item = 'revenue' AND period_end = '2025-03-31'"
+        "WHERE item = 'revenue' AND period_end = '2025-03-31'",
     ).fetchone()
     assert tuple(q1) == ("2025-05-15", 2025, "Q1")
     split = "SELECT split_factor FROM core_fundamental WHERE item = ? AND period_end = ?"
@@ -246,15 +284,15 @@ def test_fundamentals(con) -> None:
 
 def test_annual_and_daily_views(con) -> None:
     build(con)
-    year = con.execute("SELECT * FROM v_annual WHERE symbol = 'AAA' AND fiscal_year = 2025")
-    year = dict(zip([d[0] for d in year.description], year.fetchone(), strict=True))
+    year = q(con, "SELECT * FROM v_annual WHERE symbol = 'AAA' AND fiscal_year = 2025")
+    year = dict(zip(year.keys(), year.fetchone(), strict=True))
     assert year["revenue"] == pytest.approx(0.5e9)
     assert year["total_debt"] == 50.0
     assert year["shares_outstanding"] == 20.0
 
     def day(date: str) -> dict:
-        cur = con.execute("SELECT * FROM v_daily WHERE symbol = 'AAA' AND date = ?", (date,))
-        return dict(zip([d[0] for d in cur.description], cur.fetchone(), strict=True))
+        cur = q(con, "SELECT * FROM v_daily WHERE symbol = 'AAA' AND date = ?", date)
+        return dict(zip(cur.keys(), cur.fetchone(), strict=True))
 
     assert day("2025-03-28")["revenue_ttm"] is None  # nothing filed yet
     assert day("2025-03-31")["revenue_ttm"] == pytest.approx(0.4e9)  # FY2024
@@ -265,7 +303,7 @@ def test_annual_and_daily_views(con) -> None:
     assert (d["total_debt"], d["shares_outstanding"], d["market_cap"]) == (50.0, 20.0, 200.0)
 
 
-def test_ttm_keeps_every_version() -> None:
+def test_ttm_keeps_every_version(tmp_path: Path) -> None:
     """A restated quarter gives a second trailing value from its filing date."""
     rows = [
         ("2025-03-31", "2025-05-01", 10.0),
@@ -278,12 +316,17 @@ def test_ttm_keeps_every_version() -> None:
         company_id=1, item="revenue", period_type="Q", filed_estimated=False, source="sec"
     )
     f["value_adj"] = f["value"]
-    con = sqlite3.connect(":memory:")
-    con.execute(
-        "CREATE TABLE core_fundamental_ttm (company_id, item, period_end, filed, "
-        "filed_estimated, basis, value, value_adj, source)"
-    )
-    ttm = build_ttm(con, f).sort_values("filed")
+    db = opendb(tmp_path / "ttm.db")
+    with db.begin() as conn:
+        conn.execute(text("INSERT INTO core_company (company_id, symbol) VALUES (1, 'AAA')"))
+        conn.execute(
+            text(
+                "INSERT INTO core_item (item, label, kind, unit) "
+                "VALUES ('revenue', 'R', 'flow', 'USD')"
+            )
+        )
+        ttm = build_ttm(conn, f).sort_values("filed")
+    db.close()
     assert ttm[["filed", "value"]].values.tolist() == [["2026-02-01", 40.0], ["2026-03-01", 50.0]]
 
 
@@ -291,24 +334,27 @@ def test_quality_issues_and_rebuild(con) -> None:
     first = build(con)
     checks = {
         r[0]
-        for r in con.execute(
-            "SELECT check_name FROM core_quality_issue WHERE build_id = ?", (first["build_id"],)
+        for r in q(
+            con,
+            "SELECT check_name FROM core_quality_issue WHERE build_id = ?",
+            first["build_id"],
         )
     }
     assert "balance_sheet_identity" in checks  # 200 vs 150 + 80 at 2025-12-31
-    ids = dict(con.execute("SELECT symbol, company_id FROM core_company").fetchall())
+    ids = dict(q(con, "SELECT symbol, company_id FROM core_company").fetchall())
     second = build(con)
     assert second["core_fundamental"] == first["core_fundamental"]
-    assert dict(con.execute("SELECT symbol, company_id FROM core_company").fetchall()) == ids
+    assert dict(q(con, "SELECT symbol, company_id FROM core_company").fetchall()) == ids
 
 
 def test_out_tables(con) -> None:
-    top = con.execute(
+    top = q(
+        con,
         "SELECT symbol, rank_in_sector, cheap_price FROM out_screener_result WHERE stage = 2 "
-        "ORDER BY rank_in_sector"
+        "ORDER BY rank_in_sector",
     ).fetchall()
     assert [tuple(r) for r in top] == [("AAA", 1, 12.0), ("BBB", 2, 8.0)]
-    v = con.execute("SELECT as_of, method, fair_value FROM out_valuation").fetchone()
+    v = q(con, "SELECT as_of, method, fair_value FROM out_valuation").fetchone()
     assert tuple(v) == ("2026-09-28", "fcff", 14.0)
 
 
@@ -334,7 +380,7 @@ def test_targets(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_check_passes_on_a_built_database(tmp_path: Path, data_dir: Path) -> None:
-    c = connect(tmp_path / "check.db")
+    c = opendb(tmp_path / "check.db")
     load_all(c, data_dir)
     build(c)
     c.close()
@@ -350,7 +396,7 @@ def test_check_passes_on_a_built_database(tmp_path: Path, data_dir: Path) -> Non
 
 
 def test_check_fails_on_an_empty_database(tmp_path: Path) -> None:
-    connect(tmp_path / "empty.db").close()
+    opendb(tmp_path / "empty.db").close()
     db = Reader(f"sqlite:///{(tmp_path / 'empty.db').as_posix()}")
     results = {r.name: r for r in run_checks(db, {"sample_symbols": ["AAA"]})}
     db.close()
@@ -389,3 +435,32 @@ def test_derived_value_never_overrides_a_better_source() -> None:
     f.loc[0, "rank"] = 3  # same rank: the derived value wins
     out = derive(f, items)
     assert out.loc[out["item"] == "ebitda", "value"].tolist() == [12.0]
+
+
+@pytest.mark.skipif(
+    not os.environ.get("STOCK_TEST_PG_URL"),
+    reason="set STOCK_TEST_PG_URL to a throwaway PostgreSQL database to run this",
+)
+def test_whole_flow_on_postgresql(data_dir: Path) -> None:
+    """The same import, build and check on PostgreSQL (e.g. the stock_test database in the
+    local Docker container). The test empties that database first."""
+    url = os.environ["STOCK_TEST_PG_URL"]
+    db = Database(url, os.environ.get("STOCK_DB_PASSWORD"))
+    with db.begin() as conn:
+        conn.exec_driver_sql("DROP SCHEMA public CASCADE")
+        conn.exec_driver_sql("CREATE SCHEMA public")
+    db.migrate()
+    load_all(db, data_dir)
+    summary = build(db)
+    assert summary["core_price_daily"] > 0 and summary["sp500_members_now"] == 2
+    assert set(load_all(db, data_dir).values()) == {0}
+    assert (
+        one(db, "SELECT total_debt FROM v_annual WHERE symbol = 'AAA' AND fiscal_year = 2025")
+        == 50.0
+    )
+    db.close()
+    reader = Reader(url, "STOCK_DB_PASSWORD")
+    settings = {"sample_symbols": ["AAA"], "min_coverage": 0.3}
+    results = run_checks(reader, settings, today=date(2026, 11, 14))
+    reader.close()
+    assert not [r for r in results if r.status == "FAIL"], results

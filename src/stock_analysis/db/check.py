@@ -18,12 +18,14 @@ from __future__ import annotations
 
 import os
 import re
-import sqlite3
 import time
 from dataclasses import dataclass
 from datetime import date
 
-from . import db_path, dialect, load_config, migrations, target_settings
+from dotenv import load_dotenv
+from sqlalchemy import text
+
+from . import ROOT, Database, load_config, migrations, target_settings
 
 REQUIRED_ROWS = [
     "raw_fetch",
@@ -45,49 +47,27 @@ class Result:
 
 
 class Reader:
-    """A read-only connection to SQLite or PostgreSQL with the few calls the checks need."""
+    """A read-only connection (SQLite or PostgreSQL) with the few calls the checks need."""
 
     def __init__(self, url: str, password_env: str | None = None):
-        self.dialect = dialect(url)
-        if self.dialect == "sqlite":
-            path = db_path(url)
-            if not path.exists():
-                raise FileNotFoundError(f"{path} does not exist (run init, load-files, build)")
-            self.where = str(path)
-            self.con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
-        else:
-            try:
-                import psycopg
-            except ImportError as exc:
-                raise RuntimeError(
-                    "PostgreSQL needs the optional driver: uv sync --extra server"
-                ) from exc
-            password = os.environ.get(password_env) if password_env else None
-            self.where = re.sub(r"//([^:@/]+):[^@/]*@", r"//\1:***@", url)  # hide a password
-            self.con = psycopg.connect(url, password=password, connect_timeout=10)
-            self.con.read_only = True
+        password = os.environ.get(password_env) if password_env else None
+        self.db = Database(url, password, read_only=True)
+        self.dialect, self.where = self.db.dialect, self.db.where
+        self.conn = self.db.connect()
 
     def rows(self, sql: str) -> list[tuple]:
-        cur = self.con.cursor()
-        cur.execute(sql)
-        return cur.fetchall()
+        return [tuple(r) for r in self.conn.execute(text(sql))]
 
     def one(self, sql: str):
         found = self.rows(sql)
         return found[0][0] if found else None
 
     def objects(self) -> set[str]:
-        if self.dialect == "sqlite":
-            sql = "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
-        else:
-            sql = (
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = current_schema()"
-            )
-        return {r[0] for r in self.rows(sql)}
+        return self.db.objects()
 
     def close(self) -> None:
-        self.con.close()
+        self.conn.close()
+        self.db.close()
 
 
 def quote(value: str) -> str:
@@ -243,6 +223,7 @@ def check_symbol(db: Reader, symbol: str) -> list[Result]:
 
 
 def check(target: str | None = None, strict: bool = False) -> int:
+    load_dotenv(ROOT / ".env")
     config = load_config()
     try:
         settings = target_settings(target, config)

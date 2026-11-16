@@ -9,16 +9,16 @@ core_build row with that build's core_quality_issue rows.
 from __future__ import annotations
 
 import json
-import sqlite3
 import subprocess
 import tomllib
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sqlalchemy.engine import Connection
 
-from . import ROOT
-from .load_files import UNIVERSE, now, rows
+from . import ROOT, Database, frame, insert_df, records, run, scalar
+from .load_files import UNIVERSE, now
 
 ITEMS_CONFIG = ROOT / "config" / "db_items.toml"
 FIRST_DATE = "2016-01-01"
@@ -34,14 +34,6 @@ def plain(x):
     if x is None or (not isinstance(x, str) and pd.isna(x)):
         return None
     return x.item() if hasattr(x, "item") else x
-
-
-def insert(con: sqlite3.Connection, table: str, df: pd.DataFrame) -> None:
-    cols = list(df.columns)
-    con.executemany(
-        f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
-        rows(df),
-    )
 
 
 # ---------------------------------------------------------------- items
@@ -66,40 +58,44 @@ def load_items(path: Path = ITEMS_CONFIG) -> tuple[pd.DataFrame, pd.DataFrame]:
 # ---------------------------------------------------------------- companies and membership
 
 
-def build_companies(con: sqlite3.Connection) -> dict[str, int]:
-    tv = pd.read_sql(
+def build_companies(conn: Connection) -> dict[str, int]:
+    tv = frame(
+        conn,
         "SELECT c.*, f.fetched_at FROM raw_tv_constituent c JOIN raw_fetch f "
-        "ON f.fetch_id = c.fetch_id WHERE f.source = 'tradingview' AND f.request_key = ?",
-        con,
-        params=[UNIVERSE],
+        "ON f.fetch_id = c.fetch_id WHERE f.source = 'tradingview' AND f.request_key = :u",
+        {"u": UNIVERSE},
     )
     if not tv.empty:
-        last = tv.sort_values("fetch_id").drop_duplicates("symbol", keep="last")
+        last = tv.sort_values("fetch_id", kind="stable").drop_duplicates("symbol", keep="last")
+        last = last.sort_values("symbol")  # new companies get ids in symbol order
         cols = ["symbol", "name", "exchange", "sector", "industry", "currency"]
-        con.executemany(
+        run(
+            conn,
             "INSERT INTO core_company (symbol, name, exchange, sector, industry, currency) "
-            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (symbol) DO UPDATE SET "
-            "name = excluded.name, exchange = excluded.exchange, sector = excluded.sector, "
+            "VALUES (:symbol, :name, :exchange, :sector, :industry, :currency) "
+            "ON CONFLICT (symbol) DO UPDATE SET name = excluded.name, "
+            "exchange = excluded.exchange, sector = excluded.sector, "
             "industry = excluded.industry, currency = excluded.currency",
-            rows(last[cols]),
+            records(last[cols]),
         )
-    sec = pd.read_sql(
+    sec = frame(
+        conn,
         "SELECT ticker, cik FROM raw_sec_ticker "
         "WHERE fetch_id = (SELECT MAX(fetch_id) FROM raw_sec_ticker)",
-        con,
     )
     if not sec.empty:  # SEC writes BRK-B, TradingView BRK.B
         sec["symbol"] = sec["ticker"].str.replace("-", ".", regex=False)
-        con.executemany(
-            "UPDATE core_company SET cik = ? WHERE symbol = ?",
-            rows(sec.drop_duplicates("cik")[["cik", "symbol"]]),
+        run(
+            conn,
+            "UPDATE core_company SET cik = :cik WHERE symbol = :symbol",
+            records(sec.drop_duplicates("cik")[["cik", "symbol"]]),
         )
-    companies = dict(con.execute("SELECT symbol, company_id FROM core_company").fetchall())
-    build_membership(con, tv, companies)
+    companies = {r[0]: r[1] for r in run(conn, "SELECT symbol, company_id FROM core_company")}
+    build_membership(conn, tv, companies)
     return companies
 
 
-def build_membership(con: sqlite3.Connection, tv: pd.DataFrame, companies: dict) -> None:
+def build_membership(conn: Connection, tv: pd.DataFrame, companies: dict) -> None:
     """Spells of consecutive snapshots each company was in."""
     if tv.empty:
         return
@@ -118,11 +114,8 @@ def build_membership(con: sqlite3.Connection, tv: pd.DataFrame, companies: dict)
                 start = None
         if start:
             spells.append((companies[symbol], UNIVERSE, start, None if prev == days[-1] else prev))
-    con.executemany(
-        "INSERT INTO core_index_member (company_id, index_code, start_date, end_date) "
-        "VALUES (?, ?, ?, ?)",
-        spells,
-    )
+    cols = ["company_id", "index_code", "start_date", "end_date"]
+    insert_df(conn, "core_index_member", pd.DataFrame(spells, columns=cols))
 
 
 # ---------------------------------------------------------------- prices
@@ -136,8 +129,8 @@ def adjusted_close(close: pd.Series, dividends: pd.Series) -> pd.Series:
     return close * factor
 
 
-def build_prices(con: sqlite3.Connection, companies: dict[str, int]) -> pd.DataFrame:
-    raw = pd.read_sql("SELECT * FROM raw_yahoo_price ORDER BY fetch_id", con)
+def build_prices(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
+    raw = frame(conn, "SELECT * FROM raw_yahoo_price ORDER BY fetch_id")
     raw = raw[raw["symbol"].isin(companies)].drop_duplicates(["symbol", "date"], keep="last")
     frames = []
     for symbol, g in raw.sort_values("date").groupby("symbol"):
@@ -151,15 +144,15 @@ def build_prices(con: sqlite3.Connection, companies: dict[str, int]) -> pd.DataF
     out = p[[*cols, "dividends", "split_ratio"]]
     out = out.rename(columns={"dividends": "dividend"}).copy()
     out["volume"] = out["volume"].astype("Int64")
-    insert(con, "core_price_daily", out)
+    insert_df(conn, "core_price_daily", out)
     return out
 
 
-def all_splits(con: sqlite3.Connection, companies: dict[str, int]) -> pd.DataFrame:
-    s = pd.read_sql(
+def all_splits(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
+    s = frame(
+        conn,
         "SELECT DISTINCT symbol, date, stock_splits AS ratio FROM raw_yahoo_price "
         "WHERE stock_splits > 0",
-        con,
     )
     s = s[s["symbol"].isin(companies)].drop_duplicates(["symbol", "date"])
     return s.assign(company_id=s["symbol"].map(companies))[["company_id", "date", "ratio"]]
@@ -169,12 +162,12 @@ def all_splits(con: sqlite3.Connection, companies: dict[str, int]) -> pd.DataFra
 
 
 def candidates(
-    con: sqlite3.Connection, companies: dict[str, int], items: pd.DataFrame, tags: pd.DataFrame
+    conn: Connection, companies: dict[str, int], items: pd.DataFrame, tags: pd.DataFrame
 ) -> pd.DataFrame:
     """Every source value that maps to an item, with its period and (estimated) filing date."""
     kind = items.set_index("item")["kind"]
     frames = []
-    yahoo = pd.read_sql("SELECT * FROM raw_yahoo_statement", con)
+    yahoo = frame(conn, "SELECT * FROM raw_yahoo_statement")
     yahoo = yahoo[yahoo["symbol"].isin(companies)].merge(
         tags[tags["taxonomy"] == "yahoo"], left_on="line_item", right_on="tag"
     )
@@ -182,7 +175,7 @@ def candidates(
         flow_type = np.where(yahoo["frequency"] == "annual", "FY", "Q")
         yahoo["period_type"] = np.where(yahoo["item"].map(kind) == "instant", "I", flow_type)
         frames.append(yahoo.assign(source="yahoo", raw_table="raw_yahoo_statement"))
-    hist = pd.read_sql("SELECT * FROM raw_project_history", con)
+    hist = frame(conn, "SELECT * FROM raw_project_history")
     hist = hist[hist["symbol"].isin(companies)].merge(
         tags[tags["taxonomy"] == "history"], left_on="item", right_on="tag", suffixes=("_raw", "")
     )
@@ -291,8 +284,8 @@ def add_split_factor(f: pd.DataFrame, splits: pd.DataFrame) -> pd.DataFrame:
     return f
 
 
-def build_fundamentals(con, companies, items, tags, splits) -> tuple[pd.DataFrame, pd.DataFrame]:
-    c = candidates(con, companies, items, tags)
+def build_fundamentals(conn, companies, items, tags, splits) -> tuple[pd.DataFrame, pd.DataFrame]:
+    c = candidates(conn, companies, items, tags)
     if c.empty:
         return c, c
     f = choose(c)
@@ -304,11 +297,11 @@ def build_fundamentals(con, companies, items, tags, splits) -> tuple[pd.DataFram
     for col in ("fiscal_year", "raw_id"):
         out[col] = out[col].astype("Int64")
     out["filed_estimated"] = out["filed_estimated"].astype(bool)
-    insert(con, "core_fundamental", out)
+    insert_df(conn, "core_fundamental", out)
     return f, c
 
 
-def build_ttm(con: sqlite3.Connection, f: pd.DataFrame) -> pd.DataFrame:
+def build_ttm(conn: Connection, f: pd.DataFrame) -> pd.DataFrame:
     """Trailing twelve months for every version: as known on each filing date."""
     if f.empty:
         return f
@@ -354,7 +347,7 @@ def build_ttm(con: sqlite3.Connection, f: pd.DataFrame) -> pd.DataFrame:
     ttm = ttm.drop_duplicates(["company_id", "item", "period_end", "filed"])
     ttm["filed_estimated"] = ttm["filed_estimated"].astype(bool)
     cols = ["company_id", "item", "period_end", "filed", "filed_estimated", "basis", "value"]
-    insert(con, "core_fundamental_ttm", ttm[cols + ["value_adj", "source"]])
+    insert_df(conn, "core_fundamental_ttm", ttm[cols + ["value_adj", "source"]])
     return ttm
 
 
@@ -455,17 +448,17 @@ def git_sha() -> str | None:
         return None
 
 
-def build(con: sqlite3.Connection, items_config: Path = ITEMS_CONFIG) -> dict:
-    """Rebuild core from raw. Returns the summary stored in core_build."""
+def build(db: Database, items_config: Path = ITEMS_CONFIG) -> dict:
+    """Rebuild core from raw in one transaction. Returns the summary stored in core_build."""
     started = now()
     try:
-        with con:
-            max_fetch = con.execute("SELECT MAX(fetch_id) FROM raw_fetch").fetchone()[0]
-            build_id = con.execute(
-                "INSERT INTO core_build (started_at, git_sha, max_fetch_id, status) "
-                "VALUES (?, ?, ?, 'running')",
-                (started, git_sha(), max_fetch),
-            ).lastrowid
+        with db.begin() as conn:
+            build_id = scalar(
+                conn,
+                "INSERT INTO core_build (started_at, git_sha, max_fetch_id, status) VALUES "
+                "(:t, :sha, (SELECT MAX(fetch_id) FROM raw_fetch), 'running') RETURNING build_id",
+                {"t": started, "sha": git_sha()},
+            )
             for table in (
                 "core_fundamental_ttm",
                 "core_fundamental",
@@ -474,28 +467,22 @@ def build(con: sqlite3.Connection, items_config: Path = ITEMS_CONFIG) -> dict:
                 "core_item_tag",
                 "core_item",
             ):
-                con.execute(f"DELETE FROM {table}")
+                run(conn, f"DELETE FROM {table}")
             items, tags = load_items(items_config)
-            insert(con, "core_item", items)
-            insert(con, "core_item_tag", tags)
-            companies = build_companies(con)
-            prices = build_prices(con, companies)
-            f, c = build_fundamentals(con, companies, items, tags, all_splits(con, companies))
-            ttm = build_ttm(con, f)
+            insert_df(conn, "core_item", items)
+            insert_df(conn, "core_item_tag", tags)
+            companies = build_companies(conn)
+            prices = build_prices(conn, companies)
+            f, c = build_fundamentals(conn, companies, items, tags, all_splits(conn, companies))
+            ttm = build_ttm(conn, f)
             issues = quality_checks(prices, f, c)
-            con.executemany(
-                "INSERT INTO core_quality_issue (build_id, company_id, item, at_date, check_name, "
-                "severity, detail) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [(build_id, *(plain(x) for x in i)) for i in issues],
-            )
-
-            def count(sql: str) -> int:
-                return con.execute(sql).fetchone()[0]
-
+            cols = ["company_id", "item", "at_date", "check_name", "severity", "detail"]
+            found = pd.DataFrame([[plain(x) for x in i] for i in issues], columns=cols)
+            insert_df(conn, "core_quality_issue", found.assign(build_id=build_id))
             summary = {
                 "companies": len(companies),
-                "sp500_members_now": count(
-                    "SELECT COUNT(*) FROM core_index_member WHERE end_date IS NULL"
+                "sp500_members_now": scalar(
+                    conn, "SELECT COUNT(*) FROM core_index_member WHERE end_date IS NULL"
                 ),
                 "companies_with_prices": int(prices["company_id"].nunique()),
                 "core_price_daily": len(prices),
@@ -504,17 +491,24 @@ def build(con: sqlite3.Connection, items_config: Path = ITEMS_CONFIG) -> dict:
                 "core_fundamental_ttm": len(ttm),
                 "quality_issues": len(issues),
             }
-            con.execute(
-                "UPDATE core_build SET finished_at = ?, status = 'ok', summary = ? "
-                "WHERE build_id = ?",
-                (now(), json.dumps(summary), build_id),
+            run(
+                conn,
+                "UPDATE core_build SET finished_at = :t, status = 'ok', summary = :s "
+                "WHERE build_id = :id",
+                {"t": now(), "s": json.dumps(summary), "id": build_id},
             )
         return {"build_id": build_id, **summary}
     except Exception as exc:
-        with con:
-            con.execute(
+        with db.begin() as conn:
+            run(
+                conn,
                 "INSERT INTO core_build (started_at, finished_at, git_sha, status, summary) "
-                "VALUES (?, ?, ?, 'failed', ?)",
-                (started, now(), git_sha(), json.dumps({"error": repr(exc)})),
+                "VALUES (:s, :f, :sha, 'failed', :summary)",
+                {
+                    "s": started,
+                    "f": now(),
+                    "sha": git_sha(),
+                    "summary": json.dumps({"error": repr(exc)}),
+                },
             )
         raise

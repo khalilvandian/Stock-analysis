@@ -1,0 +1,30 @@
+# Local PostgreSQL for the project database (docs/DATABASE.md, "Local PostgreSQL").
+# The target `local-pg` in config/database.toml connects to it.
+#
+#   docker compose up -d          start (the password comes from STOCK_DB_PASSWORD in .env)
+#   docker compose down           stop; the data stays in the stock-db volume
+#   docker compose down -v        stop and delete the data
+#
+# The tables are created by our migrations (python -m stock_analysis.db init --target
+# local-pg), not by the container. Only this machine can connect (127.0.0.1).
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: stock
+      POSTGRES_USER: stock
+      POSTGRES_PASSWORD: ${STOCK_DB_PASSWORD:?set STOCK_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - stock-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stock -d stock"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  stock-db:
