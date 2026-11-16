@@ -219,3 +219,26 @@ their date.
 - **Consequence:** the database tests need PostgreSQL. They use the `stock_test` database in
   the local container and are skipped where none is running (for example the cloud
   sessions), while the rest of the suite still runs.
+
+### The server is Azure Database for PostgreSQL (Azure for Students), not Oracle Cloud
+
+- **Who:** Babak.
+- **Decision:** The project's PostgreSQL server is **Azure Database for PostgreSQL – Flexible
+  Server** `stock-db-bk` (Italy North, Burstable B1ms, 32 GiB, PostgreSQL 16) on the **Azure
+  for Students** subscription, opened with the university account.
+- **Why:**
+  - Oracle Cloud's free ARM machine (A1) in Milan, the home region and the only one free
+    resources can use, was "out of capacity" for every size tried.
+  - Upgrading to Pay As You Go needed a temporary hold of about €93 on the card, which
+    Babak declined for a project this size.
+  - Azure for Students needs no card, and its free services cover a B1ms PostgreSQL server
+    with 32 GB for 12 months.
+  - The server is managed, so Azure handles updates and backups. That's less work than
+    running PostgreSQL ourselves.
+- **Weekly cadence:** the data is gathered and cleaned **weekly** (Saturday), not daily. The
+  worker that does this (a small VM or GitHub Actions) is still to be set up.
+- **Access:** firewall rules for listed IPs only; `allow-my-ip` updates the home rule when the
+  IP changes. Later, only the worker's address.
+- **Later:** after 12 months the free services end and the server would use the student
+  credit (about $19 a month at list price). Decide then whether to keep, shrink or move it;
+  a `pg_dump` moves it anywhere.

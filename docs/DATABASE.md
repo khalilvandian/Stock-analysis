@@ -1,8 +1,9 @@
 # Database
 
 Status: **schema version 3** (migrations `001` to `003`), 2026-11-16. **PostgreSQL 16**,
-locally in Docker (`compose.yaml`) and later on the Oracle Cloud server. SQLite was dropped
-on 2026-11-16 (see `docs/DECISIONS.md`). It holds the data already in `data/` and the watch
+locally in Docker (`compose.yaml`) and on the server: **Azure Database for PostgreSQL**
+(`stock-db-bk`, Italy North, Azure for Students). SQLite was dropped on 2026-11-16 (see
+`docs/DECISIONS.md`). It holds the data already in `data/` and the watch
 list. No API has been called to fill it, and no analysis reads it yet. The roadmap is
 [issue #16](https://github.com/khalilvandian/Stock-analysis/issues/16).
 
@@ -43,7 +44,7 @@ SELECT * FROM v_watchlist ORDER BY position;                              -- wat
   | Target | What it is | Password |
   |---|---|---|
   | `local` | PostgreSQL 16 in Docker on this machine (`compose.yaml`), at `127.0.0.1:5432`, database `stock` | `STOCK_DB_PASSWORD` |
-  | `server` | PostgreSQL on the Oracle Cloud server. The URL is empty until it exists | `STOCK_DB_PASSWORD` |
+  | `server` | Azure Database for PostgreSQL, `stock-db-bk.postgres.database.azure.com`, database `stock`, user `stock_admin`, TLS required (see "The server") | `STOCK_SERVER_DB_PASSWORD` |
 
   Passwords are never in the config. A target reads its password from the environment
   variable named in `password_env`, and `.env` (gitignored) is read automatically.
@@ -68,6 +69,42 @@ SELECT * FROM v_watchlist ORDER BY position;                              -- wat
   the suite still runs. To create the test database once:
   `docker compose exec db psql -U stock -c "CREATE DATABASE stock_test"`.
 
+## The server (Azure)
+
+| | |
+|---|---|
+| Service | Azure Database for PostgreSQL – Flexible Server, PostgreSQL 16 |
+| Name, region | `stock-db-bk`, Italy North (Milan), resource group `stock-rg` |
+| Subscription | **Azure for Students** (university account): no credit card, about $90–100 of credit a year while a student |
+| Size | Burstable **Standard_B1ms** (1 vCore, 2 GiB), **32 GiB** Premium SSD, P4, storage autogrow **off** |
+| Cost | **€0** within the free services for 12 months (750 hours of B1ms and 32 GB of storage and backups a month). The portal's estimate shows the list price ($18.91 a month) with both lines marked free. After 12 months it would use the student credit, which needs a decision then |
+| Backups | Azure's automatic backups, 7 days, locally redundant (no geo-redundancy) |
+| High availability | Off |
+| Login | PostgreSQL authentication, admin `stock_admin`. The password lives only in the password manager and in `.env` as `STOCK_SERVER_DB_PASSWORD`, never in the repository |
+| Network | Public access limited by **firewall rules**: only listed IP addresses can connect. *Allow Azure services* is off. TLS is enforced |
+
+**Your IP changes** (home connections get a new public IP now and then). Then `check
+--target server` times out and prints the fix:
+
+```bash
+uv run python -m stock_analysis.db allow-my-ip     # sets the firewall rule `home` to your current IP
+```
+
+It uses the **Azure CLI** (`winget install Microsoft.AzureCLI`, then `az login` once with the
+university account; in this setup `az login --use-device-code` worked best) and reads
+`azure_server` and `azure_resource_group` from the `server` target in `config/database.toml`.
+Each place you work from (home, university) needs its own rule, or a rerun of the command.
+Some networks block outgoing port 5432.
+
+**Filling it:** the same commands as locally, with `--target server`. On 2026-11-16 it was
+filled from `data/` (import 15 s, build 6 s from Milan), `check` gave 28 pass, 6 warn, 0 fail,
+and every row of `v_annual`, `v_daily`, `core_fundamental`, `core_fundamental_ttm`,
+`core_company`, `out_screener_result`, `v_watchlist`, `out_watchlist_run`,
+`user_watchlist_peer` and `out_valuation` was identical to the local database.
+
+**Still to come:** the weekly worker (a small VM or GitHub Actions) and, with it, connecting
+through that machine only, so no home IP needs to be in the firewall.
+
 ### Checking a database
 
 `check` connects read-only to a target and prints PASS, WARN or FAIL for each check. It
@@ -75,7 +112,7 @@ exits 1 on any FAIL, and with `--strict` on any WARN too.
 
 | Check | FAIL when | WARN when |
 |---|---|---|
-| connection | the target has no URL, or the server can't be reached | none |
+| connection | the target has no URL, or the server can't be reached (on a timeout to Azure it prints the `allow-my-ip` command) | none |
 | tables and views | any table or view in the migrations is missing | none |
 | schema version | the database is behind the code | the database is ahead of the code |
 | last build | there is no build, or it failed | none |
@@ -89,7 +126,7 @@ exits 1 on any FAIL, and with `--strict` on any WARN too.
 
 The settings are under `[check]` in `config/database.toml`.
 
-Today, on `local`: 28 pass, 6 warn, 0 fail. The warnings are:
+Today, on `local` and `server`: 28 pass, 6 warn, 0 fail. The warnings are:
 - prices 52 days old
 - 6 and 30 of 497 members with prices and with fundamentals
 - no SEC data yet

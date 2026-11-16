@@ -254,6 +254,12 @@ def check(target: str | None = None, strict: bool = False) -> int:
         db = Reader(settings["url"], settings.get("password_env"))
     except Exception as exc:  # any driver error means the connection failed
         print(f"FAIL  connection  {settings['name']}: {exc}")
+        text_ = str(exc).lower()
+        if settings.get("azure_server") and ("timeout" in text_ or "no pg_hba" in text_):
+            print(
+                "      Your IP may have changed: "
+                f"uv run python -m stock_analysis.db allow-my-ip --target {settings['name']}"
+            )
         return 1
     ms = (time.perf_counter() - started) * 1000
     results = [Result("PASS", "connection", f"{settings['name']}: {db.where} ({ms:.0f} ms)")]

@@ -515,3 +515,24 @@ def test_watchlist(con, tmp_path: Path, data_dir: Path) -> None:
     assert load_all(con, data_dir)["user_watchlist"] == 5
     assert one(con, "SELECT target_pe FROM user_watchlist WHERE symbol = 'BBB'") == 25.0
     assert load_all(con, data_dir)["user_watchlist"] == 0
+
+
+def test_allow_my_ip_builds_the_azure_command(monkeypatch) -> None:
+    from stock_analysis.db import azure
+
+    calls = []
+
+    class Done:
+        returncode, stdout, stderr = 0, '{"name": "home"}', ""
+
+    monkeypatch.setattr(azure, "public_ip", lambda: "203.0.113.7")
+    monkeypatch.setattr(azure, "az_command", lambda: "az")
+    monkeypatch.setattr(azure.subprocess, "run", lambda cmd, **kw: calls.append(cmd) or Done())
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    message = azure.allow_my_ip("server")
+    cmd = calls[0]
+    assert cmd[1:5] == ["postgres", "flexible-server", "firewall-rule", "create"]
+    assert cmd[cmd.index("--server-name") + 1] == "stock-db-bk"
+    assert cmd[cmd.index("--name") + 1] == "home"
+    assert cmd[cmd.index("--start-ip-address") + 1] == "203.0.113.7"
+    assert message.endswith("now allows 203.0.113.7")

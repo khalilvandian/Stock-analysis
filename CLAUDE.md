@@ -12,8 +12,9 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
   at `docs/README.md`; keep it matching the code when either changes.
 - Database (issue #16): PostgreSQL 16. `config/database.toml` selects the target: `local` =
   Docker on this machine (`docker compose up -d --wait`, data in the `stock-db` volume, never
-  committed), `server` = Oracle Cloud (not set up yet); passwords only from
-  `STOCK_DB_PASSWORD` (.env). Raw, core, user (watch list, mirrored from
+  committed), `server` = Azure Database for PostgreSQL `stock-db-bk` (Azure for Students;
+  `allow-my-ip` when the home IP changes); passwords only from .env (`STOCK_DB_PASSWORD`,
+  `STOCK_SERVER_DB_PASSWORD`). Raw, core, user (watch list, mirrored from
   `config/watchlist.toml`) and out layers through SQLAlchemy; schema and rules in
   `docs/DATABASE.md`, items in `config/db_items.toml`. `uv run python -m stock_analysis.db
   load-files`, then `build`, then `check` (each takes `--target`). Analyses still read the

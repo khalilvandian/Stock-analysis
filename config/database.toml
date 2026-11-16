@@ -17,10 +17,13 @@ url = "postgresql://stock@127.0.0.1:5432/stock"  # not "localhost": IPv6 first i
 password_env = "STOCK_DB_PASSWORD"
 
 [targets.server]
-# PostgreSQL on the server (issue #16). Not set up yet: fill in the URL when it exists, e.g.
-# "postgresql://stock_reader@db.example.com:5432/stock?sslmode=require".
-url = ""
-password_env = "STOCK_DB_PASSWORD"
+# Azure Database for PostgreSQL - Flexible Server (Azure for Students, free tier: Burstable
+# B1ms, 32 GiB), resource group stock-rg. TLS is required. Access is limited by the server's
+# firewall rules (docs/DATABASE.md).
+url = "postgresql://stock_admin@stock-db-bk.postgres.database.azure.com:5432/stock?sslmode=require"
+azure_server = "stock-db-bk"
+password_env = "STOCK_SERVER_DB_PASSWORD"
+azure_resource_group = "stock-rg"
 
 # What `python -m stock_analysis.db check` looks for in the selected database.
 [check]
