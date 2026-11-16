@@ -206,3 +206,16 @@ their date.
     port 5432, because it calls the API over HTTPS instead.
   - Compose gives the same setup on the PC and the server, and Kubernetes isn't needed
     at this size.
+
+### PostgreSQL only; SQLite dropped
+
+- **Who:** Babak.
+- **Decision:** The database is PostgreSQL 16 only: in Docker on this machine now (target
+  `local`), and on the Oracle Cloud server later (`server`). The SQLite file and code path
+  are removed.
+- **Why:** PostgreSQL is what the server will run, and keeping two engines meant writing for
+  the common subset of both. On 2026-11-16, both engines were built from the same files and
+  gave identical tables, so nothing is lost.
+- **Consequence:** the database tests need PostgreSQL. They use the `stock_test` database in
+  the local container and are skipped where none is running (for example the cloud
+  sessions), while the rest of the suite still runs.

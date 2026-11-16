@@ -1131,15 +1131,11 @@ dependencies = [
     { name = "httpx" },
     { name = "markdown" },
     { name = "pandas" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "sqlalchemy" },
     { name = "yfinance" },
-]
-
-[package.optional-dependencies]
-postgres = [
-    { name = "psycopg", extra = ["binary"] },
 ]
 
 [package.dev-dependencies]
@@ -1154,13 +1150,12 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "markdown", specifier = ">=3.11.2" },
     { name = "pandas", specifier = ">=2.2" },
-    { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'", specifier = ">=3.1" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.1" },
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "requests", specifier = ">=2.31" },
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "yfinance", specifier = ">=1.7.0" },
 ]
-provides-extras = ["postgres"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -8,15 +8,12 @@ dependencies = [
     "httpx>=0.27",
     "markdown>=3.11.2",
     "pandas>=2.2",
+    "psycopg[binary]>=3.1",
     "python-dotenv>=1.0",
     "requests>=2.31",
     "sqlalchemy>=2.0",
     "yfinance>=1.7.0",
 ]
-
-[project.optional-dependencies]
-# PostgreSQL targets (local-pg in Docker, the server): uv sync --extra postgres
-postgres = ["psycopg[binary]>=3.1"]
 
 [dependency-groups]
 dev = [

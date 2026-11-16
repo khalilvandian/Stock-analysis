@@ -1,5 +1,5 @@
 """Check the selected database: the connection works, the schema is current and the data is
-there. Read-only; works on the local SQLite file and on the PostgreSQL server.
+there. Read-only; works on any target (the local Docker PostgreSQL, the server).
 
     uv run python -m stock_analysis.db check                 # the selected target
     uv run python -m stock_analysis.db check --target server
@@ -49,12 +49,12 @@ class Result:
 
 
 class Reader:
-    """A read-only connection (SQLite or PostgreSQL) with the few calls the checks need."""
+    """A read-only connection with the few calls the checks need."""
 
     def __init__(self, url: str, password_env: str | None = None):
         password = os.environ.get(password_env) if password_env else None
         self.db = Database(url, password, read_only=True)
-        self.dialect, self.where = self.db.dialect, self.db.where
+        self.where = self.db.where
         self.conn = self.db.connect()
 
     def rows(self, sql: str) -> list[tuple]:

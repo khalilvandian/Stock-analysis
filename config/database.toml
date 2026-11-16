@@ -6,16 +6,12 @@
 #
 # Never write a password here. A target reads it from the environment variable named in
 # `password_env` (set it in the shell, in .env, which git ignores, or in the cloud
-# environment's settings). PostgreSQL targets need the driver: uv sync --extra postgres.
+# environment's settings).
 
 selected = "local"
 
 [targets.local]
-# The SQLite file built from data/ (git ignores it).
-url = "sqlite:///data/stock.db"
-
-[targets.local-pg]
-# PostgreSQL in Docker on this machine (compose.yaml): docker compose up -d. Set
+# PostgreSQL in Docker on this machine (compose.yaml): docker compose up -d --wait. Set
 # STOCK_DB_PASSWORD in .env first; the same password is given to the container.
 url = "postgresql://stock@127.0.0.1:5432/stock"  # not "localhost": IPv6 first is slow
 password_env = "STOCK_DB_PASSWORD"

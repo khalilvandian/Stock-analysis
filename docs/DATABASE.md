@@ -1,9 +1,9 @@
 # Database
 
-Status: **schema version 3** (migrations `001` to `003`), 2026-11-16. The database runs on
-SQLite (`local`) and on PostgreSQL (`local-pg`, in Docker on this machine) with the same code
-and the same results. It holds the data already in `data/`. No API has been called to fill
-it, and no analysis reads it yet. The roadmap is
+Status: **schema version 3** (migrations `001` to `003`), 2026-11-16. **PostgreSQL 16**,
+locally in Docker (`compose.yaml`) and later on the Oracle Cloud server. SQLite was dropped
+on 2026-11-16 (see `docs/DECISIONS.md`). It holds the data already in `data/` and the watch
+list. No API has been called to fill it, and no analysis reads it yet. The roadmap is
 [issue #16](https://github.com/khalilvandian/Stock-analysis/issues/16).
 
 The design follows how the project analyses a company:
@@ -17,17 +17,19 @@ Only what those need is stored.
 ## Use
 
 ```bash
+# once: put STOCK_DB_PASSWORD=<a long random value> in .env (see .env.example)
+docker compose up -d --wait                     # PostgreSQL 16 on 127.0.0.1:5432, healthy
 uv run python -m stock_analysis.db init         # create the tables (apply the migrations)
-uv run python -m stock_analysis.db load-files   # import the files in data/ (no network)
+uv run python -m stock_analysis.db load-files   # import data/ and the watch list (no network)
 uv run python -m stock_analysis.db build        # rebuild the core layer from raw
 uv run python -m stock_analysis.db status       # rows per table
 uv run python -m stock_analysis.db check        # connection, schema and data (see below)
 ```
 
-Every command takes `--target local | local-pg | server`. Without it, the `selected`
-target in `config/database.toml` is used, or `DATABASE_URL` if that is set.
+Every command takes `--target local | server`. Without it, the `selected` target in
+`config/database.toml` (`local`) is used, or `DATABASE_URL` if that is set.
 
-Three views answer most questions:
+Four queries answer most questions:
 
 ```sql
 SELECT * FROM v_annual WHERE symbol = 'NEE' ORDER BY fiscal_year;       -- absolute values per year
@@ -40,58 +42,31 @@ SELECT * FROM v_watchlist ORDER BY position;                              -- wat
 
   | Target | What it is | Password |
   |---|---|---|
-  | `local` | The SQLite file `data/stock.db` | none |
-  | `local-pg` | PostgreSQL 16 in Docker on this machine (`compose.yaml`), at `127.0.0.1:5432` | `STOCK_DB_PASSWORD` |
+  | `local` | PostgreSQL 16 in Docker on this machine (`compose.yaml`), at `127.0.0.1:5432`, database `stock` | `STOCK_DB_PASSWORD` |
   | `server` | PostgreSQL on the Oracle Cloud server. The URL is empty until it exists | `STOCK_DB_PASSWORD` |
 
   Passwords are never in the config. A target reads its password from the environment
   variable named in `password_env`, and `.env` (gitignored) is read automatically.
-  PostgreSQL needs the driver: `uv sync --extra postgres`.
-- **Not committed:** the database is never committed. `data/stock.db*` is gitignored, the
-  Docker data lives in the `stock-db` volume, and the repository holds only the code and the
-  migrations that build it.
+- **Docker:** `compose.yaml` runs only the database. It uses the official `postgres:16`
+  image, binds the port to `127.0.0.1` so only this machine can connect, keeps the data in
+  the `stock-db` volume, and has a health check. Our migrations create the tables, not the
+  container. `docker compose down` stops it and keeps the data; `down -v` deletes the data.
+- **Not committed:** the database is never committed. The data lives in the Docker volume,
+  and the repository holds only the code and the migrations that build it.
 - **Rerunning:** `load-files` can be run again safely, and only stores what is new or
   changed. `build` rewrites core each time, in one transaction.
-- **Code:** `src/stock_analysis/db/`, all through SQLAlchemy, so one code path serves both
-  engines:
+- **Code:** `src/stock_analysis/db/`, through SQLAlchemy and psycopg:
   - `__init__.py`: targets, the `Database` class, migrations, helpers
   - `migrations/`: numbered SQL files
   - `load_files.py`
   - `build.py`
   - `check.py`
-- **Items:** `config/db_items.toml` lists the items and their source fields. Tests are in
-  `tests/test_db.py`.
-
-## Local PostgreSQL
-
-```bash
-# once: put STOCK_DB_PASSWORD=<a long random value> in .env (see .env.example)
-uv sync --extra postgres
-docker compose up -d --wait                                    # PostgreSQL 16, healthy
-uv run python -m stock_analysis.db load-files --target local-pg   # creates the tables first
-uv run python -m stock_analysis.db build --target local-pg
-uv run python -m stock_analysis.db check --target local-pg
-```
-
-- **Docker:** `compose.yaml` runs only the database. It uses the official `postgres:16`
-  image, binds the port to `127.0.0.1` so only this machine can connect, keeps the data in
-  the `stock-db` volume, and has a health check.
-- **Tables:** our migrations create them, not the container.
-- **Stopping:** `docker compose down` keeps the data, `docker compose down -v` deletes it.
-- **Parity:** on 2026-11-16 both targets were built from the same files and compared. All
-  rows of `v_annual`, `v_daily`, `core_fundamental`, `core_fundamental_ttm`, `core_company`
-  and `out_screener_result` were identical. New companies get their `company_id` in symbol
-  order, so the ids match too.
-- **PostgreSQL test:** `tests/test_db.py::test_whole_flow_on_postgresql` runs import, build
-  and check on a real PostgreSQL when `STOCK_TEST_PG_URL` points to a throwaway database.
-  It empties that database first, for example the `stock_test` database in the same
-  container:
-
-  ```bash
-  STOCK_TEST_PG_URL=postgresql://stock@127.0.0.1:5432/stock_test uv run pytest tests/test_db.py
-  ```
-
-  Without the variable it is skipped, so the normal test run needs no database server.
+- **Items:** `config/db_items.toml` lists the items and their source fields.
+- **Tests:** `tests/test_db.py` runs on the `stock_test` database in the same container, or
+  on `STOCK_TEST_PG_URL`. Every test empties that database first, so never point it at
+  `stock`. Without a reachable PostgreSQL the database tests are skipped, and the rest of
+  the suite still runs. To create the test database once:
+  `docker compose exec db psql -U stock -c "CREATE DATABASE stock_test"`.
 
 ### Checking a database
 
@@ -100,40 +75,37 @@ exits 1 on any FAIL, and with `--strict` on any WARN too.
 
 | Check | FAIL when | WARN when |
 |---|---|---|
-| connection | the target has no URL, the file is missing, or the server can't be reached | none |
+| connection | the target has no URL, or the server can't be reached | none |
 | tables and views | any table or view in the migrations is missing | none |
 | schema version | the database is behind the code | the database is ahead of the code |
 | last build | there is no build, or it failed | none |
-| rows per table | a core or out table that should have rows is empty | `raw_sec_*` or `out_valuation` is empty |
+| rows per table | a core, user or out table that should have rows is empty | `raw_sec_*` or `out_valuation` is empty |
 | newest price, S&P 500 snapshot, screener run | none | older than `max_age_days` (7) |
 | S&P 500 members with prices and with fundamentals | none | below `min_coverage` (95%) |
+| watch list | none | a stock has no evening run, or no prices in core |
 | each of `sample_symbols` (NEE, DUK, SO) | not a company, no prices, or no fiscal year with revenue | the latest day lacks revenue, debt or cash |
 | prices are positive; filed on or after the period end | any row breaks the rule | none |
 | quality issues | any of severity `error` | none |
-| watch list | none | a stock has no evening run, or no prices in core |
 
 The settings are under `[check]` in `config/database.toml`.
 
-Today, on both `local` and `local-pg`: 28 pass, 6 warn, 0 fail. The warnings are:
+Today, on `local`: 28 pass, 6 warn, 0 fail. The warnings are:
 - prices 52 days old
 - 6 and 30 of 497 members with prices and with fundamentals
 - no SEC data yet
 - the 5 watch list stocks have no prices in core, because there are no local price files
   for them
 
-## Portable SQL
+## SQL conventions
 
-- **Types and syntax:** the migrations use only SQL that both engines run:
-  - `DATE`, `TIMESTAMP`, `BOOLEAN`, `DOUBLE PRECISION`, `BIGINT`
-  - `ON CONFLICT`, `RETURNING`, window functions
-- **Auto-numbered keys:** `{{ID}}` in a migration becomes `INTEGER PRIMARY KEY` on SQLite
-  and `BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY` on PostgreSQL.
+- **Types:** `DATE`, `TIMESTAMP` (UTC), `BOOLEAN`, `DOUBLE PRECISION`, `BIGINT`, `TEXT`.
+- **Keys:** auto-numbered keys are `BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY`.
 - **Migrations:** `schema_version` records which migrations have been applied. A new
   change is a new numbered file, and existing ones are never edited. Opening a database
   applies any new ones, so an older database upgrades in place (`002` adds open, high and
-  low).
-- **Dates:** reads return dates as `YYYY-MM-DD` text and timestamps as ISO text on both
-  engines (`frame()` in `__init__.py`), so the build behaves the same.
+  low; `003` adds the watch list).
+- **Dates in Python:** reads return dates as `YYYY-MM-DD` text and timestamps as ISO text
+  (`frame()` in `__init__.py`).
 - **JSON:** the JSON columns are `TEXT`, and can become `jsonb` later.
 
 ## Layers

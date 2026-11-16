@@ -122,7 +122,7 @@ flowchart TD
 | `tradingview.py` | Pages through TradingView's public screener endpoint (`scanner.tradingview.com/<market>/scan`), 2,000 rows a request. |
 | `ecb.py` | Latest ECB reference rates as US dollars per unit of each currency, plus GBX (pence). |
 | `metrics.py` | The metrics dictionary: loads `config/metrics.toml`, selects sets, builds per-stock vectors, standardizes them, and writes `docs/METRICS.md`. |
-| `db/` | The project database (`docs/DATABASE.md`), on SQLite or PostgreSQL through SQLAlchemy: `__init__.py` (targets from `config/database.toml`, `Database`, migrations), `migrations/` (numbered SQL files), `load_files.py` (imports the files in `data/`, no network; raw stores only new or changed rows), `build.py` (rebuilds core from raw), `check.py` (read-only PASS/WARN/FAIL report), `python -m stock_analysis.db {init,load-files,build,status,check} [--target]`. Nothing else uses it yet. |
+| `db/` | The project database (`docs/DATABASE.md`), on PostgreSQL through SQLAlchemy and psycopg: `__init__.py` (targets from `config/database.toml`, `Database`, migrations), `migrations/` (numbered SQL files), `load_files.py` (imports the files in `data/`, no network; raw stores only new or changed rows), `build.py` (rebuilds core from raw), `check.py` (read-only PASS/WARN/FAIL report), `python -m stock_analysis.db {init,load-files,build,status,check} [--target]`. Nothing else uses it yet. |
 
 ### `analysis/` (scripts, run with `uv run python analysis/<name>.py`)
 
@@ -193,8 +193,7 @@ core build rules, trailing twelve months, the daily as-of view, quality checks).
 | `data/sector/` | Yes | Utilities screen, yearly history, absolute-values tables | `sector.py`, `history.py`, `absolute.py` |
 | `data/peers/` | Yes | Peer-group tables | `peer_screen.py` |
 | `data/screener/` | Yes, every evening (`stage1.csv`, `top.csv`, the dated CSV) | Stage 1 results, Stage 2 top per sector, the dated full table | `stage1.py`, `stage2.py`, `screener.py` |
-| Docker volume `stock-db` | No | The local PostgreSQL database (`compose.yaml`, target `local-pg`) | `python -m stock_analysis.db ... --target local-pg` |
-| `data/stock.db` | No (gitignored) | The SQLite database: raw copies of the files in `data/`, the cleaned core layer, screener results and valuations, quality issues | `python -m stock_analysis.db load-files` and `build` |
+| Docker volume `stock-db` | No | The local PostgreSQL database (`compose.yaml`, target `local`): raw copies of the files in `data/`, the cleaned core layer, the watch list, screener results, valuations and watch list runs, quality issues | `python -m stock_analysis.db load-files` and `build` |
 | `.cache/sec/` | No | Raw SEC company facts, about 250 MB for the utilities | `history.py`, `watchlist.py` |
 | `.cache/screener/` | No | Day caches of TradingView, Yahoo fills and prices; `stage1_full.pkl` for Stage 2 | `stage1.py`, `stage2.py` |
 | `.cache/watchlist/` | No | `email.html` and `last_run.json` of the last run | `watchlist.py` |
