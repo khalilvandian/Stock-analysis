@@ -35,6 +35,8 @@ REQUIRED_ROWS = [
     "core_fundamental",
     "core_fundamental_ttm",
     "out_screener_result",
+    "user_watchlist",
+    "out_watchlist_run",
 ]
 OPTIONAL_ROWS = ["raw_sec_ticker", "raw_sec_fact", "out_valuation"]
 
@@ -151,6 +153,23 @@ def run_checks(db: Reader, settings: dict, today: date | None = None) -> list[Re
                 f"{n} of {members} ({share:.0%})",
             )
         )
+
+    watch = db.one("SELECT COUNT(*) FROM user_watchlist") or 0
+    if watch:
+        priced = db.one(
+            "SELECT COUNT(*) FROM user_watchlist w JOIN core_company c ON c.symbol = w.symbol "
+            "WHERE EXISTS (SELECT 1 FROM core_price_daily p WHERE p.company_id = c.company_id)"
+        )
+        ran = db.one("SELECT COUNT(*) FROM v_watchlist WHERE last_run_at IS NOT NULL")
+        out.append(
+            Result(
+                "PASS" if ran == watch else "WARN",
+                "watch list",
+                f"{watch} stocks, {ran} with runs, {priced} with prices in core",
+            )
+        )
+        if priced < watch:
+            out[-1] = Result("WARN", out[-1].name, out[-1].detail)
 
     for symbol in settings.get("sample_symbols", []):
         out.extend(check_symbol(db, symbol))

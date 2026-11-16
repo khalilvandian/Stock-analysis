@@ -1,6 +1,6 @@
 # Database
 
-Status: **schema version 2** (migrations `001`, `002`), 2026-11-16. The database runs on
+Status: **schema version 3** (migrations `001` to `003`), 2026-11-16. The database runs on
 SQLite (`local`) and on PostgreSQL (`local-pg`, in Docker on this machine) with the same code
 and the same results. It holds the data already in `data/`. No API has been called to fill
 it, and no analysis reads it yet. The roadmap is
@@ -9,7 +9,7 @@ it, and no analysis reads it yet. The roadmap is
 The design follows how the project analyses a company:
 - the absolute values first, for every fiscal year and as of any day
 - the prices for technical analysis
-- the screener's results, and valuations
+- the screener's results, valuations, and the watch list with its evening runs
 - a clear record of where every number came from
 
 Only what those need is stored.
@@ -33,6 +33,7 @@ Three views answer most questions:
 SELECT * FROM v_annual WHERE symbol = 'NEE' ORDER BY fiscal_year;       -- absolute values per year
 SELECT * FROM v_daily  WHERE symbol = 'NEE' AND date = '2026-09-25';     -- as known that day
 SELECT * FROM out_screener_result WHERE stage = 2 ORDER BY sector, rank_in_sector;
+SELECT * FROM v_watchlist ORDER BY position;                              -- watch list, last run
 ```
 
 - **Targets** (`config/database.toml`):
@@ -109,13 +110,16 @@ exits 1 on any FAIL, and with `--strict` on any WARN too.
 | each of `sample_symbols` (NEE, DUK, SO) | not a company, no prices, or no fiscal year with revenue | the latest day lacks revenue, debt or cash |
 | prices are positive; filed on or after the period end | any row breaks the rule | none |
 | quality issues | any of severity `error` | none |
+| watch list | none | a stock has no evening run, or no prices in core |
 
 The settings are under `[check]` in `config/database.toml`.
 
-Today, on both `local` and `local-pg`: 26 pass, 5 warn, 0 fail. The warnings are:
+Today, on both `local` and `local-pg`: 28 pass, 6 warn, 0 fail. The warnings are:
 - prices 52 days old
 - 6 and 30 of 497 members with prices and with fundamentals
 - no SEC data yet
+- the 5 watch list stocks have no prices in core, because there are no local price files
+  for them
 
 ## Portable SQL
 
@@ -138,8 +142,9 @@ Today, on both `local` and `local-pg`: 26 pass, 5 warn, 0 fail. The warnings are
 |---|---|---|---|
 | `raw_*` | What each source returned, one table per source | The loaders (`load_files.py` now, API loaders later) | Append only. A row is stored when it is **new or its values changed** since the last version of the same key, and nothing is ever edited. Each row points to its `raw_fetch` |
 | `core_*` | One cleaned, standard version: companies, index membership, daily prices, fundamentals with every filed version, trailing twelve months, quality issues | `build.py`, from raw and `config/db_items.toml` only | Rewritten on every build. `core_company` is updated in place so `company_id` stays the same |
-| `out_*` | Results of the analyses: screener runs, valuations | The analyses (for now `load_files.py`, from their output files) | Keyed by **symbol and date**, so an analysis can write without a build |
-| `v_*` | Views for analysis | none | `v_annual`, `v_daily`, `v_fundamental_latest` |
+| `user_*` | What people decide: the watch list (stocks, peers, target P/E, equity stakes, EPS corrections) | For now `load-files` mirrors `config/watchlist.toml`, the master copy. Later the interface edits these tables | Keyed by symbol. A changed TOML replaces the mirror, and an unchanged one changes nothing |
+| `out_*` | Results of the analyses: screener runs, valuations, the watch list's evening runs | The analyses (for now `load_files.py`, from their output files) | Keyed by **symbol and date**, so an analysis can write without a build |
+| `v_*` | Views for analysis | none | `v_annual`, `v_daily`, `v_watchlist`, `v_fundamental_latest` |
 
 ## UML class diagram
 
@@ -364,6 +369,46 @@ classDiagram
     TEXT detail_json
     TEXT source
   }
+  class user_watchlist {
+    <<table>>
+    TEXT symbol PK
+    INTEGER position
+    DOUBLE target_pe
+    TEXT target_note
+    DOUBLE stakes_per_share
+  }
+  class user_watchlist_peer {
+    <<table>>
+    TEXT symbol PK FK
+    TEXT peer PK
+    INTEGER position
+  }
+  class user_eps_override {
+    <<table>>
+    TEXT symbol PK FK
+    DATE reported PK
+    DOUBLE eps
+    TEXT reason
+  }
+  class out_watchlist_run {
+    <<table>>
+    TEXT symbol PK
+    TIMESTAMP run_at PK
+    TEXT file
+    DOUBLE price
+    DOUBLE eps_adj_ttm
+    DOUBLE pe_adj
+    DOUBLE pe_median_10y
+    DOUBLE target_pe
+    DOUBLE entry_price
+    DOUBLE to_entry
+    TEXT verdict
+    DOUBLE stakes_per_share
+  }
+  class v_watchlist {
+    <<view>>
+    each watch list stock with its latest run
+  }
   class v_fundamental_latest {
     <<view>>
     latest filed version of each period
@@ -395,6 +440,10 @@ classDiagram
   core_item "1" --> "*" core_fundamental : item
   core_build "1" --> "*" core_quality_issue : build_id
   out_screener_run "1" --> "*" out_screener_result : run_id
+  user_watchlist "1" --> "*" user_watchlist_peer : symbol
+  user_watchlist "1" --> "*" user_eps_override : symbol
+  v_watchlist ..> user_watchlist : reads
+  v_watchlist ..> out_watchlist_run : latest run
   raw_tv_constituent ..> core_company : builds
   raw_tv_constituent ..> core_index_member : builds
   raw_sec_ticker ..> core_company : adds cik
@@ -426,6 +475,8 @@ From the repository files, 2026-11-16 (28 MB):
 | `core_fundamental_ttm` | 3,352 | Trailing figures |
 | `core_quality_issue` | 122 | Last build |
 | `out_screener_result` | 527 | The 2026-11-13 run: 497 from Stage 1, 30 from Stage 2 |
+| `user_watchlist`, `user_watchlist_peer`, `user_eps_override` | 5, 41, 11 | `config/watchlist.toml`: BSX, BKNG, NFLX, GOOGL, UBER |
+| `out_watchlist_run` | 52 | `analyses/<SYMBOL>/runs.csv`, 2026-10-27 to 2026-11-13 (times in UTC) |
 | `out_valuation` | 97 | DCF fair values from `utilities.csv` and the peer tables, 2026-09-28 to 2026-10-27 |
 
 ## Tables
@@ -460,7 +511,16 @@ From the repository files, 2026-11-16 (28 MB):
 |---|---|---|
 | `out_screener_run` | Screener run (date and universe) | Today only the latest run exists as files. Every evening run will add one |
 | `out_screener_result` | Symbol in Stage 1 or Stage 2 of a run | The fields the site and email show (sector, category, status, rank, close, cheap price). Every other column goes in `detail_json` |
+| `out_watchlist_run` | Watch list stock and evening run | Price, adjusted EPS (12 months), P/E, 10-year median P/E, target P/E, entry price, distance to entry, the verdict. `run_at` is UTC, converted from the Rome time in `runs.csv` |
 | `out_valuation` | Symbol, date and method | Fair value per share, the price, and the inputs (WACC, cash flow) in `detail_json` |
+
+### User
+
+| Table | One row per | Notes |
+|---|---|---|
+| `user_watchlist` | Watch list stock | `position` (order), `target_pe`, `target_note`, `stakes_per_share` |
+| `user_watchlist_peer` | Stock and peer | The sector peers for the ratios and screens, in order |
+| `user_eps_override` | Stock and report date | One-off corrections to a quarter's adjusted EPS, with the reason |
 
 ### Views
 
@@ -468,6 +528,7 @@ From the repository files, 2026-11-16 (28 MB):
 |---|---|---|
 | `v_annual` | Company and fiscal year | The absolute values in their latest filed version: revenue, EBITDA, net income, EPS, operating cash flow, capex, free cash flow, interest, cash, the three debts, net debt, assets, liabilities, equity and shares. Shares and EPS are on today's basis. This is what `absolute.py --history` shows |
 | `v_daily` | Company and trading day | The close, the adjusted close and the absolute values as known that day. Flows are trailing twelve months (`_ttm`). Also `market_cap`, `net_debt` and `free_cf_ttm` |
+| `v_watchlist` | Watch list stock | Its settings and its latest evening run (price, P/E, entry price, distance to entry, verdict) |
 | `v_fundamental_latest` | Company, item and period | The latest filed version |
 
 ## The 17 items

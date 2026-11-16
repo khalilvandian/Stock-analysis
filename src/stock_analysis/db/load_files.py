@@ -14,6 +14,10 @@ Analysis results go into the out layer:
 
 - data/screener/stage1.csv and top.csv (the latest screener run) -> out_screener_*
 - dcf_fair_value in data/sector/utilities.csv and data/peers/*.csv -> out_valuation
+- analyses/<SYMBOL>/runs.csv (the watch list's evening runs) -> out_watchlist_run
+
+The watch list itself (config/watchlist.toml, the master copy for now) is mirrored into the
+user layer: user_watchlist, user_watchlist_peer, user_eps_override.
 
 The other derived tables (absolute_*, history_yahoo.csv) are not imported.
 """
@@ -24,8 +28,10 @@ import hashlib
 import json
 import re
 import subprocess
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -335,10 +341,101 @@ def load_valuations(conn: Connection, data_dir: Path) -> int:
     return scalar(conn, "SELECT COUNT(*) FROM out_valuation") - before
 
 
+# ---------------------------------------------------------------- user (the watch list)
+
+
+def load_watchlist(conn: Connection, path: Path) -> int:
+    """Mirror config/watchlist.toml into the user tables; nothing changes if it is the same."""
+    if not path.exists():
+        return 0
+    stocks = tomllib.loads(path.read_text(encoding="utf-8")).get("stock", [])
+    w = pd.DataFrame(
+        [
+            {
+                "symbol": st["symbol"],
+                "position": i,
+                "target_pe": st.get("target_pe"),
+                "target_note": st.get("target_note"),
+                "stakes_per_share": st.get("stakes_per_share"),
+            }
+            for i, st in enumerate(stocks, start=1)
+        ],
+        columns=["symbol", "position", "target_pe", "target_note", "stakes_per_share"],
+    )
+    peers = pd.DataFrame(
+        [
+            {"symbol": st["symbol"], "peer": peer, "position": i}
+            for st in stocks
+            for i, peer in enumerate(st.get("peers", []), start=1)
+        ],
+        columns=["symbol", "peer", "position"],
+    )
+    overrides = pd.DataFrame(
+        [
+            {"symbol": st["symbol"], "reported": str(o["reported"]), "eps": o["eps"],
+             "reason": o.get("reason")}
+            for st in stocks
+            for o in st.get("eps_override", [])
+        ],
+        columns=["symbol", "reported", "eps", "reason"],
+    )  # fmt: skip
+    tables = {"user_watchlist": w, "user_watchlist_peer": peers, "user_eps_override": overrides}
+
+    def norm(df: pd.DataFrame) -> list[tuple]:
+        def value(v):
+            if v is None or (not isinstance(v, str) and pd.isna(v)):
+                return None
+            return float(v) if isinstance(v, int | float | np.number) else str(v)
+
+        return sorted((tuple(value(v) for v in r) for r in df.itertuples(index=False)), key=str)
+
+    def same(table: str, new: pd.DataFrame) -> bool:
+        old = frame(conn, f"SELECT {', '.join(new.columns)} FROM {table}")
+        return norm(old) == norm(new)
+
+    if all(same(t, df) for t, df in tables.items()):
+        return 0
+    for table in ("user_eps_override", "user_watchlist_peer", "user_watchlist"):
+        run(conn, f"DELETE FROM {table}")
+    return sum(insert_df(conn, t, df) for t, df in tables.items())
+
+
+def load_watchlist_runs(conn: Connection, analyses_dir: Path, timezone: str) -> int:
+    """Every row of analyses/<SYMBOL>/runs.csv for the watch list stocks (the market and
+    summary folders have other columns and are left out)."""
+    before = scalar(conn, "SELECT COUNT(*) FROM out_watchlist_run")
+    cols = ["file", "price", "eps_adj_ttm", "pe_adj", "pe_median_10y", "target_pe"]
+    cols += ["entry_price", "to_entry", "verdict", "stakes_per_share"]
+    for path in sorted(analyses_dir.glob("*/runs.csv")):
+        df = pd.read_csv(path)
+        if "entry_price" not in df:
+            continue
+        local = pd.to_datetime(df["run"].str[:16])  # 'YYYY-MM-DD HH:MM CET' in Rome time
+        utc = local.dt.tz_localize(ZoneInfo(timezone), ambiguous="NaT").dt.tz_convert("UTC")
+        out = df.reindex(columns=cols).assign(
+            symbol=path.parent.name, run_at=utc.dt.strftime("%Y-%m-%dT%H:%M:%S")
+        )
+        out = out.dropna(subset=["run_at"]).drop_duplicates(["symbol", "run_at"])
+        names = ["symbol", "run_at", *cols]
+        if not out.empty:
+            run(
+                conn,
+                f"INSERT INTO out_watchlist_run ({', '.join(names)}) "
+                f"VALUES ({', '.join(':' + c for c in names)}) ON CONFLICT DO NOTHING",
+                records(out[names]),
+            )
+    return scalar(conn, "SELECT COUNT(*) FROM out_watchlist_run") - before
+
+
 def load_all(db: Database, data_dir: Path | None = None) -> dict[str, int]:
-    """Import every file under `data_dir` (default data/), in one transaction.
-    Returns the rows added per table."""
+    """Import every file under `data_dir` (default data/) plus the watch list (config/ and
+    analyses/ next to it), in one transaction. Returns the rows added per table."""
     data_dir = Path(data_dir) if data_dir else ROOT / "data"
+    root = data_dir.parent
+    watchlist = root / "config" / "watchlist.toml"
+    timezone = "Europe/Rome"
+    if watchlist.exists():
+        timezone = tomllib.loads(watchlist.read_text(encoding="utf-8")).get("timezone", timezone)
     added = dict.fromkeys(
         [
             "raw_yahoo_price",
@@ -347,6 +444,8 @@ def load_all(db: Database, data_dir: Path | None = None) -> dict[str, int]:
             "raw_project_history",
             "out_screener_result",
             "out_valuation",
+            "user_watchlist",
+            "out_watchlist_run",
         ],
         0,
     )
@@ -361,4 +460,6 @@ def load_all(db: Database, data_dir: Path | None = None) -> dict[str, int]:
             added["out_screener_result"] += load_screener_run(conn, screener)
         added["raw_project_history"] += load_history(conn, data_dir / "sector" / "history.csv")
         added["out_valuation"] += load_valuations(conn, data_dir)
+        added["user_watchlist"] += load_watchlist(conn, watchlist)
+        added["out_watchlist_run"] += load_watchlist_runs(conn, root / "analyses", timezone)
     return added

@@ -13,7 +13,7 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
 - Database (issue #16): `config/database.toml` selects the target: `local` = SQLite
   `data/stock.db` (gitignored, never committed), `local-pg` = PostgreSQL in Docker
   (`docker compose up -d --wait`), `server` = PostgreSQL on Oracle Cloud; passwords only from
-  `STOCK_DB_PASSWORD` (.env). Raw, core and out layers through SQLAlchemy; schema and rules
+  `STOCK_DB_PASSWORD` (.env). Raw, core, out and user (watch list, mirrored from `config/watchlist.toml`) layers through SQLAlchemy; schema and rules
   in `docs/DATABASE.md`, items in `config/db_items.toml`. `uv run python -m stock_analysis.db
   load-files`, then `build`, then `check` (each takes `--target`). Analyses still read the
   files.

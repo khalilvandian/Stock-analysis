@@ -20,6 +20,22 @@ from stock_analysis.db.check import Reader, run_checks
 from stock_analysis.db.load_files import load_all
 
 QUARTERS = ["2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31"]
+WATCHLIST = """
+timezone = "Europe/Rome"
+
+[[stock]]
+symbol = "AAA"
+peers = ["BBB", "CCC"]
+target_pe = 12
+target_note = "test"
+eps_override = [{ reported = "2026-02-01", eps = 0.25, reason = "one-off" }]
+
+[[stock]]
+symbol = "BBB"
+peers = []
+target_pe = 20
+stakes_per_share = 1.5
+"""
 
 
 def write_csv(path: Path, df: pd.DataFrame, index: bool = False) -> None:
@@ -121,6 +137,27 @@ def data_dir(tmp_path: Path) -> Path:
     )  # fmt: skip
     write_csv(data / "sector" / "utilities.csv", utilities)
     (data / "sector" / "_meta.json").write_text(json.dumps({"fetched_at": "2026-09-28T02:55Z"}))
+
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "watchlist.toml").write_text(WATCHLIST, encoding="utf-8")
+    runs = pd.DataFrame(
+        {
+            "run": ["2026-11-12 21:32 CET", "2026-11-13 20:53 CET"],
+            "file": ["2026-11-12_2132.pdf", "2026-11-13_2053.pdf"],
+            "price": [10.0, 11.0],
+            "eps_adj_ttm": [1.0, 1.0],
+            "pe_adj": [10.0, 11.0],
+            "pe_median_10y": [15.0, 15.0],
+            "target_pe": [12, 12],
+            "entry_price": [12.0, 12.0],
+            "to_entry": [0.2, 0.0909],
+            "verdict": ["cheap", "near entry"],
+            "stakes_per_share": [None, None],
+        }
+    )
+    write_csv(tmp_path / "analyses" / "AAA" / "runs.csv", runs)
+    market = pd.DataFrame({"run": ["2026-11-13 20:53 CET"], "file": ["x.pdf"], "sp500": [1.0]})
+    write_csv(tmp_path / "analyses" / "market" / "runs.csv", market)  # not a stock: skipped
     return data
 
 
@@ -209,6 +246,8 @@ def test_load_files_and_rerun(tmp_path: Path, data_dir: Path) -> None:
     assert added["raw_project_history"] == 4
     assert added["out_screener_result"] == 4
     assert added["out_valuation"] == 1
+    assert added["user_watchlist"] == 2 + 2 + 1  # stocks, peers, EPS overrides
+    assert added["out_watchlist_run"] == 2
     extra = json.loads(one(c, "SELECT extra_json FROM raw_tv_constituent LIMIT 1"))
     assert extra == {"close": 10.0, "total_debt_fq": None}
     assert set(load_all(c, data_dir).values()) == {0}
@@ -464,3 +503,23 @@ def test_whole_flow_on_postgresql(data_dir: Path) -> None:
     results = run_checks(reader, settings, today=date(2026, 11, 14))
     reader.close()
     assert not [r for r in results if r.status == "FAIL"], results
+
+
+def test_watchlist(con, tmp_path: Path, data_dir: Path) -> None:
+    rows = q(
+        con,
+        "SELECT symbol, target_pe, stakes_per_share, last_run_at, price, verdict "
+        "FROM v_watchlist ORDER BY position",
+    ).fetchall()
+    assert rows == [
+        ("AAA", 12.0, None, "2026-11-13T19:53:00", 11.0, "near entry"),  # 20:53 CET in UTC
+        ("BBB", 20.0, 1.5, None, None, None),
+    ]
+    assert one(con, "SELECT peer FROM user_watchlist_peer WHERE position = 2") == "CCC"
+    assert one(con, "SELECT eps FROM user_eps_override WHERE symbol = 'AAA'") == 0.25
+    # The TOML is the master copy: an edit replaces the mirror, no edit changes nothing.
+    toml = tmp_path / "config" / "watchlist.toml"
+    toml.write_text(WATCHLIST.replace("target_pe = 20", "target_pe = 25"), encoding="utf-8")
+    assert load_all(con, data_dir)["user_watchlist"] == 5
+    assert one(con, "SELECT target_pe FROM user_watchlist WHERE symbol = 'BBB'") == 25.0
+    assert load_all(con, data_dir)["user_watchlist"] == 0
