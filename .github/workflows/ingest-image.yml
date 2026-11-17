@@ -9,7 +9,7 @@ name: Build ingest image
 
 on:
   push:
-    branches: [main, issue-18-ingest]   # the branch only while issue #18 is tested on Azure
+    branches: [main]
     paths:
       - "src/**"
       - "config/**"
