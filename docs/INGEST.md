@@ -126,6 +126,26 @@ free Azure server small: the file stays in `inbox/` and `raw_fetch.url` names it
 `curl -A "$SEC_USER_AGENT" -o inbox/sec_fsds/2026q3.zip https://www.sec.gov/files/dera/data/financial-statement-data-sets/2026q3.zip`
 (SEC serves these files to any client that names itself, no browser needed).
 
+## Sending the PC's data to the server (`db push`)
+
+The analysis and the heavy loading (bulk files, full filings) happen on this PC; the server
+should not ingest them again:
+
+```bash
+uv run python -m stock_analysis.db push --target server            # from the selected (local) db
+uv run python -m stock_analysis.db push --target server --sources sec_xbrl
+```
+
+A push replays every kept payload the target lacks (same source, request key and content
+fingerprint) for `sec_companyfacts` and `sec_xbrl`: the payload is stored there and parsed on
+this PC by the source's own loader, so the target keeps its own "new or changed rows only"
+history; the target's tasks count as fetched. Data-set quarters are imported into the target
+from their file in `inbox/`. Yahoo, TradingView and the ECB are cheap and fetched by the server
+itself. Raw rows are never copied table to table: they are stored relative to the sending
+database's own earlier versions. The server's next job run rebuilds core because raw data
+arrived after its last build, even though the run itself stored nothing. Run a push only
+after the branch is merged and deployed, so the server has the migrations.
+
 ## Where it runs
 
 | | |

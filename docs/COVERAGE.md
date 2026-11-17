@@ -33,7 +33,11 @@ fetches. For each company:
   statements have no such line (for example no operating-income subtotal: the income
   statement goes straight to income before taxes). It counts as present. Add a rule only
   after checking the company's filings: a value filed under a tag we don't map is a mapping
-  gap, not "not reported".
+  gap, not "not reported". A rule can name `symbols`, `industries` or `all = true`, and
+  `quarters = ["Q4"]` limits it to those fiscal quarters. Fourth-quarter EPS is one: a 10-K
+  reports the year, not the fourth quarter, and EPS is never approximated as the year less
+  three quarters (the share count differs each quarter), so it is present only when Yahoo
+  reports it.
 - **Explained** (`[[explained]]`): a gap checked by hand and accepted, with the reason.
   It counts as present.
 

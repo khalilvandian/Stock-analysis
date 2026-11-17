@@ -364,6 +364,12 @@ def test_coverage_counts_cells_and_switches_mode(fresh, respx_mock) -> None:
         ["not_reported", "no such line"]
     ]
     assert d1["totals"]["absent"]["not_reported"] >= 1 and "gap_rows" not in d1
+    # a rule for every company, fourth quarters only (fiscal years end in December here)
+    cov["not_reported"] = [{"all": True, "items": ["capex"], "quarters": ["Q4"], "reason": "q4"}]
+    snapshot(fresh, cov, today=TODAY)
+    q = "SELECT period, status FROM out_coverage_gap WHERE symbol = 'BBB' AND item = 'capex' "
+    status = dict(rows(fresh, q + "AND period LIKE '2025-%'").values.tolist())
+    assert status["2025-12"] == "not_reported" and status["2025-09"] == "missing"
     # everything accepted by hand: covered, and the job may switch to maintenance
     items = [i["item"] for i in d["items"]]
     cov["explained"] = [{"symbol": s, "item": i, "reason": "test"} for s in SYMBOLS for i in items]
@@ -478,6 +484,54 @@ def test_data_set_keeps_only_what_company_facts_lacks(fresh, respx_mock) -> None
         ])  # fmt: skip
         kept = not_in_company_facts(conn, 1001, part)
     assert kept["accn"].tolist() == ["q9", "k25"]
+
+
+@pytest.fixture()
+def peer(pg_url: str):  # noqa: F811
+    """A second empty, migrated database: the server a push sends to."""
+    import os
+
+    from stock_analysis.db import Database
+
+    admin = Database(pg_url, os.environ.get("STOCK_DB_PASSWORD"))
+    with admin.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        exists = conn.exec_driver_sql(
+            "SELECT 1 FROM pg_database WHERE datname = 'stock_test_peer'"
+        ).fetchone()
+        if not exists:
+            conn.exec_driver_sql("CREATE DATABASE stock_test_peer")
+    admin.close()
+    db = empty_db(pg_url.rsplit("/", 1)[0] + "/stock_test_peer")
+    db.migrate()
+    yield db
+    db.close()
+
+
+@respx.mock(assert_all_called=False)
+def test_push_sends_kept_payloads_without_asking_sec(fresh, peer, respx_mock) -> None:
+    """The PC fetched AAA's company facts and a full filing; a push gives the server the
+    same raw rows and marks its tasks fetched, with no request to SEC."""
+    from stock_analysis.ingest.push import push
+
+    mock_sources(respx_mock)
+    cfg = config()
+    for db in (fresh, peer):  # both know the universe and the CIKs
+        job.run_job(db, cfg, ctx=context(cfg), sources=["tradingview", "sec_tickers"],
+                    do_build=False, do_coverage=False)  # fmt: skip
+    job.run_job(fresh, cfg, ctx=context(cfg), sources=["sec_companyfacts"], do_build=False,
+                do_coverage=False)  # fmt: skip
+    calls = respx_mock.calls.call_count
+    result = push(fresh, peer, ["sec_companyfacts"])
+    assert respx_mock.calls.call_count == calls  # nothing asked of SEC
+    assert result["sec_companyfacts"]["payloads"] == 2
+    count = "SELECT COUNT(*) AS n FROM raw_sec_fact"
+    assert rows(peer, count)["n"][0] == rows(fresh, count)["n"][0] > 0
+    t = rows(peer, "SELECT request_key, status FROM ops_task WHERE source = 'sec_companyfacts' "
+                   "ORDER BY 1")  # fmt: skip
+    assert t.values.tolist() == [["AAA", "ok"], ["BBB", "ok"]]
+    assert push(fresh, peer, ["sec_companyfacts"])["sec_companyfacts"]["payloads"] == 0
+    assert job.raw_since_build(peer)  # the server's next run rebuilds core
 
 
 def test_only_one_run_at_a_time(fresh) -> None:

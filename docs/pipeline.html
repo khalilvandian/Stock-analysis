@@ -303,6 +303,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 
 
 
+
 <section id="inside-the-database">
   <h2>Inside the database, in UML</h2>
   <figure>
@@ -927,14 +928,15 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <circle class="u-node" cx="910" cy="128" r="11"/>
 <circle class="u-solid" cx="910" cy="128" r="6.5"/>
 <path class="u-line" d="M872,128 L899,128" marker-end="url(#u6-a)"/>
-<path class="u-note" d="M946,52 H1267 L1276,61 V169 H946 z M1267,52 V61 H1276"/>
+<path class="u-note" d="M946,52 H1267 L1276,61 V184 H946 z M1267,52 V61 H1276"/>
 <text class="u-n" x="954" y="70">db import FILE --target server: from this PC</text>
 <text class="u-n" x="954" y="85">straight into the Azure database</text>
 <text class="u-n" x="954" y="100">the same parsers as the API sources;</text>
 <text class="u-n" x="954" y="115">due again after the source&#x27;s refresh interval,</text>
 <text class="u-n" x="954" y="130">as if fetched on the file&#x27;s date: the job</text>
-<text class="u-n" x="954" y="145">never downloads what was imported</text>
-<text class="u-nm" x="954" y="160">sec_companyfacts · sec_fsds</text>
+<text class="u-n" x="954" y="145">never downloads what was imported;</text>
+<text class="u-n" x="954" y="160">db push replays the PC&#x27;s kept payloads</text>
+<text class="u-nm" x="954" y="175">sec_companyfacts · sec_fsds</text>
 <path class="u-line dash" d="M946,90 L741,106"/>
 </svg>
     </div>

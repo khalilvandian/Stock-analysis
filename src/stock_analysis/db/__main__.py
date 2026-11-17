@@ -1,6 +1,9 @@
 """Command line: python -m stock_analysis.db
-{init,load-files,build,status,check,ping,allow-my-ip,create-roles,ingest,import,reparse,
+{init,load-files,build,status,check,ping,allow-my-ip,create-roles,ingest,import,reparse,push,
 coverage,tasks} [--target].
+
+push sends what this PC ingested (kept SEC payloads, imported data-set files) to --target
+(the server) without asking SEC again (ingest/push.py); --from picks the source database.
 
 import FILE loads a file downloaded or found by hand into the raw layer of the target database
 (--target server: straight into Azure), as its API source would (ingest/files.py).
@@ -38,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
             "ingest",
             "import",
             "reparse",
+            "push",
             "coverage",
             "tasks",
         ],
@@ -57,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("file", nargs="?", help="import: the file to load")
     parser.add_argument("--kind", help="import: the kind of file (default: its folder's name)")
     parser.add_argument("--symbols", help="import: only these companies (comma-separated)")
+    parser.add_argument("--from", dest="source_db", help="push: the database to send from")
     args = parser.parse_args(argv)
     if args.command == "check":
         return check(args.target, args.strict)
@@ -104,6 +109,15 @@ def main(argv: list[str] | None = None) -> int:
 
         symbols = args.symbols.split(",") if args.symbols else None
         print("Import:", json.dumps(import_file(db, args.file, args.kind, symbols)))
+    elif args.command == "push":
+        from ..ingest.push import push
+
+        src = Database.open(args.source_db)
+        if src.where == db.where:
+            raise SystemExit("push: --from and --target are the same database")
+        sources = args.sources.split(",") if args.sources else None
+        print(f"Push from {src.target} to {db.target}:", json.dumps(push(src, db, sources)))
+        src.close()
     elif args.command == "reparse":
         from ..ingest.files import reparse_all
 

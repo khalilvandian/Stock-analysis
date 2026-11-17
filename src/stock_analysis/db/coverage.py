@@ -54,14 +54,19 @@ def explained_for(rules: list[dict], item: str, year: int | None) -> bool:
     return reason_for(rules, item, year) is not None
 
 
-def reason_for(rules: list[dict], item: str, year: int | None) -> str | None:
-    """The reason of the first rule that covers this item and fiscal year (a quarter: None,
-    matched by any rule for the item)."""
+def reason_for(
+    rules: list[dict], item: str, year: int | None, quarter: str | None = None
+) -> str | None:
+    """The reason of the first rule that covers this item and period. A fiscal year is
+    `year` (quarter None); a quarter is `quarter` ('Q1'..'Q4', year None), matched by any rule
+    for the item unless the rule lists `quarters`, which then covers only those quarters."""
     for e in rules:
         items = e.get("items") or [e.get("item")]
-        if item in items and (
-            year is None or not e.get("fiscal_years") or year in e["fiscal_years"]
-        ):
+        if item not in items:
+            continue
+        if e.get("quarters") and quarter not in e["quarters"]:
+            continue
+        if year is None or not e.get("fiscal_years") or year in e["fiscal_years"]:
             return e.get("reason") or "explained"
     return None
 
@@ -78,10 +83,12 @@ ABSENT = {
 COUNTED = {"not_reported", "explained"}  # count as present in the required cells
 
 
-def why_absent(item: str, year: int | None, no_line: list, by_hand: list) -> tuple:
+def why_absent(
+    item: str, year: int | None, no_line: list, by_hand: list, quarter: str | None = None
+) -> tuple:
     """(status, reason) of a required value that isn't in the database."""
     for status, rules in (("not_reported", no_line), ("explained", by_hand)):
-        reason = reason_for(rules, item, year)
+        reason = reason_for(rules, item, year, quarter)
         if reason:
             return status, reason
     return "missing", None
@@ -93,10 +100,11 @@ def gap(item: str, period: str, ptype: str, status: str, reason: str | None) -> 
 
 
 def rules_for(rules: list[dict], m: dict) -> list[dict]:
-    """The rules that name this company, or its industry."""
+    """The rules that name this company or its industry, or apply to all (all = true)."""
     return [
         r for r in rules
-        if m["symbol"] in ([r["symbol"]] if r.get("symbol") else r.get("symbols", []))
+        if r.get("all")
+        or m["symbol"] in ([r["symbol"]] if r.get("symbol") else r.get("symbols", []))
         or m.get("industry") in r.get("industries", [])
     ]  # fmt: skip
 
@@ -372,7 +380,8 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
                 q_req += 1
                 ok = (cid, item, month_index(end), ptype) in have_quarter
                 if not ok:
-                    status, reason = why_absent(item, None, no_line, ok_by_hand)
+                    quarter = f"Q{((end.month - month) % 12) // 3 or 4}"
+                    status, reason = why_absent(item, None, no_line, ok_by_hand, quarter)
                     gaps.append(gap(item, f"{end:%Y-%m}", ptype, status, reason))
                     ok = status in COUNTED
                 q_have += ok

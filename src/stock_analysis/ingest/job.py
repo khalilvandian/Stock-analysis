@@ -382,7 +382,7 @@ def _run_job(
     }
     build_id = None
     status = "ok"
-    if do_build and stored:
+    if do_build and (stored or raw_since_build(db)):
         try:
             result = build(db)
             build_id = result["build_id"]
@@ -421,6 +421,20 @@ def _run_job(
             },
         )
     return {"run_id": run_id, "status": status, **summary}
+
+
+def raw_since_build(db: Database) -> bool:
+    """Raw data arrived after the last good build without this run storing it (a db push or
+    db import from the PC): the core layer needs rebuilding all the same."""
+    with db.connect() as conn:
+        return bool(
+            scalar(
+                conn,
+                "SELECT COALESCE(MAX(fetch_id), 0) > COALESCE((SELECT max_fetch_id FROM "
+                "core_build WHERE status = 'ok' ORDER BY build_id DESC LIMIT 1), 0) "
+                "FROM raw_fetch WHERE status = 'ok' AND rows_stored > 0",
+            )
+        )
 
 
 LOCK_KEY = 18_000_018  # pg advisory lock: one ingest at a time per database
