@@ -41,7 +41,10 @@ function Read-DotEnv([string]$name, [switch]$Optional) {
     if (-not $line) { if ($Optional) { return $null }; throw "$name is missing from .env" }
     return $line.Substring($name.Length + 1).Trim().Trim('"')
 }
-function Az { & $az @args; if ($LASTEXITCODE -ne 0) { throw "az $($args -join ' ') failed" } }
+function Az { $ErrorActionPreference = "Continue"; & $az @args; if ($LASTEXITCODE -ne 0) { throw "az $($args[0..1] -join ' ') failed (exit $LASTEXITCODE)" } }
+# A lookup that may find nothing: Windows PowerShell 5.1 turns any stderr line (az prints
+# warnings there) into a terminating error under "Stop", so this one runs under "Continue".
+function AzFind { $ErrorActionPreference = "Continue"; $out = & $az @args 2>$null; if ($LASTEXITCODE -eq 0) { $out } }
 
 $writer = Read-DotEnv "STOCK_WRITER_DB_PASSWORD"
 $agent = Read-DotEnv "SEC_USER_AGENT"
@@ -60,9 +63,12 @@ Write-Host "2/4 Container Apps environment $Environment"
 Az extension add --name containerapp --upgrade --only-show-errors
 Az provider register --namespace Microsoft.App --wait
 Az provider register --namespace Microsoft.OperationalInsights --wait
-$exists = & $az containerapp env show -n $Environment -g $ResourceGroup --query name -o tsv 2>$null
+$exists = AzFind containerapp env show -n $Environment -g $ResourceGroup --query name -o tsv
 if (-not $exists) {
-    Az containerapp env create -n $Environment -g $ResourceGroup -l $Location --only-show-errors
+    # WorkloadProfiles mode with its Consumption profile: the newer CLI otherwise makes an
+    # "Express" environment, which cannot run jobs.
+    Az containerapp env create -n $Environment -g $ResourceGroup -l $Location `
+        --environment-mode WorkloadProfiles --only-show-errors
 }
 
 Write-Host "3/4 Job $Job ($Cron UTC)"
@@ -77,7 +83,7 @@ if ($dispatch) {
     $secrets += "github-dispatch=$dispatch"
     $envVars += "GITHUB_DISPATCH_TOKEN=secretref:github-dispatch"
 }
-$exists = & $az containerapp job show -n $Job -g $ResourceGroup --query name -o tsv 2>$null
+$exists = AzFind containerapp job show -n $Job -g $ResourceGroup --query name -o tsv
 if (-not $exists) {
     Az containerapp job create -n $Job -g $ResourceGroup --environment $Environment `
         --trigger-type Schedule --cron-expression $Cron `
@@ -94,7 +100,7 @@ if (-not $exists) {
 Write-Host "4/4 Let the job's identity manage the database firewall rules"
 $principal = (Az containerapp job show -n $Job -g $ResourceGroup --query identity.principalId -o tsv)
 $serverId = (Az postgres flexible-server show -n $Server -g $ResourceGroup --query id -o tsv)
-$has = & $az role assignment list --assignee $principal --scope $serverId --role Contributor --query "[0].id" -o tsv 2>$null
+$has = AzFind role assignment list --assignee $principal --scope $serverId --role Contributor --query "[0].id" -o tsv
 if (-not $has) {
     Az role assignment create --assignee-object-id $principal --assignee-principal-type ServicePrincipal `
         --role Contributor --scope $serverId --only-show-errors

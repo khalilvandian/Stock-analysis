@@ -82,14 +82,14 @@ How long a backfill takes: SEC needs about 500 calls (about 10 minutes) and Yaho
 
 | | |
 |---|---|
-| **Service** | Azure Container Apps **Job** `stock-ingest`, in the Consumption environment `stock-jobs-env` (resource group `stock-rg`). Billed per second while it runs, inside the monthly free grant (180,000 vCPU-seconds, 360,000 GiB-seconds) |
+| **Service** | Azure Container Apps **Job** `stock-ingest`, in the environment `stock-jobs-env` (resource group `stock-rg`, workload-profiles mode, Consumption profile; an "Express" environment, which newer CLIs create by default, cannot run jobs). Billed per second while it runs, inside the monthly free grant (180,000 vCPU-seconds, 360,000 GiB-seconds) |
 | **Schedule** | Every day at 22:30 UTC (`30 22 * * *`), after the US close. At most 3 hours, no retries: the next run carries on |
 | **Size** | 1.5 vCPU, 3 GiB. The full build of the S&P 500 peaks at 1.7 GiB (measured in the container at 2 GiB) and takes about 11 minutes |
-| **Image** | `ghcr.io/khalilvandian/stock-analysis-ingest:latest`, built from the `Dockerfile` by the workflow `ingest-image.yml` on every push to `main` that changes `src/`, `config/` or the dependencies. The job pulls it at every run |
+| **Image** | `ghcr.io/khalilvandian/stock-analysis-ingest:latest`, built from the `Dockerfile` by the workflow `ingest-image.yml` on every push to `main` that changes `src/`, `config/` or the dependencies. The job pulls it at every run, without a password: the package is public because the repository is |
 | **Settings** | `STOCK_DB_TARGET=server-writer`; secrets `STOCK_WRITER_DB_PASSWORD`, `SEC_USER_AGENT` and (optional) `GITHUB_DISPATCH_TOKEN`; `AZURE_SUBSCRIPTION_ID` |
 | **Database access** | The firewall admits only listed addresses, and the job's address changes. So each run uses the job's managed identity to set the firewall rule `ingest-job` to its own address, and deletes the rule at the end (`JobFirewall` in `src/stock_analysis/db/azure.py`). The identity is Contributor on the database server only |
 | **Deploy or update** | `powershell -ExecutionPolicy Bypass -File deploy\ingest-job.ps1` (add `-RunNow` to start a run). It also applies the migrations and the users' rights on the server |
-| **See the runs** | `az containerapp job execution list -n stock-ingest -g stock-rg -o table`, the logs in the job's Log Analytics workspace, `ops_run` in the database, and the coverage page |
+| **See the runs** | `az containerapp job execution list -n stock-ingest -g stock-rg -o table`, a run's output with `az containerapp job logs show -n stock-ingest -g stock-rg --execution <name> --container stock-ingest --format text`, the logs in the job's Log Analytics workspace, `ops_run` in the database, and the coverage page |
 
 The same image runs locally against the Docker database:
 
