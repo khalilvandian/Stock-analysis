@@ -74,7 +74,7 @@ columns (the trend) and everything else in `detail_json`. A rerun on the same da
 
 ## The page
 
-`analysis/site.py` builds `coverage.html` (the **Data** tab). The Pages workflow
+`analysis/site.py` builds `coverage.html` (**Project → Data coverage** in the menu). The Pages workflow
 (`.github/workflows/pages.yml`) runs when the ingest job finishes (the job starts it through
 GitHub's API), every day at 05:15 UTC as a fallback, and on every push. It reads the newest snapshot through the web API (`/query`, with the repository
 secret `STOCK_API_KEY`), so the site stays static and no data is committed. Without the

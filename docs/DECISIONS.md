@@ -316,3 +316,13 @@ their date.
     public repository.
   - **Opening the firewall to all of Azure:** the database stays limited to listed
     addresses.
+
+### The site gets grouped menus, and the pipeline diagram is one of its pages
+
+Seven pages no longer fit one row of tabs, least of all on a phone, so the top bar has three
+menus: Analyses, Markets and Project. They are plain `<details>` elements, so they work
+without JavaScript; a few lines of script only close the other menus. The pipeline diagram
+lives in one file, `docs/pipeline.html`, which is both the Claude artifact and the site's
+Pipeline page: its styles are scoped under `.pipeline` with `--p-` tokens, so the site can
+include it unchanged, and a push that edits it republishes the site.
+

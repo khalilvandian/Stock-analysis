@@ -141,12 +141,19 @@ A stock removed from the watch list keeps its folder and appears as "off the lis
 
 https://khalilvandian.github.io/Stock-analysis/, built by `analysis/site.py` (standard
 library only) and published by `.github/workflows/pages.yml` on pushes to `main` that
-touch `analyses/`, `data/screener/`, `analysis/site.py` or the workflow, or by hand
-(`workflow_dispatch`). Pages: **Watch list** (one summary panel per stock, sidebar of current
-and former stocks), one page per stock (verdict, key numbers, a PDF viewer over every dated
-analysis, Claude's notes, the dated table), **Market** (latest strip and every dated report),
-**Screener** (the latest Stage 1 pass counts by category and the top 3 per sector from
-`data/screener/`), and **Summaries**. PDFs are copied next to the pages.
+touch `analyses/`, `data/screener/`, `analysis/site.py`, `docs/pipeline.html` or the workflow,
+every day at 05:15 UTC, or by hand (`workflow_dispatch`). The top bar has three menus
+(`MENU` in `analysis/site.py`; add a page there):
+
+- **Analyses:** **Watch list** (one summary panel per stock, sidebar of current and former
+  stocks; one page per stock with the verdict, key numbers, a PDF viewer over every dated
+  analysis, Claude's notes and the dated table) and **Summaries**.
+- **Markets:** **Market reports** (latest strip and every dated report) and **Screener** (the
+  latest Stage 1 pass counts by category and the top 3 per sector from `data/screener/`).
+- **Project:** **Pipeline** (the diagram in `docs/pipeline.html`, shown as it is) and **Data
+  coverage** (`docs/COVERAGE.md`).
+
+PDFs are copied next to the pages.
 
 ## The email
 

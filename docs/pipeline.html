@@ -5,87 +5,90 @@
 <!--
   The project's pipeline drawn by hand (issue #18). Keep it matching the code: when a piece,
   a schedule or a data path changes, edit the SVG below, update "Updated", and republish the
-  artifact (docs/ARCHITECTURE.md links it). Coordinates sit on a 10 px grid; zones are Azure,
+  artifact (docs/ARCHITECTURE.md links it). The site's Pipeline page (analysis/site.py) is
+  built from this file: rules stay under .pipeline and tokens use the --p- prefix, so they
+  never touch the site's own styles; the body rule and #maintain are dropped there. Coordinates sit on a 10 px grid; zones are Azure,
   GitHub, the free sources and your PC / Claude sessions.
 -->
 <style>
 /* Layout: one wide engineering drawing per figure, each in its own horizontal scroller, with
    a reference table and a maintenance checklist below. */
 :root {
-  --bg: #f4f6f8; --fg: #16202a; --muted: #5b6775; --card: #ffffff; --zone: #e7ecf1;
-  --line: #c3ccd6; --edge: #7a8592; --accent: #0b7285; --accent-soft: #c9e7ec;
-  --band: #f0f3f6; --fw: #b45309;
-  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --p-bg: #f4f6f8; --p-fg: #16202a; --p-muted: #5b6775; --p-card: #ffffff; --p-zone: #e7ecf1;
+  --p-line: #c3ccd6; --p-edge: #7a8592; --p-accent: #0b7285; --p-accent-soft: #c9e7ec;
+  --p-band: #f0f3f6; --p-fw: #b45309;
+  --p-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --p-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0f151b; --fg: #e3e9ef; --muted: #96a3b0; --card: #17202a; --zone: #131c25;
-  --line: #2e3c4a; --edge: #74818e; --accent: #45c2d6; --accent-soft: #123a44;
-  --band: #1c2733; --fw: #f59e0b; color-scheme: dark; } }
+  --p-bg: #0f151b; --p-fg: #e3e9ef; --p-muted: #96a3b0; --p-card: #17202a; --p-zone: #131c25;
+  --p-line: #2e3c4a; --p-edge: #74818e; --p-accent: #45c2d6; --p-accent-soft: #123a44;
+  --p-band: #1c2733; --p-fw: #f59e0b; color-scheme: dark; } }
 :root[data-theme="dark"] {
-  --bg: #0f151b; --fg: #e3e9ef; --muted: #96a3b0; --card: #17202a; --zone: #131c25;
-  --line: #2e3c4a; --edge: #74818e; --accent: #45c2d6; --accent-soft: #123a44;
-  --band: #1c2733; --fw: #f59e0b; color-scheme: dark; }
+  --p-bg: #0f151b; --p-fg: #e3e9ef; --p-muted: #96a3b0; --p-card: #17202a; --p-zone: #131c25;
+  --p-line: #2e3c4a; --p-edge: #74818e; --p-accent: #45c2d6; --p-accent-soft: #123a44;
+  --p-band: #1c2733; --p-fw: #f59e0b; color-scheme: dark; }
 
-body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); }
-.page { max-width: 1340px; margin: 0 auto; padding-block: 28px 56px;
+body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans); }
+.pipeline { max-width: 1340px; margin: 0 auto; padding-block: 28px 56px;
+  color: var(--p-fg); font: 15px/1.55 var(--p-sans);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: grid; gap: 28px; }
-header { display: grid; gap: 6px; }
-h1 { font: 600 28px/1.2 var(--sans); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
-h2 { font: 600 18px/1.3 var(--sans); margin: 0; text-wrap: balance; }
-.lede { margin: 0; color: var(--muted); max-width: 70ch; }
-.meta { font: 12px var(--mono); color: var(--muted); }
-section { display: grid; gap: 12px; min-width: 0; }
-figure { margin: 0; display: grid; gap: 10px; min-width: 0; }
-.scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line);
+.pipeline header { display: grid; gap: 6px; }
+.pipeline h1 { font: 600 28px/1.2 var(--p-sans); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.pipeline h2 { font: 600 18px/1.3 var(--p-sans); margin: 0; text-wrap: balance; }
+.pipeline .lede { margin: 0; color: var(--p-muted); max-width: 70ch; }
+.pipeline .meta { font: 12px var(--p-mono); color: var(--p-muted); }
+.pipeline section { display: grid; gap: 12px; min-width: 0; }
+.pipeline figure { margin: 0; display: grid; gap: 10px; min-width: 0; }
+.pipeline .scroll { overflow-x: auto; background: var(--p-card); border: 1px solid var(--p-line);
   border-radius: 8px; padding: 12px; }
-.scroll svg { display: block; width: 100%; min-width: 980px; height: auto; }
-figcaption { color: var(--muted); font-size: 14px; max-width: 80ch; }
-.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); }
-.legend span { display: inline-flex; align-items: center; gap: 8px; }
-.legend i { display: inline-block; width: 28px; height: 0; border-top: 2px solid var(--edge); }
-.legend i.hot { border-top-color: var(--accent); }
-.legend i.dash { border-top-style: dashed; }
-.legend i.fw { height: 10px; width: 10px; border: 0;
-  background: repeating-linear-gradient(45deg, var(--fw) 0 2px, transparent 2px 5px); }
-.tbl { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; font-size: 14px; }
-th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-code { font: 13px var(--mono); }
-ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+.pipeline .scroll svg { display: block; width: 100%; min-width: 980px; height: auto; }
+.pipeline figcaption { color: var(--p-muted); font-size: 14px; max-width: 80ch; }
+.pipeline .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--p-muted); }
+.pipeline .legend span { display: inline-flex; align-items: center; gap: 8px; }
+.pipeline .legend i { display: inline-block; width: 28px; height: 0; border-top: 2px solid var(--p-edge); }
+.pipeline .legend i.hot { border-top-color: var(--p-accent); }
+.pipeline .legend i.dash { border-top-style: dashed; }
+.pipeline .legend i.fw { height: 10px; width: 10px; border: 0;
+  background: repeating-linear-gradient(45deg, var(--p-fw) 0 2px, transparent 2px 5px); }
+.pipeline .tbl { overflow-x: auto; }
+.pipeline table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.pipeline th, .pipeline td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--p-line); vertical-align: top; }
+.pipeline th { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--p-muted); }
+.pipeline code { font: 13px var(--p-mono); }
+.pipeline ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
 
 /* the drawings */
-.zone { fill: var(--zone); }
-.zl { font: 500 11px var(--sans); letter-spacing: 0.08em; fill: var(--muted); }
-.box { fill: var(--card); stroke: var(--line); stroke-width: 1; }
-.box.hot { stroke: var(--accent); stroke-width: 1.5; }
-.t { font: 600 13px var(--sans); fill: var(--fg); }
-.s { font: 11px var(--sans); fill: var(--muted); }
-.k { font: 11.5px var(--sans); fill: var(--fg); }
-.m { font: 11px var(--mono); fill: var(--fg); }
-.mm { font: 11px var(--mono); fill: var(--muted); }
-.rule { stroke: var(--line); stroke-width: 1; }
-.band { fill: var(--band); }
-.e { stroke: var(--edge); stroke-width: 1.5; fill: none; }
-.e.hot { stroke: var(--accent); stroke-width: 2; }
-.e.dash { stroke-dasharray: 5 4; }
-.el { font: 11px var(--sans); fill: var(--muted); }
-.el.hot { fill: var(--accent); font-weight: 500; }
-.ah { fill: var(--edge); }
-.ahh { fill: var(--accent); }
-.hatch { stroke: var(--fw); stroke-width: 2; }
-.fwl { font: 500 11px var(--mono); fill: var(--fw); }
-.axis { stroke: var(--line); stroke-width: 1; }
-.tick { font: 11px var(--mono); fill: var(--muted); }
-.cap { fill: var(--accent-soft); }
-.run { fill: var(--accent); }
-.mute { fill: var(--edge); }
+.pipeline .zone { fill: var(--p-zone); }
+.pipeline .zl { font: 500 11px var(--p-sans); letter-spacing: 0.08em; fill: var(--p-muted); }
+.pipeline .box { fill: var(--p-card); stroke: var(--p-line); stroke-width: 1; }
+.pipeline .box.hot { stroke: var(--p-accent); stroke-width: 1.5; }
+.pipeline .t { font: 600 13px var(--p-sans); fill: var(--p-fg); }
+.pipeline .s { font: 11px var(--p-sans); fill: var(--p-muted); }
+.pipeline .k { font: 11.5px var(--p-sans); fill: var(--p-fg); }
+.pipeline .m { font: 11px var(--p-mono); fill: var(--p-fg); }
+.pipeline .mm { font: 11px var(--p-mono); fill: var(--p-muted); }
+.pipeline .rule { stroke: var(--p-line); stroke-width: 1; }
+.pipeline .band { fill: var(--p-band); }
+.pipeline .e { stroke: var(--p-edge); stroke-width: 1.5; fill: none; }
+.pipeline .e.hot { stroke: var(--p-accent); stroke-width: 2; }
+.pipeline .e.dash { stroke-dasharray: 5 4; }
+.pipeline .el { font: 11px var(--p-sans); fill: var(--p-muted); }
+.pipeline .el.hot { fill: var(--p-accent); font-weight: 500; }
+.pipeline .ah { fill: var(--p-edge); }
+.pipeline .ahh { fill: var(--p-accent); }
+.pipeline .hatch { stroke: var(--p-fw); stroke-width: 2; }
+.pipeline .fwl { font: 500 11px var(--p-mono); fill: var(--p-fw); }
+.pipeline .axis { stroke: var(--p-line); stroke-width: 1; }
+.pipeline .tick { font: 11px var(--p-mono); fill: var(--p-muted); }
+.pipeline .cap { fill: var(--p-accent-soft); }
+.pipeline .run { fill: var(--p-accent); }
+.pipeline .mute { fill: var(--p-edge); }
 </style>
 
-<div class="page">
+<div class="page pipeline">
 <header>
   <h1>Stock Analysis Pipeline</h1>
   <p class="lede">How data gets from the free sources into the database, and from there to the
@@ -211,7 +214,7 @@ ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
   <line class="e hot" x1="1160" y1="318" x2="1186" y2="318" marker-end="url(#h)"/>
 
   <!-- image pulled by the job -->
-  <polyline class="e" points="1245,120 1245,40 351,40 351,88" marker-end="url(#a)"/>
+  <polyline class="e" points="1245,120 1245,40 440,40 440,88" marker-end="url(#a)"/>
   <text class="el" x="800" y="33" text-anchor="middle">image pulled at each run</text>
 
   <!-- API to the site build -->
@@ -276,7 +279,7 @@ ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
     <line class="axis" x1="990" y1="164" x2="990" y2="172"/><text x="990" y="188">04:00</text>
     <line class="axis" x1="1174" y1="164" x2="1174" y2="172"/><text x="1174" y="188">06:00</text>
   </g>
-  <text class="tick" x="1266" y="188" text-anchor="end">UTC (Italy = UTC+1 in winter, +2 in summer)</text>
+  <text class="tick" x="70" y="18">UTC · Italy is UTC+1 in winter, UTC+2 in summer</text>
 
   <!-- evening run -->
   <rect class="mute" x="254" y="34" width="69" height="14" rx="3"/>
@@ -319,7 +322,7 @@ ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
   </div>
 </section>
 
-<section>
+<section id="maintain">
   <h2>Keeping this drawing current</h2>
   <ol>
     <li>Edit <code>docs/pipeline.html</code> in the same change that adds, moves or reschedules a piece.</li>

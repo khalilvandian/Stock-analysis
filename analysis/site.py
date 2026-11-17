@@ -2,9 +2,10 @@
 
 Pages: an overview (market strip and one card per stock), one page per stock (verdict,
 key numbers, Claude's notes, every dated PDF), the market reports, the market screener's
-latest top 3 per sector (data/screener/) and the watch list summaries, with a menu on
-every page. The PDFs are copied next to the pages, so a link opens the report in the
-browser. The evening run commits to `main`; the Pages workflow
+latest top 3 per sector (data/screener/), the watch list summaries, the data coverage and
+the pipeline diagram (docs/pipeline.html), with grouped menus on every page. The PDFs
+are copied next to the pages, so a link opens the report in the browser. The evening run
+commits to `main`; the Pages workflow
 (.github/workflows/pages.yml) then runs this and publishes `_site/` at
 https://khalilvandian.github.io/Stock-analysis/.
 
@@ -33,6 +34,13 @@ CONFIG = ROOT / "config/watchlist.toml"
 SCREENER = ROOT / "data/screener"  # written by analysis/screener.py
 SITE = ROOT / "_site"
 COVERAGE = ROOT / "data/coverage/latest.json"  # db coverage --json
+PIPELINE = ROOT / "docs/pipeline.html"  # the hand-drawn pipeline diagram
+# The menus: (group, [(page, label)]). A page is <page>.html; "index" is the home page.
+MENU = [
+    ("Analyses", [("index", "Watch list"), ("summaries", "Summaries")]),
+    ("Markets", [("market", "Market reports"), ("screener", "Screener")]),
+    ("Project", [("pipeline", "Pipeline"), ("coverage", "Data coverage")]),
+]
 URL = "https://khalilvandian.github.io/Stock-analysis/"
 
 CSS = """
@@ -60,11 +68,27 @@ header.bar { background: var(--bar); color: var(--bar-text); position: sticky; t
   align-items: center; gap: 24px; height: 56px; }
 .brand { font-weight: 700; color: var(--bar-text); white-space: nowrap; letter-spacing: .2px; }
 .brand span { color: #7aa2ff; }
-nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-nav a { color: #b8c2d3; padding: 8px 12px; border-radius: 8px; white-space: nowrap;
-  font-size: .94em; }
-nav a:hover { background: rgba(255, 255, 255, .08); color: #fff; text-decoration: none; }
-nav a.on { background: rgba(122, 162, 255, .18); color: #fff; }
+nav { display: flex; gap: 4px; margin-left: auto; }
+nav details { position: relative; }
+nav summary { list-style: none; cursor: pointer; color: #b8c2d3; padding: 8px 12px;
+  border-radius: 8px; white-space: nowrap; font-size: .94em; user-select: none;
+  display: flex; align-items: center; gap: 6px; }
+nav summary::-webkit-details-marker { display: none; }
+nav summary::after { content: ""; width: 6px; height: 6px; margin-top: -3px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg); opacity: .7; }
+nav details[open] summary::after { transform: rotate(-135deg); margin-top: 3px; }
+nav summary:hover, nav details[open] summary { background: rgba(255, 255, 255, .08); color: #fff; }
+nav summary:focus-visible, nav .dd a:focus-visible { outline: 2px solid #7aa2ff;
+  outline-offset: 1px; }
+nav details.on summary { color: #fff; box-shadow: inset 0 -2px 0 #7aa2ff;
+  border-radius: 8px 8px 2px 2px; }
+nav .dd { position: absolute; right: 0; top: calc(100% + 6px); min-width: 190px; padding: 6px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, .18); display: flex; flex-direction: column; gap: 2px; }
+nav .dd a { color: var(--text); padding: 8px 12px; border-radius: 7px; white-space: nowrap; }
+nav .dd a:hover { background: var(--bg); text-decoration: none; }
+nav .dd a.on { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
 main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 64px; }
 h1 { font-size: 1.9em; margin: 0 0 4px; letter-spacing: -.3px; }
 h2 { font-size: 1.2em; margin: 36px 0 12px; }
@@ -172,7 +196,8 @@ footer { color: var(--muted); font-size: .85em; text-align: center; padding: 24p
   .viewer iframe { height: 70vh; }
 }
 @media (max-width: 640px) {
-  .bar .in { gap: 12px; } .brand { font-size: .95em; } h1 { font-size: 1.5em; }
+  .bar .in { gap: 8px; } .brand { font-size: .95em; } h1 { font-size: 1.5em; }
+  nav summary { padding: 8px 8px; font-size: .9em; }
 }
 """
 
@@ -328,11 +353,42 @@ def badge(to_entry) -> str:
 # --- pages ------------------------------------------------------------------------
 
 
-def layout(title_: str, active: str, body: str, menu: list[tuple[str, str]]) -> str:
-    links = "".join(
-        f'<a href="{href}"{" class=on" if key == active else ""}>{esc(label)}</a>'
-        for key, label, href in [(k, label, f"{k}.html") for k, label in menu]
-    ).replace('href="index.html"', 'href="./"')
+def menu_groups(menu) -> list[tuple[str, list[tuple[str, str]]]]:
+    """The menu as groups; a flat [(page, label)] list (older callers) is one group."""
+    if menu and isinstance(menu[0][1], list):
+        return menu
+    return [("Pages", list(menu))]
+
+
+# Opens one menu at a time; Escape or a click elsewhere closes it.
+MENU_JS = """<script>
+const menus = [...document.querySelectorAll("nav details")];
+menus.forEach(d => d.addEventListener("toggle", () => {
+  if (d.open) menus.forEach(o => { if (o !== d) o.open = false; });
+}));
+document.addEventListener("click", e => {
+  if (!e.target.closest("nav")) menus.forEach(d => d.open = false);
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  menus.filter(d => d.open).forEach(d => { d.open = false; d.querySelector("summary").focus(); });
+});
+</script>"""
+
+
+def layout(title_: str, active: str, body: str, menu, head: str = "") -> str:
+    groups = []
+    for group, pages in menu_groups(menu):
+        here = any(key == active for key, _ in pages)
+        links = "".join(
+            f'<a href="{"./" if key == "index" else key + ".html"}"'
+            f"{' class=on aria-current=page' if key == active else ''}>{esc(label)}</a>"
+            for key, label in pages
+        )
+        groups.append(
+            f"<details{' class=on' if here else ''}><summary>{esc(group)}</summary>"
+            f'<div class="dd">{links}</div></details>'
+        )
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
@@ -340,13 +396,25 @@ def layout(title_: str, active: str, body: str, menu: list[tuple[str, str]]) -> 
         "<link rel='preconnect' href='https://fonts.googleapis.com'>"
         "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700"
         "&display=swap' rel='stylesheet'>"
-        f"<style>{CSS}</style></head><body>"
-        "<header class='bar'><div class='in'><a class='brand' href='./'>Watch list "
-        f"<span>analyses</span></a><nav>{links}</nav></div></header>"
+        f"<style>{CSS}</style>{head}</head><body>"
+        "<header class='bar'><div class='in'><a class='brand' href='./'>Stock "
+        f"<span>analysis</span></a><nav aria-label='Site'>{''.join(groups)}</nav></div></header>"
         f"<main>{body}</main>"
         "<footer>Analysed every evening at 21:00 Italy time. Every run is kept as a dated "
-        "PDF. Not investment advice.</footer></body></html>"
+        f"PDF. Not investment advice.</footer>{MENU_JS}</body></html>"
     )
+
+
+def pipeline_page(menu, source: Path | None = None) -> str:
+    """The pipeline diagram, taken from docs/pipeline.html as it is: its styles are scoped
+    under .pipeline, so only its body rule and the maintenance notes are left out."""
+    text = (source or PIPELINE).read_text(encoding="utf-8")
+    fonts = "".join(re.findall(r"<link [^>]*fonts\.googleapis[^>]*>", text))
+    css = re.search(r"<style>(.*?)</style>", text, re.S).group(1)
+    css = re.sub(r"^body \{[^}]*\}\n", "", css, flags=re.M)
+    body = text.split("</style>", 1)[1]
+    body = re.sub(r'<section id="maintain">.*?</section>', "", body, flags=re.S)
+    return layout("Pipeline", "pipeline", body, menu, head=f"{fonts}<style>{css}</style>")
 
 
 def market_strip(r: dict) -> str:
@@ -932,13 +1000,7 @@ def build(out: Path = SITE) -> Path:
         dst = out / pdf.parent.name / pdf.name
         dst.parent.mkdir(exist_ok=True)
         shutil.copy2(pdf, dst)
-    menu = [
-        ("index", "Watch list"),
-        ("market", "Market"),
-        ("screener", "Screener"),
-        ("summaries", "Summaries"),
-        ("coverage", "Data"),
-    ]
+    menu = MENU
     (out / "index.html").write_text(overview(menu))
     for f in stocks():
         (out / f"{f.name}.html").write_text(stock_page(f, menu))
@@ -946,6 +1008,7 @@ def build(out: Path = SITE) -> Path:
     (out / "screener.html").write_text(screener_page(menu))
     (out / "summaries.html").write_text(summaries_page(menu))
     (out / "coverage.html").write_text(coverage_page(menu), encoding="utf-8")
+    (out / "pipeline.html").write_text(pipeline_page(menu), encoding="utf-8")
     (out / ".nojekyll").write_text("")
     return out
 

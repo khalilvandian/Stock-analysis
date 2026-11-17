@@ -16,6 +16,7 @@ on:
       - "analyses/**"
       - "data/screener/**"
       - "analysis/site.py"
+      - "docs/pipeline.html"
       - ".github/workflows/pages.yml"
   schedule:
     - cron: "15 5 * * *"  # every day 05:15 UTC, after the night's ingest run
