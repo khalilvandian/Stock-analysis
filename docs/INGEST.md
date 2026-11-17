@@ -32,8 +32,9 @@ Every command takes `--target`. On Azure the job runs as `server-writer`.
    The members are the newest TradingView snapshot. A company that leaves the index keeps
    its data, but its tasks become inactive. A new member gets its tasks and is fetched first.
 3. **Mode.** `backfill` while any task has never been fetched, or the last coverage snapshot
-   shows fewer than `covered_share_to_maintain` (95%) of the companies covered. Otherwise
-   `maintain`. `--mode` forces one.
+   has less than `present_share_to_maintain` (90%) of the required values. Otherwise
+   `maintain`. Backfill means "fetch everything once"; the gaps left after it are mapping work,
+   not fetching. `--mode` forces one.
 4. **Fetch.** The sources run in the `order` of `config/ingest.toml`. For each one it takes
    the tasks that are due: never-fetched ones first, then the most overdue. Each task runs in
    its own transaction, so a failure loses only that task. A source group stops when:
@@ -83,7 +84,7 @@ How long a backfill takes: SEC needs about 500 calls (about 10 minutes) and Yaho
 |---|---|
 | **Service** | Azure Container Apps **Job** `stock-ingest`, in the Consumption environment `stock-jobs-env` (resource group `stock-rg`). Billed per second while it runs, inside the monthly free grant (180,000 vCPU-seconds, 360,000 GiB-seconds) |
 | **Schedule** | Every day at 22:30 UTC (`30 22 * * *`), after the US close. At most 3 hours, no retries: the next run carries on |
-| **Size** | 1 vCPU, 2 GiB |
+| **Size** | 1.5 vCPU, 3 GiB. The full build of the S&P 500 peaks at 1.7 GiB (measured in the container at 2 GiB) and takes about 11 minutes |
 | **Image** | `ghcr.io/khalilvandian/stock-analysis-ingest:latest`, built from the `Dockerfile` by the workflow `ingest-image.yml` on every push to `main` that changes `src/`, `config/` or the dependencies. The job pulls it at every run |
 | **Settings** | `STOCK_DB_TARGET=server-writer`; secrets `STOCK_WRITER_DB_PASSWORD`, `SEC_USER_AGENT` and (optional) `GITHUB_DISPATCH_TOKEN`; `AZURE_SUBSCRIPTION_ID` |
 | **Database access** | The firewall admits only listed addresses, and the job's address changes. So each run uses the job's managed identity to set the firewall rule `ingest-job` to its own address, and deletes the rule at the end (`JobFirewall` in `src/stock_analysis/db/azure.py`). The identity is Contributor on the database server only |

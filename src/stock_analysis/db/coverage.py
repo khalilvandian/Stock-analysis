@@ -144,7 +144,8 @@ def pipeline(conn: Connection) -> dict:
     )
     last_runs = []
     for r in runs.to_dict("records"):
-        s = json.loads(r.pop("summary") or "{}")
+        raw = r.pop("summary")
+        s = json.loads(raw) if isinstance(raw, str) and raw else {}
         r["stopped"] = {
             g: v["stopped"] for g, v in (s.get("groups") or {}).items() if v.get("stopped")
         }
@@ -421,7 +422,7 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
 
 def choose_mode(detail: dict, threshold: float) -> str:
     t = detail["totals"]
-    share = t["companies_covered"] / t["companies"] if t["companies"] else 0
+    share = t["cells_present"] / t["cells_required"] if t["cells_required"] else 0
     never = detail["pipeline"]["never_fetched"]
     return "maintain" if share >= threshold and not never else "backfill"
 
@@ -432,7 +433,7 @@ def snapshot(db: Database, config: dict | None = None, today: date | None = None
     cfg = config or load_config()
     with db.connect() as conn:
         detail = compute(conn, cfg, today)
-    detail["mode"] = choose_mode(detail, float(cfg.get("covered_share_to_maintain", 0.95)))
+    detail["mode"] = choose_mode(detail, float(cfg.get("present_share_to_maintain", 0.90)))
     t = detail["totals"]
     with db.begin() as conn:
         trend = frame(

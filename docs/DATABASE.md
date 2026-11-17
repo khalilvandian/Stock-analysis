@@ -690,7 +690,13 @@ Free cash flow, net debt and market value are calculated in the views, not store
    The fiscal quarter is counted from the company's fiscal year-end month. Balance-sheet
    items are `I` whatever file they came from.
    - SEC flows are a quarter when they span 80–100 days and a fiscal year at 350–380 days.
-     Half-year and nine-month totals are left out.
+     A twelve-month total that doesn't end in the fiscal year-end month (10-Qs show trailing
+     years) is not a fiscal year.
+   - 10-Q cash flows are year to date. The second quarter is the six months less the first
+     quarter, the third the nine months less the six (same start date, latest versions,
+     `method` `derived`), where SEC doesn't report the quarter itself.
+   - SEC reports capex as a positive payment; `sec_scale = -1` in `config/db_items.toml`
+     stores it negative like the other sources.
    - SEC's fourth quarter is derived as the fiscal year less its three quarters (all from
      SEC, latest versions), except for EPS. A Q4 that Yahoo reports wins over the derived one.
    - Cover-page share counts (`dei`) are dated at their filing's balance-sheet date.

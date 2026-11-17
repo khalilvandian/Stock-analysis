@@ -102,11 +102,13 @@ def plan(conn: Connection, config: dict, now: datetime) -> dict[str, int]:
 
 
 def choose_mode(conn: Connection, threshold: float) -> str:
-    """Backfill while a task was never fetched or the last coverage snapshot is short."""
+    """Backfill until every task has been fetched once and the last coverage snapshot has at
+    least `threshold` of the required values. Gaps left after that are mapping work (a tag
+    to add, a derivation), which more fetching would not fill."""
     never = scalar(conn, "SELECT COUNT(*) FROM ops_task WHERE active AND last_success_at IS NULL")
     snap = run(
         conn,
-        "SELECT companies, companies_covered FROM out_coverage_snapshot "
+        "SELECT cells_required, cells_present FROM out_coverage_snapshot "
         "ORDER BY snapshot_date DESC LIMIT 1",
     ).fetchone()
     if never or not snap or not snap[0] or snap[1] / snap[0] < threshold:
@@ -285,7 +287,7 @@ def _run_job(
     ctx = ctx or Context(config, httpx.Client(timeout=60), sec.client(), yahoo.YahooClient())
     started = utcnow()
     deadline = time.monotonic() + 60 * float(max_minutes or config.get("max_minutes", 150))
-    threshold = coverage_config().get("covered_share_to_maintain", 0.95)
+    threshold = coverage_config().get("present_share_to_maintain", 0.90)
     with db.begin() as conn:
         # The lock is held, so a run still marked 'running' was killed part-way.
         run(

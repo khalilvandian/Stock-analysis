@@ -8,7 +8,7 @@ What it sets up, all in resource group stock-rg:
   1. the database: migrations up to date and the working users' rights (as stock_admin)
   2. the Container Apps environment stock-jobs-env (Consumption: billed per second while a job
      runs, inside the monthly free grant)
-  3. the job stock-ingest: schedule, 1 vCPU / 2 GiB, at most 3 hours, no retries (the next run
+  3. the job stock-ingest: schedule, 1.5 vCPU / 3 GiB, at most 3 hours, no retries (the next run
      picks up where this one stopped), the secrets, and a system-assigned managed identity
   4. the identity's right to change the database server's firewall rules (Contributor on the
      server only), so each run can let its own address in and remove it afterwards
@@ -82,12 +82,12 @@ if (-not $exists) {
     Az containerapp job create -n $Job -g $ResourceGroup --environment $Environment `
         --trigger-type Schedule --cron-expression $Cron `
         --replica-timeout 10800 --replica-retry-limit 0 --parallelism 1 --replica-completion-count 1 `
-        --image $Image --cpu 1 --memory 2Gi --mi-system-assigned `
+        --image $Image --cpu 1.5 --memory 3Gi --mi-system-assigned `
         --secrets @secrets --env-vars @envVars --only-show-errors
 } else {
     Az containerapp job secret set -n $Job -g $ResourceGroup --secrets @secrets --only-show-errors
     Az containerapp job update -n $Job -g $ResourceGroup --cron-expression $Cron `
-        --image $Image --cpu 1 --memory 2Gi --replica-timeout 10800 `
+        --image $Image --cpu 1.5 --memory 3Gi --replica-timeout 10800 `
         --set-env-vars @envVars --only-show-errors
 }
 

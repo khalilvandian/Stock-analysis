@@ -284,7 +284,8 @@ their date.
   - interest and the three debt lines optional
   - operating income, EBITDA, D&A and capex not required for banks, insurers and asset
     managers; operating income and EBITDA not required for REITs
-  - backfill ends at 95% of companies covered
+  - backfill ends when every task has been fetched once and 90% of the required values are
+    in (first full backfill, 2026-11-17: 95%); the gaps left are mapping work, not fetching
 - **Build:** SEC facts are now in the build, first-ranked, with their real filing dates.
   - The fourth quarter is the year less three quarters.
   - Every period is dated at its nearest month end, so SEC's 52/53-week dates and Yahoo's
@@ -298,7 +299,7 @@ their date.
 
 - **Who:** Babak, after comparing the options with Claude.
 - **Decision:** An Azure Container Apps **Job** (`stock-ingest`, Consumption environment
-  `stock-jobs-env`, schedule `30 22 * * *` UTC, 1 vCPU, 2 GiB). Its image is built from this
+  `stock-jobs-env`, schedule `30 22 * * *` UTC, 1.5 vCPU, 3 GiB: the full build peaks at 1.7 GiB). Its image is built from this
   repository by GitHub Actions and kept on GitHub Container Registry. Each run lets itself
   through the database firewall with its managed identity (rule `ingest-job`, deleted at the
   end), so *Allow Azure services* stays off. When a run ends it starts the Pages workflow, so

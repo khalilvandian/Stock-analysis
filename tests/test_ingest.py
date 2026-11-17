@@ -56,6 +56,16 @@ def companyfacts(cik: int) -> dict:
     ):
         rev.append(fact(s, e, 110.0 + i, f"2025-{5 + 3 * i:02d}-05", "10-Q", f"q{i}"))
     rev.append(fact("2025-01-01", "2025-06-30", 221.0, "2025-08-05", "10-Q", "q1"))  # half year
+    # a trailing twelve months in a 10-Q: not a fiscal year
+    rev.append(fact("2024-10-01", "2025-09-30", 460.0, "2025-11-05", "10-Q", "q2"))
+    # cash flow is year to date in 10-Qs; capex is reported as a positive payment
+    ocf = [
+        fact("2025-01-01", "2025-03-31", 30.0, "2025-05-05", "10-Q", "q0"),
+        fact("2025-01-01", "2025-06-30", 70.0, "2025-08-05", "10-Q", "q1"),
+        fact("2025-01-01", "2025-09-30", 120.0, "2025-11-05", "10-Q", "q2"),
+        fact("2025-01-01", "2025-12-31", 180.0, "2026-02-20", accn="k25"),
+    ]
+    capex = [fact("2025-01-01", "2025-12-31", 40.0, "2026-02-20", accn="k25")]
     assets = [fact(None, "2025-12-31", 900.0, "2026-02-20", accn="k25")]
     shares = [fact(None, "2026-02-10", 50.0, "2026-02-20", accn="k25")]  # cover date
     return {
@@ -64,6 +74,8 @@ def companyfacts(cik: int) -> dict:
             "us-gaap": {
                 "Revenues": {"units": {"USD": rev}},
                 "Assets": {"units": {"USD": assets}},
+                "NetCashProvidedByUsedInOperatingActivities": {"units": {"USD": ocf}},
+                "PaymentsToAcquirePropertyPlantAndEquipment": {"units": {"USD": capex}},
                 "SomethingUnmapped": {"units": {"USD": [fact(None, "2025-12-31", 1, "x")]}},
             },
             "dei": {"EntityCommonStockSharesOutstanding": {"units": {"shares": shares}}},
@@ -160,8 +172,8 @@ def test_companyfacts_keeps_only_mapped_tags() -> None:
     keep = sec.mapped_tags()
     assert ("us-gaap", "Revenues") in keep and ("dei", "EntityCommonStockSharesOutstanding") in keep
     df = sec.facts_frame(companyfacts(1001), 1001, keep)
-    assert set(df["tag"]) == {"Revenues", "Assets", "EntityCommonStockSharesOutstanding"}
-    assert len(df[df["tag"] == "Revenues"]) == 6
+    assert "SomethingUnmapped" not in set(df["tag"])
+    assert len(df[df["tag"] == "Revenues"]) == 7
     assert df.loc[df["tag"] == "Assets", "period_start"].isna().all()
 
 
@@ -247,6 +259,21 @@ def test_job_fills_the_database_and_reruns_store_nothing(fresh, respx_mock) -> N
         "AND period_end = '2025-12-31'",
     )
     assert fy["value"].iloc[0] == 500.0 and not fy["filed_estimated"].iloc[0]
+
+    def aaa(item, ptype):
+        return rows(
+            fresh,
+            "SELECT period_end, value, method FROM v_fundamental_latest f JOIN core_company c "
+            "USING (company_id) WHERE c.symbol = 'AAA' AND item = :i AND period_type = :t "
+            "ORDER BY period_end",
+            {"i": item, "t": ptype},
+        )
+
+    ocf = aaa("operating_cf", "Q")
+    assert list(ocf["value"]) == [30.0, 40.0, 50.0, 60.0]  # Q1 reported, Q2-Q4 derived
+    assert list(ocf["method"]) == ["reported", "derived", "derived", "derived"]
+    assert list(aaa("capex", "FY")["value"]) == [-40.0]
+    assert list(aaa("revenue", "FY")["period_end"]) == ["2024-12-31", "2025-12-31"]
     snap = rows(fresh, "SELECT companies, cells_present, detail_json FROM out_coverage_snapshot")
     assert snap["companies"].iloc[0] == 2
     detail = json.loads(snap["detail_json"].iloc[0])
@@ -397,3 +424,50 @@ def test_a_finished_run_asks_github_to_rebuild_the_site(respx_mock, monkeypatch)
     assert route.calls.last.request.headers["Authorization"] == "Bearer t0ken"
     monkeypatch.delenv("GITHUB_DISPATCH_TOKEN")
     assert "daily schedule" in notify.publish_site(httpx.Client())
+
+
+def test_coverage_page_renders(monkeypatch, tmp_path) -> None:
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "analysis" / "site.py"
+    spec = importlib.util.spec_from_file_location("site_page", path)
+    site = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(site)
+    monkeypatch.delenv("STOCK_API_KEY", raising=False)
+    monkeypatch.setattr(site, "COVERAGE", tmp_path / "none.json")
+    menu = [("index", "Watch list"), ("coverage", "Data")]
+    assert "No coverage snapshot yet" in site.coverage_page(menu)
+    company = {
+        "symbol": "AAA", "name": "AAA <Corp>", "sector": "Utilities", "covered": False,
+        "share": 0.5, "prices": {"ok": True, "share": 1.0, "last": "2026-11-16"},
+        "quarterly": {"present": 4, "required": 8}, "earnings": {"present": 8, "required": 8},
+        "item_shares": [1.0, None, 0.3], "missing": ["capex FY2016"], "missing_count": 3,
+    }  # fmt: skip
+    detail = {
+        "as_of": "2026-11-17", "universe": "SP:SPX", "mode": "backfill",
+        "totals": {"companies": 1, "companies_covered": 0, "cells_required": 10,
+                   "cells_present": 5, "annual_required": 6, "annual_present": 3,
+                   "quarterly_required": 8, "quarterly_present": 4, "prices_ok": 1,
+                   "earnings_ok": 1},
+        "pipeline": {"sources": {"yahoo_prices": {"tasks": 1, "ok": 1}}, "never_fetched": 0,
+                     "runs": [{"started_at": "2026-11-16T22:30:00", "mode": "backfill",
+                               "status": "ok", "requests": 9, "tasks_ok": 7, "tasks_failed": 0,
+                               "rows_stored": 100, "stopped": {}}],
+                     "runs_to_finish": 0},
+        "items": [{"item": i, "label": i.title(), "optional": False, "required": 2,
+                   "present": 1} for i in ("revenue", "capex", "cash")],
+        "years": [{"fiscal_year": 2016, "required": 3, "present": 1}],
+        "sectors": [{"sector": "Utilities", "companies": 1, "covered": 0, "required": 10,
+                     "present": 5}],
+        "freshness": {"newest_price": "2026-11-16", "prices_stale": 0,
+                      "no_filing_120_days": 0, "newest_filing": "2026-11-10"},
+        "sources": [{"source": "sec", "values": 3}], "quality": [],
+        "companies": [company], "item_order": ["revenue", "capex", "cash"],
+        "trend": [{"date": "2026-11-16", "cells_required": 10, "cells_present": 2},
+                  {"date": "2026-11-17", "cells_required": 10, "cells_present": 5}],
+    }  # fmt: skip
+    page = site.coverage_page(menu, detail)
+    assert "0 / 1" in page and "50.0%" in page and "<polyline" in page
+    assert "AAA &lt;Corp&gt;" in page and "<Corp>" not in page  # escaped
+    assert page.count('class="c h') == 2 and 'class="c na"' in page

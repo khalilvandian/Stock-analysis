@@ -15,6 +15,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from . import ROOT, Database, frame, insert_df, records, run, scalar
@@ -46,7 +47,7 @@ def load_items(path: Path = ITEMS_CONFIG) -> tuple[pd.DataFrame, pd.DataFrame]:
         items.append({k: it.get(k) for k in ("item", "label", "kind", "unit", "derive")})
         for i, tag in enumerate(it.get("sec", []), start=1):
             taxonomy, _, name = tag.rpartition(":")
-            tags.append((it["item"], taxonomy or "us-gaap", name, i, 1.0))
+            tags.append((it["item"], taxonomy or "us-gaap", name, i, float(it.get("sec_scale", 1))))
         for i, tag in enumerate(it.get("history", []), start=1):
             tags.append((it["item"], "history", tag, i, float(it.get("history_scale", 1))))
         for i, tag in enumerate(it.get("yahoo", []), start=1):
@@ -130,8 +131,16 @@ def adjusted_close(close: pd.Series, dividends: pd.Series) -> pd.Series:
 
 
 def build_prices(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
-    raw = frame(conn, "SELECT * FROM raw_yahoo_price ORDER BY fetch_id")
-    raw = raw[raw["symbol"].isin(companies)].drop_duplicates(["symbol", "date"], keep="last")
+    # The latest version of each day, from a little before core starts (the first dividend
+    # adjustment needs the close before it), read in the database to keep memory low.
+    raw = frame(
+        conn,
+        "SELECT DISTINCT ON (symbol, date) symbol, date, open, high, low, close, volume, "
+        "dividends, stock_splits FROM raw_yahoo_price WHERE date >= :start "
+        "ORDER BY symbol, date, fetch_id DESC",
+        {"start": (pd.Timestamp(FIRST_DATE) - pd.Timedelta(days=10)).strftime("%F")},
+    )
+    raw = raw[raw["symbol"].isin(companies)]
     frames = []
     for symbol, g in raw.sort_values("date").groupby("symbol"):
         g = g.assign(adj_close=adjusted_close(g["close"], g["dividends"]))
@@ -165,6 +174,7 @@ SEC_FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A", "10-KT", "10-KT/A", "20-F", "20
 SEC_FORMS |= {"40-F", "40-F/A"}
 SEC_UNITS = {"USD", "USD/shares", "shares"}
 QUARTER_DAYS, YEAR_DAYS = (80, 100), (350, 380)
+HALF_DAYS, NINE_MONTH_DAYS = (170, 200), (260, 290)
 SEC_FIRST_PERIOD = "2015-01-01"
 
 
@@ -177,42 +187,109 @@ def to_month_end(dates: pd.Series) -> pd.Series:
     return (first + pd.offsets.MonthEnd(0)).dt.strftime("%Y-%m-%d")
 
 
+def read_compact(
+    conn: Connection, sql: str, params: dict, categories: dict[str, list], chunk: int = 200_000
+) -> pd.DataFrame:
+    """A large query read in chunks, with the repeated text columns (a tag, a unit, a form)
+    turned into categories chunk by chunk, so the whole result never exists as one Python string
+    per cell. Dates must come as text (to_char in the SQL)."""
+    dtypes = {col: pd.CategoricalDtype(sorted(set(values))) for col, values in categories.items()}
+    parts = []
+    for part in pd.read_sql(text(sql), conn, params=params, chunksize=chunk):
+        for col, dtype in dtypes.items():
+            part[col] = part[col].astype(dtype)
+        parts.append(part)
+    if not parts:
+        return pd.DataFrame()
+    df = pd.concat(parts, ignore_index=True)
+    for col in dtypes:  # back to text: every cell points at one shared string per value
+        df[col] = df[col].astype(object)
+    return df
+
+
+def sec_quarters_from_ytd(sec: pd.DataFrame) -> pd.DataFrame:
+    """10-Q cash flows are year to date (3, 6 and 9 months): the second quarter is the six
+    months less the first quarter, the third the nine months less the six, both from the same
+    start date and in their latest versions. Only where SEC reports no such quarter itself."""
+    cols = ["symbol", "taxonomy", "tag", "unit"]
+    latest = sec.sort_values("filed").drop_duplicates([*cols, "period_start", "period_end"],
+                                                      keep="last")  # fmt: skip
+    q, h, n = (latest[latest["span"] == x] for x in ("Q", "H", "N"))
+    out = []
+    for longer, shorter in ((h, q), (n, h)):
+        m = longer.merge(shorter, on=[*cols, "period_start"], suffixes=("", "_s"))
+        m = m[m["period_end_s"] < m["period_end"]]
+        if m.empty:
+            continue
+        start = (pd.to_datetime(m["period_end_s"]) + pd.Timedelta(days=1)).dt.strftime("%F")
+        out.append(m.assign(value=m["value"] - m["value_s"], period_start=start, span="Q",
+                            method="derived")[latest.columns])  # fmt: skip
+    if not out:
+        return sec.iloc[0:0]
+    d = pd.concat(out, ignore_index=True)
+    have = q[[*cols, "period_end"]].drop_duplicates()
+    d = d.merge(have, on=[*cols, "period_end"], how="left", indicator=True)
+    return d[d["_merge"] == "left_only"].drop(columns="_merge")
+
+
 def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.DataFrame:
-    """SEC company facts that map to an item: a quarter or fiscal-year flow, or an instant,
-    with its real filing date. Cover-page share counts (dei) are dated at the balance-sheet
-    date of their filing, not the cover date."""
-    sec = frame(
+    """SEC company facts that map to an item: a quarter or fiscal-year flow (quarters derived
+    from year-to-date totals where needed), or an instant, with its real filing date. Cover-page
+    share counts (dei) are dated at the balance-sheet date of their filing, not the cover date.
+    Only the latest fetched version of each fact is read, in the database."""
+    sec_tags = tags[~tags["taxonomy"].isin(["history", "yahoo"])]
+    forms = ", ".join(f"'{x}'" for x in sorted(SEC_FORMS))
+    units = ", ".join(f"'{x}'" for x in sorted(SEC_UNITS))
+    pairs = ", ".join(f"('{a}', '{b}')" for a, b in zip(sec_tags["taxonomy"], sec_tags["tag"],
+                                                        strict=True))  # fmt: skip
+    symbols = frame(conn, "SELECT symbol FROM core_company WHERE cik IS NOT NULL")["symbol"]
+    if sec_tags.empty or symbols.empty:
+        return pd.DataFrame()
+    sec = read_compact(
         conn,
-        "SELECT f.raw_id, f.fetch_id, c.symbol, f.taxonomy, f.tag, f.unit, f.period_start, "
-        "f.period_end, f.value, f.form, f.filed, f.accn FROM raw_sec_fact f "
-        "JOIN core_company c ON c.cik = f.cik",
-    )
+        "SELECT DISTINCT ON (f.cik, f.taxonomy, f.tag, f.unit, f.period_start, f.period_end, "
+        "f.accn) f.raw_id, f.fetch_id, c.symbol, f.taxonomy, f.tag, f.unit, "
+        "to_char(f.period_start, 'YYYY-MM-DD') AS period_start, "
+        "to_char(f.period_end, 'YYYY-MM-DD') AS period_end, f.value, f.form, "
+        "to_char(f.filed, 'YYYY-MM-DD') AS filed, "
+        "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn FROM raw_sec_fact f "
+        f"JOIN core_company c ON c.cik = f.cik WHERE f.form IN ({forms}) AND f.unit IN ({units}) "
+        f"AND (f.taxonomy, f.tag) IN ({pairs}) AND f.period_end >= :first "
+        "ORDER BY f.cik, f.taxonomy, f.tag, f.unit, f.period_start, f.period_end, f.accn, "
+        "f.fetch_id DESC",
+        {"first": SEC_FIRST_PERIOD},
+        {"symbol": list(symbols), "taxonomy": list(sec_tags["taxonomy"]),
+         "tag": list(sec_tags["tag"]), "unit": list(SEC_UNITS), "form": list(SEC_FORMS)},
+    )  # fmt: skip
     if sec.empty:
         return sec
-    sec = sec[sec["form"].isin(SEC_FORMS) & sec["unit"].isin(SEC_UNITS)]
-    key = ["symbol", "taxonomy", "tag", "unit", "period_start", "period_end", "accn"]
-    sec = sec.sort_values("fetch_id").drop_duplicates(key, keep="last")
     instant = sec["period_start"].isna()
     balance_date = sec[instant & (sec["taxonomy"] != "dei")].groupby("accn")["period_end"].max()
     dei = sec["taxonomy"] == "dei"
     sec.loc[dei, "period_end"] = sec.loc[dei, "accn"].map(balance_date)
     sec = sec.dropna(subset=["period_end"])
-    sec_tags = tags[~tags["taxonomy"].isin(["history", "yahoo"])]
     sec = sec.merge(sec_tags, on=["taxonomy", "tag"])
     if sec.empty:
         return sec
     days = (pd.to_datetime(sec["period_end"]) - pd.to_datetime(sec["period_start"])).dt.days + 1
-    flow_type = np.select(
-        [days.between(*QUARTER_DAYS), days.between(*YEAR_DAYS)], ["Q", "FY"], default=""
-    )
+    sec["span"] = np.select(
+        [days.between(*QUARTER_DAYS), days.between(*HALF_DAYS), days.between(*NINE_MONTH_DAYS),
+         days.between(*YEAR_DAYS)],
+        ["Q", "H", "N", "FY"], default="",
+    )  # fmt: skip
+    sec["method"] = "reported"
     is_instant_item = sec["item"].map(kind) == "instant"
+    flows = sec[~is_instant_item & sec["period_start"].notna()]
+    sec = pd.concat([sec, sec_quarters_from_ytd(flows)], ignore_index=True)
+    is_instant_item = sec["item"].map(kind) == "instant"
+    flow_type = sec["span"].where(sec["span"].isin(["Q", "FY"]), "")
     sec["period_type"] = np.where(
         sec["period_start"].isna() | (is_instant_item & (flow_type != "")), "I", flow_type
     )
     # Before the price history starts the splits are unknown, so per-share values and share
     # counts could not be put on today's basis: SEC values start a year before core does.
     sec = sec[(sec["period_type"] != "") & (sec["period_end"] >= SEC_FIRST_PERIOD)]
-    return sec.assign(source="sec", raw_table="raw_sec_fact")
+    return sec.drop(columns="span").assign(source="sec", raw_table="raw_sec_fact")
 
 
 def candidates(
@@ -225,7 +302,17 @@ def candidates(
     sec = sec_candidates(conn, kind, tags)
     if not sec.empty:
         frames.append(sec[sec["symbol"].isin(companies)])
-    yahoo = frame(conn, "SELECT * FROM raw_yahoo_statement")
+    names = sorted(set(tags.loc[tags["taxonomy"] == "yahoo", "tag"]))
+    yahoo = read_compact(
+        conn,
+        "SELECT raw_id, fetch_id, symbol, statement, frequency, "
+        "to_char(period_end, 'YYYY-MM-DD') AS period_end, line_item, value "
+        "FROM raw_yahoo_statement WHERE line_item = ANY(:names)",
+        {"names": names},
+        {"line_item": names},
+    )
+    if yahoo.empty:
+        yahoo = pd.DataFrame(columns=["symbol", "line_item", "frequency"])
     yahoo = yahoo[yahoo["symbol"].isin(companies)].merge(
         tags[tags["taxonomy"] == "yahoo"], left_on="line_item", right_on="tag"
     )
@@ -233,7 +320,11 @@ def candidates(
         flow_type = np.where(yahoo["frequency"] == "annual", "FY", "Q")
         yahoo["period_type"] = np.where(yahoo["item"].map(kind) == "instant", "I", flow_type)
         frames.append(yahoo.assign(source="yahoo", raw_table="raw_yahoo_statement"))
-    hist = frame(conn, "SELECT * FROM raw_project_history")
+    hist = frame(
+        conn,
+        "SELECT * FROM raw_project_history WHERE item = ANY(:names)",
+        {"names": sorted(set(tags.loc[tags["taxonomy"] == "history", "tag"]))},
+    )
     hist = hist[hist["symbol"].isin(companies)].merge(
         tags[tags["taxonomy"] == "history"], left_on="item", right_on="tag", suffixes=("_raw", "")
     )
@@ -251,8 +342,9 @@ def candidates(
     c["rank"] = c["source"].str.split(":").str[0].map(SOURCE_RANK)
     c["kind"] = c["item"].map(kind)
     c = add_periods(c)
+    c["method"] = c["method"].fillna("reported") if "method" in c else "reported"
     cols = [*KEY, "kind", "filed", "filed_estimated", "fiscal_year", "fiscal_period", "value"]
-    cols += ["source", "tag", "raw_table", "raw_id", "rank", "priority", "fetch_id"]
+    cols += ["source", "tag", "raw_table", "raw_id", "rank", "priority", "fetch_id", "method"]
     return c[cols]
 
 
@@ -265,12 +357,22 @@ def month_index(dates: pd.Series) -> pd.Series:
 def add_periods(c: pd.DataFrame) -> pd.DataFrame:
     """Fiscal year and quarter from the fiscal year-end month, and the estimated filing date."""
     m = month_index(c["period_end"])
-    fy = c[c["period_type"] == "FY"].assign(month=m % 12)
+    fy = c["period_type"] == "FY"
+    if "form" in c:  # a twelve-month total in a 10-Q is a trailing year, not a fiscal year
+        fy &= ~c["form"].fillna("").str.startswith("10-Q")
+    fy = c[fy].assign(month=m % 12)
     fye = fy.groupby("company_id")["month"].agg(lambda s: s.mode().iloc[0])
     offset = (m % 12 - c["company_id"].map(fye).fillna(11).astype(int)) % 12
     c["fiscal_year"] = ((m + (12 - offset) % 12) // 12).astype(int)
     quarter = offset.map({3: "Q1", 6: "Q2", 9: "Q3", 0: "Q4"})
     c["fiscal_period"] = np.where(c["period_type"] == "FY", "FY", quarter)
+    # A twelve-month total that doesn't end in the fiscal year-end month (SEC filings show
+    # trailing twelve months too) is not a fiscal year, and a quarter off the fiscal quarters
+    # is not a quarter.
+    off = ((c["period_type"] == "FY") & (offset != 0)) | (
+        (c["period_type"] == "Q") & quarter.isna()
+    )
+    c, offset = c[~off].copy(), offset[~off]
     year_end = (c["period_type"] == "FY") | ((c["period_type"] == "I") & (offset == 0))
     lag = np.where(year_end, FILED_LAG_DAYS["year"], FILED_LAG_DAYS["quarter"])
     estimate = (pd.to_datetime(c["period_end"]) + pd.to_timedelta(lag, unit="D")).dt.strftime(
@@ -387,7 +489,7 @@ def build_fundamentals(conn, companies, items, tags, splits) -> tuple[pd.DataFra
     if c.empty:
         return c, c
     f = choose(c)
-    f["method"] = "reported"
+    f["method"] = f["method"].fillna("reported") if "method" in f else "reported"
     f = add_split_factor(derive(derive_q4(f, items), items), splits)
     cols = [*KEY, "filed", "filed_estimated", "fiscal_year", "fiscal_period", "value"]
     cols += ["split_factor", "method", "source", "tag", "raw_table", "raw_id"]
@@ -395,6 +497,10 @@ def build_fundamentals(conn, companies, items, tags, splits) -> tuple[pd.DataFra
     for col in ("fiscal_year", "raw_id"):
         out[col] = out[col].astype("Int64")
     out["filed_estimated"] = out["filed_estimated"].astype(bool)
+    # One row per key and filing date, a reported value before a derived one.
+    key = [*KEY, "filed"]
+    out = out.sort_values("method", key=lambda m: m.eq("derived")).drop_duplicates(key)
+    f = f.loc[out.index]
     insert_df(conn, "core_fundamental", out)
     return f, c
 

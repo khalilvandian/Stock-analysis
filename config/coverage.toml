@@ -20,9 +20,11 @@ annual_lag_days = 100          # 10-K deadlines are 60 to 90 days after the year
 quarters = 8
 quarter_lag_days = 60          # 10-Q deadlines are 40 to 45 days after the quarter end
 earnings_quarters = 8
-# The ingest job switches from backfill to maintenance once this share of the universe is
-# covered and every company has been fetched from every source at least once.
-covered_share_to_maintain = 0.95
+# The ingest job switches from backfill to maintenance once every company has been fetched
+# from every source at least once and this share of all required values is present. The gaps
+# left after that are mapping work (a tag to add, a derivation), which fetching again would
+# not fill, and they are on the Data page.
+present_share_to_maintain = 0.90
 
 # Measured and shown, but a gap does not count against "covered": many companies don't tag
 # these at all (no short-term debt, no interest line), so a gap is often a true zero.

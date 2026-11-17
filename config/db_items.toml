@@ -12,7 +12,8 @@
 #   the reported fields are then only a fallback.
 # history_scale: history.csv keeps money in billions of US dollars, so those values are
 #   multiplied by 1e9. Per-share values are kept as they are.
-# capex is stored as a negative number, the same sign as history.csv and Yahoo.
+# capex is stored as a negative number, the same sign as history.csv and Yahoo (SEC reports it
+# positive, hence sec_scale = -1).
 # A `sec` tag without a prefix is us-gaap; "dei:" marks the cover-page taxonomy.
 
 [[items]]
@@ -64,6 +65,7 @@ label = "Capital expenditure (negative)"
 kind = "flow"
 unit = "USD"
 sec = ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"]
+sec_scale = -1                  # SEC reports the payment as positive; capex is stored negative
 history = ["capex"]
 history_scale = 1e9
 yahoo = ["Capital Expenditure"]
