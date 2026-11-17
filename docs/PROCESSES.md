@@ -262,11 +262,26 @@ _site` and deploys `_site/` to GitHub Pages. To run it by hand: GitHub, Actions,
 analyses page", Run workflow. To preview locally:
 
 ```bash
+uv run python analysis/explore.py data/explore   # the explorer's data, from the database
 python analysis/site.py _site
 python -m http.server -d _site 8000     # then open http://localhost:8000/
 ```
 
 `site.py` uses the standard library only, so it needs no `uv` environment.
+
+The ticker explorer's data (issue #20) comes from `analysis/explore.py`. `STOCK_EXPLORE`
+sets where `site.py` gets it:
+
+| `STOCK_EXPLORE` | Source |
+|---|---|
+| `api` | The web API. This is the default when `STOCK_API_URL` and `STOCK_API_KEY` are set, as in the workflow. |
+| `local` | `stock_analysis.data`, the database straight from your PC. |
+| `files` | A copy of `data/explore/tickers/`. This is the default when that folder exists. |
+| `off` | No data. The explorer pages say there is none. |
+
+`analysis/explore.py data/explore --symbols NVDA,NEE` exports only a few tickers, for a quick
+look. The export reads the database in about 30 bulk queries, by blocks of symbols, so none
+returns more than the API's 50,000 rows.
 
 ## 9. Sending the email
 

@@ -14,6 +14,7 @@ policy. The step-by-step processes are in [`PROCESSES.md`](PROCESSES.md).
 | Market report alone | `uv run python analysis/market.py` |
 | Check the latest outputs (no network) | `uv run python analysis/validate.py [--verbose] [--strict]` |
 | Build the site locally | `python analysis/site.py _site` |
+| Export the ticker explorer's data | `uv run python analysis/explore.py data/explore [--symbols NVDA,NEE]` |
 | Send the last run's email | `uv run python analysis/send_email.py` |
 | Refresh the utilities data | `uv run python analysis/sector.py && uv run python analysis/history.py` |
 | Rebuild the dashboards | `uv run python dashboard/build_absolute.py && uv run python dashboard/build_sector.py && uv run python dashboard/build.py` |
@@ -75,6 +76,7 @@ Delete a cache to force fresh downloads; nothing in it is needed to rebuild.
 | `deploy\ingest-job.ps1`: "'Job' resources are not supported on express environments" | The environment was created in Express mode (the newer CLI's default) | Delete the empty environment (`az containerapp env delete -n stock-jobs-env -g stock-rg --yes`) and rerun the script, which creates it with `--environment-mode WorkloadProfiles` |
 | Azure job run fails at once with a connection timeout | The firewall rule `ingest-job` was not set: the job's identity lost its role, or `AZURE_SUBSCRIPTION_ID` is missing | Rerun `deploy\ingest-job.ps1`; check the run's log in the job's Log Analytics workspace |
 | Data page says "No coverage snapshot yet" or is a day old | The repository secret `STOCK_API_KEY` is missing, or the API or the night's run failed | Add the secret; check `ops_run`; run the Pages workflow by hand |
+| Explorer pages say "No explorer data in this build" | The export failed or found no source (`STOCK_EXPLORE`, `STOCK_API_KEY`); the workflow log has `explorer: export failed (...)` | Fix the API or the secret; run the Pages workflow by hand. Locally run `analysis/explore.py data/explore` first |
 | `git push` refused | The GitHub connection lapsed | Reconnect GitHub for Claude (see `SETUP.md`, section 5) |
 
 ## Test policy

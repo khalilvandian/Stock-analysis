@@ -192,7 +192,9 @@ flowchart TD
 | `screener.py` | Runs Stage 1 then Stage 2 and writes the dated `data/screener/YYYY-MM-DD.csv`. `run()` is called by the evening run. |
 | `watchlist.py` | The evening run's driver: runs the screener and the market report, then one PDF per watch-list stock and a summary PDF; records `runs.csv`, rebuilds the dated lists, writes the email body. |
 | `market.py` | The whole-market PDF: indices, sectors, breadth, and the screener's top 3 per sector from `data/screener/top.csv`. |
-| `site.py` | Builds the public GitHub Pages site from `analyses/` and `data/screener/` (standard library only). |
+| `site.py` | Builds the public GitHub Pages site from `analyses/` and `data/screener/` (standard library only), and the ticker explorer pages. |
+| `explore.py` | Exports the ticker explorer's data (issue #20) from the database: `tickers/<SYMBOL>.json` and `tickers/index.json` (standard library only; web API or `stock_analysis.data`). |
+| `explorer.js` | The ticker page's script: draws the tabs and the SVG charts in the browser from that JSON. |
 | `send_email.py` | Sends the last run's email through Brevo with every PDF attached. |
 | `validate.py` | Checks the latest outputs on disk (screener tables, absolute-value identities, SEC history, dated analyses, `last_run.json`) and prints PASS / WARN / FAIL; no network. |
 
