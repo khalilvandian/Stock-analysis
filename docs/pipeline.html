@@ -86,6 +86,35 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 .pipeline .cap { fill: var(--p-accent-soft); }
 .pipeline .run { fill: var(--p-accent); }
 .pipeline .mute { fill: var(--p-edge); }
+/* inside the database (UML) */
+.pipeline .u-frame { fill: none; stroke: var(--p-edge); stroke-width: 1; }
+.pipeline .u-frame-tag { fill: var(--p-band); stroke: var(--p-edge); stroke-width: 1; }
+.pipeline .u-tagk { font: 700 12px var(--p-sans); fill: var(--p-fg); }
+.pipeline .u-tag { font: 600 12px var(--p-sans); fill: var(--p-fg); }
+.pipeline .u-part { fill: none; stroke: var(--p-edge); stroke-width: 1; }
+.pipeline .u-partl { fill: none; stroke: var(--p-edge); stroke-width: 1; }
+.pipeline .u-lane { font: 600 11px var(--p-sans); letter-spacing: 0.06em; fill: var(--p-muted); }
+.pipeline .u-node { fill: var(--p-card); stroke: var(--p-fg); stroke-width: 1.3; }
+.pipeline .u-solid { fill: var(--p-fg); }
+.pipeline .u-line { fill: none; stroke: var(--p-fg); stroke-width: 1.2; }
+.pipeline .u-line.dash { stroke-dasharray: 5 4; stroke: var(--p-edge); }
+.pipeline .u-ah { fill: none; stroke: var(--p-fg); stroke-width: 1.3; }
+.pipeline .u-region { fill: none; stroke: var(--p-fg); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.pipeline .u-rake { fill: none; stroke: var(--p-fg); stroke-width: 1.3; }
+.pipeline .u-note { fill: var(--p-band); stroke: var(--p-edge); stroke-width: 1; }
+.pipeline .u-pkg { fill: none; stroke: var(--p-edge); stroke-width: 1.2; }
+.pipeline .u-pkgn { font: 600 12px var(--p-sans); fill: var(--p-fg); }
+.pipeline .u-act { font: 500 12px var(--p-sans); fill: var(--p-fg); }
+.pipeline .u-obj { font: 12px var(--p-sans); fill: var(--p-fg); }
+.pipeline .u-objm { font: 11px var(--p-mono); fill: var(--p-fg); }
+.pipeline .u-st { font: 11px var(--p-sans); fill: var(--p-muted); }
+.pipeline .u-kw { font: 10.5px var(--p-sans); fill: var(--p-muted); }
+.pipeline .u-g { font: 11px var(--p-sans); fill: var(--p-fg); }
+.pipeline .u-n { font: 11px var(--p-sans); fill: var(--p-fg); }
+.pipeline .u-nm { font: 11px var(--p-mono); fill: var(--p-muted); }
+.pipeline .u-cname { font: 600 12px var(--p-sans); fill: var(--p-fg); }
+.pipeline .u-attr { font: 11px var(--p-mono); fill: var(--p-fg); }
+.pipeline .u-mult { font: 11px var(--p-mono); fill: var(--p-muted); }
 </style>
 
 <div class="page pipeline">
@@ -260,6 +289,700 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   </figure>
 </section>
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<section id="inside-the-database">
+  <h2>Inside the database, in UML</h2>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 620" role="img" aria-label="UML activity diagram of the nightly ingest run in three partitions: the ingest job plans tasks, chooses its mode and fetches each due task into the raw layer; if rows were stored the build rebuilds the core layer in one transaction; coverage takes the snapshot that the next run reads to choose its mode.">
+<defs><marker id="u1-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="10" y="10" width="1280" height="600"/>
+<path class="u-frame-tag" d="M10,10 h179 v14 l-9,10 H10 z"/>
+<text class="u-tagk" x="18" y="26">act</text>
+<text class="u-tag" x="55.5" y="26">Nightly ingest run</text>
+<rect class="u-part" x="24" y="46" width="1252" height="550"/>
+<path class="u-partl" d="M24,256 H1276 M24,486 H1276 M50,46 V596"/>
+<text class="u-lane" x="41" y="151" text-anchor="middle" transform="rotate(-90 41 151)">ingest job</text>
+<text class="u-lane" x="41" y="371" text-anchor="middle" transform="rotate(-90 41 371)">db build · one transaction</text>
+<text class="u-lane" x="41" y="541" text-anchor="middle" transform="rotate(-90 41 541)">coverage</text>
+<circle class="u-solid" cx="74" cy="150" r="8"/>
+<rect class="u-node" x="96" y="130" width="100" height="40" rx="12"/>
+<text class="u-act" x="146" y="154" text-anchor="middle">Plan tasks</text>
+<rect class="u-node" x="226" y="130" width="110" height="40" rx="12"/>
+<text class="u-act" x="281" y="154" text-anchor="middle">Choose mode</text>
+<path class="u-line" d="M82,150 L96,150" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M196,150 L226,150" marker-end="url(#u1-a)"/>
+<path class="u-note" d="M60,58 H191 L200,67 V115 H60 z M191,58 V67 H200"/>
+<text class="u-n" x="68" y="76">one ops_task per</text>
+<text class="u-n" x="68" y="91">source and company</text>
+<text class="u-nm" x="68" y="106">ingest.toml</text>
+<path class="u-line dash" d="M146,103 L146,130"/>
+<path class="u-note" d="M212,58 H353 L362,67 V130 H212 z M353,58 V67 H362"/>
+<text class="u-n" x="220" y="76">backfill until each task</text>
+<text class="u-n" x="220" y="91">has run once and 90% of</text>
+<text class="u-n" x="220" y="106">values are present,</text>
+<text class="u-n" x="220" y="121">then maintain</text>
+<path class="u-line dash" d="M281,130 L281,130"/>
+<rect class="u-region" x="372" y="62" width="688" height="182" rx="14"/>
+<text class="u-kw" x="384" y="80">«iterative»</text>
+<text class="u-g" x="452" y="80">each due task, in source order</text>
+<rect class="u-node" x="366" y="135" width="12" height="30"/>
+<path class="u-line" d="M366,145 h12 M366,155 h12"/>
+<path class="u-line" d="M336,150 L366,150" marker-end="url(#u1-a)"/>
+<rect class="u-node" x="398" y="130" width="124" height="40" rx="12"/>
+<text class="u-act" x="460" y="154" text-anchor="middle">Fetch from source</text>
+<path class="u-line" d="M378,150 L398,150" marker-end="url(#u1-a)"/>
+<path class="u-node" d="M562,137 L575,150 L562,163 L549,150 z"/>
+<path class="u-line" d="M522,150 L549,150" marker-end="url(#u1-a)"/>
+<rect class="u-node" x="616" y="130" width="134" height="40" rx="12"/>
+<text class="u-act" x="683" y="146.5" text-anchor="middle">Keep the payload,</text>
+<text class="u-act" x="683" y="161.5" text-anchor="middle">store new rows</text>
+<path class="u-line" d="M575,150 L616,150" marker-end="url(#u1-a)"/>
+<text class="u-g" x="595" y="143" text-anchor="middle">[ok]</text>
+<rect class="u-node" x="800" y="130" width="120" height="40" rx="12"/>
+<text class="u-act" x="860" y="154" text-anchor="middle">Reschedule task</text>
+<path class="u-line" d="M750,150 L800,150" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M562,137 L562,104 L860,104 L860,130" marker-end="url(#u1-a)"/>
+<text class="u-g" x="572" y="98" text-anchor="start">[empty · error]</text>
+<circle class="u-node" cx="968" cy="150" r="9"/>
+<path class="u-line" d="M961.6,143.6 L974.4,156.4 M961.6,156.4 L974.4,143.6"/>
+<path class="u-line" d="M920,150 L959,150" marker-end="url(#u1-a)"/>
+<rect class="u-node" x="668" y="238" width="30" height="12"/>
+<path class="u-line" d="M678,238 v12 M688,238 v12"/>
+<path class="u-line" d="M683,170 L683,238" marker-end="url(#u1-a)"/>
+<path class="u-note" d="M386,176 H639 L648,185 V233 H386 z M639,176 V185 H648"/>
+<text class="u-n" x="394" y="194">SEC facts need the company&#x27;s CIK, from</text>
+<text class="u-n" x="394" y="209">the SEC ticker file; only the tags mapped</text>
+<text class="u-n" x="394" y="224">in db_items.toml are stored</text>
+<path class="u-line dash" d="M460,176 L460,170"/>
+<path class="u-note" d="M712,182 H1043 L1052,191 V239 H712 z M1043,182 V191 H1052"/>
+<text class="u-n" x="720" y="200">a source group stops at HTTP 429, its request</text>
+<text class="u-n" x="720" y="215">budget or 10 failures in a row; its other tasks</text>
+<text class="u-n" x="720" y="230">wait for the next run (see stm ops_task)</text>
+<path class="u-line dash" d="M860,182 L860,170"/>
+<path class="u-node" d="M1110,137 L1123,150 L1110,163 L1097,150 z"/>
+<path class="u-line" d="M1060,150 L1097,150" marker-end="url(#u1-a)"/>
+<text class="u-g" x="1130" y="143" text-anchor="start">[nothing stored]</text>
+<rect class="u-node" x="1045" y="328" width="130" height="44" rx="12"/>
+<text class="u-act" x="1110" y="346.5" text-anchor="middle">Clear core and</text>
+<text class="u-act" x="1110" y="361.5" text-anchor="middle">load items, tags</text>
+<rect class="u-node" x="888" y="328" width="130" height="44" rx="12"/>
+<text class="u-act" x="953" y="346.5" text-anchor="middle">Build companies</text>
+<text class="u-act" x="953" y="361.5" text-anchor="middle">and index spells</text>
+<rect class="u-node" x="731" y="328" width="130" height="44" rx="12"/>
+<text class="u-act" x="796" y="346.5" text-anchor="middle">Build daily</text>
+<text class="u-act" x="796" y="361.5" text-anchor="middle">prices</text>
+<rect class="u-node" x="574" y="328" width="130" height="44" rx="12"/>
+<text class="u-act" x="639" y="354" text-anchor="middle">Build fundamentals</text>
+<path class="u-rake" d="M690,358 v10 M685,368 v-5 h10 v5"/>
+<rect class="u-node" x="417" y="328" width="130" height="44" rx="12"/>
+<text class="u-act" x="482" y="346.5" text-anchor="middle">Build trailing</text>
+<text class="u-act" x="482" y="361.5" text-anchor="middle">twelve months</text>
+<rect class="u-node" x="260" y="328" width="130" height="44" rx="12"/>
+<text class="u-act" x="325" y="346.5" text-anchor="middle">Run quality</text>
+<text class="u-act" x="325" y="361.5" text-anchor="middle">checks</text>
+<rect class="u-node" x="103" y="328" width="130" height="44" rx="12"/>
+<text class="u-act" x="168" y="354" text-anchor="middle">Commit build</text>
+<path class="u-line" d="M1110,163 L1110,328" marker-end="url(#u1-a)"/>
+<text class="u-g" x="1118" y="200" text-anchor="start">[rows stored]</text>
+<path class="u-line" d="M1045,350 L1018,350" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M888,350 L861,350" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M731,350 L704,350" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M574,350 L547,350" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M417,350 L390,350" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M260,350 L233,350" marker-end="url(#u1-a)"/>
+<rect class="u-node" x="579" y="268" width="120" height="40"/>
+<text class="u-kw" x="639" y="284.5" text-anchor="middle">«datastore»</text>
+<text class="u-obj" x="639" y="299.5" text-anchor="middle">raw layer</text>
+<path class="u-line" d="M683,250 L683,268" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M639,308 L639,328" marker-end="url(#u1-a)"/>
+<path class="u-note" d="M724,268 H985 L994,277 V310 H724 z M985,268 V277 H994"/>
+<text class="u-n" x="732" y="286">standardise, fill, reconcile and derive:</text>
+<text class="u-n" x="732" y="301">act Build fundamentals, below</text>
+<path class="u-line dash" d="M724,290 L698,328"/>
+<rect class="u-node" x="108" y="404" width="120" height="40"/>
+<text class="u-kw" x="168" y="420.5" text-anchor="middle">«datastore»</text>
+<text class="u-obj" x="168" y="435.5" text-anchor="middle">core layer</text>
+<path class="u-line" d="M168,372 L168,404" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M325,372 L325,424 L228,424" marker-end="url(#u1-a)"/>
+<path class="u-note" d="M420,398 H811 L820,407 V470 H420 z M811,398 V407 H820"/>
+<text class="u-n" x="428" y="416">warnings written to core_quality_issue:</text>
+<text class="u-n" x="428" y="431">jump 10× · sources disagree · missing period</text>
+<text class="u-n" x="428" y="446">balance sheet identity · implied shares jump</text>
+<text class="u-n" x="428" y="461">price jump · short trading year</text>
+<path class="u-line dash" d="M420,420 L372,372"/>
+<path class="u-node" d="M70,529 L82,541 L70,553 L58,541 z"/>
+<path class="u-line" d="M103,350 L70,350 L70,529" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M1123,150 L1250,150 L1250,582 L70,582 L70,553" marker-end="url(#u1-a)"/>
+<rect class="u-node" x="104" y="521" width="128" height="40" rx="12"/>
+<text class="u-act" x="168" y="537.5" text-anchor="middle">Take coverage</text>
+<text class="u-act" x="168" y="552.5" text-anchor="middle">snapshot</text>
+<path class="u-line" d="M82,541 L104,541" marker-end="url(#u1-a)"/>
+<path class="u-line" d="M168,444 L168,521" marker-end="url(#u1-a)"/>
+<rect class="u-node" x="270" y="521" width="150" height="40"/>
+<text class="u-kw" x="345" y="537.5" text-anchor="middle">«datastore»</text>
+<text class="u-obj" x="345" y="552.5" text-anchor="middle">out_coverage_snapshot</text>
+<path class="u-line" d="M232,541 L270,541" marker-end="url(#u1-a)"/>
+<rect class="u-node" x="460" y="521" width="120" height="40" rx="12"/>
+<text class="u-act" x="520" y="545" text-anchor="middle">Record the run</text>
+<path class="u-line" d="M420,541 L460,541" marker-end="url(#u1-a)"/>
+<circle class="u-node" cx="620" cy="541" r="11"/>
+<circle class="u-solid" cx="620" cy="541" r="6.5"/>
+<path class="u-line" d="M580,541 L609,541" marker-end="url(#u1-a)"/>
+<path class="u-note" d="M660,500 H1031 L1040,509 V542 H660 z M1031,500 V509 H1040"/>
+<text class="u-n" x="668" y="518">ops_run keeps the mode, requests, rows stored,</text>
+<text class="u-n" x="668" y="533">the build and the coverage summary of each run</text>
+<path class="u-line dash" d="M660,525 L580,525"/>
+<path class="u-line" d="M345,521 V494 H403 V357.0 A7,7 0 0 1 403,343.0 V262 H281 V170" marker-end="url(#u1-a)"/>
+<text class="u-g" x="290" y="276" text-anchor="start">read by the next run</text>
+</svg>
+    </div>
+    <figcaption>Activity diagram: one run of the <code>stock-ingest</code> job, partitioned by who does the work.</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 362" role="img" aria-label="UML activity diagram of building core_fundamental in four partitions: standardise maps tags to items and classifies periods; fill derives second and third quarters from year-to-date values; reconcile chooses one value per key by source rank; derive adds fourth quarters and sums and applies split factors.">
+<defs><marker id="u2-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="70" y="10" width="1163" height="342"/>
+<path class="u-frame-tag" d="M70,10 h179 v14 l-9,10 H70 z"/>
+<text class="u-tagk" x="78" y="26">act</text>
+<text class="u-tag" x="115.5" y="26">Build fundamentals</text>
+<rect class="u-part" x="140" y="46" width="1032" height="294"/>
+<text class="u-lane" x="269" y="63" text-anchor="middle">standardise</text>
+<path class="u-partl" d="M398,46 V340"/>
+<text class="u-lane" x="460" y="63" text-anchor="middle">fill</text>
+<path class="u-partl" d="M522,46 V340"/>
+<text class="u-lane" x="640" y="63" text-anchor="middle">reconcile</text>
+<path class="u-partl" d="M758,46 V340"/>
+<text class="u-lane" x="965" y="63" text-anchor="middle">derive</text>
+<path class="u-partl" d="M140,72 H1172"/>
+<rect class="u-node" x="4" y="86" width="132" height="30"/>
+<text class="u-objm" x="70" y="105" text-anchor="middle">raw_sec_fact</text>
+<path class="u-line" d="M136,101 L146,101 L146,162 L150,162"/>
+<rect class="u-node" x="4" y="130" width="132" height="30"/>
+<text class="u-objm" x="70" y="149" text-anchor="middle">raw_sec_xbrl_fact</text>
+<path class="u-line" d="M136,145 L146,145 L146,162 L150,162" marker-end="url(#u2-a)"/>
+<rect class="u-node" x="4" y="174" width="132" height="30"/>
+<text class="u-objm" x="70" y="193" text-anchor="middle">raw_yahoo_statement</text>
+<path class="u-line" d="M136,189 L146,189 L146,162 L150,162"/>
+<rect class="u-node" x="4" y="218" width="132" height="30"/>
+<text class="u-objm" x="70" y="237" text-anchor="middle">raw_project_history</text>
+<path class="u-line" d="M136,233 L146,233 L146,162 L150,162"/>
+<rect class="u-node" x="4" y="262" width="132" height="30"/>
+<text class="u-objm" x="70" y="281" text-anchor="middle">core_item_tag</text>
+<path class="u-line" d="M136,277 L146,277 L146,162 L150,162"/>
+<rect class="u-node" x="150" y="140" width="100" height="44" rx="12"/>
+<text class="u-act" x="200" y="158.5" text-anchor="middle">Map tags</text>
+<text class="u-act" x="200" y="173.5" text-anchor="middle">to items</text>
+<rect class="u-node" x="274" y="140" width="110" height="44" rx="12"/>
+<text class="u-act" x="329" y="158.5" text-anchor="middle">Classify</text>
+<text class="u-act" x="329" y="173.5" text-anchor="middle">periods</text>
+<rect class="u-node" x="410" y="140" width="102" height="44" rx="12"/>
+<text class="u-act" x="461" y="158.5" text-anchor="middle">Q2, Q3 from</text>
+<text class="u-act" x="461" y="173.5" text-anchor="middle">year to date</text>
+<rect class="u-node" x="532" y="140" width="92" height="44"/>
+<text class="u-obj" x="578" y="158.5" text-anchor="middle">candidates</text>
+<text class="u-st" x="578" y="173.5" text-anchor="middle">[standardised]</text>
+<rect class="u-node" x="644" y="140" width="104" height="44" rx="12"/>
+<text class="u-act" x="696" y="158.5" text-anchor="middle">Choose one</text>
+<text class="u-act" x="696" y="173.5" text-anchor="middle">per key</text>
+<rect class="u-node" x="768" y="140" width="72" height="44"/>
+<text class="u-obj" x="804" y="158.5" text-anchor="middle">values</text>
+<text class="u-st" x="804" y="173.5" text-anchor="middle">[chosen]</text>
+<rect class="u-node" x="860" y="140" width="92" height="44" rx="12"/>
+<text class="u-act" x="906" y="166" text-anchor="middle">Derive Q4</text>
+<rect class="u-node" x="970" y="140" width="92" height="44" rx="12"/>
+<text class="u-act" x="1016" y="166" text-anchor="middle">Derive sums</text>
+<rect class="u-node" x="1080" y="140" width="86" height="44" rx="12"/>
+<text class="u-act" x="1123" y="158.5" text-anchor="middle">Apply split</text>
+<text class="u-act" x="1123" y="173.5" text-anchor="middle">factors</text>
+<path class="u-line" d="M250,162 L274,162" marker-end="url(#u2-a)"/>
+<path class="u-line" d="M384,162 L410,162" marker-end="url(#u2-a)"/>
+<path class="u-line" d="M512,162 L532,162" marker-end="url(#u2-a)"/>
+<path class="u-line" d="M624,162 L644,162" marker-end="url(#u2-a)"/>
+<path class="u-line" d="M748,162 L768,162" marker-end="url(#u2-a)"/>
+<path class="u-line" d="M840,162 L860,162" marker-end="url(#u2-a)"/>
+<path class="u-line" d="M952,162 L970,162" marker-end="url(#u2-a)"/>
+<path class="u-line" d="M1062,162 L1080,162" marker-end="url(#u2-a)"/>
+<rect class="u-node" x="1176" y="147.0" width="114" height="30"/>
+<text class="u-objm" x="1233" y="166" text-anchor="middle">core_fundamental</text>
+<path class="u-line" d="M1166,162 L1176,162" marker-end="url(#u2-a)"/>
+<path class="u-note" d="M150,222 H381 L390,231 V339 H150 z M381,222 V231 H390"/>
+<text class="u-n" x="158" y="240">17 items, tags tried by priority</text>
+<text class="u-n" x="158" y="255">units and sign from db_items.toml</text>
+<text class="u-n" x="158" y="270">Q 80–120 days, FY 350–380 days</text>
+<text class="u-n" x="158" y="285">a quarter placed by days since year end,</text>
+<text class="u-n" x="158" y="300">dated at its fiscal-calendar month end;</text>
+<text class="u-n" x="158" y="315">more than a month off its slot: dropped</text>
+<text class="u-n" x="158" y="330">helpers: parts of a formula, not stored</text>
+<path class="u-line dash" d="M329,222 L329,184"/>
+<path class="u-note" d="M406,222 H507 L516,231 V279 H406 z M507,222 V231 H516"/>
+<text class="u-n" x="414" y="240">SEC only</text>
+<text class="u-n" x="414" y="255">Q2 = H1 − Q1</text>
+<text class="u-n" x="414" y="270">Q3 = 9M − H1</text>
+<path class="u-line dash" d="M461,222 L461,184"/>
+<path class="u-note" d="M532,222 H743 L752,231 V294 H532 z M743,222 V231 H752"/>
+<text class="u-n" x="540" y="240">key: company, item, period, filed</text>
+<text class="u-n" x="540" y="255">SEC 1 › history 2 › Yahoo 3,</text>
+<text class="u-n" x="540" y="270">then tag priority, latest fetch</text>
+<text class="u-n" x="540" y="285">every filing date is kept</text>
+<path class="u-line dash" d="M696,222 L696,184"/>
+<path class="u-note" d="M768,222 H1157 L1166,231 V324 H768 z M1157,222 V231 H1166"/>
+<text class="u-n" x="776" y="240">Q4 = FY − Q1 − Q2 − Q3 for SEC flows, not EPS</text>
+<text class="u-n" x="776" y="255">EBITDA = operating income + D&amp;A; total debt = short + long</text>
+<text class="u-n" x="776" y="270">total liabilities = liabilities and equity − equity − temporary equity?</text>
+<text class="u-n" x="776" y="285">a derived value never replaces one of a better rank; fallback</text>
+<text class="u-n" x="776" y="300">items (total liabilities) keep the company&#x27;s own figure</text>
+<text class="u-n" x="776" y="315">split factor: splits after filing (shares, per share)</text>
+<path class="u-line dash" d="M1016,222 L1016,184"/>
+</svg>
+    </div>
+    <figcaption>Activity diagram: the call behaviour <em>Build fundamentals</em> from the run above, partitioned by step; boxes between actions are the data in each state.</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 850" role="img" aria-label="UML class diagram of the database tables in four packages, raw, core, ops and out, with their key attributes, the foreign-key associations and their multiplicities.">
+<defs><marker id="u3-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="10" y="10" width="1280" height="830"/>
+<path class="u-frame-tag" d="M10,10 h144 v14 l-9,10 H10 z"/>
+<text class="u-tagk" x="18" y="26">class</text>
+<text class="u-tag" x="70.5" y="26">Data layers</text>
+<path class="u-pkg" d="M20,46 h44.5 v18 H396 V704 H20 z"/>
+<path class="u-line" d="M20,64 h44.5"/>
+<text class="u-pkgn" x="30" y="59.5">raw</text>
+<path class="u-pkg" d="M412,46 h52.0 v18 H1040 V654 H412 z"/>
+<path class="u-line" d="M412,64 h52.0"/>
+<text class="u-pkgn" x="422" y="59.5">core</text>
+<path class="u-pkg" d="M1056,46 h44.5 v18 H1284 V424 H1056 z"/>
+<path class="u-line" d="M1056,64 h44.5"/>
+<text class="u-pkgn" x="1066" y="59.5">ops</text>
+<path class="u-pkg" d="M1056,430 h44.5 v18 H1284 V808 H1056 z"/>
+<path class="u-line" d="M1056,448 h44.5"/>
+<text class="u-pkgn" x="1066" y="443.5">out</text>
+<rect class="u-node" x="34" y="84" width="163" height="130"/>
+<text class="u-kw" x="115.5" y="98" text-anchor="middle">«table»</text>
+<text class="u-cname" x="115.5" y="113" text-anchor="middle">raw_fetch</text>
+<path class="u-line" d="M34,122 h163"/>
+<text class="u-attr" x="42" y="138">fetch_id : bigint {id}</text>
+<text class="u-attr" x="42" y="152">source : text</text>
+<text class="u-attr" x="42" y="166">request_key : text</text>
+<text class="u-attr" x="42" y="180">fetched_at : ts</text>
+<text class="u-attr" x="42" y="194">status : text</text>
+<text class="u-attr" x="42" y="208">payload_sha256 : text</text>
+<rect class="u-node" x="232" y="84" width="142" height="172"/>
+<text class="u-kw" x="303" y="98" text-anchor="middle">«table»</text>
+<text class="u-cname" x="303" y="113" text-anchor="middle">raw_sec_xbrl_fact</text>
+<path class="u-line" d="M232,122 h142"/>
+<text class="u-attr" x="240" y="138">cik : bigint</text>
+<text class="u-attr" x="240" y="152">accn : text</text>
+<text class="u-attr" x="240" y="166">concept : text</text>
+<text class="u-attr" x="240" y="180">axis : text</text>
+<text class="u-attr" x="240" y="194">member : text</text>
+<text class="u-attr" x="240" y="208">period_end : date</text>
+<text class="u-attr" x="240" y="222">value : float</text>
+<text class="u-attr" x="240" y="236">statement : text</text>
+<text class="u-attr" x="240" y="250">custom : bool</text>
+<rect class="u-node" x="232" y="286" width="157" height="130"/>
+<text class="u-kw" x="310.5" y="300" text-anchor="middle">«table»</text>
+<text class="u-cname" x="310.5" y="315" text-anchor="middle">raw_yahoo_statement</text>
+<path class="u-line" d="M232,324 h157"/>
+<text class="u-attr" x="240" y="340">symbol : text</text>
+<text class="u-attr" x="240" y="354">statement : text</text>
+<text class="u-attr" x="240" y="368">frequency : text</text>
+<text class="u-attr" x="240" y="382">period_end : date</text>
+<text class="u-attr" x="240" y="396">line_item : text</text>
+<text class="u-attr" x="240" y="410">value : float</text>
+<rect class="u-node" x="34" y="270" width="143" height="214"/>
+<text class="u-kw" x="105.5" y="284" text-anchor="middle">«table»</text>
+<text class="u-cname" x="105.5" y="299" text-anchor="middle">raw_sec_fact</text>
+<path class="u-line" d="M34,308 h143"/>
+<text class="u-attr" x="42" y="324">cik : bigint</text>
+<text class="u-attr" x="42" y="338">taxonomy : text</text>
+<text class="u-attr" x="42" y="352">tag : text</text>
+<text class="u-attr" x="42" y="366">unit : text</text>
+<text class="u-attr" x="42" y="380">period_start : date</text>
+<text class="u-attr" x="42" y="394">period_end : date</text>
+<text class="u-attr" x="42" y="408">value : float</text>
+<text class="u-attr" x="42" y="422">fy : int</text>
+<text class="u-attr" x="42" y="436">fp : text</text>
+<text class="u-attr" x="42" y="450">form : text</text>
+<text class="u-attr" x="42" y="464">filed : date</text>
+<text class="u-attr" x="42" y="478">accn : text</text>
+<path class="u-line" d="M197,146 L232,146"/>
+<text class="u-mult" x="201" y="160" text-anchor="start">1</text>
+<text class="u-mult" x="228" y="140" text-anchor="end">0..*</text>
+<path class="u-line" d="M197,196 L212,196 L212,300 L232,300"/>
+<text class="u-mult" x="201" y="190" text-anchor="start">1</text>
+<text class="u-mult" x="228" y="294" text-anchor="end">0..*</text>
+<path class="u-line" d="M100,214 L100,270"/>
+<text class="u-mult" x="106" y="228" text-anchor="start">1</text>
+<text class="u-mult" x="106" y="264" text-anchor="start">0..*</text>
+<path class="u-note" d="M34,504 H181 L190,513 V636 H34 z M181,504 V513 H190"/>
+<text class="u-n" x="42" y="522">also raw_project_history,</text>
+<text class="u-n" x="42" y="537">raw_yahoo_price,</text>
+<text class="u-n" x="42" y="552">raw_yahoo_earnings,</text>
+<text class="u-n" x="42" y="567">raw_tv_constituent,</text>
+<text class="u-n" x="42" y="582">raw_sec_ticker and</text>
+<text class="u-n" x="42" y="597">raw_ecb_rate; each row</text>
+<text class="u-n" x="42" y="612">points to one raw_fetch</text>
+<text class="u-n" x="42" y="627">(1 to 0..*)</text>
+<rect class="u-node" x="232" y="480" width="157" height="116"/>
+<text class="u-kw" x="310.5" y="494" text-anchor="middle">«table»</text>
+<text class="u-cname" x="310.5" y="509" text-anchor="middle">raw_payload</text>
+<path class="u-line" d="M232,518 h157"/>
+<text class="u-attr" x="240" y="534">fetch_id : bigint {id}</text>
+<text class="u-attr" x="240" y="548">media_type : text</text>
+<text class="u-attr" x="240" y="562">encoding : gzip</text>
+<text class="u-attr" x="240" y="576">size_bytes : bigint</text>
+<text class="u-attr" x="240" y="590">content : bytea</text>
+<text class="u-kw" x="310.5" y="612" text-anchor="middle">each payload as it came</text>
+<path class="u-line" d="M197,206 H222 V293 A7,7 0 0 1 222,307 V423 A7,7 0 0 1 222,437 V538 H232"/>
+<text class="u-mult" x="201" y="220" text-anchor="start">1</text>
+<text class="u-mult" x="218" y="532" text-anchor="end">0..1</text>
+<rect class="u-node" x="428" y="84" width="157" height="116"/>
+<text class="u-kw" x="506.5" y="98" text-anchor="middle">«table»</text>
+<text class="u-cname" x="506.5" y="113" text-anchor="middle">core_item</text>
+<path class="u-line" d="M428,122 h157"/>
+<text class="u-attr" x="436" y="138">item : text {id}</text>
+<text class="u-attr" x="436" y="152">label : text</text>
+<text class="u-attr" x="436" y="166">kind : flow | instant</text>
+<text class="u-attr" x="436" y="180">unit : text</text>
+<text class="u-attr" x="436" y="194">derive : text</text>
+<rect class="u-node" x="652" y="84" width="150" height="116"/>
+<text class="u-kw" x="727" y="98" text-anchor="middle">«table»</text>
+<text class="u-cname" x="727" y="113" text-anchor="middle">core_item_tag</text>
+<path class="u-line" d="M652,122 h150"/>
+<text class="u-attr" x="660" y="138">item : text {id}</text>
+<text class="u-attr" x="660" y="152">taxonomy : text {id}</text>
+<text class="u-attr" x="660" y="166">tag : text {id}</text>
+<text class="u-attr" x="660" y="180">priority : int</text>
+<text class="u-attr" x="660" y="194">scale : float</text>
+<rect class="u-node" x="866" y="84" width="163" height="116"/>
+<text class="u-kw" x="947.5" y="98" text-anchor="middle">«table»</text>
+<text class="u-cname" x="947.5" y="113" text-anchor="middle">core_build</text>
+<path class="u-line" d="M866,122 h163"/>
+<text class="u-attr" x="874" y="138">build_id : bigint {id}</text>
+<text class="u-attr" x="874" y="152">started_at : ts</text>
+<text class="u-attr" x="874" y="166">max_fetch_id : bigint</text>
+<text class="u-attr" x="874" y="180">status : text</text>
+<text class="u-attr" x="874" y="194">summary : json</text>
+<rect class="u-node" x="428" y="250" width="209" height="214"/>
+<text class="u-kw" x="532.5" y="264" text-anchor="middle">«table»</text>
+<text class="u-cname" x="532.5" y="279" text-anchor="middle">core_fundamental</text>
+<path class="u-line" d="M428,288 h209"/>
+<text class="u-attr" x="436" y="304">company_id : bigint {id}</text>
+<text class="u-attr" x="436" y="318">item : text {id}</text>
+<text class="u-attr" x="436" y="332">period_type : Q | FY | I {id}</text>
+<text class="u-attr" x="436" y="346">period_end : date {id}</text>
+<text class="u-attr" x="436" y="360">filed : date {id}</text>
+<text class="u-attr" x="436" y="374">value : float</text>
+<text class="u-attr" x="436" y="388">split_factor : float</text>
+<text class="u-attr" x="436" y="402">method : text</text>
+<text class="u-attr" x="436" y="416">source : text</text>
+<text class="u-attr" x="436" y="430">tag : text</text>
+<text class="u-attr" x="436" y="444">raw_table : text</text>
+<text class="u-attr" x="436" y="458">raw_id : bigint</text>
+<rect class="u-node" x="666" y="250" width="183" height="144"/>
+<text class="u-kw" x="757.5" y="264" text-anchor="middle">«table»</text>
+<text class="u-cname" x="757.5" y="279" text-anchor="middle">core_fundamental_ttm</text>
+<path class="u-line" d="M666,288 h183"/>
+<text class="u-attr" x="674" y="304">company_id : bigint {id}</text>
+<text class="u-attr" x="674" y="318">item : text {id}</text>
+<text class="u-attr" x="674" y="332">period_end : date {id}</text>
+<text class="u-attr" x="674" y="346">filed : date {id}</text>
+<text class="u-attr" x="674" y="360">basis : fy | 4q | instant</text>
+<text class="u-attr" x="674" y="374">value : float</text>
+<text class="u-attr" x="674" y="388">value_adj : float</text>
+<rect class="u-node" x="888" y="250" width="163" height="158"/>
+<text class="u-kw" x="969.5" y="264" text-anchor="middle">«table»</text>
+<text class="u-cname" x="969.5" y="279" text-anchor="middle">core_quality_issue</text>
+<path class="u-line" d="M888,288 h163"/>
+<text class="u-attr" x="896" y="304">issue_id : bigint {id}</text>
+<text class="u-attr" x="896" y="318">build_id : bigint</text>
+<text class="u-attr" x="896" y="332">company_id : bigint</text>
+<text class="u-attr" x="896" y="346">item : text</text>
+<text class="u-attr" x="896" y="360">at_date : date</text>
+<text class="u-attr" x="896" y="374">check_name : text</text>
+<text class="u-attr" x="896" y="388">severity : text</text>
+<text class="u-attr" x="896" y="402">detail : text</text>
+<rect class="u-node" x="428" y="520" width="176" height="102"/>
+<text class="u-kw" x="516" y="534" text-anchor="middle">«table»</text>
+<text class="u-cname" x="516" y="549" text-anchor="middle">core_company</text>
+<path class="u-line" d="M428,558 h176"/>
+<text class="u-attr" x="436" y="574">company_id : bigint {id}</text>
+<text class="u-attr" x="436" y="588">symbol : text</text>
+<text class="u-attr" x="436" y="602">cik : bigint</text>
+<text class="u-attr" x="436" y="616">sector : text</text>
+<rect class="u-node" x="666" y="520" width="176" height="102"/>
+<text class="u-kw" x="754" y="534" text-anchor="middle">«table»</text>
+<text class="u-cname" x="754" y="549" text-anchor="middle">core_price_daily</text>
+<path class="u-line" d="M666,558 h176"/>
+<text class="u-attr" x="674" y="574">company_id : bigint {id}</text>
+<text class="u-attr" x="674" y="588">date : date {id}</text>
+<text class="u-attr" x="674" y="602">close : float</text>
+<text class="u-attr" x="674" y="616">adj_close : float</text>
+<rect class="u-node" x="888" y="520" width="142" height="102"/>
+<text class="u-kw" x="959" y="534" text-anchor="middle">«table»</text>
+<text class="u-cname" x="959" y="549" text-anchor="middle">core_index_member</text>
+<path class="u-line" d="M888,558 h142"/>
+<text class="u-attr" x="896" y="574">company_id {id}</text>
+<text class="u-attr" x="896" y="588">index_code {id}</text>
+<text class="u-attr" x="896" y="602">start_date {id}</text>
+<text class="u-attr" x="896" y="616">end_date : date</text>
+<path class="u-line" d="M470,200 L470,250"/>
+<text class="u-mult" x="476" y="214" text-anchor="start">1</text>
+<text class="u-mult" x="476" y="244" text-anchor="start">0..*</text>
+<path class="u-line" d="M585,140 L652,140"/>
+<text class="u-mult" x="589" y="134" text-anchor="start">1</text>
+<text class="u-mult" x="648" y="154" text-anchor="end">0..*</text>
+<path class="u-line" d="M969.5,200 L969.5,250"/>
+<text class="u-mult" x="975.5" y="214" text-anchor="start">1</text>
+<text class="u-mult" x="975.5" y="244" text-anchor="start">0..*</text>
+<path class="u-line" d="M470,520 L470,464"/>
+<text class="u-mult" x="476" y="514" text-anchor="start">1</text>
+<text class="u-mult" x="476" y="478" text-anchor="start">0..*</text>
+<path class="u-line" d="M604,570 L666,570"/>
+<text class="u-mult" x="608" y="564" text-anchor="start">1</text>
+<text class="u-mult" x="662" y="584" text-anchor="end">0..*</text>
+<path class="u-line" d="M520,622 L520,622 L959,622 L959,622"/>
+<text class="u-mult" x="526" y="636" text-anchor="start">1</text>
+<text class="u-mult" x="965" y="636" text-anchor="start">0..*</text>
+<path class="u-line" d="M969.5,408 L969.5,492 L560,492 L560,520"/>
+<text class="u-mult" x="975.5" y="422" text-anchor="start">0..*</text>
+<text class="u-mult" x="566" y="514" text-anchor="start">0..1</text>
+<path class="u-line dash" d="M666,330 L637,330" marker-end="url(#u3-a)"/>
+<text class="u-kw" x="651.5" y="322" text-anchor="middle">«derive»</text>
+<path class="u-line dash" d="M428,430 L177,430" marker-end="url(#u3-a)"/>
+<text class="u-kw" x="300" y="422" text-anchor="middle">«trace»</text>
+<text class="u-mult" x="300" y="446" text-anchor="middle">raw_table, raw_id</text>
+<rect class="u-node" x="1068" y="84" width="170" height="158"/>
+<text class="u-kw" x="1153" y="98" text-anchor="middle">«table»</text>
+<text class="u-cname" x="1153" y="113" text-anchor="middle">ops_task</text>
+<path class="u-line" d="M1068,122 h170"/>
+<text class="u-attr" x="1076" y="138">source : text {id}</text>
+<text class="u-attr" x="1076" y="152">request_key : text {id}</text>
+<text class="u-attr" x="1076" y="166">symbol : text</text>
+<text class="u-attr" x="1076" y="180">active : bool</text>
+<text class="u-attr" x="1076" y="194">status : text</text>
+<text class="u-attr" x="1076" y="208">attempts : int</text>
+<text class="u-attr" x="1076" y="222">next_due_at : ts</text>
+<text class="u-attr" x="1076" y="236">last_fetch_id : bigint</text>
+<rect class="u-node" x="1068" y="270" width="170" height="130"/>
+<text class="u-kw" x="1153" y="284" text-anchor="middle">«table»</text>
+<text class="u-cname" x="1153" y="299" text-anchor="middle">ops_run</text>
+<path class="u-line" d="M1068,308 h170"/>
+<text class="u-attr" x="1076" y="324">run_id : bigint {id}</text>
+<text class="u-attr" x="1076" y="338">mode : text</text>
+<text class="u-attr" x="1076" y="352">status : text</text>
+<text class="u-attr" x="1076" y="366">requests : int</text>
+<text class="u-attr" x="1076" y="380">rows_stored : int</text>
+<text class="u-attr" x="1076" y="394">build_id : bigint</text>
+<path class="u-line" d="M1068,330 L1048,330 L1048,150 L1029,150"/>
+<text class="u-mult" x="1064" y="324" text-anchor="end">0..*</text>
+<text class="u-mult" x="1033" y="144" text-anchor="start">0..1</text>
+<rect class="u-node" x="1068" y="468" width="183" height="144"/>
+<text class="u-kw" x="1159.5" y="482" text-anchor="middle">«table»</text>
+<text class="u-cname" x="1159.5" y="497" text-anchor="middle">out_coverage_snapshot</text>
+<path class="u-line" d="M1068,506 h183"/>
+<text class="u-attr" x="1076" y="522">snapshot_date : date {id}</text>
+<text class="u-attr" x="1076" y="536">universe : text</text>
+<text class="u-attr" x="1076" y="550">companies : int</text>
+<text class="u-attr" x="1076" y="564">companies_covered : int</text>
+<text class="u-attr" x="1076" y="578">cells_required : int</text>
+<text class="u-attr" x="1076" y="592">cells_present : int</text>
+<text class="u-attr" x="1076" y="606">mode : text</text>
+<rect class="u-node" x="1068" y="650" width="183" height="144"/>
+<text class="u-kw" x="1159.5" y="664" text-anchor="middle">«table»</text>
+<text class="u-cname" x="1159.5" y="679" text-anchor="middle">out_coverage_gap</text>
+<path class="u-line" d="M1068,688 h183"/>
+<text class="u-attr" x="1076" y="704">symbol : text {id}</text>
+<text class="u-attr" x="1076" y="718">item : text {id}</text>
+<text class="u-attr" x="1076" y="732">period : text {id}</text>
+<text class="u-attr" x="1076" y="746">period_type : text {id}</text>
+<text class="u-attr" x="1076" y="760">status : text</text>
+<text class="u-attr" x="1076" y="774">reason : text</text>
+<text class="u-attr" x="1076" y="788">snapshot_date : date</text>
+<path class="u-line" d="M1159.5,612 L1159.5,650"/>
+<text class="u-mult" x="1165.5" y="626" text-anchor="start">1</text>
+<text class="u-mult" x="1165.5" y="644" text-anchor="start">0..*</text>
+<path class="u-line dash" d="M1056,720 L740,720 L740,654" marker-end="url(#u3-a)"/>
+<text class="u-kw" x="900" y="712" text-anchor="middle">«derive» from the core package</text>
+<path class="u-note" d="M34,716 H375 L384,725 V758 H34 z M375,716 V725 H384"/>
+<text class="u-n" x="42" y="734">{id} = primary key · multiplicities from foreign keys</text>
+<text class="u-nm" x="42" y="749">ts = timestamp</text>
+</svg>
+    </div>
+    <figcaption>Class diagram: the tables of the data path, with their keys and links (migrations 001 to 010).</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 390" role="img" aria-label="UML state machine of an ingest task: created pending, fetched when due into ok, empty or error with their retry times, fetched again when due; it becomes inactive when its company leaves the universe and resumes its last state when it rejoins.">
+<defs><marker id="u4-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="10" y="10" width="1280" height="370"/>
+<path class="u-frame-tag" d="M10,10 h109 v14 l-9,10 H10 z"/>
+<text class="u-tagk" x="18" y="26">stm</text>
+<text class="u-tag" x="55.5" y="26">ops_task</text>
+<rect class="u-node" x="90" y="40" width="920" height="290" rx="14"/>
+<path class="u-line" d="M90,62 H1010"/>
+<text class="u-act" x="550" y="56" text-anchor="middle">active</text>
+<circle class="u-solid" cx="108" cy="204" r="8"/>
+<rect class="u-node" x="130" y="184" width="90" height="40" rx="10"/>
+<text class="u-act" x="175" y="208" text-anchor="middle">pending</text>
+<path class="u-line" d="M116,204 L130,204" marker-end="url(#u4-a)"/>
+<circle class="u-solid" cx="330" cy="204" r="5"/>
+<path class="u-line" d="M220,204 L325,204" marker-end="url(#u4-a)"/>
+<text class="u-g" x="273" y="196" text-anchor="middle">when(due) / fetch</text>
+<path class="u-node" d="M400,191 L413,204 L400,217 L387,204 z"/>
+<path class="u-line" d="M335,204 L387,204" marker-end="url(#u4-a)"/>
+<rect class="u-node" x="630" y="96" width="360" height="214" rx="12"/>
+<path class="u-line" d="M630,118 H990"/>
+<text class="u-act" x="810" y="112" text-anchor="middle">fetched</text>
+<rect class="u-node" x="760" y="130" width="120" height="36" rx="10"/>
+<text class="u-act" x="820" y="152" text-anchor="middle">ok</text>
+<rect class="u-node" x="760" y="186" width="120" height="36" rx="10"/>
+<text class="u-act" x="820" y="208" text-anchor="middle">empty</text>
+<rect class="u-node" x="760" y="246" width="120" height="36" rx="10"/>
+<text class="u-act" x="820" y="268" text-anchor="middle">error</text>
+<path class="u-line" d="M400,191 L400,148 L760,148" marker-end="url(#u4-a)"/>
+<text class="u-g" x="412" y="141" text-anchor="start">[ok] / due again after refresh_days</text>
+<path class="u-line" d="M413,204 L760,204" marker-end="url(#u4-a)"/>
+<text class="u-g" x="420" y="197" text-anchor="start">[no data] / due again in 7 days</text>
+<path class="u-line" d="M400,217 L400,264 L760,264" marker-end="url(#u4-a)"/>
+<text class="u-g" x="412" y="257" text-anchor="start">[failure] / attempts + 1, retry</text>
+<text class="u-g" x="412" y="279" text-anchor="start">in 6 h × 2^attempts, at most 24 h</text>
+<path class="u-line" d="M700,96 L700,80 L330,80 L330,199" marker-end="url(#u4-a)"/>
+<text class="u-g" x="515" y="74" text-anchor="middle">when(due) / fetch</text>
+<circle class="u-node" cx="175" cy="290" r="11"/>
+<text class="u-act" x="175" y="294" text-anchor="middle">H</text>
+<rect class="u-node" x="1120" y="182" width="130" height="44" rx="10"/>
+<text class="u-act" x="1185" y="208" text-anchor="middle">inactive</text>
+<path class="u-line" d="M1010,204 L1120,204" marker-end="url(#u4-a)"/>
+<text class="u-g" x="1065" y="197" text-anchor="middle">left universe</text>
+<path class="u-line" d="M1185,226 L1185,352 L175,352 L175,301" marker-end="url(#u4-a)"/>
+<text class="u-g" x="680" y="368" text-anchor="middle">rejoined (resumes the last state)</text>
+<path class="u-note" d="M1040,40 H1271 L1280,49 V112 H1040 z M1271,40 V49 H1280"/>
+<text class="u-n" x="1048" y="58">status, attempts and next_due_at are</text>
+<text class="u-n" x="1048" y="73">columns of ops_task; HTTP 429 or a</text>
+<text class="u-n" x="1048" y="88">used budget stops the source group:</text>
+<text class="u-n" x="1048" y="103">the task keeps its state, stays due</text>
+<path class="u-line dash" d="M1040,120 L1010,120"/>
+</svg>
+    </div>
+    <figcaption>State machine: the life of one ingest task, row by row in <code>ops_task</code>.</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 232" role="img" aria-label="UML activity diagram of db import: a file downloaded by hand is read; for each payload in it, a new one is kept and parsed into the raw tables, one seen before only gets its kept copy; then the tasks it covered count as fetched, so the job does not download it again.">
+<defs><marker id="u6-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="10" y="10" width="1280" height="212"/>
+<path class="u-frame-tag" d="M10,10 h144 v14 l-9,10 H10 z"/>
+<text class="u-tagk" x="18" y="26">act</text>
+<text class="u-tag" x="55.5" y="26">Import a file</text>
+<circle class="u-solid" cx="40" cy="128" r="8"/>
+<rect class="u-node" x="64" y="106" width="132" height="44" rx="12"/>
+<text class="u-act" x="130" y="124.5" text-anchor="middle">Read the file</text>
+<text class="u-objm" x="130" y="139.5" text-anchor="middle">inbox/&lt;kind&gt;/</text>
+<path class="u-line" d="M48,128 L64,128" marker-end="url(#u6-a)"/>
+<rect class="u-region" x="232" y="52" width="640" height="158" rx="14"/>
+<text class="u-kw" x="244" y="70">«iterative»</text>
+<text class="u-g" x="312" y="70">each payload in it: a company&#x27;s facts, a quarter&#x27;s data set</text>
+<rect class="u-node" x="226" y="113" width="12" height="30"/>
+<path class="u-line" d="M226,123 h12 M226,133 h12"/>
+<path class="u-line" d="M196,128 L226,128" marker-end="url(#u6-a)"/>
+<path class="u-node" d="M300,115 L313,128 L300,141 L287,128 z"/>
+<path class="u-line" d="M238,128 L287,128" marker-end="url(#u6-a)"/>
+<rect class="u-node" x="344" y="106" width="116" height="44" rx="12"/>
+<text class="u-act" x="402" y="124.5" text-anchor="middle">Keep the</text>
+<text class="u-act" x="402" y="139.5" text-anchor="middle">payload</text>
+<path class="u-line" d="M313,128 L344,128" marker-end="url(#u6-a)"/>
+<text class="u-g" x="318" y="120" text-anchor="start">[new]</text>
+<rect class="u-node" x="488" y="106" width="116" height="44" rx="12"/>
+<text class="u-act" x="546" y="124.5" text-anchor="middle">Parse into</text>
+<text class="u-act" x="546" y="139.5" text-anchor="middle">raw tables</text>
+<path class="u-line" d="M460,128 L488,128" marker-end="url(#u6-a)"/>
+<path class="u-node" d="M640,115 L653,128 L640,141 L627,128 z"/>
+<path class="u-line" d="M604,128 L627,128" marker-end="url(#u6-a)"/>
+<path class="u-line" d="M300,141 L300,188 L640,188 L640,141" marker-end="url(#u6-a)"/>
+<text class="u-g" x="310" y="182" text-anchor="start">[seen before] / keep its copy only</text>
+<rect class="u-node" x="676" y="106" width="130" height="44" rx="12"/>
+<text class="u-act" x="741" y="124.5" text-anchor="middle">Mark its tasks</text>
+<text class="u-act" x="741" y="139.5" text-anchor="middle">fetched</text>
+<path class="u-line" d="M653,128 L676,128" marker-end="url(#u6-a)"/>
+<circle class="u-node" cx="840" cy="128" r="9"/>
+<path class="u-line" d="M833.6,121.6 L846.4,134.4 M833.6,134.4 L846.4,121.6"/>
+<path class="u-line" d="M806,128 L831,128" marker-end="url(#u6-a)"/>
+<circle class="u-node" cx="910" cy="128" r="11"/>
+<circle class="u-solid" cx="910" cy="128" r="6.5"/>
+<path class="u-line" d="M872,128 L899,128" marker-end="url(#u6-a)"/>
+<path class="u-note" d="M946,52 H1267 L1276,61 V169 H946 z M1267,52 V61 H1276"/>
+<text class="u-n" x="954" y="70">db import FILE --target server: from this PC</text>
+<text class="u-n" x="954" y="85">straight into the Azure database</text>
+<text class="u-n" x="954" y="100">the same parsers as the API sources;</text>
+<text class="u-n" x="954" y="115">due again after the source&#x27;s refresh interval,</text>
+<text class="u-n" x="954" y="130">as if fetched on the file&#x27;s date: the job</text>
+<text class="u-n" x="954" y="145">never downloads what was imported</text>
+<text class="u-nm" x="954" y="160">sec_companyfacts · sec_fsds</text>
+<path class="u-line dash" d="M946,90 L741,106"/>
+</svg>
+    </div>
+    <figcaption>Activity diagram: a file downloaded by hand loaded into the pipeline (<code>db import</code>).</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 112" role="img" aria-label="Key to the UML symbols used in the four diagrams.">
+<defs><marker id="u5-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<circle class="u-solid" cx="32" cy="30" r="8"/>
+<text class="u-n" x="46" y="34">start</text>
+<circle class="u-node" cx="104" cy="30" r="11"/>
+<circle class="u-solid" cx="104" cy="30" r="6.5"/>
+<text class="u-n" x="122" y="34">end</text>
+<circle class="u-node" cx="169" cy="30" r="9"/>
+<path class="u-line" d="M162.6,23.6 L175.4,36.4 M162.6,36.4 L175.4,23.6"/>
+<text class="u-n" x="186" y="34">end of one flow</text>
+<rect class="u-node" x="286" y="18" width="46" height="24" rx="10"/>
+<text class="u-n" x="340" y="34">action</text>
+<path class="u-node" d="M402,19 L413,30 L402,41 L391,30 z"/>
+<text class="u-n" x="420" y="34">decision / merge</text>
+<rect class="u-node" x="530" y="18" width="40" height="24"/>
+<text class="u-n" x="578" y="34">object (data) · «datastore» table</text>
+<rect class="u-region" x="766" y="18" width="40" height="24" rx="8"/>
+<text class="u-n" x="814" y="34">expansion region: once per item</text>
+<path class="u-rake" d="M1004,24 v10 M999,34 v-5 h10 v5"/>
+<text class="u-n" x="1020" y="34">detailed in its own diagram</text>
+<path class="u-note" d="M24,64 H55 L64,73 V88 H24 z M55,64 V73 H64"/>
+<text class="u-n" x="72" y="80">note</text>
+<path class="u-line" d="M120,76 h44" marker-end="url(#u5-a)"/>
+<text class="u-n" x="172" y="80">control or object flow · transition</text>
+<path class="u-line dash" d="M372,76 h44" marker-end="url(#u5-a)"/>
+<text class="u-n" x="424" y="80">dependency («derive», «trace»)</text>
+<path class="u-line" d="M600,76 h44"/>
+<text class="u-mult" x="602" y="70">1</text>
+<text class="u-mult" x="644" y="70" text-anchor="end">0..*</text>
+<text class="u-n" x="652" y="80">association (foreign key)</text>
+<circle class="u-solid" cx="816" cy="76" r="5"/>
+<text class="u-n" x="828" y="80">junction</text>
+<circle class="u-node" cx="901" cy="76" r="11"/>
+<text class="u-act" x="901" y="80" text-anchor="middle">H</text>
+<text class="u-n" x="920" y="80">history: back to the last state</text>
+</svg>
+    </div>
+    <figcaption>Key to the symbols (UML 2.5).</figcaption>
+  </figure>
+</section>
+
 <section>
   <h2>One day, in UTC</h2>
   <figure>
@@ -327,6 +1050,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <ol>
     <li>Edit <code>docs/pipeline.html</code> in the same change that adds, moves or reschedules a piece.</li>
     <li>Change the dashed line when the evening run reads from the database instead of the sources.</li>
+    <li>"Inside the database, in UML" follows <code>src/stock_analysis/db/build.py</code>, <code>db/coverage.py</code>, <code>ingest/job.py</code> and the migrations: redraw an action, table or state when the code changes it, in <code>docs/pipeline_uml.py</code> (run it with this file as its argument); keep the notes to the structure: no counts, dates or plans.</li>
     <li>Update the date under the title and republish the artifact; the link is in <code>docs/ARCHITECTURE.md</code>.</li>
   </ol>
 </section>

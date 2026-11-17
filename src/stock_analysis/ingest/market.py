@@ -53,7 +53,10 @@ def load_constituents(conn: Connection, http: httpx.Client, market: str, index: 
     tv = d[list(TV_COLUMNS)].rename(columns=TV_COLUMNS)
     tv = tv.drop_duplicates("tv_symbol").sort_values("tv_symbol")
     url = tradingview.SCAN_URL.format(market=market)
-    fetch_id = start_fetch(conn, "tradingview", index, url, sha256(tv.to_csv(index=False)))
+    fetch_id = start_fetch(
+        conn, "tradingview", index, url, sha256(tv.to_csv(index=False)),
+        payload=d.to_json(orient="records").encode(),  # every field the scan returned
+    )  # fmt: skip
     if fetch_id is None:
         return out
     extra = d.loc[tv.index, ["fundamental_currency_code"]]
@@ -86,7 +89,10 @@ def load_rates(conn: Connection, http: httpx.Client, days: int = 10) -> Outcome:
     r.raise_for_status()
     out = Outcome(requests=1)
     df = rates_frame(r.text)
-    fetch_id = start_fetch(conn, "ecb_rates", "EUR", ecb.URL, sha256(r.content))
+    fetch_id = start_fetch(
+        conn, "ecb_rates", "EUR", ecb.URL, sha256(r.content), payload=r.content,
+        media_type="text/csv",
+    )  # fmt: skip
     if fetch_id is None:
         return out
     stored = 0

@@ -498,6 +498,88 @@ def test_derived_value_never_overrides_a_better_source() -> None:
     assert out.loc[out["item"] == "ebitda", "value"].tolist() == [12.0]
 
 
+def test_liabilities_derived_with_optional_part_and_reported_wins() -> None:
+    from stock_analysis.db.build import derive, parse_derive
+
+    assert parse_derive("a - b - c?") == [(1, "a", False), (-1, "b", False), (-1, "c", True)]
+    base = {"company_id": 1, "period_type": "I", "filed": "2026-03-31",
+            "filed_estimated": False, "fiscal_year": 2025, "fiscal_period": "Q4",
+            "method": "reported", "source": "sec", "rank": 1}  # fmt: skip
+    f = pd.DataFrame(
+        [
+            {**base, "period_end": "2024-12-31", "item": "liabilities_and_equity", "value": 100.0},
+            {**base, "period_end": "2024-12-31", "item": "equity_total", "value": 30.0},
+            {**base, "period_end": "2024-12-31", "item": "temporary_equity", "value": 5.0},
+            {**base, "period_end": "2025-12-31", "item": "liabilities_and_equity", "value": 120.0},
+            {**base, "period_end": "2025-12-31", "item": "equity_total", "value": 40.0},
+            {**base, "period_end": "2025-06-30", "item": "liabilities_and_equity", "value": 110.0},
+            {**base, "period_end": "2025-06-30", "item": "equity_total", "value": 35.0},
+            {**base, "period_end": "2025-06-30", "item": "total_liabilities", "value": 74.0},
+            {**base, "period_end": "2025-03-31", "item": "equity_total", "value": 33.0},
+        ]
+    )
+    items = pd.DataFrame(
+        [{"item": "total_liabilities", "kind": "instant", "derive_mode": "fallback",
+          "derive": "liabilities_and_equity - equity_total - temporary_equity?"}]
+    )  # fmt: skip
+    out = derive(f, items)
+    tl = out[out["item"] == "total_liabilities"].set_index("period_end")
+    assert tl["value"].to_dict() == {"2024-12-31": 65.0, "2025-12-31": 80.0, "2025-06-30": 74.0}
+    assert tl.loc["2025-06-30", "method"] == "reported"  # the company's own figure wins
+    assert tl.loc["2024-12-31", "method"] == "derived"
+
+
+def test_capex_is_the_sum_of_its_parts_when_no_total_is_reported() -> None:
+    from stock_analysis.db.build import derive
+
+    base = {"company_id": 1, "period_type": "FY", "filed": "2026-02-20",
+            "filed_estimated": False, "fiscal_year": 2025, "fiscal_period": "FY",
+            "method": "reported", "source": "sec", "rank": 1}  # fmt: skip
+    rows = [
+        ("2025-12-31", "capex_oil_gas", -6115.0),  # EOG: two lines, no total
+        ("2025-12-31", "capex_other_property", -479.0),
+        ("2024-12-31", "capex_construction", -8453.0),  # AEP: one line
+        ("2023-12-31", "capex", -900.0),  # a reported total wins over its parts
+        ("2023-12-31", "capex_other_property", -100.0),
+    ]
+    f = pd.DataFrame([{**base, "period_end": e, "item": i, "value": v} for e, i, v in rows])
+    items = pd.DataFrame(
+        [{"item": "capex", "kind": "flow", "derive_mode": "fallback",
+          "derive": "capex_oil_gas? + capex_other_property? + capex_construction?"}]
+    )  # fmt: skip
+    out = derive(f, items)
+    capex = out[out["item"] == "capex"].set_index("period_end")["value"].to_dict()
+    assert capex == {"2025-12-31": -6594.0, "2024-12-31": -8453.0, "2023-12-31": -900.0}
+
+
+def test_custom_tags_are_summed_and_signed(con, monkeypatch) -> None:
+    from stock_analysis.db import build as b
+
+    rules = {
+        "custom_tag": [{"symbol": "AAA", "item": "capex", "tags": ["UtilityCapex", "OtherCapex"]}]
+    }
+    monkeypatch.setattr(b, "load_companies", lambda: rules)
+    with con.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO core_company (symbol, cik) VALUES ('AAA', 1001) "
+            "ON CONFLICT (symbol) DO UPDATE SET cik = 1001"
+        ))  # fmt: skip
+        fetch = conn.execute(text(
+            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status) "
+            "VALUES ('sec_fsds', 'q', '2026-01-01', '2026-01-01', 'ok') RETURNING fetch_id"
+        )).scalar()  # fmt: skip
+        for tag, v in (("UtilityCapex", 4399e6), ("OtherCapex", 68e6), ("Unrelated", 5e6)):
+            conn.execute(text(
+                "INSERT INTO raw_sec_xbrl_fact (fetch_id, cik, accn, form, filed, concept, unit, "
+                "period_start, period_end, value, custom) VALUES (:f, 1001, 'a1', '10-K', "
+                "'2025-02-20', :c, 'USD', '2024-01-01', '2024-12-31', :v, TRUE)"
+            ), {"f": fetch, "c": f"custom:{tag}", "v": v})  # fmt: skip
+        _, tags = b.load_items()
+        x = b.custom_facts(conn, tags)
+    assert len(x) == 1 and x["item"].iloc[0] == "capex" and x["value"].iloc[0] == 4467e6
+    assert x["scale"].iloc[0] == -1.0  # stored negative, like the other capex
+
+
 def test_watchlist(con, tmp_path: Path, data_dir: Path) -> None:
     rows = q(
         con,

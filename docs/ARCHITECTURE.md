@@ -11,6 +11,10 @@ It is one repository and one Python package (`src/stock_analysis`), with its set
 
 The drawn version of this map, with the daily timeline, is [`pipeline.html`](pipeline.html)
 (published at https://claude.ai/artifact/A54Gn496CWVif9xdr5fgCi). Keep it matching this page.
+Its section "Inside the database, in UML" draws the data path in UML 2.5: an
+activity diagram of the nightly run (ingest, build, coverage), an activity diagram of building
+the fundamentals (standardise, fill, reconcile, derive), a class diagram of the tables and a
+state machine of an ingest task.
 
 | Piece | Runs on | Started by | Code |
 |---|---|---|---|

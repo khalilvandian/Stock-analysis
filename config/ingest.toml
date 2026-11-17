@@ -65,6 +65,15 @@ order = 4
 requests = 1
 refresh_days = { backfill = 30, maintain = 7 }
 
+# A whole 10-K or 10-Q through edgartools (about 8 requests): only the filings that report a
+# missing value of a company with a listed share class (config/companies.toml). A filing
+# doesn't change, so it is fetched once.
+[sources.sec_xbrl]
+group = "sec"
+order = 4
+requests = 8
+refresh_days = { backfill = 3650, maintain = 3650 }
+
 [sources.yahoo_prices]
 group = "yahoo"
 order = 5

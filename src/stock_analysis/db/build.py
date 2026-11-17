@@ -1,9 +1,10 @@
 """Rebuild the core layer from the raw layer (docs/DATABASE.md, "Build rules").
 
-The build reads only raw_* tables and config/db_items.toml. In one transaction it rewrites
-core_item, core_item_tag, core_index_member, core_price_daily, core_fundamental and
-core_fundamental_ttm, updates core_company in place (so company_id stays the same), and adds a
-core_build row with that build's core_quality_issue rows.
+The build reads only raw_* tables, config/db_items.toml and config/companies.toml (predecessor
+CIKs). In one transaction it rewrites core_item, core_item_tag, core_index_member,
+core_price_daily, core_fundamental and core_fundamental_ttm, updates core_company in place (so
+company_id stays the same), and adds a core_build row with that build's core_quality_issue
+rows.
 """
 
 from __future__ import annotations
@@ -22,6 +23,16 @@ from . import ROOT, Database, frame, insert_df, records, run, scalar
 from .load_files import UNIVERSE, now
 
 ITEMS_CONFIG = ROOT / "config" / "db_items.toml"
+COMPANIES_CONFIG = ROOT / "config" / "companies.toml"
+
+
+def load_companies(path: Path = COMPANIES_CONFIG) -> dict:
+    """config/companies.toml: predecessor CIKs and formation dates."""
+    if not Path(path).exists():
+        return {}
+    return tomllib.loads(Path(path).read_text(encoding="utf-8"))
+
+
 FIRST_DATE = "2016-01-01"
 SOURCE_RANK = {"sec": 1, "history": 2, "yahoo": 3}
 # No source loaded so far records filing dates: estimate them as the latest SEC deadline.
@@ -44,16 +55,44 @@ def load_items(path: Path = ITEMS_CONFIG) -> tuple[pd.DataFrame, pd.DataFrame]:
     config = tomllib.loads(Path(path).read_text(encoding="utf-8"))
     items, tags = [], []
     for it in config["items"]:
-        items.append({k: it.get(k) for k in ("item", "label", "kind", "unit", "derive")})
+        row = {k: it.get(k) for k in ("item", "label", "kind", "unit", "derive")}
+        row["derive_mode"] = it.get("derive_mode", "replace")
+        row["helper"] = bool(it.get("helper", False))
+        items.append(row)
         for i, tag in enumerate(it.get("sec", []), start=1):
             taxonomy, _, name = tag.rpartition(":")
             tags.append((it["item"], taxonomy or "us-gaap", name, i, float(it.get("sec_scale", 1))))
+        for i, tag in enumerate(it.get("sec_class", []), start=1):  # per share class
+            tags.append((it["item"], "sec_class", tag, i, float(it.get("sec_scale", 1))))
         for i, tag in enumerate(it.get("history", []), start=1):
             tags.append((it["item"], "history", tag, i, float(it.get("history_scale", 1))))
         for i, tag in enumerate(it.get("yahoo", []), start=1):
             tags.append((it["item"], "yahoo", tag, i, 1.0))
     tags = pd.DataFrame(tags, columns=["item", "taxonomy", "tag", "priority", "scale"])
     return pd.DataFrame(items), tags
+
+
+ITEM_COLUMNS = ["item", "label", "kind", "unit", "derive"]  # the columns of core_item
+
+
+def stored(items: pd.DataFrame, tags: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The items and tags written to core_item and core_item_tag: helpers (the parts of a
+    derivation, such as liabilities and equity) are used inside the build only."""
+    keep = items[~items["helper"]]
+    return keep[ITEM_COLUMNS], tags[tags["item"].isin(keep["item"])]
+
+
+def parse_derive(expr: str) -> list[tuple[int, str, bool]]:
+    """'a - b - c?' as [(1, 'a', False), (-1, 'b', False), (-1, 'c', True)]: the sign, the
+    item, and whether the term is optional (counted as 0 when the company has none)."""
+    terms, sign = [], 1
+    for token in expr.replace("+", " + ").replace("-", " - ").split():
+        if token in "+-":
+            sign = 1 if token == "+" else -1
+            continue
+        terms.append((sign, token.rstrip("?"), token.endswith("?")))
+        sign = 1
+    return terms
 
 
 # ---------------------------------------------------------------- companies and membership
@@ -89,7 +128,7 @@ def build_companies(conn: Connection) -> dict[str, int]:
         run(
             conn,
             "UPDATE core_company SET cik = :cik WHERE symbol = :symbol",
-            records(sec.drop_duplicates("cik")[["cik", "symbol"]]),
+            records(sec[["cik", "symbol"]]),  # share classes (GOOG, GOOGL) share the CIK
         )
     companies = {r[0]: r[1] for r in run(conn, "SELECT symbol, company_id FROM core_company")}
     build_membership(conn, tv, companies)
@@ -173,9 +212,13 @@ def all_splits(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
 SEC_FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A", "10-KT", "10-KT/A", "20-F", "20-F/A"}
 SEC_FORMS |= {"40-F", "40-F/A"}
 SEC_UNITS = {"USD", "USD/shares", "shares"}
-QUARTER_DAYS, YEAR_DAYS = (80, 100), (350, 380)
-HALF_DAYS, NINE_MONTH_DAYS = (170, 200), (260, 290)
+# Period lengths in days (end - start + 1). 52/53-week years have quarters of 12 to 17 weeks
+# (84 to 119 days), half years of 24 to 28 weeks and nine months of 36 to 40 weeks.
+QUARTER_DAYS, YEAR_DAYS = (80, 120), (350, 380)
+HALF_DAYS, NINE_MONTH_DAYS = (165, 200), (245, 290)
+QUARTER_SLACK = 0.35  # how far (in quarters, about a month) a quarter may sit off its slot
 SEC_FIRST_PERIOD = "2015-01-01"
+CLASS_AXIS = "us-gaap:StatementClassOfStockAxis"
 
 
 def to_month_end(dates: pd.Series) -> pd.Series:
@@ -237,7 +280,7 @@ def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.
     from year-to-date totals where needed), or an instant, with its real filing date. Cover-page
     share counts (dei) are dated at the balance-sheet date of their filing, not the cover date.
     Only the latest fetched version of each fact is read, in the database."""
-    sec_tags = tags[~tags["taxonomy"].isin(["history", "yahoo"])]
+    sec_tags = tags[~tags["taxonomy"].isin(["history", "yahoo", "sec_class"])]
     forms = ", ".join(f"'{x}'" for x in sorted(SEC_FORMS))
     units = ", ".join(f"'{x}'" for x in sorted(SEC_UNITS))
     pairs = ", ".join(f"('{a}', '{b}')" for a, b in zip(sec_tags["taxonomy"], sec_tags["tag"],
@@ -245,22 +288,56 @@ def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.
     symbols = frame(conn, "SELECT symbol FROM core_company WHERE cik IS NOT NULL")["symbol"]
     if sec_tags.empty or symbols.empty:
         return pd.DataFrame()
+    # Each company's own CIK, and the CIKs of its predecessors up to the new one's first filing
+    # (config/companies.toml): one company may read two CIKs, two share classes one CIK.
+    preds = [
+        f"('{p['symbol']}', {int(p['cik'])}, DATE '{p['until']}')"
+        for p in load_companies().get("predecessor", [])
+    ]
+    owners = "SELECT symbol, cik, NULL::date AS until FROM core_company WHERE cik IS NOT NULL"
+    if preds:
+        owners += " UNION ALL SELECT * FROM (VALUES " + ", ".join(preds) + ") AS p(s, c, u)"
     sec = read_compact(
         conn,
-        "SELECT DISTINCT ON (f.cik, f.taxonomy, f.tag, f.unit, f.period_start, f.period_end, "
+        "SELECT DISTINCT ON (c.symbol, f.taxonomy, f.tag, f.unit, f.period_start, f.period_end, "
         "f.accn) f.raw_id, f.fetch_id, c.symbol, f.taxonomy, f.tag, f.unit, "
         "to_char(f.period_start, 'YYYY-MM-DD') AS period_start, "
         "to_char(f.period_end, 'YYYY-MM-DD') AS period_end, f.value, f.form, "
         "to_char(f.filed, 'YYYY-MM-DD') AS filed, "
         "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn FROM raw_sec_fact f "
-        f"JOIN core_company c ON c.cik = f.cik WHERE f.form IN ({forms}) AND f.unit IN ({units}) "
+        f"JOIN ({owners}) c ON c.cik = f.cik WHERE f.form IN ({forms}) AND f.unit IN ({units}) "
         f"AND (f.taxonomy, f.tag) IN ({pairs}) AND f.period_end >= :first "
-        "ORDER BY f.cik, f.taxonomy, f.tag, f.unit, f.period_start, f.period_end, f.accn, "
+        "AND (c.until IS NULL OR f.period_end < c.until) "
+        "ORDER BY c.symbol, f.taxonomy, f.tag, f.unit, f.period_start, f.period_end, f.accn, "
         "f.fetch_id DESC",
         {"first": SEC_FIRST_PERIOD},
         {"symbol": list(symbols), "taxonomy": list(sec_tags["taxonomy"]),
          "tag": list(sec_tags["tag"]), "unit": list(SEC_UNITS), "form": list(SEC_FORMS)},
     )  # fmt: skip
+    # The same tags from the data sets and full filings, for the filings company facts lacks
+    # (db import keeps only those there).
+    concepts = [f"{a}:{b}" for a, b in zip(sec_tags["taxonomy"], sec_tags["tag"], strict=True)]
+    filings = frame(
+        conn,
+        "SELECT DISTINCT ON (c.symbol, f.concept, f.unit, f.period_start, f.period_end, f.accn) "
+        "f.raw_id, f.fetch_id, c.symbol, split_part(f.concept, ':', 1) AS taxonomy, "
+        "split_part(f.concept, ':', 2) AS tag, f.unit, "
+        "to_char(f.period_start, 'YYYY-MM-DD') AS period_start, "
+        "to_char(f.period_end, 'YYYY-MM-DD') AS period_end, f.value, f.form, "
+        "to_char(f.filed, 'YYYY-MM-DD') AS filed, "
+        "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn "
+        f"FROM raw_sec_xbrl_fact f JOIN ({owners}) c ON c.cik = f.cik "
+        f"WHERE NOT f.custom AND f.axis = '' AND f.concept = ANY(:concepts) "
+        f"AND f.form IN ({forms}) AND f.unit IN ({units}) AND f.period_end >= :first "
+        "AND (c.until IS NULL OR f.period_end < c.until) "
+        "ORDER BY c.symbol, f.concept, f.unit, f.period_start, f.period_end, f.accn, "
+        "f.fetch_id DESC",
+        {"concepts": concepts, "first": SEC_FIRST_PERIOD},
+    )
+    sec = pd.concat(
+        [sec.assign(raw_table="raw_sec_fact"), filings.assign(raw_table="raw_sec_xbrl_fact")],
+        ignore_index=True,
+    )
     if sec.empty:
         return sec
     instant = sec["period_start"].isna()
@@ -269,6 +346,7 @@ def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.
     sec.loc[dei, "period_end"] = sec.loc[dei, "accn"].map(balance_date)
     sec = sec.dropna(subset=["period_end"])
     sec = sec.merge(sec_tags, on=["taxonomy", "tag"])
+    sec = pd.concat([sec, class_facts(conn, tags), custom_facts(conn, tags)], ignore_index=True)
     if sec.empty:
         return sec
     days = (pd.to_datetime(sec["period_end"]) - pd.to_datetime(sec["period_start"])).dt.days + 1
@@ -289,7 +367,90 @@ def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.
     # Before the price history starts the splits are unknown, so per-share values and share
     # counts could not be put on today's basis: SEC values start a year before core does.
     sec = sec[(sec["period_type"] != "") & (sec["period_end"] >= SEC_FIRST_PERIOD)]
-    return sec.drop(columns="span").assign(source="sec", raw_table="raw_sec_fact")
+    return sec.drop(columns="span").assign(source="sec")
+
+
+def custom_facts(conn: Connection, tags: pd.DataFrame) -> pd.DataFrame:
+    """A company's own tags for an item ([[custom_tag]] in config/companies.toml), from the
+    full filings (raw_sec_xbrl_fact): Dominion reports capex only as "plant construction and
+    other property additions", DTE in two lines (utility, non-utility), summed per filing and
+    period. Tried after the standard tags (priority 200), with the item's SEC scale."""
+    rules = load_companies().get("custom_tag", [])
+    if not rules:
+        return pd.DataFrame()
+    concepts = sorted({f"custom:{t}" for r in rules for t in r["tags"]})
+    x = frame(
+        conn,
+        "SELECT DISTINCT ON (c.symbol, f.concept, f.unit, f.period_start, f.period_end, f.accn) "
+        "f.raw_id, f.fetch_id, c.symbol, f.concept, f.unit, "
+        "to_char(f.period_start, 'YYYY-MM-DD') AS period_start, "
+        "to_char(f.period_end, 'YYYY-MM-DD') AS period_end, f.value, f.form, "
+        "to_char(f.filed, 'YYYY-MM-DD') AS filed, "
+        "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn "
+        "FROM raw_sec_xbrl_fact f JOIN core_company c ON c.cik = f.cik "
+        "WHERE f.custom AND f.axis = '' AND f.concept = ANY(:concepts) "
+        "AND f.unit = ANY(:units) AND f.period_end >= :first "
+        "ORDER BY c.symbol, f.concept, f.unit, f.period_start, f.period_end, f.accn, "
+        "f.fetch_id DESC",
+        {"concepts": concepts, "units": list(SEC_UNITS), "first": SEC_FIRST_PERIOD},
+    )
+    if x.empty:
+        return pd.DataFrame()
+    out = []
+    for r in rules:
+        mine = x[
+            (x["symbol"] == r["symbol"]) & x["concept"].isin([f"custom:{t}" for t in r["tags"]])
+        ]
+        if mine.empty:
+            continue
+        keys = ["symbol", "unit", "period_start", "period_end", "accn", "form", "filed"]
+        g = mine.groupby(keys, dropna=False).agg(
+            value=("value", "sum"), raw_id=("raw_id", "first"), fetch_id=("fetch_id", "max")
+        ).reset_index()  # fmt: skip
+        sec_scale = tags.loc[(tags["item"] == r["item"]) & (tags["taxonomy"] == "us-gaap"), "scale"]
+        out.append(g.assign(
+            item=r["item"], taxonomy="custom", tag=" + ".join(f"custom:{t}" for t in r["tags"]),
+            priority=200, scale=float(sec_scale.iloc[0]) if len(sec_scale) else 1.0,
+            raw_table="raw_sec_xbrl_fact",
+        ))  # fmt: skip
+    return pd.concat(out, ignore_index=True) if out else pd.DataFrame()
+
+
+def class_facts(conn: Connection, tags: pd.DataFrame) -> pd.DataFrame:
+    """The listed share class's facts from full filings (raw_sec_xbrl_fact), for the items
+    read per class (sec_class in config/db_items.toml) and the companies with a listed class
+    (config/companies.toml): Visa's diluted EPS is reported only per class, and the price is
+    the Class A share's. Tried after the company's undimensioned tags (priority + 100)."""
+    classes = {c["symbol"]: c["member"] for c in load_companies().get("share_class", [])}
+    by_class = tags[tags["taxonomy"] == "sec_class"]
+    if not classes or by_class.empty:
+        return pd.DataFrame()
+    x = frame(
+        conn,
+        "SELECT DISTINCT ON (c.symbol, f.concept, f.member, f.unit, f.period_start, "
+        "f.period_end, f.accn) f.raw_id, f.fetch_id, c.symbol, f.concept, f.member, f.unit, "
+        "to_char(f.period_start, 'YYYY-MM-DD') AS period_start, "
+        "to_char(f.period_end, 'YYYY-MM-DD') AS period_end, f.value, f.form, "
+        "to_char(f.filed, 'YYYY-MM-DD') AS filed, "
+        "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn "
+        "FROM raw_sec_xbrl_fact f JOIN core_company c ON c.cik = f.cik "
+        "WHERE c.symbol = ANY(:symbols) AND f.axis = :axis AND f.concept = ANY(:concepts) "
+        "AND f.unit = ANY(:units) AND f.period_end >= :first "
+        "ORDER BY c.symbol, f.concept, f.member, f.unit, f.period_start, f.period_end, f.accn, "
+        "f.fetch_id DESC",
+        {"symbols": list(classes), "axis": CLASS_AXIS, "concepts": list(by_class["tag"]),
+         "units": list(SEC_UNITS), "first": SEC_FIRST_PERIOD},
+    )  # fmt: skip
+    x = x[x["member"] == x["symbol"].map(classes)]
+    if x.empty:
+        return pd.DataFrame()
+    x = x.merge(by_class.rename(columns={"tag": "concept"}), on="concept")
+    return x.assign(
+        taxonomy="sec_class",
+        tag=x["concept"] + " [" + x["member"] + "]",
+        priority=x["priority"] + 100,
+        raw_table="raw_sec_xbrl_fact",
+    ).drop(columns=["concept", "member", "taxonomy_y"], errors="ignore")
 
 
 def candidates(
@@ -336,7 +497,6 @@ def candidates(
     if not frames:
         return pd.DataFrame()
     c = pd.concat(frames, ignore_index=True)
-    c["period_end"] = to_month_end(c["period_end"])
     c["company_id"] = c["symbol"].map(companies)
     c["value"] = c["value"] * c["scale"]
     c["rank"] = c["source"].str.split(":").str[0].map(SOURCE_RANK)
@@ -354,17 +514,41 @@ def month_index(dates: pd.Series) -> pd.Series:
     return d.dt.year * 12 + d.dt.month - 1
 
 
+def month_end_of(index: pd.Series) -> pd.Series:
+    """The last day of the month numbered year * 12 + month - 1 (as month_index returns)."""
+    first = pd.to_datetime({"year": index // 12, "month": index % 12 + 1, "day": 1})
+    return first + pd.offsets.MonthEnd(0)
+
+
 def add_periods(c: pd.DataFrame) -> pd.DataFrame:
-    """Fiscal year and quarter from the fiscal year-end month, and the estimated filing date."""
-    m = month_index(c["period_end"])
+    """Each period on its company's fiscal calendar: the fiscal year and quarter, a month-end
+    period_end and the estimated filing date. period_end comes in as the source's real date.
+
+    A quarter is placed by the days since the last fiscal year end (91.3 per quarter), not by
+    its calendar month, because 52/53-week years have quarters of 12 to 17 weeks: Costco's
+    third quarter ends around 10 May, Kroger's first after 16 weeks in late May. Its
+    period_end is the month end of its slot in the fiscal calendar (fiscal year end + 3, 6, 9
+    or 12 months), so every source's date for the same quarter gives one period. Fiscal years
+    and other dates keep the nearest month end."""
+    real = pd.to_datetime(c["period_end"])
+    m = month_index(real)
     fy = c["period_type"] == "FY"
     if "form" in c:  # a twelve-month total in a 10-Q is a trailing year, not a fiscal year
         fy &= ~c["form"].fillna("").str.startswith("10-Q")
     fy = c[fy].assign(month=m % 12)
     fye = fy.groupby("company_id")["month"].agg(lambda s: s.mode().iloc[0])
-    offset = (m % 12 - c["company_id"].map(fye).fillna(11).astype(int)) % 12
+    fye_month = c["company_id"].map(fye).fillna(11).astype(int)
+    offset = (m % 12 - fye_month) % 12
+    last_fye = m - offset  # month index of the fiscal year end at or before the date
+    position = (real - month_end_of(last_fye)).dt.days / (365.25 / 4)
+    slot = position.round()
+    on_calendar = (position - slot).abs() <= QUARTER_SLACK
+    quarter = (slot % 4).map({1: "Q1", 2: "Q2", 3: "Q3", 0: "Q4"}).where(on_calendar)
+    snap = c["period_type"].isin(["Q", "I"]) & on_calendar
+    m = m.where(~snap, last_fye + 3 * slot.astype(int))
+    offset = (m % 12 - fye_month) % 12
+    c["period_end"] = month_end_of(m).dt.strftime("%Y-%m-%d")
     c["fiscal_year"] = ((m + (12 - offset) % 12) // 12).astype(int)
-    quarter = offset.map({3: "Q1", 6: "Q2", 9: "Q3", 0: "Q4"})
     c["fiscal_period"] = np.where(c["period_type"] == "FY", "FY", quarter)
     # A twelve-month total that doesn't end in the fiscal year-end month (SEC filings show
     # trailing twelve months too) is not a fiscal year, and a quarter off the fiscal quarters
@@ -398,19 +582,28 @@ def latest(f: pd.DataFrame) -> pd.DataFrame:
 
 
 def derive(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
-    """Items defined as a sum of others, wherever all parts exist. The derived value replaces a
-    reported one from the same or a lower-ranked source, never one from a better source
-    (Yahoo's parts do not override history.csv's EBITDA)."""
+    """Items computed from others ('a + b', 'a - b - c?'), wherever every part that isn't
+    optional (?) exists; an optional part missing counts as 0. The derived value is as good as
+    its worst part. With derive_mode "replace" it replaces a reported value from the same or a
+    lower-ranked source (EBITDA: the parts are what we trust); with "fallback" only one from a
+    lower-ranked source, so a value the company reports itself always wins (total
+    liabilities). Never one from a better source: Yahoo's parts do not override history.csv's
+    EBITDA."""
     for _, it in items[items["derive"].notna()].iterrows():
-        parts = [p.strip() for p in it["derive"].split("+")]
+        terms = parse_derive(it["derive"])
+        parts = [t[1] for t in terms]
+        needed = [t[1] for t in terms if not t[2]]
         have = latest(f[f["item"].isin(parts)])
         idx = ["company_id", "period_type", "period_end"]
         wide = have.pivot_table(index=idx, columns="item", values="value", aggfunc="first")
-        if not set(parts) <= set(wide.columns):
+        if not set(needed) <= set(wide.columns):
             continue
-        wide = wide[parts].dropna()
+        wide = wide.reindex(columns=parts).dropna(subset=needed)
+        if not needed:  # every part optional: at least one must be there
+            wide = wide.dropna(how="all")
         if wide.empty:
             continue
+        signs = pd.Series({t[1]: t[0] for t in terms})
         meta = have.groupby(idx).agg(
             filed=("filed", "max"),
             filed_estimated=("filed_estimated", "max"),
@@ -419,11 +612,16 @@ def derive(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
             source=("source", lambda s: s.iloc[0] if s.nunique() == 1 else "derived"),
             rank=("rank", "max"),  # as good as its worst part
         )
-        d = wide.sum(axis=1).rename("value").to_frame().join(meta).reset_index()
+        total = (wide.fillna(0) * signs).sum(axis=1)
+        d = total.rename("value").to_frame().join(meta).reset_index()
         d = d.assign(item=it["item"], kind=it["kind"], tag=it["derive"], method="derived")
         reported = f[f["item"] == it["item"]].groupby(KEY)["rank"].min().rename("reported_rank")
         d = d.merge(reported.reset_index(), on=KEY, how="left")
-        d = d[~(d["reported_rank"] < d["rank"])].drop(columns="reported_rank")
+        if it.get("derive_mode") == "fallback":
+            d = d[~(d["reported_rank"] <= d["rank"])]
+        else:
+            d = d[~(d["reported_rank"] < d["rank"])]
+        d = d.drop(columns="reported_rank")
         drop = f.merge(d[KEY], on=KEY, how="left", indicator=True)["_merge"] == "both"
         f = pd.concat([f[~drop.to_numpy()], d], ignore_index=True)
     return f
@@ -490,7 +688,10 @@ def build_fundamentals(conn, companies, items, tags, splits) -> tuple[pd.DataFra
         return c, c
     f = choose(c)
     f["method"] = f["method"].fillna("reported") if "method" in f else "reported"
-    f = add_split_factor(derive(derive_q4(f, items), items), splits)
+    f = derive(derive_q4(f, items), items)
+    helpers = set(items.loc[items["helper"], "item"])
+    f, c = f[~f["item"].isin(helpers)], c[~c["item"].isin(helpers)]
+    f = add_split_factor(f, splits)
     cols = [*KEY, "filed", "filed_estimated", "fiscal_year", "fiscal_period", "value"]
     cols += ["split_factor", "method", "source", "tag", "raw_table", "raw_id"]
     out = f[cols].copy()
@@ -685,8 +886,8 @@ def build(db: Database, items_config: Path = ITEMS_CONFIG) -> dict:
             ):
                 run(conn, f"DELETE FROM {table}")
             items, tags = load_items(items_config)
-            insert_df(conn, "core_item", items)
-            insert_df(conn, "core_item_tag", tags)
+            for table, df in zip(("core_item", "core_item_tag"), stored(items, tags), strict=True):
+                insert_df(conn, table, df)
             companies = build_companies(conn)
             prices = build_prices(conn, companies)
             f, c = build_fundamentals(conn, companies, items, tags, all_splits(conn, companies))

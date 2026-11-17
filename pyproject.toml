@@ -5,6 +5,7 @@ description = "Stock analysis: absolute values first, a two-stage market screene
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "edgartools>=6.0,<7",
     "httpx>=0.27",
     "markdown>=3.11.2",
     "pandas>=2.2",

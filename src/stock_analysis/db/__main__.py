@@ -1,6 +1,13 @@
 """Command line: python -m stock_analysis.db
-{init,load-files,build,status,check,ping,allow-my-ip,create-roles,ingest,coverage,tasks}
-[--target]."""
+{init,load-files,build,status,check,ping,allow-my-ip,create-roles,ingest,import,reparse,
+coverage,tasks} [--target].
+
+import FILE loads a file downloaded or found by hand into the raw layer of the target database
+(--target server: straight into Azure), as its API source would (ingest/files.py).
+
+reparse reads the kept SEC payloads again (company facts, full filings, the data-set quarters in
+inbox/) with today's mapping (config/db_items.toml), without asking SEC; run build afterwards.
+"""
 
 from __future__ import annotations
 
@@ -29,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
             "allow-my-ip",
             "create-roles",
             "ingest",
+            "import",
+            "reparse",
             "coverage",
             "tasks",
         ],
@@ -45,6 +54,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-build", action="store_true", help="ingest: skip build and coverage")
     parser.add_argument("--due-now", help="ingest: make SOURCE's tasks due now, then run")
     parser.add_argument("--json", help="coverage: also write the page's JSON to this file")
+    parser.add_argument("file", nargs="?", help="import: the file to load")
+    parser.add_argument("--kind", help="import: the kind of file (default: its folder's name)")
+    parser.add_argument("--symbols", help="import: only these companies (comma-separated)")
     args = parser.parse_args(argv)
     if args.command == "check":
         return check(args.target, args.strict)
@@ -87,6 +99,15 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.json).parent.mkdir(parents=True, exist_ok=True)
             Path(args.json).write_text(json.dumps(snap["detail"], default=str), encoding="utf-8")
             print(f"Wrote {args.json}")
+    elif args.command == "import":
+        from ..ingest.files import import_file
+
+        symbols = args.symbols.split(",") if args.symbols else None
+        print("Import:", json.dumps(import_file(db, args.file, args.kind, symbols)))
+    elif args.command == "reparse":
+        from ..ingest.files import reparse_all
+
+        print("Reparse:", json.dumps(reparse_all(db)))
     elif args.command == "tasks":
         from ..ingest.job import task_table
 

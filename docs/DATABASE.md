@@ -245,8 +245,8 @@ Today, on `local` and `server`: 28 pass, 6 warn, 0 fail. The warnings are:
 
 | Layer | Holds | Written by | Rule |
 |---|---|---|---|
-| `raw_*` | What each source returned, one table per source | The loaders (`load_files.py` now, API loaders later) | Append only. A row is stored when it is **new or its values changed** since the last version of the same key, and nothing is ever edited. Each row points to its `raw_fetch` |
-| `core_*` | One cleaned, standard version: companies, index membership, daily prices, fundamentals with every filed version, trailing twelve months, quality issues | `build.py`, from raw and `config/db_items.toml` only | Rewritten on every build. `core_company` is updated in place so `company_id` stays the same |
+| `raw_*` | What each source returned: the payload itself as it came (`raw_payload`), and its parsed rows, one table per source | The loaders (`load_files.py` and the ingest job) | Append only. A row is stored when it is **new or its values changed** since the last version of the same key, and nothing is ever edited. Each row points to its `raw_fetch`. Parsing can be redone from the kept payloads, so a parsing rule is never a reason to ask a source again |
+| `core_*` | One cleaned, standard version: companies, index membership, daily prices, fundamentals with every filed version, trailing twelve months, quality issues | `build.py`, from raw, `config/db_items.toml` and `config/companies.toml` (predecessor CIKs) only | Rewritten on every build. `core_company` is updated in place so `company_id` stays the same |
 | `user_*` | What people decide: the watch list (stocks, peers, target P/E, equity stakes, EPS corrections) | For now `load-files` mirrors `config/watchlist.toml`, the master copy. Later the interface edits these tables | Keyed by symbol. A changed TOML replaces the mirror, and an unchanged one changes nothing |
 | `out_*` | Results of the analyses: screener runs, valuations, the watch list's evening runs | The analyses (for now `load_files.py`, from their output files) | Keyed by **symbol and date**, so an analysis can write without a build |
 | `v_*` | Views for analysis | none | `v_annual`, `v_daily`, `v_watchlist`, `v_fundamental_latest` |
@@ -359,7 +359,7 @@ classDiagram
     <<table>>
     BIGINT company_id PK
     TEXT symbol UK
-    BIGINT cik UK
+    BIGINT cik
     TEXT name
     TEXT exchange
     TEXT sector
@@ -590,7 +590,9 @@ From the repository files, 2026-11-16 (28 MB):
 
 | Table | One row per | Notes |
 |---|---|---|
-| `raw_fetch` | Download or imported file | `source` is one of `tradingview`, `yahoo_prices`, `yahoo_statements`, `yahoo_earnings`, `project_history`, `sec_tickers`, `sec_companyfacts` or `ecb_rates`. A failed download is a row with `status` `error`. `url` is `file:<path>` for a repository file. `row_count` is the rows received and `rows_stored` the rows that were new or changed. A file with the same SHA-256 as one loaded before is skipped |
+| `raw_fetch` | Download or imported file | `source` is one of `tradingview`, `yahoo_prices`, `yahoo_statements`, `yahoo_earnings`, `project_history`, `sec_tickers`, `sec_companyfacts`, `sec_xbrl` or `ecb_rates`. A failed download is a row with `status` `error`. `url` is `file:<path>` for a repository file. `row_count` is the rows received and `rows_stored` the rows that were new or changed. A file with the same SHA-256 as one loaded before is skipped |
+| `raw_payload` | Distinct payload fetched | The payload as the source returned it, gzip-compressed (`content`, `size_bytes` before compression, `media_type`): the SEC files, TradingView's scan, the ECB's CSV, the tables yfinance returns. The other raw tables hold what is parsed from it, so a changed parsing rule (a newly mapped SEC tag) reads the kept copy (`db reparse`) instead of the source. About 0.25 MB per SEC company file |
+| `raw_sec_xbrl_fact` | Fact of a full 10-K or 10-Q, per dimension | Read from the filing's XBRL (edgartools, source `sec_xbrl`) for the values company facts leaves out: `axis` and `member` give the share class (Visa's Class A diluted EPS). Only the concepts in `sec_class` in `config/db_items.toml`. Also filled from SEC's Financial Statement Data Sets (`db import`, kind `sec_fsds`): the companies' own tags (`custom`, read through `[[custom_tag]]` in `config/companies.toml`) and the values per share class. `statement` is BS, IS, CF, EQ or CI |
 | `raw_tv_constituent` | Company in one S&P 500 snapshot | The whole snapshot is stored, since its prices change daily. `extra_json` holds the columns that have no field of their own |
 | `raw_yahoo_price` | Symbol, day and version | Open, high, low and close (split-adjusted), volume, dividends and splits. The dividend-adjusted close is **computed in core**, so a dividend does not rewrite the history here, and Yahoo's own adjusted close isn't stored. Open, high and low were added by migration `002` for technical analysis |
 | `raw_yahoo_statement` | Line item, period and version | Yahoo's own names (`Total Revenue`) |
@@ -625,11 +627,15 @@ From the repository files, 2026-11-16 (28 MB):
 
 | Table | One row per | Notes |
 |---|---|---|
-| `ops_task` | Source and request key (a symbol, or `SP:SPX`, `all`, `EUR`) | Status, consecutive failures, last attempt and success, when it is due again, the last fetch and error. Inactive once a company leaves the index |
+| `ops_task` | Source and request key (a symbol, `CIK` + number for a predecessor's filings, or `SP:SPX`, `all`, `EUR`) | Status, consecutive failures, last attempt and success, when it is due again, the last fetch and error. Inactive once a company leaves the index |
 | `ops_run` | Run of the job | Mode, host, status, requests, tasks done and failed, rows stored, the build, and a JSON summary per source (what stopped it) |
 
 `out_coverage_snapshot` (one row per day: companies, covered, cells required and present,
 the mode, and the whole measurement in `detail_json`) is the coverage page's source.
+`out_coverage_gap` (one row per company, item and period the coverage measures but the
+database doesn't hold, from the latest snapshot) says why each value is absent:
+`before_listing`, `not_applicable`, `not_reported`, `explained` or `missing`, with the
+reason (docs/COVERAGE.md).
 
 ### User
 
@@ -677,19 +683,38 @@ Free cash flow, net debt and market value are calculated in the views, not store
 ## Build rules
 
 1. **Companies:** core covers companies in the TradingView S&P 500 snapshots. Raw keeps
-   everything else too, such as TLN and the non-S&P 500 utilities.
+   everything else too, such as TLN and the non-S&P 500 utilities. Each company gets its
+   CIK from the SEC ticker file; two share classes (GOOG and GOOGL) share one. SEC values
+   come from company facts (`raw_sec_fact`) and, for the filings it lacks, the companies'
+   own tags (`[[custom_tag]]`) and the values per share class (`[[share_class]]`), from the
+   data sets and full filings (`raw_sec_xbrl_fact`). A company whose earlier filings are under a predecessor's CIK (`[[predecessor]]` in
+   `config/companies.toml`) reads that CIK too, for periods ending before the new CIK's
+   first 10-K or 10-Q.
 2. **One source per period:** for each company, item, period type and period end, the build
    takes the best source (SEC, then `history.csv`, then Yahoo), then the first field in the
    config order. It keeps every filing date (version) of that source.
-3. **Derived items:** a derived item (`ebitda`, `total_debt`) is computed wherever all its
-   parts exist. It replaces a reported value from the same or a lower-ranked source, never
-   one from a better source. For example, `history.csv`'s SEC EBITDA is not overridden by
-   Yahoo's operating income + D&A.
-4. **Periods:** every period end is stored as its nearest month end (`period_end`), so SEC's
-   52/53-week dates (Apple's 2026-09-26) and Yahoo's month ends (2026-09-30) are one period.
-   The fiscal quarter is counted from the company's fiscal year-end month. Balance-sheet
-   items are `I` whatever file they came from.
-   - SEC flows are a quarter when they span 80–100 days and a fiscal year at 350–380 days.
+3. **Derived items:** a derived item (`ebitda`, `total_debt`, `total_liabilities`) is
+   computed wherever all its parts exist; a part marked `?` is optional and counts as 0
+   (`liabilities_and_equity - equity_total - temporary_equity?`). It is as good as its
+   worst part and never replaces a value from a better source: `history.csv`'s SEC EBITDA is
+   not overridden by Yahoo's operating income + D&A. With `derive_mode = "replace"` (EBITDA,
+   total debt) it replaces a reported value of the same rank; with `"fallback"` (total
+   liabilities) the company's own figure always wins and the derived one only fills a gap.
+   Items with `helper = true` (the parts of the liabilities formula) are used inside the
+   build only: they are not stored in `core_item` or `core_fundamental`, nor counted by the
+   coverage.
+4. **Periods:** every period is put on its company's fiscal calendar, so SEC's 52/53-week
+   dates (Apple's 2026-09-26) and Yahoo's month ends (2026-09-30) are one period. A fiscal
+   year ends in the company's fiscal year-end month and is stored as its nearest month end.
+   A quarter (and a balance sheet at a quarter's end) is placed by the days since the last
+   fiscal year end, about 91 per quarter, and stored as the month end of its slot (year end
+   + 3, 6, 9 or 12 months). 52/53-week years have quarters of 12 to 17 weeks: Costco's third
+   quarter ends around 10 May and is stored as May; Kroger's 16-week first quarter ends in
+   late May and is stored as April, three months after its January year end. A quarter more
+   than about a month off its slot is not a quarter. Balance-sheet items are `I` whatever
+   file they came from.
+   - SEC flows are a quarter when they span 80–120 days (12 to 17 weeks) and a fiscal year
+     at 350–380 days; half years run 165–200 days and nine months 245–290.
      A twelve-month total that doesn't end in the fiscal year-end month (10-Qs show trailing
      years) is not a fiscal year.
    - 10-Q cash flows are year to date. The second quarter is the six months less the first

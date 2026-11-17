@@ -19,7 +19,7 @@ from sqlalchemy.engine import Connection
 from ..db import frame, insert_df
 from ..db.build import ITEMS_CONFIG, load_items
 from ..db.load_files import finish_fetch, store_changed
-from .common import NoData, Outcome, RateLimited, sha256, start_fetch
+from .common import NoData, Outcome, RateLimited, read_payload, sha256, start_fetch
 
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
@@ -65,7 +65,9 @@ def mapped_tags(items_config=ITEMS_CONFIG) -> set[tuple[str, str]]:
 def load_tickers(conn: Connection, http: httpx.Client) -> Outcome:
     r = get(http, TICKERS_URL)
     out = Outcome(requests=1)
-    fetch_id = start_fetch(conn, "sec_tickers", "all", TICKERS_URL, sha256(r.content))
+    fetch_id = start_fetch(
+        conn, "sec_tickers", "all", TICKERS_URL, sha256(r.content), payload=r.content
+    )
     if fetch_id is None:
         return out  # same file as last time
     rows = pd.DataFrame(r.json().values())
@@ -131,12 +133,44 @@ def load_companyfacts(
     url = FACTS_URL.format(cik=cik)
     r = get(http, url)
     out = Outcome(requests=1)
-    fetch_id = start_fetch(conn, "sec_companyfacts", str(cik), url, sha256(r.content))
+    # The whole file is kept (raw_payload); raw_sec_fact holds the mapped tags only, and a tag
+    # mapped later is read from the kept file (reparse_companyfacts), not fetched again.
+    fetch_id = start_fetch(
+        conn, "sec_companyfacts", str(cik), url, sha256(r.content), payload=r.content
+    )
     if fetch_id is None:
         return out
-    df = facts_frame(json.loads(r.content), cik, keep)
-    stored = store_changed(conn, "raw_sec_fact", df, FACT_KEY, FACT_VALUES, fetch_id)
-    finish_fetch(conn, fetch_id, len(df), stored)
-    out.received, out.stored = len(df), stored
+    stored, received = parse_companyfacts(conn, r.content, cik, keep, fetch_id)
+    finish_fetch(conn, fetch_id, received, stored)
+    out.received, out.stored = received, stored
     out.fetch_ids.append(fetch_id)
     return out
+
+
+def parse_companyfacts(
+    conn: Connection, content: bytes, cik: int, keep: set[tuple[str, str]], fetch_id: int
+) -> tuple[int, int]:
+    """The mapped facts of one company-facts file into raw_sec_fact: (rows stored, rows read)."""
+    df = facts_frame(json.loads(content), cik, keep)
+    return store_changed(conn, "raw_sec_fact", df, FACT_KEY, FACT_VALUES, fetch_id), len(df)
+
+
+def reparse_companyfacts(db, keep: set[tuple[str, str]] | None = None) -> dict:
+    """Read every company's newest kept company-facts file again with today's mapping
+    (config/db_items.toml), without asking SEC: the facts of a newly mapped tag are added,
+    pointing at the fetch they came from. Returns {"files": n, "stored": rows}."""
+    keep = keep or mapped_tags()
+    with db.connect() as conn:
+        files = frame(
+            conn,
+            "SELECT DISTINCT ON (f.request_key) f.request_key, f.fetch_id FROM raw_fetch f "
+            "JOIN raw_payload p ON p.fetch_id = f.fetch_id "
+            "WHERE f.source = 'sec_companyfacts' ORDER BY f.request_key, f.fetch_id DESC",
+        )
+    stored = 0
+    for key, fetch_id in zip(files["request_key"], files["fetch_id"], strict=True):
+        with db.begin() as conn:
+            content = read_payload(conn, int(fetch_id))
+            cik = int(key[3:]) if key.startswith("CIK") else int(key)
+            stored += parse_companyfacts(conn, content, cik, keep, int(fetch_id))[0]
+    return {"files": len(files), "stored": stored}

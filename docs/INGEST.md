@@ -11,6 +11,7 @@ uv run python -m stock_analysis.db ingest                  # one run on the sele
 uv run python -m stock_analysis.db ingest --limit 3        # a small test: 3 tasks per source
 uv run python -m stock_analysis.db ingest --sources yahoo_prices --no-build
 uv run python -m stock_analysis.db ingest --due-now sec_companyfacts   # refetch a source now
+uv run python -m stock_analysis.db reparse     # SEC facts of newly mapped tags, from kept files
 uv run python -m stock_analysis.db tasks                   # the to-do list, by source and status
 uv run python -m stock_analysis.db coverage                # today's coverage (and the snapshot)
 ```
@@ -28,6 +29,9 @@ Every command takes `--target`. On Azure the job runs as `server-writer`.
      `ecb_rates`
    - one task per S&P 500 member for `sec_companyfacts`, `yahoo_prices`, `yahoo_earnings` and
      `yahoo_statements`
+   - one `sec_companyfacts` task per predecessor CIK (`CIK` + number, `[[predecessor]]` in
+     `config/companies.toml`): a company's filings from before a new holding company took
+     over
 
    The members are the newest TradingView snapshot. A company that leaves the index keeps
    its data, but its tasks become inactive. A new member gets its tasks and is fetched first.
@@ -66,17 +70,61 @@ Every command takes `--target`. On Azure the job runs as `server-writer`.
 | `sec_tickers` | Ticker to CIK (`raw_sec_ticker`) | 1 | 10 a second | 7 / 7 days |
 | `ecb_rates` | Exchange rates, last 10 days (`raw_ecb_rate`) | 1 | None | 1 / 1 day |
 | `sec_companyfacts` | Every filed value of the mapped tags (`raw_sec_fact`), with the real filing date | 1 per company | 10 a second; a `SEC_USER_AGENT` naming you is required | 30 / 7 days |
+| `sec_xbrl` | The full XBRL of a 10-K or 10-Q (edgartools), for the facts company facts leaves out: a value reported only per share class (`raw_sec_xbrl_fact`, with its axis and member). Only the filings that report a missing value of a company with a `[[share_class]]` in `config/companies.toml` | About 8 per filing | Shares the SEC group's rate and budget | Once (3650 days) |
 | `yahoo_prices` | Daily prices (`raw_yahoo_price`): from 2015-12-01 the first time, then from 10 days before the newest stored day. A split in the new days fetches the whole history again (it rescales every price) | 1, or 2 after a split | Yahoo throttles; budget 4,000 / 1,200 calls per run | 1 / 1 day |
 | `yahoo_earnings` | Earnings dates with estimated and reported EPS (`raw_yahoo_earnings`) | 1 | as above | 30 / 7 days |
 | `yahoo_statements` | Six statements, annual and quarterly (`raw_yahoo_statement`) | 6 | as above | 30 / 7 days |
 
-Payloads seen before are not stored again, and only new or changed rows go into the raw
-tables. This follows the same rules as `load-files`: every row points to its `raw_fetch`. Only
-the SEC tags in `config/db_items.toml` are kept, about 4,700 facts per company. After adding
-a tag, run `ingest --due-now sec_companyfacts` to fetch them.
+Every payload is kept as the source returned it, gzip-compressed, in `raw_payload` (one row
+per distinct payload, on its `raw_fetch`): the SEC files, TradingView's scan, the ECB's CSV,
+and the tables yfinance returns. The raw tables hold what is parsed from them. Payloads seen
+before are not stored again, and only new or changed rows go into the raw tables. This
+follows the same rules as `load-files`: every row points to its `raw_fetch`.
+
+`raw_sec_fact` keeps only the SEC tags in `config/db_items.toml`, about 4,700 of a company's
+roughly 27,000 facts; the whole file (about 0.25 MB compressed, 4 MB as JSON) is in
+`raw_payload`. After mapping a new tag, read it from the kept files instead of asking SEC
+again:
+
+```bash
+uv run python -m stock_analysis.db reparse    # the new tag's facts, from the kept files
+                                               # (company facts, full filings, data-set quarters)
+uv run python -m stock_analysis.db build
+```
+
+Files fetched before the payloads were kept (before migration 008) get their copy on their
+next fetch.
 
 How long a backfill takes: SEC needs about 500 calls (about 10 minutes) and Yahoo about 4,000
 (about an hour), so the S&P 500 can fill in one or two nights if Yahoo doesn't throttle.
+
+## Files downloaded by hand (`db import`)
+
+A file found or downloaded on this PC is loaded instead of being fetched again:
+
+```bash
+uv run python -m stock_analysis.db import inbox/sec_companyfacts/companyfacts.zip                  # local
+uv run python -m stock_analysis.db import inbox/sec_companyfacts/companyfacts.zip --target server  # Azure
+uv run python -m stock_analysis.db import FILE --symbols COST,KR                                   # a sample
+```
+
+The file goes through the same parser as its API source, into the same raw tables: a
+`raw_fetch` row per payload with `url` `file:<name>`, the payload kept in `raw_payload`, and a
+payload seen before skipped. The tasks it covered count as fetched on the file's date
+(`ops_task`), so the job, here or on the server, doesn't download them again. With
+`--target server` the Azure database receives the data from this PC; the cloud job never
+needs the file. Files wait in `inbox/<kind>/` (ignored by git); the folder's name is the
+kind, or pass `--kind`.
+
+| Kind | File | Notes |
+|---|---|---|
+| `sec_companyfacts` | SEC's `companyfacts.zip` (every company's company facts, 1.4 GB, rebuilt nightly at sec.gov/Archives/edgar/daily-index/xbrl/), or one `CIK##########.json` | Only the companies the database follows (the universe and the predecessors) |
+| `sec_fsds` | A quarter of SEC's Financial Statement Data Sets (`2026q3.zip`, about 80 MB, at sec.gov/files/dera/data/financial-statement-data-sets/) | Every filing's numbers, with the companies' own tags and the dimensions company facts leaves out. For the followed companies' 10-K and 10-Q, into `raw_sec_xbrl_fact`: their own tags; the values per share class of the concepts read per class; and the mapped standard tags of the filings company facts lacks (some never reach it: DTE's, Dominion's and Digital Realty's 10-Qs for June 2026). Subsidiaries' values (co-registrants) are left out. About 10 seconds a quarter |
+
+A payload larger than 50 MB (a data-set quarter) is not copied into the database, to keep the
+free Azure server small: the file stays in `inbox/` and `raw_fetch.url` names it. Downloading:
+`curl -A "$SEC_USER_AGENT" -o inbox/sec_fsds/2026q3.zip https://www.sec.gov/files/dera/data/financial-statement-data-sets/2026q3.zip`
+(SEC serves these files to any client that names itself, no browser needed).
 
 ## Where it runs
 
