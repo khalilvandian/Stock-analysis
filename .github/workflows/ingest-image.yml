@@ -1,4 +1,4 @@
-# Builds the ingest job's container image (Dockerfile) and pushes it to GitHub Container
+﻿# Builds the ingest job's container image (Dockerfile) and pushes it to GitHub Container
 # Registry as ghcr.io/khalilvandian/stock-analysis-ingest (free for a public repository).
 # The Azure Container Apps Job pulls :latest at every run, so a push to main that changes
 # the code or the settings is live from the next scheduled run (docs/INGEST.md).
@@ -9,7 +9,7 @@ name: Build ingest image
 
 on:
   push:
-    branches: [main]
+    branches: [main, issue-18-ingest]   # the branch only while issue #18 is tested on Azure
     paths:
       - "src/**"
       - "config/**"
