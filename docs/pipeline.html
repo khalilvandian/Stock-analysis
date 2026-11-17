@@ -94,7 +94,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <p class="lede">How data gets from the free sources into the database, and from there to the
   analyses, the public site and the evening email. One repository and one Python package, run in
   four places that meet in one PostgreSQL database.</p>
-  <div class="meta">Updated 2026-11-17 · issue #18 · source: docs/pipeline.html</div>
+  <div class="meta">Updated 2026-11-17 · issues #18, #20 · source: docs/pipeline.html</div>
 </header>
 
 <section>
@@ -107,7 +107,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   </div>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; the web API reads the newest coverage snapshot for the GitHub Pages build; GitHub Actions builds the job's image, which the job pulls at each run; the evening run and your analyses use the database and the repository.">
+<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; the web API reads the newest coverage snapshot and every ticker's data for the GitHub Pages build; GitHub Actions builds the job's image, which the job pulls at each run; the evening run and your analyses use the database and the repository.">
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
     <marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahh" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -209,7 +209,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="s" x="1044" y="330">on push · 05:15 UTC</text>
   <rect class="box hot" x="1188" y="290" width="114" height="56" rx="6"/>
   <text class="t" x="1202" y="313">GitHub Pages</text>
-  <text class="s" x="1202" y="330">site, Data page</text>
+  <text class="s" x="1202" y="330">site, Data, explorer</text>
   <line class="e" x1="1002" y1="318" x2="1028" y2="318" marker-end="url(#a)"/>
   <line class="e hot" x1="1160" y1="318" x2="1186" y2="318" marker-end="url(#h)"/>
 
@@ -219,7 +219,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 
   <!-- API to the site build -->
   <polyline class="e hot" points="810,408 1095,408 1095,348" marker-end="url(#h)"/>
-  <text class="el hot" x="960" y="401" text-anchor="middle">newest coverage snapshot</text>
+  <text class="el hot" x="960" y="401" text-anchor="middle">coverage snapshot, ticker data</text>
 
   <!-- PC and Claude sessions -->
   <rect class="box" x="240" y="540" width="222" height="66" rx="6"/>
@@ -255,7 +255,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
     </div>
     <figcaption>The highlighted path runs by itself every night: the ingest job opens the
     firewall for its own address, fills the raw layer, rebuilds the core layer and writes a
-    coverage snapshot; the site build reads that snapshot through the web API. GitHub Actions
+    coverage snapshot; the site build reads that snapshot, and exports every ticker for the explorer pages, through the web API. GitHub Actions
     turns code into the image the job runs and turns the repository into the site.</figcaption>
   </figure>
 </section>
@@ -295,7 +295,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <rect class="mute" x="326" y="126" width="10" height="10" rx="2" transform="rotate(45 331 131)"/>
   <text class="s" x="346" y="135">site rebuilt on the evening commit</text>
   <rect class="run" x="1100" y="126" width="10" height="10" rx="2" transform="rotate(45 1105 131)"/>
-  <text class="k" x="1090" y="135" text-anchor="end">Site rebuilt from the newest snapshot (05:15)</text>
+  <text class="k" x="1090" y="135" text-anchor="end">Site and ticker explorer rebuilt from the database (05:15)</text>
 </svg>
     </div>
     <figcaption>The scheduled site build comes after the ingest job's latest possible end, so
@@ -314,7 +314,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
       <tr><td>Database</td><td>Azure Database for PostgreSQL <code>stock-db-bk</code>; Docker locally</td><td>Always on</td><td><code>src/stock_analysis/db/</code></td></tr>
       <tr><td>Web API</td><td>Azure App Service <code>stock-api-bk</code> (F1, wakes on request)</td><td>An HTTPS request</td><td><code>api/app.py</code></td></tr>
       <tr><td>Image build</td><td>GitHub Actions → GHCR</td><td>A push to <code>main</code> touching code or settings</td><td><code>.github/workflows/ingest-image.yml</code>, <code>Dockerfile</code></td></tr>
-      <tr><td>Site</td><td>GitHub Actions → GitHub Pages</td><td>A push to <code>main</code>, daily at 05:15 UTC, by hand</td><td><code>.github/workflows/pages.yml</code>, <code>analysis/site.py</code></td></tr>
+      <tr><td>Site</td><td>GitHub Actions → GitHub Pages</td><td>A push to <code>main</code>, daily at 05:15 UTC, by hand</td><td><code>.github/workflows/pages.yml</code>, <code>analysis/site.py</code>, <code>analysis/explore.py</code></td></tr>
       <tr><td>Evening run</td><td>A scheduled Claude Code session</td><td>Weekdays at 21:00 Italy time</td><td><code>analysis/watchlist.py</code>, <code>docs/EVENING_RUN.md</code></td></tr>
       <tr><td>Analyses by hand</td><td>Your PC or a Claude session</td><td>You</td><td><code>analysis/*.py</code>, <code>Data.open()</code></td></tr>
     </tbody>

@@ -38,9 +38,20 @@ PIPELINE = ROOT / "docs/pipeline.html"  # the hand-drawn pipeline diagram
 # The menus: (group, [(page, label)]). A page is <page>.html; "index" is the home page.
 MENU = [
     ("Analyses", [("index", "Watch list"), ("summaries", "Summaries")]),
+    (
+        "Explore",
+        [
+            ("tickers", "All tickers"),
+            ("ticker", "Ticker explorer"),
+            ("sectors", "Sector valuations"),
+            ("calendar", "Earnings calendar"),
+        ],
+    ),
     ("Markets", [("market", "Market reports"), ("screener", "Screener")]),
     ("Project", [("pipeline", "Pipeline"), ("coverage", "Data coverage")]),
 ]
+EXPLORER_JS = ROOT / "analysis/explorer.js"  # the ticker page's script
+EXPLORE_DATA = ROOT / "data/explore"  # a local export (python analysis/explore.py data/explore)
 URL = "https://khalilvandian.github.io/Stock-analysis/"
 
 CSS = """
@@ -137,6 +148,7 @@ th { color: var(--muted); font-weight: 600; font-size: .85em; text-transform: up
 tr:last-child td { border-bottom: 0; }
 td.d { white-space: nowrap; }
 td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+th.n { text-align: right; }
 .split { display: grid; grid-template-columns: 230px 1fr; gap: 28px; align-items: start; }
 aside.side { position: sticky; top: 76px; }
 .split > * { min-width: 0; }
@@ -187,6 +199,69 @@ aside.side { position: sticky; top: 76px; }
 .trend svg { width: 100%; height: auto; display: block; }
 .trend text { fill: var(--muted); font-size: 11px; }
 footer { color: var(--muted); font-size: .85em; text-align: center; padding: 24px 16px; }
+form.find input { font: inherit; font-size: .9em; width: 120px; padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .18); background: rgba(255, 255, 255, .06); color: #fff; }
+form.find input::placeholder { color: #b8c2d3; }
+.na, .muted { color: var(--muted); font-weight: 400; }
+.xhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+  flex-wrap: wrap; }
+.xhead .sub { margin-bottom: 12px; }
+.xprice { text-align: right; } .xprice b { font-size: 1.8em; font-variant-numeric: tabular-nums; }
+.xprice small { display: block; color: var(--muted); }
+.chg { margin-left: 8px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chg.up { color: var(--good); } .chg.down { color: var(--warn); }
+table.fin th.grp { text-transform: uppercase; font-size: .75em; letter-spacing: .4px;
+  color: var(--muted); padding-top: 14px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 8px 0 8px;
+  overflow-x: auto; }
+.tabs button, .seg button { font: inherit; cursor: pointer; background: none; border: 0;
+  color: var(--muted); padding: 10px 14px; white-space: nowrap; }
+.tabs button.on { color: var(--brand); box-shadow: inset 0 -2px 0 var(--brand); font-weight: 600; }
+.tabs button:hover, .seg button:hover { color: var(--text); }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--card);
+  border: 1px solid var(--line); margin: 14px 0 0; }
+.seg button { padding: 5px 12px; border-radius: 7px; font-size: .9em; }
+.seg button.on { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+.tile em { display: block; font-style: normal; color: var(--muted); font-size: .78em;
+  margin-top: 2px; }
+.xpanel { padding: 14px 16px; margin-bottom: 14px; }
+.xpanel h3 { margin: 0 0 8px; font-size: .95em; }
+.xpanel h3:empty { display: none; }
+.xpanel .seg { margin: 0 0 8px; }
+.note { color: var(--muted); font-size: .85em; margin: 8px 0 0; }
+.empty { color: var(--muted); }
+.charts { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  margin-top: 14px; }
+.charts .xpanel { margin: 0; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .base { stroke: var(--muted); stroke-width: 1; opacity: .6; }
+.chart .bar { fill: var(--brand); }
+.chart .bar.neg { fill: var(--muted); }
+.chart .line { fill: none; stroke: var(--brand); stroke-width: 2; stroke-linejoin: round; }
+.chart .cross { stroke: var(--muted); stroke-dasharray: 3 3; }
+.chart .dotm { fill: var(--brand); stroke: var(--card); stroke-width: 2; }
+.chart .hit { fill: transparent; }
+.chart rect.hit:hover { fill: color-mix(in srgb, var(--brand) 7%, transparent); }
+.tip { position: fixed; z-index: 20; pointer-events: none; background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: .85em;
+  box-shadow: 0 6px 18px rgba(16, 24, 40, .18); font-variant-numeric: tabular-nums; }
+table.fin th[scope=row] { text-transform: none; letter-spacing: 0; font-size: .95em;
+  color: var(--text);
+  font-weight: 500; position: sticky; left: 0; background: var(--card); white-space: nowrap; }
+table.fin td, table.fin th { padding: 7px 10px; }
+table.sort th { cursor: pointer; user-select: none; white-space: nowrap; }
+table.sort th[aria-sort=ascending]::after { content: " \\25B2"; }
+table.sort th[aria-sort=descending]::after { content: " \\25BC"; }
+.tools select, .tools label { font: inherit; }
+.tools select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); }
+tr.hide { display: none; }
+/* a wide table scrolls inside its card instead of widening the page */
+.cols > *, .charts > *, .strip > *, #explorer, #tab, .xpanel { min-width: 0; }
 @media (max-width: 860px) {
   .split { grid-template-columns: 1fr; gap: 12px; }
   aside.side { position: static; }
@@ -198,6 +273,8 @@ footer { color: var(--muted); font-size: .85em; text-align: center; padding: 24p
 @media (max-width: 640px) {
   .bar .in { gap: 8px; } .brand { font-size: .95em; } h1 { font-size: 1.5em; }
   nav summary { padding: 8px 8px; font-size: .9em; }
+  form.find { display: none; }
+  .xprice { text-align: left; }
 }
 """
 
@@ -398,7 +475,10 @@ def layout(title_: str, active: str, body: str, menu, head: str = "") -> str:
         "&display=swap' rel='stylesheet'>"
         f"<style>{CSS}</style>{head}</head><body>"
         "<header class='bar'><div class='in'><a class='brand' href='./'>Stock "
-        f"<span>analysis</span></a><nav aria-label='Site'>{''.join(groups)}</nav></div></header>"
+        "<span>analysis</span></a><form class='find' action='ticker.html' role='search'>"
+        "<input name='s' placeholder='Find a ticker' aria-label='Find a ticker' "
+        "autocomplete='off'></form>"
+        f"<nav aria-label='Site'>{''.join(groups)}</nav></div></header>"
         f"<main>{body}</main>"
         "<footer>Analysed every evening at 21:00 Italy time. Every run is kept as a dated "
         f"PDF. Not investment advice.</footer>{MENU_JS}</body></html>"
@@ -992,10 +1072,303 @@ def coverage_page(menu, d: dict | None = None) -> str:
     return layout("Data coverage", "coverage", "\n".join(body), menu)
 
 
+# --- the ticker explorer (issue #20) --------------------------------------------------
+
+
+def explore_index(out: Path) -> dict | None:
+    """Export the explorer's data into out/tickers (analysis/explore.py) and return its
+    index. STOCK_EXPLORE picks the source: "api" (the default when STOCK_API_URL and
+    STOCK_API_KEY are set, as in the Pages workflow), "local" (stock_analysis.data on a PC),
+    "files" (a copy of data/explore/tickers), "off". Without a source the explorer pages
+    say there is no data yet."""
+    mode = os.environ.get("STOCK_EXPLORE")
+    if not mode:
+        api = os.environ.get("STOCK_API_URL") and os.environ.get("STOCK_API_KEY")
+        mode = "api" if api else ("files" if (EXPLORE_DATA / "tickers").exists() else "off")
+    if mode == "off":
+        return None
+    if mode == "files":
+        if not (EXPLORE_DATA / "tickers/index.json").exists():
+            return None
+        shutil.copytree(EXPLORE_DATA / "tickers", out / "tickers", dirs_exist_ok=True)
+        return json.loads((out / "tickers/index.json").read_text(encoding="utf-8"))
+    sys.path.insert(0, str(ROOT / "analysis"))
+    import explore
+
+    try:
+        query = explore.local_backend() if mode == "local" else explore.backend()
+        return explore.export(out, query=query)
+    except Exception as exc:  # the rest of the site still builds
+        print(f"explorer: export failed ({exc}); the explorer pages say there is no data")
+        return None
+
+
+def fmt_money(v) -> str:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    s, x = ("−" if x < 0 else ""), abs(x)
+    for unit, d in ((1e12, "T"), (1e9, "B"), (1e6, "M")):
+        if x >= unit:
+            return f"{s}${x / unit:.{2 if d == 'T' else 1 if x < 1e11 else 0}f}{d}"
+    return f"{s}${x:,.0f}"
+
+
+def fmt(v, pattern: str) -> str:
+    try:
+        return pattern.format(float(v))
+    except (TypeError, ValueError):
+        return "—"
+
+
+def median_of(xs) -> float | None:
+    v = sorted(float(x) for x in xs if isinstance(x, int | float))
+    if not v:
+        return None
+    m = len(v) // 2
+    return v[m] if len(v) % 2 else (v[m - 1] + v[m]) / 2
+
+
+def no_explore_data(title_: str, active: str, menu) -> str:
+    return layout(
+        title_,
+        active,
+        f"<h1>{esc(title_)}</h1><p class='sub'>No explorer data in this build. The Pages "
+        "workflow exports it from the database every day; locally run "
+        "<code>python analysis/explore.py data/explore</code> first.</p>",
+        menu,
+    )
+
+
+def ticker_link(sym: str) -> str:
+    return f'<a href="ticker.html?s={esc(sym)}"><b>{esc(sym)}</b></a>'
+
+
+# Sortable, filterable tables: click a header to sort by its data-v values.
+SORT_JS = """<script>
+document.querySelectorAll("table.sort").forEach(t => {
+  const body = t.tBodies[0];
+  t.querySelectorAll("th").forEach((th, col) => th.addEventListener("click", () => {
+    const dir = th.getAttribute("aria-sort") === "descending" ? 1 : -1;
+    t.querySelectorAll("th").forEach(h => h.removeAttribute("aria-sort"));
+    th.setAttribute("aria-sort", dir === 1 ? "ascending" : "descending");
+    const key = r => { const c = r.cells[col]; const v = c.dataset.v ?? c.textContent.trim();
+      const n = parseFloat(v); return v === "" ? null : (isNaN(n) ? v.toLowerCase() : n); };
+    [...body.rows].sort((a, b) => { const x = key(a), y = key(b);
+      if (x === null) return 1; if (y === null) return -1;
+      return (x < y ? -1 : x > y ? 1 : 0) * dir; }).forEach(r => body.appendChild(r));
+  }));
+});
+const q = document.getElementById("q"), sec = document.getElementById("sector"),
+  pass = document.getElementById("pass"), count = document.getElementById("count");
+function filter() {
+  const s = (q?.value || "").toLowerCase(); let n = 0;
+  document.querySelectorAll("table.sort tbody tr").forEach(r => {
+    const show = (!s || r.dataset.k.includes(s))
+      && (!sec || !sec.value || r.dataset.s === sec.value)
+      && (!pass || !pass.checked || r.dataset.p === "pass");
+    r.classList.toggle("hide", !show); n += show;
+  });
+  if (count) count.textContent = n;
+}
+[q, sec, pass].forEach(e => e && e.addEventListener("input", filter));
+</script>"""
+
+
+def ticker_page(menu) -> str:
+    body = (
+        '<div id="explorer"><p class="sub">Loading…</p></div>'
+        "<noscript><p>The ticker explorer needs JavaScript.</p></noscript>"
+        '<script src="explorer.js" defer></script>'
+    )
+    return layout("Ticker explorer", "ticker", body, menu)
+
+
+def tickers_page(menu, idx: dict | None) -> str:
+    if not idx:
+        return no_explore_data("All tickers", "tickers", menu)
+    rows = sorted(idx["tickers"], key=lambda r: -(r.get("market_cap") or 0))
+    sectors = sorted({r["sector"] for r in rows if r.get("sector")})
+    cols = [
+        ("Price", "price", "${:,.2f}"),
+        ("Market value", "market_cap", None),
+        ("Revenue", "revenue", None),
+        ("Net income", "net_income", None),
+        ("FCF", "free_cf", None),
+        ("Net debt", "net_debt", None),
+        ("P/E", "pe", "{:.1f}x"),
+        ("EV/EBITDA", "ev_ebitda", "{:.1f}x"),
+        ("FCF yield", "fcf_yield", "{:.1%}"),
+        ("Div. yield", "div_yield", "{:.1%}"),
+        ("Net margin", "net_margin", "{:.1%}"),
+        ("ROE", "roe", "{:.1%}"),
+        ("Revenue 5y", "revenue_5y", "{:+.1%}"),
+        ("Return 1y", "return_1y", "{:+.1%}"),
+    ]
+    head = (
+        "<th>Ticker</th><th>Company</th><th>Sector</th>"
+        + "".join(f"<th class='n'>{esc(c[0])}</th>" for c in cols)
+        + "<th>Lynch category</th><th>Stage 1</th>"
+    )
+    trs = []
+    for r in rows:
+        key = f"{r['symbol']} {r.get('name') or ''} {r.get('industry') or ''}".lower()
+        cells = "".join(
+            f"<td class='n' data-v=\"{'' if r.get(k) is None else r[k]}\">"
+            f"{fmt_money(r.get(k)) if p is None else fmt(r.get(k), p)}</td>"
+            for _, k, p in cols
+        )
+        cat = (r.get("category") or "").replace("_", " ")
+        trs.append(
+            f'<tr data-k="{esc(key)}" data-s="{esc(r.get("sector") or "")}" '
+            f'data-p="{esc(r.get("stage1") or "")}"><td>{ticker_link(r["symbol"])}</td>'
+            f"<td>{esc(r.get('name') or '')}</td><td>{esc(r.get('sector') or '')}</td>{cells}"
+            f"<td>{esc(cat)}</td><td>{esc(r.get('stage1') or '')}</td></tr>"
+        )
+    body = (
+        "<h1>All tickers</h1>"
+        f"<p class='sub'><span id='count'>{len(rows)}</span> companies in the database, data "
+        f"as of {esc(idx.get('asof') or '—')}. Absolute values over the last twelve months; "
+        "click a column to sort, a ticker to explore it.</p>"
+        "<div class='tools'><input type='search' id='q' placeholder='Ticker, name or industry'"
+        " aria-label='Search'><select id='sector' aria-label='Sector'><option value=''>"
+        "Every sector</option>"
+        + "".join(f"<option>{esc(s)}</option>" for s in sectors)
+        + "</select><label><input type='checkbox' id='pass'> Stage 1 pass only</label></div>"
+        f"<div class='card wrap'><table class='sort'><thead><tr>{head}</tr></thead><tbody>"
+        + "".join(trs)
+        + "</tbody></table></div>"
+        + SORT_JS
+    )
+    return layout("All tickers", "tickers", body, menu)
+
+
+SECTOR_COLS = [
+    ("P/E", "pe", "{:.1f}x"),
+    ("P/S", "ps", "{:.1f}x"),
+    ("P/B", "pb", "{:.1f}x"),
+    ("EV/EBITDA", "ev_ebitda", "{:.1f}x"),
+    ("FCF yield", "fcf_yield", "{:.1%}"),
+    ("Div. yield", "div_yield", "{:.1%}"),
+    ("Net margin", "net_margin", "{:.1%}"),
+    ("ROE", "roe", "{:.1%}"),
+    ("Net debt/EBITDA", "net_debt_to_ebitda", "{:.1f}x"),
+    ("Revenue 5y", "revenue_5y", "{:+.1%}"),
+    ("EPS 5y", "eps_5y", "{:+.1%}"),
+    ("Return 1y", "return_1y", "{:+.1%}"),
+]
+
+
+def sectors_page(menu, idx: dict | None) -> str:
+    if not idx:
+        return no_explore_data("Sector valuations", "sectors", menu)
+    by: dict[str, list[dict]] = {}
+    for r in idx["tickers"]:
+        by.setdefault(r.get("sector") or "Not classified", []).append(r)
+    every = idx["tickers"]
+    head = "<th>Sector</th><th class='n'>Companies</th><th class='n'>Market value</th>" + "".join(
+        f"<th class='n'>{esc(c[0])}</th>" for c in SECTOR_COLS
+    )
+
+    def line(name: str, rows: list[dict], link: bool) -> str:
+        cap = sum(r.get("market_cap") or 0 for r in rows)
+        cells = ""
+        for _, k, p in SECTOR_COLS:
+            m = median_of(r.get(k) for r in rows)
+            cells += f"<td class='n' data-v=\"{'' if m is None else m}\">{fmt(m, p)}</td>"
+        label = f'<a href="#{esc(slug(name))}">{esc(name)}</a>' if link else f"<b>{esc(name)}</b>"
+        return (
+            f"<tr><td>{label}</td><td class='n'>{len(rows)}</td>"
+            f"<td class='n' data-v='{cap}'>{fmt_money(cap)}</td>{cells}</tr>"
+        )
+
+    body = [
+        "<h1>Sector valuations</h1>",
+        f"<p class='sub'>Medians per TradingView sector, data as of "
+        f"{esc(idx.get('asof') or '—')}. P/E, P/B and EV/EBITDA only count positive "
+        "earnings, equity and EBITDA. Each sector lists its companies below, cheapest P/E "
+        "first.</p>",
+        f"<div class='card wrap'><table class='sort'><thead><tr>{head}</tr></thead><tbody>",
+        *[line(s, by[s], True) for s in sorted(by)],
+        "</tbody><tfoot>" + line("All companies", every, False) + "</tfoot></table></div>",
+    ]
+    for s in sorted(by):
+        rows = sorted(by[s], key=lambda r: (r.get("pe") is None, r.get("pe") or 0))
+        body.append(
+            f"<h2 id='{esc(slug(s))}'>{esc(s)}</h2><div class='card wrap'><table><tr>"
+            "<th>Ticker</th><th>Company</th><th class='n'>Market value</th>"
+            + "".join(f"<th class='n'>{esc(c[0])}</th>" for c in SECTOR_COLS[:8])
+            + "</tr>"
+            + "".join(
+                f"<tr><td>{ticker_link(r['symbol'])}</td><td>{esc(r.get('name') or '')}</td>"
+                f"<td class='n'>{fmt_money(r.get('market_cap'))}</td>"
+                + "".join(f"<td class='n'>{fmt(r.get(k), p)}</td>" for _, k, p in SECTOR_COLS[:8])
+                + "</tr>"
+                for r in rows
+            )
+            + "</table></div>"
+        )
+    return layout("Sector valuations", "sectors", "\n".join(body) + SORT_JS, menu)
+
+
+def slug(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+
+
+def calendar_page(menu, idx: dict | None, weeks: int = 8) -> str:
+    if not idx:
+        return no_explore_data("Earnings calendar", "calendar", menu)
+    import datetime as dt
+
+    start = dt.date.fromisoformat(idx.get("built") or dt.date.today().isoformat())
+    end = (start + dt.timedelta(weeks=weeks)).isoformat()
+    rows = sorted(
+        (r for r in idx["tickers"] if r.get("next_earnings") and r["next_earnings"] <= end),
+        key=lambda r: (r["next_earnings"], -(r.get("market_cap") or 0)),
+    )
+    body = [
+        "<h1>Earnings calendar</h1>",
+        f"<p class='sub'>The next {weeks} weeks of quarterly reports: {len(rows)} companies. "
+        "EPS estimate = the analysts' consensus for that quarter; last surprise = reported "
+        "EPS against the estimate a quarter earlier. Source: Yahoo, rebuilt "
+        f"{esc(idx.get('built') or '—')}.</p>",
+    ]
+    day = None
+    for r in rows:
+        if r["next_earnings"] != day:
+            if day:
+                body.append("</table></div>")
+            day = r["next_earnings"]
+            label = dt.date.fromisoformat(day).strftime("%A %d %B %Y")
+            body.append(
+                f"<h2>{esc(label)}</h2><div class='card wrap'><table><tr><th>Ticker</th>"
+                "<th>Company</th><th>Sector</th><th>Market value</th><th>EPS estimate</th>"
+                "<th>Last surprise</th><th>P/E</th></tr>"
+            )
+        last = r.get("last_surprise")
+        surprise = None if last is None else last / 100
+        body.append(
+            f"<tr><td>{ticker_link(r['symbol'])}</td><td>{esc(r.get('name') or '')}</td>"
+            f"<td>{esc(r.get('sector') or '')}</td>"
+            f"<td class='n'>{fmt_money(r.get('market_cap'))}</td>"
+            f"<td class='n'>{fmt(r.get('next_eps_estimate'), '${:,.2f}')}</td>"
+            f"<td class='n'>{fmt(surprise, '{:+.1%}')}</td>"
+            f"<td class='n'>{fmt(r.get('pe'), '{:.1f}x')}</td></tr>"
+        )
+    if day:
+        body.append("</table></div>")
+    else:
+        body.append("<p class='empty'>No reports in the coming weeks.</p>")
+    return layout("Earnings calendar", "calendar", "\n".join(body), menu)
+
+
 def build(out: Path = SITE) -> Path:
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
+    idx = explore_index(out)
+    shutil.copy2(EXPLORER_JS, out / "explorer.js")
     for pdf in ANALYSES.glob("*/*.pdf"):
         dst = out / pdf.parent.name / pdf.name
         dst.parent.mkdir(exist_ok=True)
@@ -1009,6 +1382,10 @@ def build(out: Path = SITE) -> Path:
     (out / "summaries.html").write_text(summaries_page(menu))
     (out / "coverage.html").write_text(coverage_page(menu), encoding="utf-8")
     (out / "pipeline.html").write_text(pipeline_page(menu), encoding="utf-8")
+    (out / "ticker.html").write_text(ticker_page(menu), encoding="utf-8")
+    (out / "tickers.html").write_text(tickers_page(menu, idx), encoding="utf-8")
+    (out / "sectors.html").write_text(sectors_page(menu, idx), encoding="utf-8")
+    (out / "calendar.html").write_text(calendar_page(menu, idx), encoding="utf-8")
     (out / ".nojekyll").write_text("")
     return out
 
