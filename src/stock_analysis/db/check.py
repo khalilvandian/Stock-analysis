@@ -38,7 +38,15 @@ REQUIRED_ROWS = [
     "user_watchlist",
     "out_watchlist_run",
 ]
-OPTIONAL_ROWS = ["raw_sec_ticker", "raw_sec_fact", "out_valuation"]
+OPTIONAL_ROWS = [
+    "raw_sec_ticker",
+    "raw_sec_fact",
+    "raw_yahoo_earnings",
+    "raw_ecb_rate",
+    "out_valuation",
+    "ops_task",
+    "out_coverage_snapshot",
+]
 
 
 @dataclass

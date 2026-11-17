@@ -1,11 +1,13 @@
 # Database
 
-Status: **schema version 4** (migrations `001` to `004`), 2026-11-16. **PostgreSQL 16**,
+Status: **schema version 5** (migrations `001` to `005`), 2026-11-17. **PostgreSQL 16**,
 locally in Docker (`compose.yaml`) and on the server: **Azure Database for PostgreSQL**
 (`stock-db-bk`, Italy North, Azure for Students). SQLite was dropped on 2026-11-16 (see
-`docs/DECISIONS.md`). It holds the data already in `data/` and the watch
-list. No API has been called to fill it, and no analysis reads it yet. The roadmap is
-[issue #16](https://github.com/khalilvandian/Stock-analysis/issues/16).
+`docs/DECISIONS.md`). It holds the data already in `data/`, the watch list,
+and what the ingest job fetches from TradingView, SEC, Yahoo and the ECB
+([`INGEST.md`](INGEST.md), [issue #18](https://github.com/khalilvandian/Stock-analysis/issues/18)).
+How complete it is: [`COVERAGE.md`](COVERAGE.md) and the site's Data page. No analysis reads
+it yet. The first roadmap was [issue #16](https://github.com/khalilvandian/Stock-analysis/issues/16).
 
 The design follows how the project analyses a company:
 - the absolute values first, for every fiscal year and as of any day
@@ -25,6 +27,8 @@ uv run python -m stock_analysis.db load-files   # import data/ and the watch lis
 uv run python -m stock_analysis.db build        # rebuild the core layer from raw
 uv run python -m stock_analysis.db status       # rows per table
 uv run python -m stock_analysis.db check        # connection, schema and data (see below)
+uv run python -m stock_analysis.db ingest       # fetch from the sources (docs/INGEST.md)
+uv run python -m stock_analysis.db coverage     # how complete it is (docs/COVERAGE.md)
 ```
 
 Every command takes `--target local | server`. Without it, the `selected` target in
@@ -586,12 +590,14 @@ From the repository files, 2026-11-16 (28 MB):
 
 | Table | One row per | Notes |
 |---|---|---|
-| `raw_fetch` | Download or imported file | `source` is one of `tradingview`, `yahoo_prices`, `yahoo_statements`, `project_history`, `sec_tickers` or `sec_companyfacts`. `url` is `file:<path>` for a repository file. `row_count` is the rows received and `rows_stored` the rows that were new or changed. A file with the same SHA-256 as one loaded before is skipped |
+| `raw_fetch` | Download or imported file | `source` is one of `tradingview`, `yahoo_prices`, `yahoo_statements`, `yahoo_earnings`, `project_history`, `sec_tickers`, `sec_companyfacts` or `ecb_rates`. A failed download is a row with `status` `error`. `url` is `file:<path>` for a repository file. `row_count` is the rows received and `rows_stored` the rows that were new or changed. A file with the same SHA-256 as one loaded before is skipped |
 | `raw_tv_constituent` | Company in one S&P 500 snapshot | The whole snapshot is stored, since its prices change daily. `extra_json` holds the columns that have no field of their own |
 | `raw_yahoo_price` | Symbol, day and version | Open, high, low and close (split-adjusted), volume, dividends and splits. The dividend-adjusted close is **computed in core**, so a dividend does not rewrite the history here, and Yahoo's own adjusted close isn't stored. Open, high and low were added by migration `002` for technical analysis |
 | `raw_yahoo_statement` | Line item, period and version | Yahoo's own names (`Total Revenue`) |
 | `raw_project_history` | Value in `history.csv` and version | As in the file: money in $bn |
-| `raw_sec_fact` | XBRL fact and version | Only the tags in `config/db_items.toml`. A tag added later is fetched again from SEC, which is free and takes a few minutes |
+| `raw_sec_fact` | XBRL fact and version | Only the tags in `config/db_items.toml`. A tag added later is fetched again from SEC, which is free and takes a few minutes (`ingest --due-now sec_companyfacts`) |
+| `raw_yahoo_earnings` | Symbol, report date and version | Estimated and reported EPS and the surprise. A report Yahoo lists before it happens has no reported EPS; the version after the report has it. Migration `005` |
+| `raw_ecb_rate` | Currency, day and version | US dollars per unit, from the ECB's reference rates. Migration `005` |
 
 ### Core
 
@@ -614,6 +620,16 @@ From the repository files, 2026-11-16 (28 MB):
 | `out_screener_result` | Symbol in Stage 1 or Stage 2 of a run | The fields the site and email show (sector, category, status, rank, close, cheap price). Every other column goes in `detail_json` |
 | `out_watchlist_run` | Watch list stock and evening run | Price, adjusted EPS (12 months), P/E, 10-year median P/E, target P/E, entry price, distance to entry, the verdict. `run_at` is UTC, converted from the Rome time in `runs.csv` |
 | `out_valuation` | Symbol, date and method | Fair value per share, the price, and the inputs (WACC, cash flow) in `detail_json` |
+
+### Ops (the ingest job's own state, migration `005`)
+
+| Table | One row per | Notes |
+|---|---|---|
+| `ops_task` | Source and request key (a symbol, or `SP:SPX`, `all`, `EUR`) | Status, consecutive failures, last attempt and success, when it is due again, the last fetch and error. Inactive once a company leaves the index |
+| `ops_run` | Run of the job | Mode, host, status, requests, tasks done and failed, rows stored, the build, and a JSON summary per source (what stopped it) |
+
+`out_coverage_snapshot` (one row per day: companies, covered, cells required and present,
+the mode, and the whole measurement in `detail_json`) is the coverage page's source.
 
 ### User
 
@@ -669,13 +685,27 @@ Free cash flow, net debt and market value are calculated in the views, not store
    parts exist. It replaces a reported value from the same or a lower-ranked source, never
    one from a better source. For example, `history.csv`'s SEC EBITDA is not overridden by
    Yahoo's operating income + D&A.
-4. **Periods:** the fiscal quarter is counted from the company's fiscal year-end month, with
-   52/53-week ends rounded to the nearest month end. Balance-sheet items are `I` whatever
-   file they came from.
-5. **Filing dates:** no source loaded so far records filing dates. They are estimated as
-   the period end plus the latest SEC deadline (90 days after a year, 45 after a quarter)
-   and marked `filed_estimated`. The view can show a figure late but never early. SEC
-   facts will bring real dates.
+4. **Periods:** every period end is stored as its nearest month end (`period_end`), so SEC's
+   52/53-week dates (Apple's 2026-09-26) and Yahoo's month ends (2026-09-30) are one period.
+   The fiscal quarter is counted from the company's fiscal year-end month. Balance-sheet
+   items are `I` whatever file they came from.
+   - SEC flows are a quarter when they span 80–100 days and a fiscal year at 350–380 days.
+     A twelve-month total that doesn't end in the fiscal year-end month (10-Qs show trailing
+     years) is not a fiscal year.
+   - 10-Q cash flows are year to date. The second quarter is the six months less the first
+     quarter, the third the nine months less the six (same start date, latest versions,
+     `method` `derived`), where SEC doesn't report the quarter itself.
+   - SEC reports capex as a positive payment; `sec_scale = -1` in `config/db_items.toml`
+     stores it negative like the other sources.
+   - SEC's fourth quarter is derived as the fiscal year less its three quarters (all from
+     SEC, latest versions), except for EPS. A Q4 that Yahoo reports wins over the derived one.
+   - Cover-page share counts (`dei`) are dated at their filing's balance-sheet date.
+   - SEC values start with periods in 2015, a year before core, because splits before the
+     price history are unknown.
+5. **Filing dates:** SEC facts carry the real filing date (`filed_estimated` false). Other
+   sources have none, so it is estimated as the period end plus the latest SEC deadline (90
+   days after a year, 45 after a quarter) and marked `filed_estimated`. The view can show an
+   estimated figure late but never early.
 6. **Splits:** Yahoo shares and EPS are adjusted for the splits after their filing date.
    `history.csv` is meant to be adjusted already (see the caveat below).
 7. **Trailing twelve months:** at a fiscal year end, the fiscal-year value. Otherwise, the
@@ -686,11 +716,15 @@ Free cash flow, net debt and market value are calculated in the views, not store
 | Check | Count | Meaning |
 |---|---|---|
 | `jump_10x` | 50 | A value moved more than 10× from one period to the next |
-| `sources_disagree` | 48 | `history.csv` and Yahoo differ by more than 2% for the same period |
+| `sources_disagree` | 48 | The best filed source (SEC, else `history.csv`) and Yahoo differ by more than 2% for the same period |
 | `balance_sheet_identity` | 13 | Assets − liabilities − equity is more than 2% of assets (minority interest at NEE and SO) |
 | `implied_shares_jump` | 6 | Net income ÷ EPS moved 1.8× or more in a year, usually a split not applied to EPS |
 | `missing_period` | 5 | A quarter or year is missing |
 | `short_trading_year` | 0 | Fewer than 200 trading days in a full year |
+| `price_jump` | new | The close moved more than 50% in a day without a split |
+
+(Counts from the 2026-11-16 build of the repository files; the coverage page shows the
+current ones.)
 
 **Caveat found by these checks:** `history.csv` has EPS and market value that were never
 split-adjusted. NEE's EPS for 2016–2017 is in pre-2020-split shares (6.24 and 11.39 against
@@ -700,11 +734,7 @@ as it is and flags it.
 
 ## Not done yet
 
-- **API loaders:**
-  - TradingView daily
-  - the SEC ticker file (gives the CIKs)
-  - SEC company facts (10 years, real filing dates)
-  - Yahoo prices for the whole S&P 500 from 2016, fetching only new days
+- **API loaders:** done in issue #18 (`ingest`, [`INGEST.md`](INGEST.md)).
 - **Analyses writing to `out_*`:** the evening run and the screener writing their results
   to the database.
 - **Readers:** no analysis, dashboard or the site reads the database yet.

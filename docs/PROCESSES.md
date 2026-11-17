@@ -350,3 +350,20 @@ Babak's own Gmail.
 2. Add it to a named set if it belongs there.
 3. `uv run python -m stock_analysis.metrics doc` to regenerate `docs/METRICS.md`.
 4. `uv run pytest tests/test_metrics.py` (it fails if the doc is stale or a field is missing).
+
+## 14. Filling the database (the ingest job)
+
+The job runs by itself on Azure every night ([`INGEST.md`](INGEST.md)). By hand:
+
+1. **Locally**, against the Docker database: `docker compose up -d --wait`, then
+   `uv run python -m stock_analysis.db ingest --target local --limit 3` for a quick test, or
+   without `--limit` for a full run (about an hour for the S&P 500 the first time).
+2. **Watch it:** `uv run python -m stock_analysis.db tasks` (the to-do list by source and
+   status) and `uv run python -m stock_analysis.db coverage` (how complete the data is).
+3. **After adding an SEC tag** to `config/db_items.toml`:
+   `uv run python -m stock_analysis.db ingest --due-now sec_companyfacts`.
+4. **Deploy or change the Azure job** (schedule, size, secrets):
+   `powershell -ExecutionPolicy Bypass -File deploy\ingest-job.ps1`. Code changes need only
+   a push to `main`: the image is rebuilt and the next run uses it.
+5. **Change what counts as complete:** edit `config/coverage.toml`
+   ([`COVERAGE.md`](COVERAGE.md)). The next snapshot and the Data page use it.

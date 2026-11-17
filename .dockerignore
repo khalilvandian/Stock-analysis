@@ -1,0 +1,8 @@
+# Only pyproject.toml, uv.lock, README.md, src/ and config/ go into the ingest image.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!config/
+**/__pycache__

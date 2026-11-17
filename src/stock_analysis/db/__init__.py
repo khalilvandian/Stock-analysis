@@ -210,13 +210,13 @@ def records(df: pd.DataFrame) -> list[dict]:
     return obj.to_dict("records")
 
 
-def insert_df(conn: Connection, table: str, df: pd.DataFrame) -> int:
+def insert_df(conn: Connection, table: str, df: pd.DataFrame, chunk: int = 20_000) -> int:
+    """Insert every row, `chunk` rows at a time, so a large table (1.3 million prices) never
+    exists as one list of Python dicts."""
     if df.empty:
         return 0
     cols = list(df.columns)
-    run(
-        conn,
-        f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})",
-        records(df),
-    )
+    sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"
+    for start in range(0, len(df), chunk):
+        run(conn, sql, records(df.iloc[start : start + chunk]))
     return len(df)

@@ -176,3 +176,29 @@ def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
     assert 'value="BSX/2026-10-26_2100.pdf"' in bsx and 'id="previous"' in bsx
     assert bsx.index("2026-10-27 21:00 CET") < bsx.index("2026-10-26 21:00 CET")  # newest first
     assert "Boston Scientific Corporation" in bsx and 'href="market.html"' in bsx  # the menu
+
+
+def test_site_has_grouped_menus_and_the_pipeline_page(tmp_path, monkeypatch):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "analyses_site_menu", Path(__file__).resolve().parent.parent / "analysis/site.py"
+    )
+    site = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(site)
+    monkeypatch.delenv("STOCK_API_KEY", raising=False)
+    monkeypatch.setattr(site, "ANALYSES", tmp_path / "analyses")
+    monkeypatch.setattr(site, "CONFIG", tmp_path / "watchlist.toml")
+    monkeypatch.setattr(site, "COVERAGE", tmp_path / "none.json")
+    (tmp_path / "analyses").mkdir()
+    (tmp_path / "watchlist.toml").write_text("")
+    out = site.build(tmp_path / "_site")
+    page = (out / "pipeline.html").read_text(encoding="utf-8")
+    # every group is on every page; the current page and its group are marked
+    for group in ("Analyses", "Markets", "Project"):
+        assert f"<summary>{group}</summary>" in page
+    assert 'href="pipeline.html" class=on aria-current=page' in page
+    assert "<details class=on><summary>Project</summary>" in page
+    # the diagram comes from docs/pipeline.html, without the notes on maintaining it
+    assert "Stock Analysis Pipeline" in page and "<svg" in page
+    assert 'id="maintain"' not in page and ".pipeline .box" in page

@@ -1,0 +1,53 @@
+# What "complete" means for the database (issue #18, docs/COVERAGE.md). The coverage command
+# (python -m stock_analysis.db coverage), the ingest job's switch from backfill to maintenance
+# and the coverage page on the site all measure against this file.
+#
+# A company counts as covered when every required value is present or explained:
+#   - daily prices from `prices_from` (or its first trading day, if it listed later) to a
+#     recent day, with at least `price_days_share` of the market's trading days
+#   - every required item for each fiscal year from `first_fiscal_year` (or its listing year)
+#     to the latest fiscal year that should be filed by now (the year end + `annual_lag_days`)
+#   - every required item for each of the last `quarters` quarters (end + `quarter_lag_days`)
+#   - Yahoo's reported EPS for the last `earnings_quarters` quarterly reports
+# Items are the ones in config/db_items.toml.
+
+universe = "SP:SPX"            # TradingView's code for the S&P 500
+prices_from = "2016-01-01"
+price_days_share = 0.98        # of the trading days in the database's own calendar
+price_max_age_days = 5         # the newest price must be at most this old (calendar days)
+first_fiscal_year = 2016
+annual_lag_days = 100          # 10-K deadlines are 60 to 90 days after the year end
+quarters = 8
+quarter_lag_days = 60          # 10-Q deadlines are 40 to 45 days after the quarter end
+earnings_quarters = 8
+# The ingest job switches from backfill to maintenance once every company has been fetched
+# from every source at least once and this share of all required values is present. The gaps
+# left after that are mapping work (a tag to add, a derivation), which fetching again would
+# not fill, and they are on the Data page.
+present_share_to_maintain = 0.90
+
+# Measured and shown, but a gap does not count against "covered": many companies don't tag
+# these at all (no short-term debt, no interest line), so a gap is often a true zero.
+optional_items = ["interest_expense", "short_term_debt", "total_debt", "long_term_debt"]
+
+# Items that don't apply to a kind of business (TradingView industries). They are left out
+# of that company's required cells.
+[[not_applicable]]
+industries = ["Major Banks", "Regional Banks", "Savings Banks", "Investment Banks/Brokers",
+              "Financial Conglomerates", "Life/Health Insurance", "Property/Casualty Insurance",
+              "Multi-Line Insurance", "Insurance Brokers/Services", "Investment Managers",
+              "Finance/Rental/Leasing"]
+items = ["operating_income", "ebitda", "d_and_a", "capex"]
+reason = "banks, insurers and asset managers have no operating income or capex in the industrial sense"
+
+[[not_applicable]]
+industries = ["Real Estate Investment Trusts"]
+items = ["operating_income", "ebitda"]
+reason = "REITs are judged on funds from operations, not operating income"
+
+# Gaps checked by hand and accepted, so they count as explained:
+# [[explained]]
+# symbol = "XYZ"
+# item = "capex"
+# fiscal_years = [2016, 2017]     # leave out for every year
+# reason = "spun off in 2018; no filings before"

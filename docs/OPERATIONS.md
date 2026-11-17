@@ -69,6 +69,12 @@ Delete a cache to force fresh downloads; nothing in it is needed to rebuild.
 | Email links go to GitHub, not the site | `WATCHLIST_BRANCH` is set to a branch other than `main` | Unset it for evening runs on `main` |
 | Pages workflow fails at deploy, or the site is not updated | Pages is not set to deploy from Actions, or the push didn't touch the workflow's paths | GitHub, Settings, Pages, Build and deployment, Source: **GitHub Actions** (one time). Run the workflow by hand from the Actions tab |
 | `uv sync` or downloads fail with "certificate verify failed" | A TLS-inspecting proxy in the cloud environment | Use the system trust store: `UV_SYSTEM_CERTS=true` (older uv: `UV_NATIVE_TLS=true`, now deprecated), or point `SSL_CERT_FILE` (and `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE` for requests and yfinance's curl backend) at the proxy's CA bundle. Never turn verification off |
+| Ingest: `skipped`, "another ingest is running" | A run holds the database lock (an overrun, or a second copy started by hand) | Wait for it; `ops_run` shows it. A run killed part-way is marked `failed` by the next one |
+| Ingest: a group "stopped: rate limited" | Yahoo throttled, or SEC refused (403: no `SEC_USER_AGENT`) | Nothing for Yahoo: the next run carries on. For SEC set `SEC_USER_AGENT`. Lower the budget in `config/ingest.toml` if it happens every run |
+| Ingest: many tasks `error` | One cause, usually: read `last_error` (`SELECT source, last_error, COUNT(*) FROM ops_task WHERE status = 'error' GROUP BY 1, 2`) | Fix it; failed tasks retry on their own (6 hours, doubling, at most a day), or now with `ingest --due-now SOURCE` |
+| `deploy\ingest-job.ps1`: "'Job' resources are not supported on express environments" | The environment was created in Express mode (the newer CLI's default) | Delete the empty environment (`az containerapp env delete -n stock-jobs-env -g stock-rg --yes`) and rerun the script, which creates it with `--environment-mode WorkloadProfiles` |
+| Azure job run fails at once with a connection timeout | The firewall rule `ingest-job` was not set: the job's identity lost its role, or `AZURE_SUBSCRIPTION_ID` is missing | Rerun `deploy\ingest-job.ps1`; check the run's log in the job's Log Analytics workspace |
+| Data page says "No coverage snapshot yet" or is a day old | The repository secret `STOCK_API_KEY` is missing, or the API or the night's run failed | Add the secret; check `ops_run`; run the Pages workflow by hand |
 | `git push` refused | The GitHub connection lapsed | Reconnect GitHub for Claude (see `SETUP.md`, section 5) |
 
 ## Test policy
@@ -103,6 +109,8 @@ To fix formatting: `uv run ruff format .`.
 
 The repository is public. Never write an API key, a token or an email address into code,
 docs, notes, reports or commit messages. Refer to the variables by name: `FMP_API_KEY`,
-`SEC_USER_AGENT`, `BREVO_API_KEY`, `WATCHLIST_EMAIL_FROM`, `WATCHLIST_EMAIL_TO`. Set them in
+`SEC_USER_AGENT`, `BREVO_API_KEY`, `WATCHLIST_EMAIL_FROM`, `WATCHLIST_EMAIL_TO`,
+`STOCK_API_KEY`, `GITHUB_DISPATCH_TOKEN` and the database passwords. The ingest job's secrets
+live in the Azure job, set by `deploy/ingest-job.ps1` from `.env`. Set them in
 the cloud environment's settings, or in a local `.env` (ignored by git, template in
 `.env.example`).

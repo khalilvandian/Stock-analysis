@@ -2,9 +2,10 @@
 
 Pages: an overview (market strip and one card per stock), one page per stock (verdict,
 key numbers, Claude's notes, every dated PDF), the market reports, the market screener's
-latest top 3 per sector (data/screener/) and the watch list summaries, with a menu on
-every page. The PDFs are copied next to the pages, so a link opens the report in the
-browser. The evening run commits to `main`; the Pages workflow
+latest top 3 per sector (data/screener/), the watch list summaries, the data coverage and
+the pipeline diagram (docs/pipeline.html), with grouped menus on every page. The PDFs
+are copied next to the pages, so a link opens the report in the browser. The evening run
+commits to `main`; the Pages workflow
 (.github/workflows/pages.yml) then runs this and publishes `_site/` at
 https://khalilvandian.github.io/Stock-analysis/.
 
@@ -18,10 +19,13 @@ from __future__ import annotations
 
 import csv
 import html
+import json
+import os
 import re
 import shutil
 import sys
 import tomllib
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +33,14 @@ ANALYSES = ROOT / "analyses"
 CONFIG = ROOT / "config/watchlist.toml"
 SCREENER = ROOT / "data/screener"  # written by analysis/screener.py
 SITE = ROOT / "_site"
+COVERAGE = ROOT / "data/coverage/latest.json"  # db coverage --json
+PIPELINE = ROOT / "docs/pipeline.html"  # the hand-drawn pipeline diagram
+# The menus: (group, [(page, label)]). A page is <page>.html; "index" is the home page.
+MENU = [
+    ("Analyses", [("index", "Watch list"), ("summaries", "Summaries")]),
+    ("Markets", [("market", "Market reports"), ("screener", "Screener")]),
+    ("Project", [("pipeline", "Pipeline"), ("coverage", "Data coverage")]),
+]
 URL = "https://khalilvandian.github.io/Stock-analysis/"
 
 CSS = """
@@ -56,11 +68,27 @@ header.bar { background: var(--bar); color: var(--bar-text); position: sticky; t
   align-items: center; gap: 24px; height: 56px; }
 .brand { font-weight: 700; color: var(--bar-text); white-space: nowrap; letter-spacing: .2px; }
 .brand span { color: #7aa2ff; }
-nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-nav a { color: #b8c2d3; padding: 8px 12px; border-radius: 8px; white-space: nowrap;
-  font-size: .94em; }
-nav a:hover { background: rgba(255, 255, 255, .08); color: #fff; text-decoration: none; }
-nav a.on { background: rgba(122, 162, 255, .18); color: #fff; }
+nav { display: flex; gap: 4px; margin-left: auto; }
+nav details { position: relative; }
+nav summary { list-style: none; cursor: pointer; color: #b8c2d3; padding: 8px 12px;
+  border-radius: 8px; white-space: nowrap; font-size: .94em; user-select: none;
+  display: flex; align-items: center; gap: 6px; }
+nav summary::-webkit-details-marker { display: none; }
+nav summary::after { content: ""; width: 6px; height: 6px; margin-top: -3px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg); opacity: .7; }
+nav details[open] summary::after { transform: rotate(-135deg); margin-top: 3px; }
+nav summary:hover, nav details[open] summary { background: rgba(255, 255, 255, .08); color: #fff; }
+nav summary:focus-visible, nav .dd a:focus-visible { outline: 2px solid #7aa2ff;
+  outline-offset: 1px; }
+nav details.on summary { color: #fff; box-shadow: inset 0 -2px 0 #7aa2ff;
+  border-radius: 8px 8px 2px 2px; }
+nav .dd { position: absolute; right: 0; top: calc(100% + 6px); min-width: 190px; padding: 6px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, .18); display: flex; flex-direction: column; gap: 2px; }
+nav .dd a { color: var(--text); padding: 8px 12px; border-radius: 7px; white-space: nowrap; }
+nav .dd a:hover { background: var(--bg); text-decoration: none; }
+nav .dd a.on { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
 main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 64px; }
 h1 { font-size: 1.9em; margin: 0 0 4px; letter-spacing: -.3px; }
 h2 { font-size: 1.2em; margin: 36px 0 12px; }
@@ -137,6 +165,27 @@ aside.side { position: sticky; top: 76px; }
 .viewer select { font: inherit; padding: 7px 10px; border-radius: 8px;
   border: 1px solid var(--line); background: var(--bg); color: var(--text); }
 .viewer iframe { width: 100%; height: 80vh; border: 0; display: block; background: #fff; }
+.meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden;
+  min-width: 80px; }
+.meter i { display: block; height: 100%; border-radius: 4px; background: var(--brand); }
+.heat { border-collapse: separate; border-spacing: 2px; font-size: .78em; }
+.heat th, .heat td { padding: 3px 5px; border: 0; }
+.heat th.v { writing-mode: vertical-rl; transform: rotate(180deg); height: 120px;
+  text-transform: none; letter-spacing: 0; font-size: .95em; vertical-align: bottom; }
+.heat td.c { width: 26px; min-width: 26px; border-radius: 3px; text-align: center;
+  font-variant-numeric: tabular-nums; }
+.heat td.na { background: transparent; color: var(--muted); }
+.heat td.h0 { background: color-mix(in srgb, var(--brand) 6%, var(--card)); }
+.heat td.h1 { background: color-mix(in srgb, var(--brand) 28%, var(--card)); }
+.heat td.h2 { background: color-mix(in srgb, var(--brand) 50%, var(--card)); }
+.heat td.h3 { background: color-mix(in srgb, var(--brand) 72%, var(--card)); }
+.heat td.h4 { background: var(--brand); }
+.heat tr.hide { display: none; }
+.tools { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
+.tools input[type=search] { font: inherit; padding: 7px 10px; border-radius: 8px;
+  min-width: 220px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.trend svg { width: 100%; height: auto; display: block; }
+.trend text { fill: var(--muted); font-size: 11px; }
 footer { color: var(--muted); font-size: .85em; text-align: center; padding: 24px 16px; }
 @media (max-width: 860px) {
   .split { grid-template-columns: 1fr; gap: 12px; }
@@ -147,7 +196,8 @@ footer { color: var(--muted); font-size: .85em; text-align: center; padding: 24p
   .viewer iframe { height: 70vh; }
 }
 @media (max-width: 640px) {
-  .bar .in { gap: 12px; } .brand { font-size: .95em; } h1 { font-size: 1.5em; }
+  .bar .in { gap: 8px; } .brand { font-size: .95em; } h1 { font-size: 1.5em; }
+  nav summary { padding: 8px 8px; font-size: .9em; }
 }
 """
 
@@ -303,11 +353,42 @@ def badge(to_entry) -> str:
 # --- pages ------------------------------------------------------------------------
 
 
-def layout(title_: str, active: str, body: str, menu: list[tuple[str, str]]) -> str:
-    links = "".join(
-        f'<a href="{href}"{" class=on" if key == active else ""}>{esc(label)}</a>'
-        for key, label, href in [(k, label, f"{k}.html") for k, label in menu]
-    ).replace('href="index.html"', 'href="./"')
+def menu_groups(menu) -> list[tuple[str, list[tuple[str, str]]]]:
+    """The menu as groups; a flat [(page, label)] list (older callers) is one group."""
+    if menu and isinstance(menu[0][1], list):
+        return menu
+    return [("Pages", list(menu))]
+
+
+# Opens one menu at a time; Escape or a click elsewhere closes it.
+MENU_JS = """<script>
+const menus = [...document.querySelectorAll("nav details")];
+menus.forEach(d => d.addEventListener("toggle", () => {
+  if (d.open) menus.forEach(o => { if (o !== d) o.open = false; });
+}));
+document.addEventListener("click", e => {
+  if (!e.target.closest("nav")) menus.forEach(d => d.open = false);
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  menus.filter(d => d.open).forEach(d => { d.open = false; d.querySelector("summary").focus(); });
+});
+</script>"""
+
+
+def layout(title_: str, active: str, body: str, menu, head: str = "") -> str:
+    groups = []
+    for group, pages in menu_groups(menu):
+        here = any(key == active for key, _ in pages)
+        links = "".join(
+            f'<a href="{"./" if key == "index" else key + ".html"}"'
+            f"{' class=on aria-current=page' if key == active else ''}>{esc(label)}</a>"
+            for key, label in pages
+        )
+        groups.append(
+            f"<details{' class=on' if here else ''}><summary>{esc(group)}</summary>"
+            f'<div class="dd">{links}</div></details>'
+        )
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
@@ -315,13 +396,25 @@ def layout(title_: str, active: str, body: str, menu: list[tuple[str, str]]) -> 
         "<link rel='preconnect' href='https://fonts.googleapis.com'>"
         "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700"
         "&display=swap' rel='stylesheet'>"
-        f"<style>{CSS}</style></head><body>"
-        "<header class='bar'><div class='in'><a class='brand' href='./'>Watch list "
-        f"<span>analyses</span></a><nav>{links}</nav></div></header>"
+        f"<style>{CSS}</style>{head}</head><body>"
+        "<header class='bar'><div class='in'><a class='brand' href='./'>Stock "
+        f"<span>analysis</span></a><nav aria-label='Site'>{''.join(groups)}</nav></div></header>"
         f"<main>{body}</main>"
         "<footer>Analysed every evening at 21:00 Italy time. Every run is kept as a dated "
-        "PDF. Not investment advice.</footer></body></html>"
+        f"PDF. Not investment advice.</footer>{MENU_JS}</body></html>"
     )
+
+
+def pipeline_page(menu, source: Path | None = None) -> str:
+    """The pipeline diagram, taken from docs/pipeline.html as it is: its styles are scoped
+    under .pipeline, so only its body rule and the maintenance notes are left out."""
+    text = (source or PIPELINE).read_text(encoding="utf-8")
+    fonts = "".join(re.findall(r"<link [^>]*fonts\.googleapis[^>]*>", text))
+    css = re.search(r"<style>(.*?)</style>", text, re.S).group(1)
+    css = re.sub(r"^body \{[^}]*\}\n", "", css, flags=re.M)
+    body = text.split("</style>", 1)[1]
+    body = re.sub(r'<section id="maintain">.*?</section>', "", body, flags=re.S)
+    return layout("Pipeline", "pipeline", body, menu, head=f"{fonts}<style>{css}</style>")
 
 
 def market_strip(r: dict) -> str:
@@ -627,6 +720,278 @@ def summaries_page(menu) -> str:
     return layout("Watch list summaries", "summaries", "\n".join(body), menu)
 
 
+# --- the data coverage page (issue #18) --------------------------------------------
+
+
+def coverage_detail() -> dict | None:
+    """The newest coverage snapshot: from the web API when STOCK_API_URL and STOCK_API_KEY
+    are set (the Pages workflow), else data/coverage/latest.json, else nothing."""
+    url, key = os.environ.get("STOCK_API_URL"), os.environ.get("STOCK_API_KEY")
+    if url and key:
+        sql = "SELECT detail_json FROM out_coverage_snapshot ORDER BY snapshot_date DESC LIMIT 1"
+        req = urllib.request.Request(
+            url.rstrip("/") + "/query",
+            data=json.dumps({"sql": sql, "limit": 1}).encode(),
+            method="POST",
+            headers={"Content-Type": "application/json", "X-API-Key": key},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                rows = json.loads(r.read())["rows"]
+            if rows:
+                return json.loads(rows[0][0])
+        except Exception as exc:  # the page still builds, from the file if there is one
+            print(f"coverage: web API failed ({exc}); using {COVERAGE.name} if present")
+    if COVERAGE.exists():
+        return json.loads(COVERAGE.read_text(encoding="utf-8"))
+    return None
+
+
+def share(a_, b_) -> float:
+    return a_ / b_ if b_ else 0.0
+
+
+def meter(x: float) -> str:
+    return f'<div class="meter"><i style="width:{max(0.0, min(1.0, x)) * 100:.1f}%"></i></div>'
+
+
+def heat_cell(x) -> str:
+    """One cell of the company x item heatmap: one hue in five steps, darker = more years."""
+    if x is None:
+        return '<td class="c na" title="does not apply">·</td>'
+    step = 4 if x >= 1 else int(x * 4)  # 0-24%, 25-49%, 50-74%, 75-99%, all
+    return f'<td class="c h{step}" title="{x:.0%} of the fiscal years"></td>'
+
+
+def trend_svg(trend: list[dict]) -> str:
+    """Share of the required values present, per snapshot day (one series, so no legend)."""
+    pts = [(t["date"], share(t["cells_present"], t["cells_required"])) for t in trend]
+    if len(pts) < 2:
+        return "<p class='sub'>The trend line appears after the second daily snapshot.</p>"
+    w, h, left, bottom = 720, 180, 36, 22
+
+    def y_of(v: float) -> float:
+        return 10 + (1 - v) * (h - bottom - 10)
+
+    xs = [left + i * (w - left - 10) / (len(pts) - 1) for i in range(len(pts))]
+    ys = [y_of(v) for _, v in pts]
+    line = " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys, strict=True))
+    area = f"{xs[0]:.1f},{h - bottom} {line} {xs[-1]:.1f},{h - bottom}"
+    grid = "".join(
+        f'<line x1="{left}" x2="{w - 10}" y1="{y_of(g):.1f}" y2="{y_of(g):.1f}" '
+        f'stroke="var(--line)" stroke-width="1"/>'
+        f'<text x="{left - 6}" y="{y_of(g) + 4:.1f}" text-anchor="end">{g:.0%}</text>'
+        for g in (0, 0.5, 1)
+    )
+    dots = "".join(
+        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="var(--brand)" stroke="var(--card)" '
+        f'stroke-width="2"><title>{esc(d)}: {v:.1%}</title></circle>'
+        for (d, v), x, y in zip(pts, xs, ys, strict=True)
+    )
+    return (
+        f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="Share of the required values '
+        f'present, per day">{grid}<polygon points="{area}" fill="var(--brand-soft)"/>'
+        f'<polyline points="{line}" fill="none" stroke="var(--brand)" stroke-width="2"/>{dots}'
+        f'<text x="{left}" y="{h - 4}">{esc(pts[0][0])}</text>'
+        f'<text x="{w - 10}" y="{h - 4}" text-anchor="end">{esc(pts[-1][0])}</text></svg>'
+    )
+
+
+def table(head: list[str], rows: str) -> str:
+    th = "".join(f"<th>{esc(x)}</th>" for x in head)
+    return f"<div class='card wrap'><table><tr>{th}</tr>{rows}</table></div>"
+
+
+def share_rows(entries: list[tuple[str, int, int]]) -> str:
+    return "".join(
+        f"<tr><td>{label}</td><td class='n'>{have:,} / {need:,}</td>"
+        f"<td class='n'>{share(have, need):.0%}</td>"
+        f"<td style='width:40%'>{meter(share(have, need))}</td></tr>"
+        for label, have, need in entries
+    )
+
+
+def coverage_page(menu, d: dict | None = None) -> str:
+    d = d if d is not None else coverage_detail()
+    if not d:
+        body = (
+            "<h1>Data coverage</h1><p class='sub'>No coverage snapshot yet. It appears after "
+            "the first run of the ingest job (python -m stock_analysis.db ingest).</p>"
+        )
+        return layout("Data coverage", "coverage", body, menu)
+    t, p = d["totals"], d["pipeline"]
+    n = t["companies"]
+    if d.get("mode") == "maintain":
+        mode_badge = '<span class="badge good">Maintenance: complete, kept current</span>'
+    else:
+        mode_badge = '<span class="badge warn">Backfill: still filling the database</span>'
+    if p.get("runs_to_finish"):
+        finish = f"about {p['runs_to_finish']} more runs"
+    else:
+        finish = "every task fetched" if not p.get("never_fetched") else "not known yet"
+    tiles = [
+        ("Companies covered", f"{t['companies_covered']} / {n}", "every required value in"),
+        ("Required values", f"{share(t['cells_present'], t['cells_required']):.1%}",
+         f"{t['cells_present']:,} of {t['cells_required']:,}"),
+        ("Fiscal-year values", f"{share(t['annual_present'], t['annual_required']):.0%}",
+         f"{t['annual_present']:,} of {t['annual_required']:,}"),
+        ("Quarterly values", f"{share(t['quarterly_present'], t['quarterly_required']):.0%}",
+         f"{t['quarterly_present']:,} of {t['quarterly_required']:,}"),
+        ("Price history", f"{t['prices_ok']} / {n}", "complete and current"),
+        ("Reported EPS", f"{t['earnings_ok']} / {n}", "the last 8 reports"),
+        ("Still to fetch", f"{p.get('never_fetched', 0):,} tasks", finish),
+    ]  # fmt: skip
+    body = [
+        "<h1>Data coverage</h1>",
+        '<p class="sub">How much of the required data for the S&amp;P 500 '
+        f"({n} companies) is in the database, and how good it is. Snapshot of "
+        f"{esc(d['as_of'])}. {mode_badge}</p>",
+        '<div class="strip">'
+        + "".join(
+            f'<div class="card tile"><small>{esc(x)}</small><b>{esc(y)}</b>'
+            f"<small>{esc(z)}</small></div>"
+            for x, y, z in tiles
+        )
+        + "</div>",
+        "<h2>Required values present, per day</h2>"
+        "<div class='card trend' style='padding:14px 16px'>"
+        + trend_svg(d.get("trend", []))
+        + "</div>",
+    ]
+    items = share_rows(
+        [
+            (
+                esc(i["label"]) + (" <small>(optional)</small>" if i["optional"] else ""),
+                i["present"],
+                i["required"],
+            )
+            for i in d["items"]
+        ]  # fmt: skip
+    )
+    years = share_rows([(f"FY{y['fiscal_year']}", y["present"], y["required"]) for y in d["years"]])
+    body.append(
+        "<div class='cols'><div><h2>By item (fiscal years)</h2>"
+        + table(["Item", "Present", "Share", ""], items)
+        + "</div><div><h2>By fiscal year</h2>"
+        + table(["Year", "Present", "Share", ""], years)
+        + "</div></div>"
+    )
+    sectors = share_rows(
+        [
+            (
+                f"{esc(s['sector'])} <small>{s['covered']} of {s['companies']} covered</small>",
+                s["present"],
+                s["required"],
+            )
+            for s in sorted(d["sectors"], key=lambda s: -s["companies"])
+        ]  # fmt: skip
+    )
+    f = d["freshness"]
+    fresh = (
+        f"<tr><td>Newest price</td><td class='n'>{esc(f.get('newest_price') or '–')}</td></tr>"
+        f"<tr><td>Companies with incomplete or stale prices</td>"
+        f"<td class='n'>{f['prices_stale']}</td></tr>"
+        f"<tr><td>Newest SEC filing loaded</td>"
+        f"<td class='n'>{esc(f.get('newest_filing') or '–')}</td></tr>"
+        f"<tr><td>Companies with no SEC filing in 120 days</td>"
+        f"<td class='n'>{f['no_filing_120_days']}</td></tr>"
+    )
+    total_src = sum(x["values"] for x in d["sources"]) or 1
+    sources = "".join(
+        f"<tr><td>{esc(x['source'])}</td><td class='n'>{x['values']:,}</td>"
+        f"<td class='n'>{x['values'] / total_src:.0%}</td></tr>"
+        for x in d["sources"]
+    )
+    quality = (
+        "".join(
+            f"<tr><td>{esc(q['check_name'].replace('_', ' '))}</td><td>{esc(q['severity'])}</td>"
+            f"<td class='n'>{q['count']:,}</td></tr>"
+            for q in d["quality"]
+        )
+        or "<tr><td colspan=3>No issues in the last build.</td></tr>"
+    )
+    body.append(
+        "<div class='cols'><div><h2>By sector</h2>"
+        + table(["Sector", "Values", "Share", ""], sectors)
+        + "</div><div><h2>Freshness</h2>"
+        + table(["", ""], fresh)
+        + "<h2>Where the fiscal-year values come from</h2>"
+        + table(["Source", "Values", "Share"], sources)
+        + "<h2>Quality checks (last build)</h2>"
+        + table(["Check", "Severity", "Count"], quality)
+        + "</div></div>"
+    )
+    src = "".join(
+        f"<tr><td>{esc(k.replace('_', ' '))}</td><td class='n'>{v.get('tasks', 0)}</td>"
+        f"<td class='n'>{v.get('ok', 0) + v.get('empty', 0)}</td>"
+        f"<td class='n'>{v.get('pending', 0)}</td><td class='n'>{v.get('error', 0)}</td></tr>"
+        for k, v in sorted(p["sources"].items())
+    )
+    runs = "".join(
+        f"<tr><td class='d'>{esc(str(r['started_at'])[:16].replace('T', ' '))}</td>"
+        f"<td>{esc(r['mode'])}</td><td>{esc(r['status'])}</td>"
+        f"<td class='n'>{r['requests']:,}</td><td class='n'>{r['tasks_ok']:,}</td>"
+        f"<td class='n'>{r['tasks_failed']:,}</td><td class='n'>{r['rows_stored']:,}</td>"
+        f"<td>{esc('; '.join(f'{g}: {why}' for g, why in r['stopped'].items()))}</td></tr>"
+        for r in p["runs"][:10]
+    )
+    body.append(
+        "<h2>The ingest job</h2><div class='cols'>"
+        + table(["Source", "Tasks", "Fetched", "Waiting", "Failed"], src)
+        + table(
+            ["Run (UTC)", "Mode", "Result", "Requests", "Done", "Failed", "Rows", "Stopped by"],
+            runs,
+        )
+        + "</div>"
+    )
+    order = d.get("item_order", [i["item"] for i in d["items"]])
+    labels = {i["item"]: i["label"] for i in d["items"]}
+    head = "".join(f"<th class='v'>{esc(labels.get(i, i))}</th>" for i in order)
+    lines = []
+    for c in sorted(d["companies"], key=lambda c: (c["share"], c["symbol"])):
+        if c["covered"]:
+            flag = '<span class="dot good" title="covered"></span>'
+        else:
+            flag = '<span class="dot warn" title="not covered yet"></span>'
+        more = c["missing_count"] - len(c["missing"])
+        missing = ", ".join(c["missing"]) + (f" and {more} more" if more > 0 else "")
+        tags = esc(f"{c['symbol']} {c['name'] or ''} {c['sector'] or ''}")
+        price_tip = f"{c['prices']['share']:.0%} of trading days, last {c['prices']['last']}"
+        lines.append(
+            f"<tr data-s='{tags}' data-ok='{int(c['covered'])}'><td>{flag}</td>"
+            f"<td><b>{esc(c['symbol'])}</b></td><td class='n'>{c['share']:.0%}</td>"
+            f"<td class='n' title='{esc(price_tip)}'>{'✓' if c['prices']['ok'] else '✗'}</td>"
+            f"<td class='n'>{c['quarterly']['present']}/{c['quarterly']['required']}</td>"
+            f"<td class='n'>{c['earnings']['present']}/{c['earnings']['required']}</td>"
+            + "".join(heat_cell(x) for x in c["item_shares"])
+            + f"<td class='n' title='{esc(missing)}'>{c['missing_count']}</td></tr>"
+        )
+    script = (
+        "<script>(function(){var q=document.getElementById('q'),g=document.getElementById("
+        "'gaps');function f(){var s=q.value.toLowerCase();document.querySelectorAll("
+        "'tr[data-s]').forEach(function(r){var hit=r.dataset.s.toLowerCase().indexOf(s)>=0&&"
+        "(!g.checked||r.dataset.ok==='0');r.classList.toggle('hide',!hit);});}"
+        "q.addEventListener('input',f);g.addEventListener('change',f);})();</script>"
+    )
+    body.append(
+        "<h2>Every company</h2><p class='sub'>Each cell is the share of the company's fiscal "
+        "years that have the value (darker is more, the darkest is every year; · = does not "
+        "apply to the business). "
+        "Prices ✓ = complete and current. Quarters and EPS = present / required. Hover the "
+        "last cell of a row for what is missing.</p><div class='tools'><input type='search' "
+        "id='q' placeholder='Filter by symbol, name or sector' aria-label='Filter companies'>"
+        "<label><input type='checkbox' id='gaps'> Only companies not covered</label></div>"
+        "<div class='card wrap'><table class='heat'><tr><th></th><th>Symbol</th><th>All</th>"
+        f"<th>Prices</th><th>Quarters</th><th>EPS</th>{head}<th>Missing</th></tr>"
+        + "".join(lines)
+        + "</table></div>"
+        + script
+        + "<p class='sub'>What counts as required: config/coverage.toml. How it is measured: "
+        "docs/COVERAGE.md in the repository.</p>"
+    )
+    return layout("Data coverage", "coverage", "\n".join(body), menu)
+
+
 def build(out: Path = SITE) -> Path:
     if out.exists():
         shutil.rmtree(out)
@@ -635,18 +1000,15 @@ def build(out: Path = SITE) -> Path:
         dst = out / pdf.parent.name / pdf.name
         dst.parent.mkdir(exist_ok=True)
         shutil.copy2(pdf, dst)
-    menu = [
-        ("index", "Watch list"),
-        ("market", "Market"),
-        ("screener", "Screener"),
-        ("summaries", "Summaries"),
-    ]
+    menu = MENU
     (out / "index.html").write_text(overview(menu))
     for f in stocks():
         (out / f"{f.name}.html").write_text(stock_page(f, menu))
     (out / "market.html").write_text(market_page(menu))
     (out / "screener.html").write_text(screener_page(menu))
     (out / "summaries.html").write_text(summaries_page(menu))
+    (out / "coverage.html").write_text(coverage_page(menu), encoding="utf-8")
+    (out / "pipeline.html").write_text(pipeline_page(menu), encoding="utf-8")
     (out / ".nojekyll").write_text("")
     return out
 
