@@ -9,7 +9,9 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
   downloader identifies itself with `SEC_USER_AGENT`; never hardcode a personal email.
 - Setup for new sessions and environments: `docs/SETUP.md`. The full documentation
   (architecture, entities, every process, the screener rules, decisions, operations) starts
-  at `docs/README.md`; keep it matching the code when either changes.
+  at `docs/README.md`; keep it matching the code when either changes. The pipeline diagram is
+  `docs/pipeline.html` (hand-drawn SVG, published as a Claude artifact); update it and republish
+  it in the same change that adds, moves or reschedules a piece.
 - Database (issue #16): PostgreSQL 16. `config/database.toml` selects the target: `local` =
   Docker on this machine (`docker compose up -d --wait`, data in the `stock-db` volume, never
   committed), `server` = Azure Database for PostgreSQL `stock-db-bk` (Azure for Students;

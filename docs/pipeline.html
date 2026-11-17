@@ -1,0 +1,330 @@
+<title>Stock Analysis Pipeline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!--
+  The project's pipeline drawn by hand (issue #18). Keep it matching the code: when a piece,
+  a schedule or a data path changes, edit the SVG below, update "Updated", and republish the
+  artifact (docs/ARCHITECTURE.md links it). Coordinates sit on a 10 px grid; zones are Azure,
+  GitHub, the free sources and your PC / Claude sessions.
+-->
+<style>
+/* Layout: one wide engineering drawing per figure, each in its own horizontal scroller, with
+   a reference table and a maintenance checklist below. */
+:root {
+  --bg: #f4f6f8; --fg: #16202a; --muted: #5b6775; --card: #ffffff; --zone: #e7ecf1;
+  --line: #c3ccd6; --edge: #7a8592; --accent: #0b7285; --accent-soft: #c9e7ec;
+  --band: #f0f3f6; --fw: #b45309;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151b; --fg: #e3e9ef; --muted: #96a3b0; --card: #17202a; --zone: #131c25;
+  --line: #2e3c4a; --edge: #74818e; --accent: #45c2d6; --accent-soft: #123a44;
+  --band: #1c2733; --fw: #f59e0b; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f151b; --fg: #e3e9ef; --muted: #96a3b0; --card: #17202a; --zone: #131c25;
+  --line: #2e3c4a; --edge: #74818e; --accent: #45c2d6; --accent-soft: #123a44;
+  --band: #1c2733; --fw: #f59e0b; color-scheme: dark; }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); }
+.page { max-width: 1340px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px; }
+header { display: grid; gap: 6px; }
+h1 { font: 600 28px/1.2 var(--sans); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font: 600 18px/1.3 var(--sans); margin: 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+.meta { font: 12px var(--mono); color: var(--muted); }
+section { display: grid; gap: 12px; min-width: 0; }
+figure { margin: 0; display: grid; gap: 10px; min-width: 0; }
+.scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px; }
+.scroll svg { display: block; width: 100%; min-width: 980px; height: auto; }
+figcaption { color: var(--muted); font-size: 14px; max-width: 80ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { display: inline-block; width: 28px; height: 0; border-top: 2px solid var(--edge); }
+.legend i.hot { border-top-color: var(--accent); }
+.legend i.dash { border-top-style: dashed; }
+.legend i.fw { height: 10px; width: 10px; border: 0;
+  background: repeating-linear-gradient(45deg, var(--fw) 0 2px, transparent 2px 5px); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+code { font: 13px var(--mono); }
+ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 80ch; }
+
+/* the drawings */
+.zone { fill: var(--zone); }
+.zl { font: 500 11px var(--sans); letter-spacing: 0.08em; fill: var(--muted); }
+.box { fill: var(--card); stroke: var(--line); stroke-width: 1; }
+.box.hot { stroke: var(--accent); stroke-width: 1.5; }
+.t { font: 600 13px var(--sans); fill: var(--fg); }
+.s { font: 11px var(--sans); fill: var(--muted); }
+.k { font: 11.5px var(--sans); fill: var(--fg); }
+.m { font: 11px var(--mono); fill: var(--fg); }
+.mm { font: 11px var(--mono); fill: var(--muted); }
+.rule { stroke: var(--line); stroke-width: 1; }
+.band { fill: var(--band); }
+.e { stroke: var(--edge); stroke-width: 1.5; fill: none; }
+.e.hot { stroke: var(--accent); stroke-width: 2; }
+.e.dash { stroke-dasharray: 5 4; }
+.el { font: 11px var(--sans); fill: var(--muted); }
+.el.hot { fill: var(--accent); font-weight: 500; }
+.ah { fill: var(--edge); }
+.ahh { fill: var(--accent); }
+.hatch { stroke: var(--fw); stroke-width: 2; }
+.fwl { font: 500 11px var(--mono); fill: var(--fw); }
+.axis { stroke: var(--line); stroke-width: 1; }
+.tick { font: 11px var(--mono); fill: var(--muted); }
+.cap { fill: var(--accent-soft); }
+.run { fill: var(--accent); }
+.mute { fill: var(--edge); }
+</style>
+
+<div class="page">
+<header>
+  <h1>Stock Analysis Pipeline</h1>
+  <p class="lede">How data gets from the free sources into the database, and from there to the
+  analyses, the public site and the evening email. One repository and one Python package, run in
+  four places that meet in one PostgreSQL database.</p>
+  <div class="meta">Updated 2026-11-17 · issue #18 · source: docs/pipeline.html</div>
+</header>
+
+<section>
+  <h2>The system</h2>
+  <div class="legend" aria-hidden="true">
+    <span><i class="hot"></i>the scheduled data path (ingest → database → site)</span>
+    <span><i></i>code, deploy and analysis flows</span>
+    <span><i class="dash"></i>still separate: moves to the database next</span>
+    <span><i class="fw"></i>database firewall (listed addresses only)</span>
+  </div>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; the web API reads the newest coverage snapshot for the GitHub Pages build; GitHub Actions builds the job's image, which the job pulls at each run; the evening run and your analyses use the database and the repository.">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahh" d="M0,0 L10,5 L0,10 z"/></marker>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch" x1="0" y1="0" x2="0" y2="6"/></pattern>
+  </defs>
+
+  <!-- zones -->
+  <rect class="zone" x="14" y="60" width="188" height="390" rx="10"/>
+  <text class="zl" x="26" y="82">FREE SOURCES</text>
+  <rect class="zone" x="218" y="60" width="612" height="390" rx="10"/>
+  <text class="zl" x="232" y="82">AZURE · stock-rg · ITALY NORTH</text>
+  <rect class="zone" x="870" y="60" width="446" height="390" rx="10"/>
+  <text class="zl" x="884" y="82">GITHUB</text>
+  <rect class="zone" x="218" y="500" width="612" height="160" rx="10"/>
+  <text class="zl" x="232" y="650">YOUR PC AND CLAUDE SESSIONS</text>
+
+  <!-- sources -->
+  <rect class="box" x="26" y="100" width="164" height="52" rx="6"/>
+  <text class="t" x="38" y="122">Yahoo Finance</text><text class="s" x="38" y="139">prices, statements, EPS</text>
+  <rect class="box" x="26" y="170" width="164" height="52" rx="6"/>
+  <text class="t" x="38" y="192">SEC EDGAR</text><text class="s" x="38" y="209">XBRL company facts</text>
+  <rect class="box" x="26" y="240" width="164" height="52" rx="6"/>
+  <text class="t" x="38" y="262">TradingView</text><text class="s" x="38" y="279">S&amp;P 500 members, sectors</text>
+  <rect class="box" x="26" y="310" width="164" height="52" rx="6"/>
+  <text class="t" x="38" y="332">ECB</text><text class="s" x="38" y="349">exchange rates</text>
+
+  <text class="el hot" x="215" y="116" text-anchor="middle">fetch</text>
+  <line class="e hot" x1="190" y1="126" x2="238" y2="126" marker-end="url(#h)"/>
+  <line class="e hot" x1="190" y1="196" x2="238" y2="196" marker-end="url(#h)"/>
+  <line class="e hot" x1="190" y1="266" x2="238" y2="266" marker-end="url(#h)"/>
+  <line class="e hot" x1="190" y1="336" x2="238" y2="336" marker-end="url(#h)"/>
+
+  <!-- ingest job -->
+  <rect class="box hot" x="240" y="90" width="222" height="260" rx="6"/>
+  <text class="t" x="254" y="114">Ingest job</text>
+  <text class="s" x="254" y="131">Container Apps Job · 22:30 UTC</text>
+  <line class="rule" x1="254" y1="143" x2="448" y2="143"/>
+  <text class="k" x="254" y="166">1  lock, open firewall rule</text>
+  <text class="k" x="254" y="192">2  plan tasks → <tspan class="m">ops_task</tspan></text>
+  <text class="k" x="254" y="218">3  fetch to budget → <tspan class="m">raw_*</tspan></text>
+  <text class="k" x="254" y="244">4  build <tspan class="m">raw_*</tspan> → <tspan class="m">core_*</tspan></text>
+  <text class="k" x="254" y="270">5  coverage → <tspan class="m">out_*</tspan></text>
+  <text class="k" x="254" y="296">6  close firewall rule</text>
+  <text class="s" x="254" y="330">backfill until 90% present, then maintain</text>
+
+  <!-- firewall -->
+  <text class="fwl" x="525" y="84" text-anchor="middle">firewall</text>
+  <rect x="520" y="90" width="10" height="260" fill="url(#hatch)"/>
+  <text class="s" x="525" y="368" text-anchor="middle">listed IPs only</text>
+  <text class="el hot" x="490" y="159" text-anchor="middle">opens</text>
+  <line class="e hot dash" x1="462" y1="166" x2="516" y2="166" marker-end="url(#h)"/>
+  <text class="el hot" x="490" y="223" text-anchor="middle">writes</text>
+  <line class="e hot" x1="462" y1="230" x2="588" y2="230" marker-end="url(#h)"/>
+
+  <!-- database -->
+  <rect class="box hot" x="590" y="90" width="220" height="260" rx="6"/>
+  <text class="t" x="604" y="114">PostgreSQL</text>
+  <text class="s" x="604" y="131">stock-db-bk · Flexible Server</text>
+  <rect class="band" x="602" y="146" width="196" height="30" rx="4"/>
+  <text class="m" x="612" y="165">raw_*</text><text class="s" x="668" y="165">fetched, append-only</text>
+  <rect class="band" x="602" y="182" width="196" height="30" rx="4"/>
+  <text class="m" x="612" y="201">core_*</text><text class="s" x="668" y="201">prices, fundamentals</text>
+  <rect class="band" x="602" y="218" width="196" height="30" rx="4"/>
+  <text class="m" x="612" y="237">out_*</text><text class="s" x="668" y="237">screener, coverage</text>
+  <rect class="band" x="602" y="254" width="196" height="30" rx="4"/>
+  <text class="m" x="612" y="273">user_*</text><text class="s" x="668" y="273">watch list</text>
+  <rect class="band" x="602" y="290" width="196" height="30" rx="4"/>
+  <text class="m" x="612" y="309">ops_*</text><text class="s" x="668" y="309">task queue, runs</text>
+
+  <!-- web API -->
+  <rect class="box hot" x="670" y="380" width="140" height="56" rx="6"/>
+  <text class="t" x="684" y="403">Web API</text>
+  <text class="s" x="684" y="420">stock-api-bk · F1</text>
+  <line class="e hot" x1="740" y1="378" x2="740" y2="353" marker-start="url(#h)" marker-end="url(#h)"/>
+  <text class="el hot" x="748" y="370">SQL</text>
+
+  <!-- github -->
+  <rect class="box" x="890" y="100" width="112" height="270" rx="6"/>
+  <text class="t" x="904" y="124">Repository</text>
+  <text class="s" x="904" y="141">main branch</text>
+  <line class="rule" x1="904" y1="153" x2="988" y2="153"/>
+  <text class="mm" x="904" y="176">src/</text>
+  <text class="mm" x="904" y="194">config/</text>
+  <text class="mm" x="904" y="212">analyses/</text>
+  <text class="mm" x="904" y="230">data/screener/</text>
+  <text class="mm" x="904" y="248">reports/</text>
+
+  <rect class="box" x="1030" y="120" width="130" height="56" rx="6"/>
+  <text class="t" x="1044" y="143">Build image</text>
+  <text class="s" x="1044" y="160">on push: src, config</text>
+  <rect class="box" x="1188" y="120" width="114" height="56" rx="6"/>
+  <text class="t" x="1202" y="143">GHCR</text>
+  <text class="s" x="1202" y="160">image :latest</text>
+  <line class="e" x1="1002" y1="148" x2="1028" y2="148" marker-end="url(#a)"/>
+  <line class="e" x1="1160" y1="148" x2="1186" y2="148" marker-end="url(#a)"/>
+
+  <rect class="box hot" x="1030" y="290" width="130" height="56" rx="6"/>
+  <text class="t" x="1044" y="313">Publish site</text>
+  <text class="s" x="1044" y="330">on push · 05:15 UTC</text>
+  <rect class="box hot" x="1188" y="290" width="114" height="56" rx="6"/>
+  <text class="t" x="1202" y="313">GitHub Pages</text>
+  <text class="s" x="1202" y="330">site, Data page</text>
+  <line class="e" x1="1002" y1="318" x2="1028" y2="318" marker-end="url(#a)"/>
+  <line class="e hot" x1="1160" y1="318" x2="1186" y2="318" marker-end="url(#h)"/>
+
+  <!-- image pulled by the job -->
+  <polyline class="e" points="1245,120 1245,40 351,40 351,88" marker-end="url(#a)"/>
+  <text class="el" x="800" y="33" text-anchor="middle">image pulled at each run</text>
+
+  <!-- API to the site build -->
+  <polyline class="e hot" points="810,408 1095,408 1095,348" marker-end="url(#h)"/>
+  <text class="el hot" x="960" y="401" text-anchor="middle">newest coverage snapshot</text>
+
+  <!-- PC and Claude sessions -->
+  <rect class="box" x="240" y="540" width="222" height="66" rx="6"/>
+  <text class="t" x="254" y="563">Evening run</text>
+  <text class="s" x="254" y="580">Claude session · watchlist.py</text>
+  <text class="s" x="254" y="596">weekdays 21:00 Italy</text>
+
+  <rect class="box" x="590" y="540" width="220" height="66" rx="6"/>
+  <text class="t" x="604" y="563">Your analyses</text>
+  <text class="s" x="604" y="580">analysis/*.py · Data.open()</text>
+  <text class="s" x="604" y="596">on your PC or in a session</text>
+
+  <rect class="box" x="890" y="540" width="134" height="66" rx="6"/>
+  <text class="t" x="904" y="563">Evening email</text>
+  <text class="s" x="904" y="580">via Brevo</text>
+  <text class="s" x="904" y="596">PDFs attached</text>
+
+  <line class="e" x1="630" y1="538" x2="630" y2="353" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="el" x="622" y="470" text-anchor="end">direct SQL (PC)</text>
+  <line class="e" x1="740" y1="538" x2="740" y2="439" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="el" x="748" y="492">HTTPS (cloud)</text>
+
+  <polyline class="e" points="350,540 350,520 852,520 852,250 888,250" marker-end="url(#a)"/>
+  <text class="el" x="470" y="513" text-anchor="middle">commits PDFs + screener</text>
+
+  <polyline class="e" points="350,606 350,630 957,630 957,608" marker-end="url(#a)"/>
+  <text class="el" x="700" y="624" text-anchor="middle">PDFs + summary</text>
+
+  <polyline class="e dash" points="108,452 108,573 238,573" marker-end="url(#a)"/>
+  <text class="el" x="116" y="500">still fetches</text>
+  <text class="el" x="116" y="514">its own data</text>
+</svg>
+    </div>
+    <figcaption>The highlighted path runs by itself every night: the ingest job opens the
+    firewall for its own address, fills the raw layer, rebuilds the core layer and writes a
+    coverage snapshot; the site build reads that snapshot through the web API. GitHub Actions
+    turns code into the image the job runs and turns the repository into the site.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>One day, in UTC</h2>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1330 210" role="img" aria-label="Daily timeline in UTC: the evening run at 20:00, which republishes the site when it commits; the ingest job from 22:30, usually about 25 minutes and at most until 01:30; the scheduled site build at 05:15.">
+  <defs>
+    <marker id="ta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <!-- x = 70 + (hour - 18) * 92 -->
+  <line class="axis" x1="70" y1="168" x2="1266" y2="168"/>
+  <g class="tick" text-anchor="middle">
+    <line class="axis" x1="70" y1="164" x2="70" y2="172"/><text x="70" y="188">18:00</text>
+    <line class="axis" x1="254" y1="164" x2="254" y2="172"/><text x="254" y="188">20:00</text>
+    <line class="axis" x1="438" y1="164" x2="438" y2="172"/><text x="438" y="188">22:00</text>
+    <line class="axis" x1="622" y1="164" x2="622" y2="172"/><text x="622" y="188">00:00</text>
+    <line class="axis" x1="806" y1="164" x2="806" y2="172"/><text x="806" y="188">02:00</text>
+    <line class="axis" x1="990" y1="164" x2="990" y2="172"/><text x="990" y="188">04:00</text>
+    <line class="axis" x1="1174" y1="164" x2="1174" y2="172"/><text x="1174" y="188">06:00</text>
+  </g>
+  <text class="tick" x="1266" y="188" text-anchor="end">UTC (Italy = UTC+1 in winter, +2 in summer)</text>
+
+  <!-- evening run -->
+  <rect class="mute" x="254" y="34" width="69" height="14" rx="3"/>
+  <text class="k" x="334" y="45">Evening run (21:00 Italy, weekdays): notes, PDFs, screener, email</text>
+
+  <!-- ingest -->
+  <rect class="cap" x="484" y="80" width="276" height="14" rx="3"/>
+  <rect class="run" x="484" y="80" width="38" height="14" rx="3"/>
+  <text class="k" x="770" y="91">Ingest job: usually about 25 minutes, stops by 01:30 at the latest</text>
+  <text class="s" x="484" y="112">22:30 start</text>
+
+  <!-- site -->
+  <rect class="mute" x="326" y="126" width="10" height="10" rx="2" transform="rotate(45 331 131)"/>
+  <text class="s" x="346" y="135">site rebuilt on the evening commit</text>
+  <rect class="run" x="1100" y="126" width="10" height="10" rx="2" transform="rotate(45 1105 131)"/>
+  <text class="k" x="1090" y="135" text-anchor="end">Site rebuilt from the newest snapshot (05:15)</text>
+</svg>
+    </div>
+    <figcaption>The scheduled site build comes after the ingest job's latest possible end, so
+    the Data page is never more than a few hours behind the database. A token-based trigger
+    (<code>GITHUB_DISPATCH_TOKEN</code>) can rebuild it right after each run instead.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Where each piece runs</h2>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Piece</th><th>Runs on</th><th>Started by</th><th>Code</th></tr></thead>
+    <tbody>
+      <tr><td>Ingest job</td><td>Azure Container Apps Job <code>stock-ingest</code> (1.5 vCPU, 3 GiB, Consumption)</td><td>Daily at 22:30 UTC</td><td><code>python -m stock_analysis.db ingest</code></td></tr>
+      <tr><td>Database</td><td>Azure Database for PostgreSQL <code>stock-db-bk</code>; Docker locally</td><td>Always on</td><td><code>src/stock_analysis/db/</code></td></tr>
+      <tr><td>Web API</td><td>Azure App Service <code>stock-api-bk</code> (F1, wakes on request)</td><td>An HTTPS request</td><td><code>api/app.py</code></td></tr>
+      <tr><td>Image build</td><td>GitHub Actions → GHCR</td><td>A push to <code>main</code> touching code or settings</td><td><code>.github/workflows/ingest-image.yml</code>, <code>Dockerfile</code></td></tr>
+      <tr><td>Site</td><td>GitHub Actions → GitHub Pages</td><td>A push to <code>main</code>, daily at 05:15 UTC, by hand</td><td><code>.github/workflows/pages.yml</code>, <code>analysis/site.py</code></td></tr>
+      <tr><td>Evening run</td><td>A scheduled Claude Code session</td><td>Weekdays at 21:00 Italy time</td><td><code>analysis/watchlist.py</code>, <code>docs/EVENING_RUN.md</code></td></tr>
+      <tr><td>Analyses by hand</td><td>Your PC or a Claude session</td><td>You</td><td><code>analysis/*.py</code>, <code>Data.open()</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>Keeping this drawing current</h2>
+  <ol>
+    <li>Edit <code>docs/pipeline.html</code> in the same change that adds, moves or reschedules a piece.</li>
+    <li>Change the dashed line when the evening run reads from the database instead of the sources.</li>
+    <li>Update the date under the title and republish the artifact; the link is in <code>docs/ARCHITECTURE.md</code>.</li>
+  </ol>
+</section>
+</div>

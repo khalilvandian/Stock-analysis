@@ -9,6 +9,9 @@ It is one repository and one Python package (`src/stock_analysis`), with its set
 `config/`, run in five places. They meet in one PostgreSQL database
 ([`DATABASE.md`](DATABASE.md)):
 
+The drawn version of this map, with the daily timeline, is [`pipeline.html`](pipeline.html)
+(published at https://claude.ai/artifact/A54Gn496CWVif9xdr5fgCi). Keep it matching this page.
+
 | Piece | Runs on | Started by | Code |
 |---|---|---|---|
 | Ingest job | Azure Container Apps Job `stock-ingest` | A schedule (22:30 UTC daily) | `python -m stock_analysis.db ingest` ([`INGEST.md`](INGEST.md)) |
