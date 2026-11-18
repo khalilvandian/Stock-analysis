@@ -24,7 +24,7 @@ Only what those need is stored.
 docker compose up -d --wait                     # PostgreSQL 16 on 127.0.0.1:5432, healthy
 uv run python -m stock_analysis.db init         # create the tables (apply the migrations)
 uv run python -m stock_analysis.db load-files   # import data/ and the watch list (no network)
-uv run python -m stock_analysis.db build        # rebuild the core layer from raw
+uv run python -m stock_analysis.db build        # rebuild core for what changed (--full: all)
 uv run python -m stock_analysis.db status       # rows per table
 uv run python -m stock_analysis.db check        # connection, schema and data (see below)
 uv run python -m stock_analysis.db ingest       # fetch from the sources (docs/INGEST.md)
@@ -59,7 +59,16 @@ SELECT * FROM v_watchlist ORDER BY position;                              -- wat
 - **Not committed:** the database is never committed. The data lives in the Docker volume,
   and the repository holds only the code and the migrations that build it.
 - **Rerunning:** `load-files` can be run again safely, and only stores what is new or
-  changed. `build` rewrites core each time, in one transaction.
+  changed. `build` rebuilds core in one transaction, only for the companies that changed
+  since the last build: raw rows stored after its `max_fetch_id`, a changed entry in
+  `config/companies.toml`, a new company or a changed CIK. It rebuilds every company (a
+  full build) when there is no earlier build, when `config/db_items.toml` or `build.py`
+  changed (their fingerprints are kept in `core_build.summary`), or with `--full`;
+  `--symbols A,B` rebuilds only those. The other companies' core rows and quality issues
+  stay as they were. Each step works company by company, so the result is the same as a
+  full build (`test_incremental_build_rebuilds_only_what_changed_and_matches_a_full_one`).
+  The summary records the mode, the reason, the companies rebuilt and the seconds per step.
+  Rows are written with `COPY`.
 - **Code:** `src/stock_analysis/db/`, through SQLAlchemy and psycopg:
   - `__init__.py`: targets, the `Database` class, migrations, helpers
   - `migrations/`: numbered SQL files

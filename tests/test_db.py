@@ -414,6 +414,56 @@ def test_quality_issues_and_rebuild(con) -> None:
     assert dict(q(con, "SELECT symbol, company_id FROM core_company").fetchall()) == ids
 
 
+CORE_SNAPSHOT = {
+    "core_fundamental": "SELECT company_id, item, period_type, period_end, filed, value, "
+    "split_factor, method, source FROM core_fundamental",
+    "core_fundamental_ttm": "SELECT company_id, item, period_end, filed, basis, value, "
+    "value_adj FROM core_fundamental_ttm",
+    "core_price_daily": "SELECT company_id, date, close, adj_close FROM core_price_daily",
+}
+
+
+def core_rows(con) -> dict:
+    return {t: sorted(map(tuple, q(con, sql).fetchall())) for t, sql in CORE_SNAPSHOT.items()}
+
+
+def issue_rows(con, build_id) -> list:
+    sql = (
+        "SELECT company_id, item, at_date, check_name, detail FROM core_quality_issue "
+        "WHERE build_id = ?"
+    )
+    return sorted(map(tuple, q(con, sql, build_id).fetchall()))
+
+
+def test_incremental_build_rebuilds_only_what_changed_and_matches_a_full_one(con) -> None:
+    first = build(con)
+    assert first["mode"] == "full" and first["why"] == "no earlier build to start from"
+    again = build(con)  # nothing changed since
+    assert again["mode"] == "incremental" and again["rebuilt"] == 0
+    assert again["quality_issues"] == first["quality_issues"]
+    # A new Yahoo price for AAA: only AAA is rebuilt.
+    with con.begin() as conn:
+        fetch = conn.execute(text(
+            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status) "
+            "VALUES ('yahoo_prices', 'AAA', '2026-11-18', '2026-11-18', 'ok') RETURNING fetch_id"
+        )).scalar()  # fmt: skip
+        conn.execute(text(
+            "INSERT INTO raw_yahoo_price (fetch_id, symbol, date, close, volume, dividends, "
+            "stock_splits) SELECT :f, symbol, date, close * 1.01, volume, dividends, stock_splits "
+            "FROM raw_yahoo_price WHERE symbol = 'AAA' ORDER BY date DESC LIMIT 1"
+        ), {"f": fetch})  # fmt: skip
+    step = build(con)
+    assert step["mode"] == "incremental" and step["rebuilt_symbols"] == ["AAA"]
+    incremental, step_issues = core_rows(con), issue_rows(con, step["build_id"])
+    full = build(con, full=True)
+    assert full["mode"] == "full"
+    assert core_rows(con) == incremental  # the same core as a full build
+    assert issue_rows(con, full["build_id"]) == step_issues
+    # Asked for one company.
+    only = build(con, symbols=["BBB"])
+    assert only["rebuilt_symbols"] == ["BBB"] and core_rows(con) == incremental
+
+
 def test_out_tables(con) -> None:
     top = q(
         con,

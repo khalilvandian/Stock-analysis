@@ -10,6 +10,10 @@ import FILE loads a file downloaded or found by hand into the raw layer of the t
 
 reparse reads the kept SEC payloads again (company facts, full filings, the data-set quarters in
 inbox/) with today's mapping (config/db_items.toml), without asking SEC; run build afterwards.
+
+build rebuilds core for the companies whose raw data, config/companies.toml entry or CIK
+changed since the last build; --full rebuilds every company (also done by itself when
+config/db_items.toml or the build code changed); --symbols A,B rebuilds only those.
 """
 
 from __future__ import annotations
@@ -60,7 +64,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", help="coverage: also write the page's JSON to this file")
     parser.add_argument("file", nargs="?", help="import: the file to load")
     parser.add_argument("--kind", help="import: the kind of file (default: its folder's name)")
-    parser.add_argument("--symbols", help="import: only these companies (comma-separated)")
+    parser.add_argument("--symbols", help="import, build: only these companies (comma-separated)")
+    parser.add_argument(
+        "--full", action="store_true", help="build: every company, not only what changed"
+    )
     parser.add_argument("--from", dest="source_db", help="push: the database to send from")
     args = parser.parse_args(argv)
     if args.command == "check":
@@ -94,7 +101,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "load-files":
         print("Rows added:", json.dumps(load_all(db, args.data), indent=2))
     elif args.command == "build":
-        print("Build:", json.dumps(build(db), indent=2))
+        symbols = args.symbols.split(",") if args.symbols else None
+        print("Build:", json.dumps(build(db, full=args.full, symbols=symbols), indent=2))
     elif args.command == "coverage":
         from .coverage import snapshot, summary_lines
 

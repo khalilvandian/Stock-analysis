@@ -693,3 +693,15 @@ def test_52_53_week_quarters_sit_on_the_fiscal_calendar() -> None:
         2026,
     ]
     assert out["period_end"].iloc[3] == "2025-05-31"
+
+
+def test_xbrl_units_named_as_company_facts_names_them() -> None:
+    """A filing names its own unit ids (Berkshire: 'U_shares', 'U_xbrlishares')."""
+    from stock_analysis.ingest.xbrl import unit_of
+
+    assert [unit_of(u, None) for u in ("shares", "U_shares", "U_xbrlishares", "Shares")] == [
+        "shares"
+    ] * 4
+    assert unit_of("U_USDPerShare", "USD") == "USD/shares"
+    assert unit_of("usd", None) == "USD" and unit_of("U_iso4217USD", "USD") == "USD"
+    assert unit_of("pure", None) == "pure"

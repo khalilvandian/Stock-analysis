@@ -82,8 +82,10 @@ def parse_files(files: dict):
 
 
 def unit_of(unit_ref: str, currency) -> str:
-    """The fact's unit as SEC's company facts names it."""
-    ref = str(unit_ref or "").lower()
+    """The fact's unit as SEC's company facts names it. A filing names its units itself
+    ('shares', 'U_shares', 'U_xbrlishares' in Berkshire's filings), so the id's prefix and
+    the xbrli namespace are dropped first."""
+    ref = re.sub(r"^u[_-]", "", str(unit_ref or "").lower()).replace("xbrli", "")
     if "pershare" in ref or "per_share" in ref:
         return "USD/shares"
     if ref.startswith("share"):

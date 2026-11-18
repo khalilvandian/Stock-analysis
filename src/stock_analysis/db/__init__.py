@@ -216,6 +216,15 @@ def insert_df(conn: Connection, table: str, df: pd.DataFrame, chunk: int = 20_00
     if df.empty:
         return 0
     cols = list(df.columns)
+    raw = getattr(conn.connection, "driver_connection", None)
+    if raw is not None and hasattr(raw, "cursor") and type(raw).__module__.startswith("psycopg"):
+        # COPY: several times faster than INSERT for the build's millions of rows.
+        with raw.cursor() as cur, cur.copy(f"COPY {table} ({', '.join(cols)}) FROM STDIN") as cp:
+            for start in range(0, len(df), chunk):
+                obj = df.iloc[start : start + chunk].astype(object)
+                for row in obj.where(pd.notna(obj), None).itertuples(index=False, name=None):
+                    cp.write_row(row)
+        return len(df)
     sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"
     for start in range(0, len(df), chunk):
         run(conn, sql, records(df.iloc[start : start + chunk]))

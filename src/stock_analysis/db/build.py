@@ -9,8 +9,11 @@ rows.
 
 from __future__ import annotations
 
+import bisect
+import hashlib
 import json
 import subprocess
+import time
 import tomllib
 from pathlib import Path
 
@@ -39,6 +42,20 @@ SOURCE_RANK = {"sec": 1, "history": 2, "yahoo": 3}
 FILED_LAG_DAYS = {"year": 90, "quarter": 45}
 SPLIT_ITEMS = {"shares_outstanding": "multiply", "eps_diluted": "divide"}
 KEY = ["company_id", "item", "period_type", "period_end"]
+
+# The companies the running build rebuilds (symbols); None while a full build runs. Every
+# raw read below adds scoped(...) to its WHERE and with_scope(...) to its parameters, so an
+# incremental build reads only those companies' rows. Every step works company by company,
+# so a company's core rows don't depend on the others.
+_SCOPE: list[str] | None = None
+
+
+def scoped(column: str) -> str:
+    return "" if _SCOPE is None else f" AND {column} = ANY(:scope)"
+
+
+def with_scope(params: dict) -> dict:
+    return params if _SCOPE is None else {**params, "scope": _SCOPE}
 
 
 def plain(x):
@@ -175,9 +192,9 @@ def build_prices(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
     raw = frame(
         conn,
         "SELECT DISTINCT ON (symbol, date) symbol, date, open, high, low, close, volume, "
-        "dividends, stock_splits FROM raw_yahoo_price WHERE date >= :start "
-        "ORDER BY symbol, date, fetch_id DESC",
-        {"start": (pd.Timestamp(FIRST_DATE) - pd.Timedelta(days=10)).strftime("%F")},
+        "dividends, stock_splits FROM raw_yahoo_price WHERE date >= :start"
+        f"{scoped('symbol')} ORDER BY symbol, date, fetch_id DESC",
+        with_scope({"start": (pd.Timestamp(FIRST_DATE) - pd.Timedelta(days=10)).strftime("%F")}),
     )
     raw = raw[raw["symbol"].isin(companies)]
     frames = []
@@ -200,7 +217,8 @@ def all_splits(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
     s = frame(
         conn,
         "SELECT DISTINCT symbol, date, stock_splits AS ratio FROM raw_yahoo_price "
-        "WHERE stock_splits > 0",
+        f"WHERE stock_splits > 0{scoped('symbol')}",
+        with_scope({}),
     )
     s = s[s["symbol"].isin(companies)].drop_duplicates(["symbol", "date"])
     return s.assign(company_id=s["symbol"].map(companies))[["company_id", "date", "ratio"]]
@@ -307,10 +325,10 @@ def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.
         "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn FROM raw_sec_fact f "
         f"JOIN ({owners}) c ON c.cik = f.cik WHERE f.form IN ({forms}) AND f.unit IN ({units}) "
         f"AND (f.taxonomy, f.tag) IN ({pairs}) AND f.period_end >= :first "
-        "AND (c.until IS NULL OR f.period_end < c.until) "
+        f"AND (c.until IS NULL OR f.period_end < c.until){scoped('c.symbol')} "
         "ORDER BY c.symbol, f.taxonomy, f.tag, f.unit, f.period_start, f.period_end, f.accn, "
         "f.fetch_id DESC",
-        {"first": SEC_FIRST_PERIOD},
+        with_scope({"first": SEC_FIRST_PERIOD}),
         {"symbol": list(symbols), "taxonomy": list(sec_tags["taxonomy"]),
          "tag": list(sec_tags["tag"]), "unit": list(SEC_UNITS), "form": list(SEC_FORMS)},
     )  # fmt: skip
@@ -329,10 +347,10 @@ def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.
         f"FROM raw_sec_xbrl_fact f JOIN ({owners}) c ON c.cik = f.cik "
         f"WHERE NOT f.custom AND f.axis = '' AND f.concept = ANY(:concepts) "
         f"AND f.form IN ({forms}) AND f.unit IN ({units}) AND f.period_end >= :first "
-        "AND (c.until IS NULL OR f.period_end < c.until) "
+        f"AND (c.until IS NULL OR f.period_end < c.until){scoped('c.symbol')} "
         "ORDER BY c.symbol, f.concept, f.unit, f.period_start, f.period_end, f.accn, "
         "f.fetch_id DESC",
-        {"concepts": concepts, "first": SEC_FIRST_PERIOD},
+        with_scope({"concepts": concepts, "first": SEC_FIRST_PERIOD}),
     )
     sec = pd.concat(
         [sec.assign(raw_table="raw_sec_fact"), filings.assign(raw_table="raw_sec_xbrl_fact")],
@@ -389,10 +407,10 @@ def custom_facts(conn: Connection, tags: pd.DataFrame) -> pd.DataFrame:
         "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn "
         "FROM raw_sec_xbrl_fact f JOIN core_company c ON c.cik = f.cik "
         "WHERE f.custom AND f.axis = '' AND f.concept = ANY(:concepts) "
-        "AND f.unit = ANY(:units) AND f.period_end >= :first "
+        f"AND f.unit = ANY(:units) AND f.period_end >= :first{scoped('c.symbol')} "
         "ORDER BY c.symbol, f.concept, f.unit, f.period_start, f.period_end, f.accn, "
         "f.fetch_id DESC",
-        {"concepts": concepts, "units": list(SEC_UNITS), "first": SEC_FIRST_PERIOD},
+        with_scope({"concepts": concepts, "units": list(SEC_UNITS), "first": SEC_FIRST_PERIOD}),
     )
     if x.empty:
         return pd.DataFrame()
@@ -451,11 +469,12 @@ def class_facts(conn: Connection, tags: pd.DataFrame) -> pd.DataFrame:
         "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn "
         "FROM raw_sec_xbrl_fact f JOIN core_company c ON c.cik = f.cik "
         "WHERE c.symbol = ANY(:symbols) AND f.axis = :axis AND f.concept = ANY(:concepts) "
-        "AND f.unit = ANY(:units) AND f.period_end >= :first "
+        f"AND f.unit = ANY(:units) AND f.period_end >= :first{scoped('c.symbol')} "
         "ORDER BY c.symbol, f.concept, f.member, f.unit, f.period_start, f.period_end, f.accn, "
         "f.fetch_id DESC",
-        {"symbols": list(classes), "axis": CLASS_AXIS, "concepts": list(set(allowed["concept"])),
-         "units": list(SEC_UNITS), "first": SEC_FIRST_PERIOD},
+        with_scope({"symbols": list(classes), "axis": CLASS_AXIS,
+                    "concepts": list(set(allowed["concept"])), "units": list(SEC_UNITS),
+                    "first": SEC_FIRST_PERIOD}),
     )  # fmt: skip
     x = x[x["member"] == x["symbol"].map(classes)]
     x = x.merge(allowed, on=["symbol", "concept"])
@@ -495,12 +514,12 @@ def converted_facts(conn: Connection, entries: list[dict], tags: pd.DataFrame) -
         "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn "
         "FROM raw_sec_xbrl_fact f JOIN core_company c ON c.cik = f.cik "
         "WHERE c.symbol = ANY(:symbols) AND f.axis = :axis AND f.concept = ANY(:concepts) "
-        "AND f.unit = ANY(:units) AND f.period_end >= :first "
+        f"AND f.unit = ANY(:units) AND f.period_end >= :first{scoped('c.symbol')} "
         "ORDER BY c.symbol, f.concept, f.member, f.unit, f.period_start, f.period_end, f.accn, "
         "f.fetch_id DESC",
-        {"symbols": sorted({s for s, _ in rules}), "axis": CLASS_AXIS,
-         "concepts": sorted({r["concept"] for _, r in rules}), "units": list(SEC_UNITS),
-         "first": SEC_FIRST_PERIOD},
+        with_scope({"symbols": sorted({s for s, _ in rules}), "axis": CLASS_AXIS,
+                    "concepts": sorted({r["concept"] for _, r in rules}), "units": list(SEC_UNITS),
+                    "first": SEC_FIRST_PERIOD}),
     )  # fmt: skip
     if x.empty:
         return pd.DataFrame()
@@ -541,8 +560,8 @@ def candidates(
         conn,
         "SELECT raw_id, fetch_id, symbol, statement, frequency, "
         "to_char(period_end, 'YYYY-MM-DD') AS period_end, line_item, value "
-        "FROM raw_yahoo_statement WHERE line_item = ANY(:names)",
-        {"names": names},
+        f"FROM raw_yahoo_statement WHERE line_item = ANY(:names){scoped('symbol')}",
+        with_scope({"names": names}),
         {"line_item": names},
     )
     if yahoo.empty:
@@ -560,8 +579,8 @@ def candidates(
         frames.append(yahoo.assign(source="yahoo", raw_table="raw_yahoo_statement"))
     hist = frame(
         conn,
-        "SELECT * FROM raw_project_history WHERE item = ANY(:names)",
-        {"names": sorted(set(tags.loc[tags["taxonomy"] == "history", "tag"]))},
+        f"SELECT * FROM raw_project_history WHERE item = ANY(:names){scoped('symbol')}",
+        with_scope({"names": sorted(set(tags.loc[tags["taxonomy"] == "history", "tag"]))}),
     )
     hist = hist[hist["symbol"].isin(companies)].merge(
         tags[tags["taxonomy"] == "history"], left_on="item", right_on="tag", suffixes=("_raw", "")
@@ -791,28 +810,38 @@ def build_ttm(conn: Connection, f: pd.DataFrame) -> pd.DataFrame:
     inst = f[f["period_type"] == "I"][base + ["source"]].assign(basis="instant")
     fy = f[f["period_type"] == "FY"][base + ["source"]].assign(basis="fy")
     sums = []
-    for (cid, item), g in f[f["period_type"] == "Q"].groupby(["company_id", "item"]):
-        versions = {e: v.sort_values("filed") for e, v in g.groupby("period_end")}
+    cols = ["company_id", "item", "period_end", "filed", "filed_estimated", "value", "value_adj",
+            "source"]  # fmt: skip
+    quarters = f.loc[f["period_type"] == "Q", cols].sort_values(cols[:4])
+    # Plain lists, not pandas: this runs for every window and filing date (millions of times).
+    groups: dict[tuple, dict[str, list]] = {}
+    for cid, item, end, filed, est, value, adj, source in quarters.itertuples(index=False):
+        groups.setdefault((cid, item), {}).setdefault(end, []).append(
+            (filed, bool(est), value, adj, source)
+        )
+    for (cid, item), versions in groups.items():
         ends = sorted(versions)
+        filed_of = {e: [v[0] for v in versions[e]] for e in ends}  # sorted by filing date
         for i in range(3, len(ends)):
             window = ends[i - 3 : i + 1]
             span = (pd.Timestamp(window[-1]) - pd.Timestamp(window[0])).days
             if not 250 <= span <= 300:  # four consecutive quarters
                 continue
-            first_known = max(versions[e]["filed"].iloc[0] for e in window)
-            dates = sorted({d for e in window for d in versions[e]["filed"] if d >= first_known})
+            first_known = max(filed_of[e][0] for e in window)
+            dates = sorted({d for e in window for d in filed_of[e] if d >= first_known})
             for day in dates:
-                used = [versions[e][versions[e]["filed"] <= day].iloc[-1] for e in window]
+                # the latest version of each quarter known on that day
+                used = [versions[e][bisect.bisect_right(filed_of[e], day) - 1] for e in window]
                 sums.append(
                     {
                         "company_id": cid,
                         "item": item,
                         "period_end": window[-1],
                         "filed": day,
-                        "filed_estimated": any(bool(u["filed_estimated"]) for u in used),
-                        "value": sum(u["value"] for u in used),
-                        "value_adj": sum(u["value_adj"] for u in used),
-                        "source": used[-1]["source"],
+                        "filed_estimated": any(u[1] for u in used),
+                        "value": sum(u[2] for u in used),
+                        "value_adj": sum(u[3] for u in used),
+                        "source": used[-1][4],
                         "basis": "4q",
                     }
                 )
@@ -942,48 +971,193 @@ def git_sha() -> str | None:
         return None
 
 
-def build(db: Database, items_config: Path = ITEMS_CONFIG) -> dict:
-    """Rebuild core from raw in one transaction. Returns the summary stored in core_build."""
+CORE_TABLES = ("core_fundamental_ttm", "core_fundamental", "core_price_daily")
+ISSUE_COLUMNS = ["company_id", "item", "at_date", "check_name", "severity", "detail"]
+
+
+def file_sha(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
+
+
+def company_rules() -> dict[str, str]:
+    """A fingerprint of each company's entries in config/companies.toml, so a changed entry
+    rebuilds only that company."""
+    by_symbol: dict[str, list] = {}
+    for kind, entries in load_companies().items():
+        for e in entries if isinstance(entries, list) else []:
+            if isinstance(e, dict) and e.get("symbol"):
+                by_symbol.setdefault(e["symbol"], []).append([kind, e])
+    return {
+        s: hashlib.sha256(json.dumps(v, sort_keys=True, default=str).encode()).hexdigest()[:16]
+        for s, v in by_symbol.items()
+    }
+
+
+def last_build(conn: Connection) -> dict | None:
+    row = run(
+        conn,
+        "SELECT build_id, max_fetch_id, summary FROM core_build WHERE status = 'ok' "
+        "ORDER BY build_id DESC LIMIT 1",
+    ).fetchone()
+    if row is None:
+        return None
+    try:
+        summary = json.loads(row[2] or "{}")
+    except ValueError:
+        summary = {}
+    return {**summary, "build_id": row[0], "max_fetch_id": row[1]}
+
+
+def changed_since(conn: Connection, fetch_id: int) -> set[str]:
+    """The companies with raw rows stored after this fetch. The raw tables keep new or changed
+    rows only, so these are exactly the companies whose sources changed."""
+    preds = load_companies().get("predecessor", [])
+    owners = "SELECT symbol, cik FROM core_company WHERE cik IS NOT NULL"
+    if preds:
+        values = ", ".join(f"('{p['symbol']}', {int(p['cik'])})" for p in preds)
+        owners += f" UNION ALL SELECT * FROM (VALUES {values}) AS p(s, c)"
+    rows = run(
+        conn,
+        "SELECT symbol FROM raw_yahoo_price WHERE fetch_id > :f "
+        "UNION SELECT symbol FROM raw_yahoo_statement WHERE fetch_id > :f "
+        "UNION SELECT symbol FROM raw_project_history WHERE fetch_id > :f "
+        f"UNION SELECT o.symbol FROM raw_sec_fact r JOIN ({owners}) o ON o.cik = r.cik "
+        "WHERE r.fetch_id > :f "
+        f"UNION SELECT o.symbol FROM raw_sec_xbrl_fact r JOIN ({owners}) o ON o.cik = r.cik "
+        "WHERE r.fetch_id > :f",
+        {"f": int(fetch_id)},
+    )
+    return {r[0] for r in rows}
+
+
+def plan_build(
+    conn: Connection, items_config: Path, before: dict, full: bool, symbols: list[str] | None
+) -> tuple[list[str] | None, str]:
+    """(the companies to rebuild, or None for all; why). A full build when asked, when there is
+    no earlier build to start from, or when the item mapping or the build code changed, since
+    those can change any company's values."""
+    if full:
+        return None, "asked for a full build"
+    if symbols:
+        return sorted(symbols), "asked for these companies"
+    last = last_build(conn)
+    if last is None or last.get("max_fetch_id") is None or "items_sha" not in last:
+        return None, "no earlier build to start from"
+    if last["items_sha"] != file_sha(items_config):
+        return None, "config/db_items.toml changed"
+    if last.get("code_sha") != file_sha(Path(__file__)):
+        return None, "the build code changed"
+    scope = changed_since(conn, last["max_fetch_id"])
+    rules, old_rules = company_rules(), last.get("company_rules", {})
+    scope |= {s for s in rules.keys() | old_rules.keys() if rules.get(s) != old_rules.get(s)}
+    after = {r[0]: r[1] for r in run(conn, "SELECT symbol, cik FROM core_company")}
+    scope |= {s for s, cik in after.items() if s not in before or before[s] != cik}
+    scope &= after.keys()
+    return sorted(scope), (
+        "raw data, company rules or CIKs changed" if scope else "nothing changed"
+    )
+
+
+def build(
+    db: Database,
+    items_config: Path = ITEMS_CONFIG,
+    *,
+    full: bool = False,
+    symbols: list[str] | None = None,
+) -> dict:
+    """Rebuild core from raw in one transaction: only the companies whose raw data, company
+    rules (config/companies.toml) or CIK changed since the last build, or every company (a
+    full build: when asked, or when the item mapping or this code changed). Returns the
+    summary stored in core_build."""
+    global _SCOPE
     started = now()
+    seconds: dict[str, float] = {}
+    clock = [time.monotonic()]
+
+    def lap(step: str) -> None:
+        seconds[step] = round(time.monotonic() - clock[0], 1)
+        clock[0] = time.monotonic()
+
     try:
         with db.begin() as conn:
+            prev = last_build(conn)
             build_id = scalar(
                 conn,
                 "INSERT INTO core_build (started_at, git_sha, max_fetch_id, status) VALUES "
                 "(:t, :sha, (SELECT MAX(fetch_id) FROM raw_fetch), 'running') RETURNING build_id",
                 {"t": started, "sha": git_sha()},
             )
-            for table in (
-                "core_fundamental_ttm",
-                "core_fundamental",
-                "core_price_daily",
-                "core_index_member",
-                "core_item_tag",
-                "core_item",
-            ):
-                run(conn, f"DELETE FROM {table}")
-            items, tags = load_items(items_config)
-            for table, df in zip(("core_item", "core_item_tag"), stored(items, tags), strict=True):
-                insert_df(conn, table, df)
+            before = {r[0]: r[1] for r in run(conn, "SELECT symbol, cik FROM core_company")}
+            run(conn, "DELETE FROM core_index_member")
             companies = build_companies(conn)
-            prices = build_prices(conn, companies)
-            f, c = build_fundamentals(conn, companies, items, tags, all_splits(conn, companies))
-            ttm = build_ttm(conn, f)
-            issues = quality_checks(prices, f, c)
-            cols = ["company_id", "item", "at_date", "check_name", "severity", "detail"]
-            found = pd.DataFrame([[plain(x) for x in i] for i in issues], columns=cols)
+            scope, why = plan_build(conn, items_config, before, full, symbols)
+            items, tags = load_items(items_config)
+            lap("plan")
+            if scope is None:
+                for table in (*CORE_TABLES, "core_item_tag", "core_item"):
+                    run(conn, f"DELETE FROM {table}")
+                for table, df in zip(("core_item", "core_item_tag"), stored(items, tags),
+                                     strict=True):  # fmt: skip
+                    insert_df(conn, table, df)
+                todo = companies
+            else:
+                todo = {s: companies[s] for s in scope if s in companies}
+                ids = list(todo.values())
+                for table in CORE_TABLES:
+                    run(conn, f"DELETE FROM {table} WHERE company_id = ANY(:ids)", {"ids": ids})
+            lap("delete")
+            _SCOPE = None if scope is None else list(todo)
+            issues: list[tuple] = []
+            if todo:
+                prices = build_prices(conn, todo)
+                lap("prices")
+                f, c = build_fundamentals(conn, todo, items, tags, all_splits(conn, todo))
+                lap("fundamentals")
+                build_ttm(conn, f)
+                lap("ttm")
+                issues = quality_checks(prices, f, c)
+            found = pd.DataFrame([[plain(x) for x in i] for i in issues], columns=ISSUE_COLUMNS)
             insert_df(conn, "core_quality_issue", found.assign(build_id=build_id))
+            if scope is not None and prev:  # the other companies' issues stay as they were
+                cols = ", ".join(ISSUE_COLUMNS)
+                run(
+                    conn,
+                    f"INSERT INTO core_quality_issue (build_id, {cols}) SELECT :new, {cols} "
+                    "FROM core_quality_issue WHERE build_id = :old "
+                    "AND (company_id IS NULL OR NOT company_id = ANY(:ids))",
+                    {"new": build_id, "old": prev["build_id"], "ids": list(todo.values())},
+                )
+            lap("quality")
+
+            def count(sql: str) -> int:
+                return int(scalar(conn, sql) or 0)
+
             summary = {
+                "mode": "full" if scope is None else "incremental",
+                "why": why,
+                "rebuilt": len(todo),
+                "rebuilt_symbols": sorted(todo)[:50] if scope is not None else [],
                 "companies": len(companies),
-                "sp500_members_now": scalar(
-                    conn, "SELECT COUNT(*) FROM core_index_member WHERE end_date IS NULL"
+                "sp500_members_now": count(
+                    "SELECT COUNT(*) FROM core_index_member WHERE end_date IS NULL"
                 ),
-                "companies_with_prices": int(prices["company_id"].nunique()),
-                "core_price_daily": len(prices),
-                "core_fundamental": len(f),
-                "companies_with_fundamentals": int(f["company_id"].nunique()) if len(f) else 0,
-                "core_fundamental_ttm": len(ttm),
-                "quality_issues": len(issues),
+                "companies_with_prices": count(
+                    "SELECT COUNT(DISTINCT company_id) FROM core_price_daily"
+                ),
+                "core_price_daily": count("SELECT COUNT(*) FROM core_price_daily"),
+                "core_fundamental": count("SELECT COUNT(*) FROM core_fundamental"),
+                "companies_with_fundamentals": count(
+                    "SELECT COUNT(DISTINCT company_id) FROM core_fundamental"
+                ),
+                "core_fundamental_ttm": count("SELECT COUNT(*) FROM core_fundamental_ttm"),
+                "quality_issues": count(
+                    f"SELECT COUNT(*) FROM core_quality_issue WHERE build_id = {int(build_id)}"
+                ),
+                "seconds": seconds,
+                # what the next build compares with, to rebuild only what changed
+                "items_sha": file_sha(items_config),
+                "code_sha": file_sha(Path(__file__)),
+                "company_rules": company_rules(),
             }
             run(
                 conn,
@@ -991,7 +1165,8 @@ def build(db: Database, items_config: Path = ITEMS_CONFIG) -> dict:
                 "WHERE build_id = :id",
                 {"t": now(), "s": json.dumps(summary), "id": build_id},
             )
-        return {"build_id": build_id, **summary}
+        hidden = ("company_rules", "items_sha", "code_sha")
+        return {"build_id": build_id, **{k: v for k, v in summary.items() if k not in hidden}}
     except Exception as exc:
         with db.begin() as conn:
             run(
@@ -1006,3 +1181,5 @@ def build(db: Database, items_config: Path = ITEMS_CONFIG) -> dict:
                 },
             )
         raise
+    finally:
+        _SCOPE = None
