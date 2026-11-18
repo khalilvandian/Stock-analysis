@@ -22,10 +22,11 @@ from pathlib import Path
 import pandas as pd
 from sqlalchemy.engine import Connection
 
-from . import ROOT, Database, frame, run
-from .build import ITEMS_CONFIG, load_items
+from . import ROOT, Database, frame, insert_df, run
+from .build import ITEMS_CONFIG, load_companies, load_items
 
 CONFIG = ROOT / "config" / "coverage.toml"
+GAP_COLUMNS = ["snapshot_date", "symbol", "item", "period", "period_type", "status", "reason"]
 MAX_MISSING_SHOWN = 12
 
 
@@ -50,12 +51,62 @@ def fiscal_end(year: int, fye_month: int) -> date:
 
 def explained_for(rules: list[dict], item: str, year: int | None) -> bool:
     """A gap accepted by hand in config/coverage.toml ([[explained]])."""
+    return reason_for(rules, item, year) is not None
+
+
+def reason_for(
+    rules: list[dict], item: str, year: int | None, quarter: str | None = None
+) -> str | None:
+    """The reason of the first rule that covers this item and period. A fiscal year is
+    `year` (quarter None); a quarter is `quarter` ('Q1'..'Q4', year None), matched by any rule
+    for the item unless the rule lists `quarters`, which then covers only those quarters."""
     for e in rules:
-        if e.get("item") == item and (
-            year is None or not e.get("fiscal_years") or year in e["fiscal_years"]
-        ):
-            return True
-    return False
+        items = e.get("items") or [e.get("item")]
+        if item not in items:
+            continue
+        if e.get("quarters") and quarter not in e["quarters"]:
+            continue
+        if year is None or not e.get("fiscal_years") or year in e["fiscal_years"]:
+            return e.get("reason") or "explained"
+    return None
+
+
+# Why a value is absent (out_coverage_gap.status). Only "missing" is a gap to fix; the others
+# say the value does not exist, so they don't count against coverage.
+ABSENT = {
+    "before_listing": "the period ends before the company was listed",
+    "not_applicable": "the item does not apply to this kind of business",
+    "not_reported": "the company files, but has no such line in its statements",
+    "explained": "checked by hand and accepted",
+    "missing": "not in the database: a gap to fix",
+}
+COUNTED = {"not_reported", "explained"}  # count as present in the required cells
+
+
+def why_absent(
+    item: str, year: int | None, no_line: list, by_hand: list, quarter: str | None = None
+) -> tuple:
+    """(status, reason) of a required value that isn't in the database."""
+    for status, rules in (("not_reported", no_line), ("explained", by_hand)):
+        reason = reason_for(rules, item, year, quarter)
+        if reason:
+            return status, reason
+    return "missing", None
+
+
+def gap(item: str, period: str, ptype: str, status: str, reason: str | None) -> dict:
+    return {"item": item, "period": period, "period_type": ptype, "status": status,
+            "reason": reason}  # fmt: skip
+
+
+def rules_for(rules: list[dict], m: dict) -> list[dict]:
+    """The rules that name this company or its industry, or apply to all (all = true)."""
+    return [
+        r for r in rules
+        if r.get("all")
+        or m["symbol"] in ([r["symbol"]] if r.get("symbol") else r.get("symbols", []))
+        or m.get("industry") in r.get("industries", [])
+    ]  # fmt: skip
 
 
 # ---------------------------------------------------------------- reading
@@ -177,12 +228,15 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
     cfg = config or load_config()
     today = today or date.today()
     items_df, _ = load_items(cfg.get("items_config", ITEMS_CONFIG))
+    items_df = items_df[~items_df["helper"]]  # parts of a derivation, not stored in core
     labels = dict(zip(items_df["item"], items_df["label"], strict=True))
     kinds = dict(zip(items_df["item"], items_df["kind"], strict=True))
     all_items = list(items_df["item"])
     optional = set(cfg.get("optional_items", []))
     na_rules = cfg.get("not_applicable", [])
     explained = cfg.get("explained", [])
+    not_reported = cfg.get("not_reported", [])
+    formed = {f["symbol"]: f for f in load_companies().get("formed", [])}
     start = cfg.get("prices_from", "2016-01-01")
     first_fy = int(cfg.get("first_fiscal_year", 2016))
     n_quarters = int(cfg.get("quarters", 8))
@@ -211,6 +265,7 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
     price_last = prices["calendar_last"].dropna().max() if len(prices) else None
 
     item_cells = {i: [0, 0] for i in all_items}  # required, present (annual)
+    gap_rows: list[dict] = []  # every absent value and why (out_coverage_gap)
     year_cells: dict[int, list[int]] = {}
     companies = []
     for m in members.to_dict("records"):
@@ -222,7 +277,13 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
         }  # fmt: skip
         required = [i for i in all_items if i not in na and i not in optional]
         measured = [i for i in all_items if i not in na]
-        ok_by_hand = [e for e in explained if e.get("symbol") == m["symbol"]]
+        ok_by_hand = rules_for(explained, m)
+        no_line = rules_for(not_reported, m)
+        na_reason = {
+            i: rule.get("reason", ABSENT["not_applicable"]) for rule in na_rules
+            if m.get("industry") in rule.get("industries", []) for i in rule.get("items", [])
+        }  # fmt: skip
+        gaps: list[dict] = []
 
         # prices
         p = prices.loc[cid] if cid is not None and cid in prices.index else None
@@ -231,6 +292,10 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
             pd.Timestamp(start) + pd.Timedelta(days=15)
         ).strftime("%Y-%m-%d"):
             listed = date.fromisoformat(str(p["first_day"])[:10])
+        since = formed.get(m["symbol"])  # did not exist in this form before (companies.toml)
+        if since and (listed is None or date.fromisoformat(since["date"]) > listed):
+            listed = date.fromisoformat(since["date"])
+        start_reason = f"{since['reason']} ({listed})" if since else f"listed {listed}"
         price_share = float(p["days"] / p["expected"]) if p is not None and p["expected"] else 0.0
         price_age = (
             (today - date.fromisoformat(str(p["last_day"])[:10])).days if p is not None else None
@@ -257,12 +322,22 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
         missing: list[str] = []
         shares = []
         for item in all_items:
+            ptype = "I" if kinds[item] == "instant" else "FY"
+            for y in range(first_fy, first_year):  # before the company was listed
+                if (cid, item, y) not in have_year:
+                    gaps.append(gap(item, f"FY{y}", ptype, "before_listing", start_reason))
             if item not in measured:
+                for y in years:
+                    gaps.append(gap(item, f"FY{y}", ptype, "not_applicable", na_reason[item]))
                 shares.append(None)
                 continue
             got = 0
             for y in years:
-                present = (cid, item, y) in have_year or explained_for(ok_by_hand, item, y)
+                present = (cid, item, y) in have_year
+                if not present and item in required:
+                    status, reason = why_absent(item, y, no_line, ok_by_hand)
+                    gaps.append(gap(item, f"FY{y}", ptype, status, reason))
+                    present = status in COUNTED
                 got += present
                 item_cells[item][0] += 1
                 item_cells[item][1] += present
@@ -279,24 +354,36 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
 
         # quarters: the last n quarter ends that should be filed by now
         qlag = timedelta(days=int(cfg.get("quarter_lag_days", 60)))
-        q_ends = []
+        slots = []
         y, mo = today.year, today.month
-        while len(q_ends) < n_quarters and y > 2000:
+        while len(slots) < n_quarters and y > 2000:
             if (mo - month) % 3 == 0:
                 end = month_end(y, mo)
-                if end + qlag <= today and (listed is None or end >= listed):
-                    q_ends.append(end)
+                if end + qlag <= today:
+                    slots.append(end)
             mo -= 1
             if mo == 0:
                 y, mo = y - 1, 12
+        q_ends = [e for e in slots if listed is None or e >= listed]
         q_req = q_have = 0
+        for item in all_items:
+            ptype = "I" if kinds[item] == "instant" else "Q"
+            for end in slots:
+                if end in q_ends and item not in na:
+                    continue
+                status = "not_applicable" if item in na else "before_listing"
+                reason = na_reason.get(item) or start_reason
+                gaps.append(gap(item, f"{end:%Y-%m}", ptype, status, reason))
         for item in required:
             ptype = "I" if kinds[item] == "instant" else "Q"
             for end in q_ends:
                 q_req += 1
-                ok = (cid, item, month_index(end), ptype) in have_quarter or explained_for(
-                    ok_by_hand, item, None
-                )
+                ok = (cid, item, month_index(end), ptype) in have_quarter
+                if not ok:
+                    quarter = f"Q{((end.month - month) % 12) // 3 or 4}"
+                    status, reason = why_absent(item, None, no_line, ok_by_hand, quarter)
+                    gaps.append(gap(item, f"{end:%Y-%m}", ptype, status, reason))
+                    ok = status in COUNTED
                 q_have += ok
                 if not ok:
                     missing.append(f"{item} {end:%Y-%m}")
@@ -308,6 +395,7 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
         eps_have = int(eps_count.get(m["symbol"], 0))
         eps_ok = eps_have >= eps_needed
 
+        gap_rows.extend({"symbol": m["symbol"], **g} for g in gaps)
         cells_req = a_req + q_req + 2
         cells_have = a_have + q_have + int(prices_ok) + int(eps_ok)
         ci = issues[issues["company_id"] == cid] if cid is not None else issues.iloc[0:0]
@@ -340,6 +428,7 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
                 "item_shares": shares,
                 "missing": missing[:MAX_MISSING_SHOWN],
                 "missing_count": len(missing),
+                "absent": {k: sum(g["status"] == k for g in gaps) for k in ABSENT},
             }
         )  # fmt: skip
 
@@ -386,6 +475,7 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
             "quarterly_required": sum(c["quarterly"]["required"] for c in companies),
             "quarterly_present": sum(c["quarterly"]["present"] for c in companies),
             "earnings_ok": sum(c["earnings"]["ok"] for c in companies),
+            "absent": {k: sum(g["status"] == k for g in gap_rows) for k in ABSENT},
         },
         "items": [
             {
@@ -417,6 +507,7 @@ def compute(conn: Connection, config: dict | None = None, today: date | None = N
         "pipeline": pipeline(conn),
         "companies": companies,
         "item_order": all_items,
+        "gap_rows": gap_rows,  # stored in out_coverage_gap, not in detail_json
     }
 
 
@@ -434,6 +525,7 @@ def snapshot(db: Database, config: dict | None = None, today: date | None = None
     with db.connect() as conn:
         detail = compute(conn, cfg, today)
     detail["mode"] = choose_mode(detail, float(cfg.get("present_share_to_maintain", 0.90)))
+    gaps = pd.DataFrame(detail.pop("gap_rows"), columns=GAP_COLUMNS[1:])
     t = detail["totals"]
     with db.begin() as conn:
         trend = frame(
@@ -469,6 +561,9 @@ def snapshot(db: Database, config: dict | None = None, today: date | None = None
                 "j": json.dumps(detail, default=str),
             },
         )
+        # The current reasons only: the table is replaced by every snapshot.
+        run(conn, "DELETE FROM out_coverage_gap")
+        insert_df(conn, "out_coverage_gap", gaps.assign(snapshot_date=detail["as_of"]))
     return {**t, "mode": detail["mode"], "detail": detail}
 
 

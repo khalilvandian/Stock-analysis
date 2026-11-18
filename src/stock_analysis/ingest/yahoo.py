@@ -8,6 +8,7 @@ to Yahoo through curl_cffi, which respx can't mock).
 
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 
 import pandas as pd
@@ -93,14 +94,19 @@ def load_prices(
     if newest:
         start = max(first, (pd.Timestamp(newest) - timedelta(days=overlap_days)).strftime("%F"))
     out = Outcome(requests=1)
-    df = price_frame(yahoo.prices(symbol, start), symbol)
+    raw = yahoo.prices(symbol, start)
+    df = price_frame(raw, symbol)
     if newest and start != first and (df["stock_splits"].fillna(0) > 0).any():
-        df = price_frame(yahoo.prices(symbol, first), symbol)
+        raw = yahoo.prices(symbol, first)
+        df = price_frame(raw, symbol)
         out.requests += 1
     if df.empty:
         raise NoData(f"Yahoo has no prices for {symbol} since {start}")
     url = f"yfinance:history?symbol={yahoo_symbol(symbol)}&start={start}"
-    fetch_id = start_fetch(conn, "yahoo_prices", symbol, url, sha256(df.to_csv(index=False)))
+    fetch_id = start_fetch(
+        conn, "yahoo_prices", symbol, url, sha256(df.to_csv(index=False)),
+        payload=raw.to_csv().encode(), media_type="text/csv",  # yfinance's table as returned
+    )  # fmt: skip
     if fetch_id is None:
         return out
     stored = store_changed(conn, "raw_yahoo_price", df, ["symbol", "date"], PRICE_VALUES, fetch_id)
@@ -135,17 +141,20 @@ def statement_frame(
 
 def load_statements(conn: Connection, yahoo: YahooClient, symbol: str) -> Outcome:
     out = Outcome()
-    frames = []
+    frames, raw = [], {}
     for (statement, frequency), attribute in STATEMENTS.items():
-        frames.append(
-            statement_frame(yahoo.statement(symbol, attribute), symbol, statement, frequency)
-        )
+        table = yahoo.statement(symbol, attribute)
+        raw[attribute] = None if table is None else table.to_csv()
+        frames.append(statement_frame(table, symbol, statement, frequency))
         out.requests += 1
     df = pd.concat(frames, ignore_index=True)
     if df.empty:
         raise NoData(f"Yahoo has no statements for {symbol}")
     url = f"yfinance:statements?symbol={yahoo_symbol(symbol)}"
-    fetch_id = start_fetch(conn, "yahoo_statements", symbol, url, sha256(df.to_csv(index=False)))
+    fetch_id = start_fetch(
+        conn, "yahoo_statements", symbol, url, sha256(df.to_csv(index=False)),
+        payload=json.dumps(raw).encode(),  # each yfinance statement table, as CSV
+    )  # fmt: skip
     if fetch_id is None:
         return out
     stored = 0
@@ -184,11 +193,15 @@ def earnings_frame(raw: pd.DataFrame | None, symbol: str) -> pd.DataFrame:
 
 def load_earnings(conn: Connection, yahoo: YahooClient, symbol: str) -> Outcome:
     out = Outcome(requests=1)
-    df = earnings_frame(yahoo.earnings(symbol), symbol)
+    table = yahoo.earnings(symbol)
+    df = earnings_frame(table, symbol)
     if df.empty:
         raise NoData(f"Yahoo has no earnings dates for {symbol}")
     url = f"yfinance:earnings_dates?symbol={yahoo_symbol(symbol)}"
-    fetch_id = start_fetch(conn, "yahoo_earnings", symbol, url, sha256(df.to_csv(index=False)))
+    fetch_id = start_fetch(
+        conn, "yahoo_earnings", symbol, url, sha256(df.to_csv(index=False)),
+        payload=table.to_csv().encode(), media_type="text/csv",
+    )  # fmt: skip
     if fetch_id is None:
         return out
     values = ["eps_estimate", "eps_reported", "surprise_pct"]

@@ -37,10 +37,12 @@ The code screens the US and 17 European markets with one setting change (`index 
 
 ## Universe
 
-TradingView's screener, market by market, primary listings of common stock only, market
-value above $50m in local currency as a first cut, then above `min_market_cap_usd` after
-conversion. With `index = "SP:SPX"` only rows whose `indexes` list S&P 500 membership remain:
-497 companies on 2026-10-27 (the index has about 503 share classes). Companies whose
+TradingView's screener, market by market, common stock, market value above $50m in local
+currency as a first cut, then above `min_market_cap_usd` after conversion. With
+`index = "SP:SPX"` only rows whose `indexes` list S&P 500 membership remain, one listing per
+company: the primary listing where it is a member, otherwise the member listing (the index
+holds BRK.B and BF.B, whose primary listings are the A shares, and GM's non-primary listing).
+500 companies on 2026-11-18 (503 share classes). Without an index, primary listings only. Companies whose
 statement or trading currency has no ECB rate are dropped.
 
 ## Screener types

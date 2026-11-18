@@ -25,9 +25,11 @@ TV_FIELDS = [
     "market_cap_basic",
     "fundamental_currency_code",
     "indexes",
+    "is_primary",
 ]
+# Every listing, not only primary ones: the index sometimes holds a secondary listing
+# (BRK.B, BF.B, GM); tradingview.one_per_company then keeps one listing per company.
 TV_FILTERS = [
-    {"left": "is_primary", "operation": "equal", "right": True},
     {"left": "type", "operation": "equal", "right": "stock"},
     {"left": "market_cap_basic", "operation": "greater", "right": 1e9},
 ]
@@ -46,14 +48,18 @@ def load_constituents(conn: Connection, http: httpx.Client, market: str, index: 
         if exc.response.status_code == 429:
             raise RateLimited(f"TradingView 429: {exc}") from exc
         raise
-    d = d[d["indexes"].map(lambda v: in_index(v, index))].reset_index()
+    d = d[d["indexes"].map(lambda v: in_index(v, index))]
+    d = tradingview.one_per_company(d).sort_index().reset_index()
     out = Outcome(requests=1)
     if d.empty:
         raise NoData(f"TradingView lists no members of {index} in {market}")
     tv = d[list(TV_COLUMNS)].rename(columns=TV_COLUMNS)
     tv = tv.drop_duplicates("tv_symbol").sort_values("tv_symbol")
     url = tradingview.SCAN_URL.format(market=market)
-    fetch_id = start_fetch(conn, "tradingview", index, url, sha256(tv.to_csv(index=False)))
+    fetch_id = start_fetch(
+        conn, "tradingview", index, url, sha256(tv.to_csv(index=False)),
+        payload=d.to_json(orient="records").encode(),  # every field the scan returned
+    )  # fmt: skip
     if fetch_id is None:
         return out
     extra = d.loc[tv.index, ["fundamental_currency_code"]]
@@ -86,7 +92,10 @@ def load_rates(conn: Connection, http: httpx.Client, days: int = 10) -> Outcome:
     r.raise_for_status()
     out = Outcome(requests=1)
     df = rates_frame(r.text)
-    fetch_id = start_fetch(conn, "ecb_rates", "EUR", ecb.URL, sha256(r.content))
+    fetch_id = start_fetch(
+        conn, "ecb_rates", "EUR", ecb.URL, sha256(r.content), payload=r.content,
+        media_type="text/csv",
+    )  # fmt: skip
     if fetch_id is None:
         return out
     stored = 0

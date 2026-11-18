@@ -16,7 +16,7 @@ from test_db import empty_db, pg_url  # noqa: F401  (pg_url is a fixture)
 
 from stock_analysis import ecb, tradingview
 from stock_analysis.db import frame
-from stock_analysis.db.build import derive_q4, to_month_end
+from stock_analysis.db.build import add_periods, derive_q4, to_month_end
 from stock_analysis.db.coverage import month_index, snapshot
 from stock_analysis.ingest import job, market, sec, yahoo
 from stock_analysis.ingest.common import RateLimited
@@ -33,10 +33,10 @@ def tv_rows(symbols: list[str]) -> dict:
     rows = []
     for s in symbols:
         d = [s, f"{s} Corp", "NYSE", "Utilities", "Electric Utilities", "United States", "USD",
-             2e10, "USD", [{"name": "S&P 500", "proname": "SP:SPX"}]]  # fmt: skip
+             2e10, "USD", [{"name": "S&P 500", "proname": "SP:SPX"}], True]  # fmt: skip
         rows.append({"s": f"NYSE:{s}", "d": d})
     rows.append({"s": "NYSE:ZZZ", "d": ["ZZZ", "Not in it", "NYSE", "Finance", "Major Banks",
-                 "United States", "USD", 5e9, "USD", []]})  # fmt: skip
+                 "United States", "USD", 5e9, "USD", [], True]})  # fmt: skip
     return {"totalCount": len(rows), "data": rows}
 
 
@@ -348,6 +348,28 @@ def test_coverage_counts_cells_and_switches_mode(fresh, respx_mock) -> None:
     rev = next(i for i in d["items"] if i["item"] == "revenue")
     assert rev["required"] == 4 and rev["present"] == 4  # 2 companies x 2 years
     assert d["trend"][-1]["date"] == TODAY.isoformat()
+    # every absent value is in out_coverage_gap with its reason
+    gap = (
+        "SELECT status, reason FROM out_coverage_gap "
+        "WHERE symbol = 'AAA' AND item = '{}' AND period = 'FY2025'"
+    )
+    assert rows(fresh, gap.format("net_income"))["status"].tolist() == ["missing"]
+    assert aaa["absent"]["missing"] == aaa["missing_count"]
+    # a line the company doesn't report: absent for a reason, so not a gap
+    cov["not_reported"] = [{"symbols": ["AAA"], "items": ["net_income"], "reason": "no such line"}]
+    d1 = snapshot(fresh, cov, today=TODAY)["detail"]
+    aaa1 = next(c for c in d1["companies"] if c["symbol"] == "AAA")
+    assert "net_income FY2025" not in aaa1["missing"]
+    assert rows(fresh, gap.format("net_income")).values.tolist() == [
+        ["not_reported", "no such line"]
+    ]
+    assert d1["totals"]["absent"]["not_reported"] >= 1 and "gap_rows" not in d1
+    # a rule for every company, fourth quarters only (fiscal years end in December here)
+    cov["not_reported"] = [{"all": True, "items": ["capex"], "quarters": ["Q4"], "reason": "q4"}]
+    snapshot(fresh, cov, today=TODAY)
+    q = "SELECT period, status FROM out_coverage_gap WHERE symbol = 'BBB' AND item = 'capex' "
+    status = dict(rows(fresh, q + "AND period LIKE '2025-%'").values.tolist())
+    assert status["2025-12"] == "not_reported" and status["2025-09"] == "missing"
     # everything accepted by hand: covered, and the job may switch to maintenance
     items = [i["item"] for i in d["items"]]
     cov["explained"] = [{"symbol": s, "item": i, "reason": "test"} for s in SYMBOLS for i in items]
@@ -356,6 +378,160 @@ def test_coverage_counts_cells_and_switches_mode(fresh, respx_mock) -> None:
     assert len(rows(fresh, "SELECT * FROM out_coverage_snapshot")) == 1  # one row per day
     with fresh.connect() as conn:
         assert job.choose_mode(conn, 0.95) == "maintain"
+
+
+@respx.mock(assert_all_called=False)
+def test_predecessor_cik_fills_the_years_before_the_new_company(
+    fresh, respx_mock, monkeypatch
+) -> None:
+    """AAA's earlier filings are under CIK 2001 until mid-2024 (config/companies.toml): its
+    FY2023 comes from there, while FY2024 stays the new company's own figure."""
+    from stock_analysis.db import build as build_module
+
+    companies = {"predecessor": [{"symbol": "AAA", "cik": 2001, "until": "2024-06-30"}]}
+    monkeypatch.setattr(job, "load_companies", lambda: companies)
+    monkeypatch.setattr(build_module, "load_companies", lambda: companies)
+    mock_sources(respx_mock)
+    old = {"cik": 2001, "facts": {"us-gaap": {"Revenues": {"units": {"USD": [
+        fact("2023-01-01", "2023-12-31", 300.0, "2024-02-20", accn="old23"),
+        fact("2024-01-01", "2024-12-31", 999.0, "2025-02-20", accn="old24"),  # after `until`
+    ]}}}}}  # fmt: skip
+    respx_mock.get(sec.FACTS_URL.format(cik=2001)).mock(return_value=httpx.Response(200, json=old))
+    cfg = config()
+    job.run_job(fresh, cfg, ctx=context(cfg), do_coverage=False)
+    task = rows(fresh, "SELECT symbol, status FROM ops_task WHERE request_key = 'CIK2001'")
+    assert task.values.tolist() == [["AAA", "ok"]]
+    rev = rows(
+        fresh,
+        "SELECT f.fiscal_year, f.value FROM v_fundamental_latest f JOIN core_company c "
+        "USING (company_id) WHERE c.symbol = 'AAA' AND f.item = 'revenue' "
+        "AND f.period_type = 'FY' ORDER BY 1",
+    )
+    assert rev.values.tolist() == [[2023, 300.0], [2024, 400.0], [2025, 500.0]]
+
+
+@respx.mock(assert_all_called=False)
+def test_payload_is_kept_and_a_new_tag_is_read_from_it(fresh, respx_mock) -> None:
+    """The company-facts file is kept as SEC returned it; a tag mapped later is read from the
+    kept copy (reparse), without asking SEC again."""
+    from stock_analysis.ingest.common import read_payload
+
+    mock_sources(respx_mock)
+    keep = {("us-gaap", "Revenues")}
+    with fresh.begin() as conn:
+        first = sec.load_companyfacts(conn, httpx.Client(), 1001, keep)
+        again = sec.load_companyfacts(conn, httpx.Client(), 1001, keep)
+        kept = read_payload(conn, first.fetch_ids[0])
+    assert first.stored > 0 and again.stored == 0 and not again.fetch_ids  # same: skipped
+    assert json.loads(kept) == companyfacts(1001)  # byte for byte what SEC sent
+    calls = respx_mock.calls.call_count
+    result = sec.reparse_companyfacts(fresh, keep | {("us-gaap", "Assets")})
+    assert result == {"files": 1, "stored": 1}  # the one Assets fact
+    assert respx_mock.calls.call_count == calls  # no request
+    assert sec.reparse_companyfacts(fresh, keep | {("us-gaap", "Assets")})["stored"] == 0
+
+
+@respx.mock(assert_all_called=False)
+def test_a_downloaded_file_is_imported_and_not_fetched_again(fresh, respx_mock, tmp_path) -> None:
+    """SEC's companyfacts.zip, downloaded by hand: the followed companies' facts go into raw
+    as the API's would, their tasks count as fetched, and the job asks SEC for nothing."""
+    import zipfile
+
+    from stock_analysis.ingest.files import import_file
+
+    mock_sources(respx_mock)
+    cfg = config()
+    job.run_job(fresh, cfg, ctx=context(cfg), sources=["tradingview", "sec_tickers"],
+                do_build=False, do_coverage=False)  # fmt: skip
+    folder = tmp_path / "sec_companyfacts"
+    folder.mkdir()
+    bulk = folder / "companyfacts.zip"
+    with zipfile.ZipFile(bulk, "w") as z:
+        for cik in (1001, 1002, 9999):  # 9999: a company the database doesn't follow
+            z.writestr(f"CIK{cik:010d}.json", json.dumps(companyfacts(cik)))
+    result = import_file(fresh, bulk, symbols=None)
+    assert result["kind"] == "sec_companyfacts" and result["new"] == 2
+    assert result["skipped_not_followed"] == 1 and result["stored"] > 0
+    assert import_file(fresh, bulk)["new"] == 0  # the same payloads: nothing new
+    t = rows(fresh, "SELECT request_key, status, next_due_at > now() AS later FROM ops_task "
+                    "WHERE source = 'sec_companyfacts' ORDER BY 1")  # fmt: skip
+    assert t.values.tolist() == [["AAA", "ok", True], ["BBB", "ok", True]]
+    calls = respx_mock.calls.call_count
+    job.run_job(fresh, cfg, ctx=context(cfg), sources=["sec_companyfacts"], do_build=False,
+                do_coverage=False)  # fmt: skip
+    assert respx_mock.calls.call_count == calls  # nothing due: no request to SEC
+    urls = rows(fresh, "SELECT DISTINCT url FROM raw_fetch WHERE source = 'sec_companyfacts'")
+    assert sorted(urls["url"]) == [
+        "file:companyfacts.zip#CIK0000001001.json", "file:companyfacts.zip#CIK0000001002.json"
+    ]  # fmt: skip
+
+
+@respx.mock(assert_all_called=False)
+def test_data_set_keeps_only_what_company_facts_lacks(fresh, respx_mock) -> None:
+    import pandas as pd
+
+    from stock_analysis.ingest.files import not_in_company_facts
+
+    mock_sources(respx_mock)
+    with fresh.begin() as conn:
+        sec.load_companyfacts(conn, httpx.Client(), 1001, {("us-gaap", "Revenues")})
+        row = {"cik": 1001, "axis": "", "member": "", "unit": "USD", "custom": False,
+               "concept": "us-gaap:Revenues", "period_end": "2025-12-31"}  # fmt: skip
+        part = pd.DataFrame([
+            {**row, "accn": "k25"},                      # in company facts: dropped
+            {**row, "accn": "q9", "period_end": "2026-06-30"},  # a filing it lacks: kept
+            {**row, "accn": "k25", "custom": True, "concept": "custom:Own"},  # own tag: kept
+        ])  # fmt: skip
+        kept = not_in_company_facts(conn, 1001, part)
+    assert kept["accn"].tolist() == ["q9", "k25"]
+
+
+@pytest.fixture()
+def peer(pg_url: str):  # noqa: F811
+    """A second empty, migrated database: the server a push sends to."""
+    import os
+
+    from stock_analysis.db import Database
+
+    admin = Database(pg_url, os.environ.get("STOCK_DB_PASSWORD"))
+    with admin.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        exists = conn.exec_driver_sql(
+            "SELECT 1 FROM pg_database WHERE datname = 'stock_test_peer'"
+        ).fetchone()
+        if not exists:
+            conn.exec_driver_sql("CREATE DATABASE stock_test_peer")
+    admin.close()
+    db = empty_db(pg_url.rsplit("/", 1)[0] + "/stock_test_peer")
+    db.migrate()
+    yield db
+    db.close()
+
+
+@respx.mock(assert_all_called=False)
+def test_push_sends_kept_payloads_without_asking_sec(fresh, peer, respx_mock) -> None:
+    """The PC fetched AAA's company facts and a full filing; a push gives the server the
+    same raw rows and marks its tasks fetched, with no request to SEC."""
+    from stock_analysis.ingest.push import push
+
+    mock_sources(respx_mock)
+    cfg = config()
+    for db in (fresh, peer):  # both know the universe and the CIKs
+        job.run_job(db, cfg, ctx=context(cfg), sources=["tradingview", "sec_tickers"],
+                    do_build=False, do_coverage=False)  # fmt: skip
+    job.run_job(fresh, cfg, ctx=context(cfg), sources=["sec_companyfacts"], do_build=False,
+                do_coverage=False)  # fmt: skip
+    calls = respx_mock.calls.call_count
+    result = push(fresh, peer, ["sec_companyfacts"])
+    assert respx_mock.calls.call_count == calls  # nothing asked of SEC
+    assert result["sec_companyfacts"]["payloads"] == 2
+    count = "SELECT COUNT(*) AS n FROM raw_sec_fact"
+    assert rows(peer, count)["n"][0] == rows(fresh, count)["n"][0] > 0
+    t = rows(peer, "SELECT request_key, status FROM ops_task WHERE source = 'sec_companyfacts' "
+                   "ORDER BY 1")  # fmt: skip
+    assert t.values.tolist() == [["AAA", "ok"], ["BBB", "ok"]]
+    assert push(fresh, peer, ["sec_companyfacts"])["sec_companyfacts"]["payloads"] == 0
+    assert job.raw_since_build(peer)  # the server's next run rebuilds core
 
 
 def test_only_one_run_at_a_time(fresh) -> None:
@@ -471,3 +647,61 @@ def test_coverage_page_renders(monkeypatch, tmp_path) -> None:
     assert "0 / 1" in page and "50.0%" in page and "<polyline" in page
     assert "AAA &lt;Corp&gt;" in page and "<Corp>" not in page  # escaped
     assert page.count('class="c h') == 2 and 'class="c na"' in page
+
+
+def test_52_53_week_quarters_sit_on_the_fiscal_calendar() -> None:
+    """Costco (fiscal year to about 1 September; quarters of 12, 12, 12 and 16 weeks) and
+    Kroger (to about 1 February; a 16-week first quarter): every quarter gets its fiscal slot,
+    and the month end of that slot, whatever its real end date."""
+    rows = [
+        (1, "FY", "2024-09-01", "FY2024 Aug"),
+        (1, "Q", "2024-11-24", "Q1 Nov"),
+        (1, "Q", "2025-02-16", "Q2 Feb"),
+        (1, "Q", "2025-05-11", "Q3 May"),  # nearest month end is April 30
+        (1, "I", "2025-05-11", "Q3 May"),  # the balance sheet of that quarter
+        (1, "FY", "2025-08-31", "FY2025 Aug"),
+        (2, "FY", "2025-02-01", "FY2025 Jan"),  # fiscal year = the year it ends in
+        (2, "Q", "2025-05-24", "Q1 Apr"),  # 16 weeks
+        (2, "Q", "2025-08-16", "Q2 Jul"),
+        (2, "Q", "2025-11-08", "Q3 Oct"),
+        (2, "Q", "2025-12-15", "dropped"),  # half way between two quarters: not a quarter
+    ]
+    c = pd.DataFrame(
+        [
+            {"company_id": cid, "period_type": t, "period_end": end, "filed": None}
+            for cid, t, end, _ in rows
+        ]
+    )
+    out = add_periods(c)
+    assert len(out) == len(rows) - 1
+    got = [
+        f"{p} {pd.Timestamp(e):%b}"
+        for p, e in zip(out["fiscal_period"], out["period_end"], strict=True)
+    ]
+    got = [g.replace("FY ", f"FY{y} ") for g, y in zip(got, out["fiscal_year"], strict=True)]
+    assert got == [r[3] for r in rows[:-1]]
+    assert out["fiscal_year"].tolist() == [
+        2024,
+        2025,
+        2025,
+        2025,
+        2025,
+        2025,
+        2025,
+        2026,
+        2026,
+        2026,
+    ]
+    assert out["period_end"].iloc[3] == "2025-05-31"
+
+
+def test_xbrl_units_named_as_company_facts_names_them() -> None:
+    """A filing names its own unit ids (Berkshire: 'U_shares', 'U_xbrlishares')."""
+    from stock_analysis.ingest.xbrl import unit_of
+
+    assert [unit_of(u, None) for u in ("shares", "U_shares", "U_xbrlishares", "Shares")] == [
+        "shares"
+    ] * 4
+    assert unit_of("U_USDPerShare", "USD") == "USD/shares"
+    assert unit_of("usd", None) == "USD" and unit_of("U_iso4217USD", "USD") == "USD"
+    assert unit_of("pure", None) == "pure"

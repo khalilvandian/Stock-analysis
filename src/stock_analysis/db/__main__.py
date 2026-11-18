@@ -1,6 +1,24 @@
 """Command line: python -m stock_analysis.db
-{init,load-files,build,status,check,ping,allow-my-ip,create-roles,ingest,coverage,tasks}
-[--target]."""
+{init,load-files,build,status,check,ping,allow-my-ip,create-roles,ingest,import,reparse,push,
+coverage,tasks} [--target].
+
+push sends what this PC ingested (kept SEC payloads, imported data-set files) to --target
+(the server) without asking SEC again (ingest/push.py); --from picks the source database.
+
+import FILE loads a file downloaded or found by hand into the raw layer of the target database
+(--target server: straight into Azure), as its API source would (ingest/files.py).
+
+reparse reads the kept SEC payloads again (company facts, full filings, the data-set quarters in
+inbox/) with today's mapping (config/db_items.toml), without asking SEC; run build afterwards.
+
+build rebuilds core for the companies whose raw data, config/companies.toml entry or CIK
+changed since the last build (the job never rebuilds the whole database); --symbols A,B
+rebuilds only those; --full rebuilds every company (only when asked).
+
+check-sample --symbols A,B builds those companies with today's code and config, shows what
+would change against the values in the database, and rolls back: nothing is written. The
+way to check a change of the extraction on a sample.
+"""
 
 from __future__ import annotations
 
@@ -23,12 +41,16 @@ def main(argv: list[str] | None = None) -> int:
             "init",
             "load-files",
             "build",
+            "check-sample",
             "status",
             "check",
             "ping",
             "allow-my-ip",
             "create-roles",
             "ingest",
+            "import",
+            "reparse",
+            "push",
             "coverage",
             "tasks",
         ],
@@ -45,6 +67,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-build", action="store_true", help="ingest: skip build and coverage")
     parser.add_argument("--due-now", help="ingest: make SOURCE's tasks due now, then run")
     parser.add_argument("--json", help="coverage: also write the page's JSON to this file")
+    parser.add_argument("file", nargs="?", help="import: the file to load")
+    parser.add_argument("--kind", help="import: the kind of file (default: its folder's name)")
+    parser.add_argument("--symbols", help="import, build: only these companies (comma-separated)")
+    parser.add_argument(
+        "--full", action="store_true", help="build: every company, not only what changed"
+    )
+    parser.add_argument("--from", dest="source_db", help="push: the database to send from")
     args = parser.parse_args(argv)
     if args.command == "check":
         return check(args.target, args.strict)
@@ -77,7 +106,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "load-files":
         print("Rows added:", json.dumps(load_all(db, args.data), indent=2))
     elif args.command == "build":
-        print("Build:", json.dumps(build(db), indent=2))
+        symbols = args.symbols.split(",") if args.symbols else None
+        print("Build:", json.dumps(build(db, full=args.full, symbols=symbols), indent=2))
+    elif args.command == "check-sample":
+        if not args.symbols:
+            parser.error("check-sample needs --symbols A,B")
+        report = build(db, symbols=args.symbols.split(","), dry_run=True)
+        print(json.dumps({k: v for k, v in report.items() if k != "changes"}, indent=2))
+        for c in report["changes"]:
+            print(
+                f"  {c['symbol']:6} {c['item']:20} {c['period_type']:2} {c['period_end']} "
+                f"filed {c['filed']}  {c['change']:8} {c['value_old']} -> {c['value_new']}"
+            )
     elif args.command == "coverage":
         from .coverage import snapshot, summary_lines
 
@@ -87,6 +127,24 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.json).parent.mkdir(parents=True, exist_ok=True)
             Path(args.json).write_text(json.dumps(snap["detail"], default=str), encoding="utf-8")
             print(f"Wrote {args.json}")
+    elif args.command == "import":
+        from ..ingest.files import import_file
+
+        symbols = args.symbols.split(",") if args.symbols else None
+        print("Import:", json.dumps(import_file(db, args.file, args.kind, symbols)))
+    elif args.command == "push":
+        from ..ingest.push import push
+
+        src = Database.open(args.source_db)
+        if src.where == db.where:
+            raise SystemExit("push: --from and --target are the same database")
+        sources = args.sources.split(",") if args.sources else None
+        print(f"Push from {src.target} to {db.target}:", json.dumps(push(src, db, sources)))
+        src.close()
+    elif args.command == "reparse":
+        from ..ingest.files import reparse_all
+
+        print("Reparse:", json.dumps(reparse_all(db)))
     elif args.command == "tasks":
         from ..ingest.job import task_table
 

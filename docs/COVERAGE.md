@@ -29,17 +29,49 @@ fetches. For each company:
 - **Not applicable** (`[[not_applicable]]`, by TradingView industry):
   - banks, insurers and asset managers: no operating income, EBITDA, D&A or capex
   - REITs: no operating income or EBITDA
+- **Not reported** (`[[not_reported]]`, by symbol or industry): the company files, but its
+  statements have no such line (for example no operating-income subtotal: the income
+  statement goes straight to income before taxes). It counts as present. Add a rule only
+  after checking the company's filings: a value filed under a tag we don't map is a mapping
+  gap, not "not reported". A rule can name `symbols`, `industries` or `all = true`, and
+  `quarters = ["Q4"]` limits it to those fiscal quarters. Fourth-quarter EPS is one: a 10-K
+  reports the year, not the fourth quarter, and EPS is never approximated as the year less
+  three quarters (the share count differs each quarter), so it is present only when Yahoo
+  reports it.
 - **Explained** (`[[explained]]`): a gap checked by hand and accepted, with the reason.
   It counts as present.
 
 A company is **covered** when every one of its cells is present or explained. The headline
 number is the share of all required cells present.
 
+## Why a value is absent
+
+An empty cell is not always missing data: the value may not exist. Every value the coverage
+measures but the database doesn't hold gets a status, stored with its reason in
+`out_coverage_gap` (replaced by every snapshot) and counted per company (`absent`) and in
+total (`totals.absent`) in the snapshot:
+
+| Status | Meaning | Counts against coverage |
+|---|---|---|
+| `before_listing` | The period ends before the company was listed, or before it existed in its current form (`[[formed]]` in `config/companies.toml`: TKO, Smurfit Westrock) | No (not required) |
+| `not_applicable` | The item doesn't apply to the business (`[[not_applicable]]`) | No (not required) |
+| `not_reported` | The company has no such line (`[[not_reported]]`) | No (counts as present) |
+| `explained` | Checked by hand and accepted (`[[explained]]`) | No (counts as present) |
+| `missing` | None of the above: a gap to fix, by a source, a mapping or a derivation | Yes |
+
+So a reader can tell "the company had not been formed yet" or "banks have no capex" from a
+real gap: `SELECT * FROM out_coverage_gap WHERE symbol = 'TKO'`.
+
 **Trading calendar:** the days on which at least a fifth of the companies in the database have
 a price. That avoids needing an exchange holiday calendar.
 
 **Listing date:** a first price more than 15 days after 2016-01-01 is taken as the listing
-date.
+date. A `[[formed]]` date in `config/companies.toml` overrides it when later (the price
+history of a merged company can start before the company did).
+
+**Predecessors:** a company whose earlier filings are under another SEC CIK (a new holding
+company took over the listed one) reads the old CIK for the years before
+(`[[predecessor]]` in `config/companies.toml`), so those years are present, not missing.
 
 ## Quality, freshness and progress
 

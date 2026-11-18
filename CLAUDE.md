@@ -4,7 +4,12 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
 
 - Market data: `stock_analysis.fetch` (Yahoo Finance via yfinance) saves CSVs to `data/<SYMBOL>/`. `FMPClient` wraps Financial Modeling Prep, but the free plan blocks most symbols (HTTP 402)
   and the current key is rejected as invalid, so Yahoo, SEC EDGAR, TradingView and the ECB are
-  the working sources.
+  the working sources. SEC also comes in bulk (`companyfacts.zip`, the quarterly Financial
+  Statement Data Sets): files downloaded by hand wait in `inbox/<kind>/` (never committed)
+  and are loaded with `uv run python -m stock_analysis.db import FILE [--target server]`
+  (docs/INGEST.md), which marks their tasks fetched so the job doesn't download them again.
+  Every payload is kept as received (`raw_payload`); `db reparse` re-reads kept SEC files
+  after a tag mapping change. edgartools reads full filings (source `sec_xbrl`).
 - The API key is read from the `FMP_API_KEY` env var. Never hardcode or commit it. The SEC
   downloader identifies itself with `SEC_USER_AGENT`; never hardcode a personal email.
 - Setup for new sessions and environments: `docs/SETUP.md`. The full documentation

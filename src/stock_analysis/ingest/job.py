@@ -31,7 +31,8 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from ..db import ROOT, Database, frame, run, scalar
-from . import market, sec, yahoo
+from ..db.build import load_companies
+from . import market, sec, xbrl, yahoo
 from .common import NoData, Outcome, RateLimited, log_error
 
 CONFIG = ROOT / "config" / "ingest.toml"
@@ -66,6 +67,17 @@ def members(conn: Connection, index: str) -> list[str]:
     return sorted(set(df["symbol"]))
 
 
+def xbrl_items() -> set[str]:
+    """The items read per share class from full filings: sec_class in config/db_items.toml,
+    and the items a [[share_class]] converts from another class's units (Berkshire's shares)."""
+    from ..db.build import load_companies, load_items
+
+    _, tags = load_items()
+    converted = {r["item"] for c in load_companies().get("share_class", [])
+                 for r in c.get("convert", [])}  # fmt: skip
+    return set(tags.loc[tags["taxonomy"] == "sec_class", "item"]) | converted
+
+
 def plan(conn: Connection, config: dict, now: datetime) -> dict[str, int]:
     """Create the missing tasks, activate the members' and deactivate the others'. Returns
     the number of active tasks per source."""
@@ -82,6 +94,19 @@ def plan(conn: Connection, config: dict, now: datetime) -> dict[str, int]:
         if s in config["sources"]
         for sym in symbols
     ]
+    if "sec_companyfacts" in config["sources"]:  # earlier filings under a predecessor's CIK
+        rows += [
+            {"source": "sec_companyfacts", "key": f"CIK{int(p['cik'])}", "symbol": p["symbol"]}
+            for p in load_companies().get("predecessor", [])
+            if p["symbol"] in symbols
+        ]
+    if "sec_xbrl" in config["sources"]:  # the filings that report a missing value
+        items = sorted(xbrl_items())
+        rows += [
+            {"source": "sec_xbrl", "key": f["accession"], "symbol": f["symbol"]}
+            for f in xbrl.filings_for_gaps(conn, items)
+            if f["symbol"] in symbols
+        ]
     if rows:
         run(
             conn,
@@ -92,7 +117,7 @@ def plan(conn: Connection, config: dict, now: datetime) -> dict[str, int]:
     if symbols:  # leavers keep their data but are no longer fetched
         run(
             conn,
-            "UPDATE ops_task SET active = (request_key = ANY(:symbols)) WHERE symbol IS NOT NULL",
+            "UPDATE ops_task SET active = (symbol = ANY(:symbols)) WHERE symbol IS NOT NULL",
             {"symbols": symbols},
         )
     counts = run(
@@ -160,11 +185,17 @@ class Context:
     sleep: Callable[[float], None] = time.sleep
     _ciks: dict[str, int] | None = None
     _tags: set | None = None
+    _concepts: set | None = None
 
     def cik(self, conn: Connection, symbol: str) -> int | None:
         if self._ciks is None:
             self._ciks = sec.ciks(conn)
         return self._ciks.get(symbol)
+
+    def concepts(self) -> set:
+        if self._concepts is None:
+            self._concepts = xbrl.mapped_concepts()
+        return self._concepts
 
     def tags(self) -> set:
         if self._tags is None:
@@ -182,8 +213,10 @@ def handle(conn: Connection, task: dict, ctx: Context) -> Outcome:
         return out
     if source == "ecb_rates":
         return market.load_rates(conn, ctx.http)
+    if source == "sec_xbrl":
+        return xbrl.load_filing(conn, key, ctx.concepts())
     if source == "sec_companyfacts":
-        cik = ctx.cik(conn, key)
+        cik = int(key[3:]) if key.startswith("CIK") else ctx.cik(conn, key)
         if cik is None:
             raise NoData(f"no CIK for {key} in the SEC ticker file")
         return sec.load_companyfacts(conn, ctx.sec_http, cik, ctx.tags())
@@ -352,7 +385,7 @@ def _run_job(
     }
     build_id = None
     status = "ok"
-    if do_build and stored:
+    if do_build and (stored or raw_since_build(db)):
         try:
             result = build(db)
             build_id = result["build_id"]
@@ -391,6 +424,20 @@ def _run_job(
             },
         )
     return {"run_id": run_id, "status": status, **summary}
+
+
+def raw_since_build(db: Database) -> bool:
+    """Raw data arrived after the last good build without this run storing it (a db push or
+    db import from the PC): the core layer needs rebuilding all the same."""
+    with db.connect() as conn:
+        return bool(
+            scalar(
+                conn,
+                "SELECT COALESCE(MAX(fetch_id), 0) > COALESCE((SELECT max_fetch_id FROM "
+                "core_build WHERE status = 'ok' ORDER BY build_id DESC LIMIT 1), 0) "
+                "FROM raw_fetch WHERE status = 'ok' AND rows_stored > 0",
+            )
+        )
 
 
 LOCK_KEY = 18_000_018  # pg advisory lock: one ingest at a time per database

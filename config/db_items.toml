@@ -8,8 +8,13 @@
 # statements (`yahoo`, data/<SYMBOL>/*.csv).
 #
 # kind: "flow" (measured over a period) or "instant" (measured at a date).
-# derive: "a + b" computes the item from other items wherever they all exist for a period;
-#   the reported fields are then only a fallback.
+# derive: "a + b" or "a - b - c?" computes the item from other items wherever every part
+#   exists for a period; a part marked "?" is optional and counts as 0 when missing.
+# derive_mode: "replace" (default): the derived value replaces a reported one from the same or
+#   a lower-ranked source, so the reported fields are only a fallback (EBITDA). "fallback":
+#   only where no source of the same or a better rank reports the item (total liabilities).
+# helper = true: a part of a derivation only. It is used inside the build and not stored in
+#   core, nor counted by the coverage.
 # history_scale: history.csv keeps money in billions of US dollars, so those values are
 #   multiplied by 1e9. Per-share values are kept as they are.
 # capex is stored as a negative number, the same sign as history.csv and Yahoo (SEC reports it
@@ -23,7 +28,7 @@ kind = "flow"
 unit = "USD"
 sec = ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
        "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet",
-       "RegulatedAndUnregulatedOperatingRevenue"]
+       "RegulatedAndUnregulatedOperatingRevenue", "RevenuesNetOfInterestExpense"]
 history = ["revenue"]
 history_scale = 1e9
 yahoo = ["Total Revenue", "Operating Revenue"]
@@ -44,6 +49,9 @@ label = "Diluted EPS"
 kind = "flow"
 unit = "USD/share"
 sec = ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"]
+# Companies that report EPS only per share class: the listed class's, from the full filings
+# (sec_xbrl, [[share_class]] in config/companies.toml).
+sec_class = ["us-gaap:EarningsPerShareDiluted", "us-gaap:EarningsPerShareBasicAndDiluted"]
 history = ["eps"]
 history_scale = 1
 yahoo = ["Diluted EPS"]
@@ -66,6 +74,12 @@ kind = "flow"
 unit = "USD"
 sec = ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"]
 sec_scale = -1                  # SEC reports the payment as positive; capex is stored negative
+# Without one of those totals, capex is the sum of the lines a company splits it into: EOG
+# reports oil and gas properties ($6.1bn) and other property ($0.5bn) on separate lines,
+# utilities their construction expenditures, REITs development and improvements. Taking one
+# line alone would understate it.
+derive = "capex_oil_gas? + capex_other_property? + capex_construction? + capex_real_estate_development? + capex_real_estate_improvements?"
+derive_mode = "fallback"
 history = ["capex"]
 history_scale = 1e9
 yahoo = ["Capital Expenditure"]
@@ -162,6 +176,12 @@ kind = "instant"
 unit = "USD"
 sec = ["Liabilities"]
 yahoo = ["Total Liabilities Net Minority Interest"]
+# Many companies show no total-liabilities line (about 1 in 5 periods in SEC filings): the
+# balance-sheet total less equity, including minority interests, and less the redeemable
+# (temporary) equity shown between them. Checked against 9,428 periods that report both: 95%
+# equal, 98% within 2%.
+derive = "liabilities_and_equity - equity_total - temporary_equity?"
+derive_mode = "fallback"
 
 [[items]]
 item = "equity"
@@ -178,3 +198,82 @@ kind = "instant"
 unit = "shares"
 sec = ["dei:EntityCommonStockSharesOutstanding", "WeightedAverageNumberOfDilutedSharesOutstanding"]
 yahoo = ["Ordinary Shares Number", "Share Issued"]
+
+# ---- helpers: parts of a derivation, not stored in core
+
+[[items]]
+item = "liabilities_and_equity"
+label = "Total liabilities and equity"
+kind = "instant"
+unit = "USD"
+helper = true
+sec = ["LiabilitiesAndStockholdersEquity"]
+
+[[items]]
+item = "equity_total"
+label = "Equity including minority interests"
+kind = "instant"
+unit = "USD"
+helper = true
+sec = ["StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+       "StockholdersEquity"]
+
+[[items]]
+item = "temporary_equity"
+label = "Redeemable (temporary) equity"
+kind = "instant"
+unit = "USD"
+helper = true
+sec = ["TemporaryEquityCarryingAmountIncludingPortionAttributableToNoncontrollingInterests",
+       "TemporaryEquityCarryingAmount", "TemporaryEquityCarryingAmountAttributableToParent",
+       "RedeemableNoncontrollingInterestEquityCarryingAmount",
+       "RedeemableNoncontrollingInterestEquityFairValue",
+       "RedeemableNoncontrollingInterestEquityOtherCarryingAmount",
+       "RedeemableNoncontrollingInterestEquityOtherFairValue",
+       "TemporaryEquityCarryingAmountAttributableToNoncontrollingInterest"]
+
+[[items]]
+item = "capex_oil_gas"
+label = "Capex: oil and gas properties"
+kind = "flow"
+unit = "USD"
+helper = true
+sec = ["PaymentsToAcquireOilAndGasPropertyAndEquipment",
+       "PaymentsToExploreAndDevelopOilAndGasProperties"]
+sec_scale = -1
+
+[[items]]
+item = "capex_other_property"
+label = "Capex: other property, plant and equipment"
+kind = "flow"
+unit = "USD"
+helper = true
+sec = ["PaymentsToAcquireOtherPropertyPlantAndEquipment"]
+sec_scale = -1
+
+[[items]]
+item = "capex_construction"
+label = "Capex: construction expenditures"
+kind = "flow"
+unit = "USD"
+helper = true
+sec = ["PaymentsForConstructionInProcess"]
+sec_scale = -1
+
+[[items]]
+item = "capex_real_estate_development"
+label = "Capex: real estate development"
+kind = "flow"
+unit = "USD"
+helper = true
+sec = ["PaymentsToDevelopRealEstateAssets"]
+sec_scale = -1
+
+[[items]]
+item = "capex_real_estate_improvements"
+label = "Capex: capital improvements"
+kind = "flow"
+unit = "USD"
+helper = true
+sec = ["PaymentsForCapitalImprovements"]
+sec_scale = -1
