@@ -128,9 +128,11 @@ threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the ful
 ### Stage 1: good financial statements (`analysis/stage1.py`)
 
 1. **Universe.** TradingView's screener is scanned market by market for the regions in
-   `[universe] regions` (now `["US"]`, the `america` market). Only primary listings of common
-   stock are kept. With `[universe] index = "SP:SPX"` only S&P 500 members remain (497
-   companies); with `index = ""` every company in the regions does. Cached for the day in
+   `[universe] regions` (now `["US"]`, the `america` market). With `[universe] index =
+   "SP:SPX"` the index's members remain, one listing per company (`tradingview.one_per_company`:
+   the primary listing where it is a member, else the member listing, so BRK.B, BF.B and GM
+   stay in; 500 companies); with `index = ""` every primary listing of common stock in the
+   regions. Cached for the day in
    `.cache/screener/tradingview_<index>_<regions>_<date>.pkl`.
 2. **FX.** ECB rates convert each company's statements (`fundamental_currency_code`) and
    price (`currency`, GBX for London) to US dollars. Companies in a currency the ECB doesn't

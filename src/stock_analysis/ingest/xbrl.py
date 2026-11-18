@@ -36,9 +36,15 @@ REQUESTS_PER_FILING = 8
 
 
 def mapped_concepts(items_config=ITEMS_CONFIG) -> set[str]:
-    """The concepts config/db_items.toml reads per share class (sec_class)."""
+    """The concepts read per share class: sec_class in config/db_items.toml, and the tags a
+    [[share_class]] entry in config/companies.toml names for an item (Berkshire's basic EPS)."""
     _, tags = load_items(items_config)
-    return set(tags.loc[tags["taxonomy"] == "sec_class", "tag"])
+    entries = load_companies().get("share_class", [])
+    own = {
+        concept for c in entries for concepts in c.get("tags", {}).values() for concept in concepts
+    }
+    converted = {r["concept"] for c in entries for r in c.get("convert", [])}
+    return set(tags.loc[tags["taxonomy"] == "sec_class", "tag"]) | own | converted
 
 
 def share_classes() -> dict[str, str]:

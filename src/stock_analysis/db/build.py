@@ -421,9 +421,69 @@ def class_facts(conn: Connection, tags: pd.DataFrame) -> pd.DataFrame:
     read per class (sec_class in config/db_items.toml) and the companies with a listed class
     (config/companies.toml): Visa's diluted EPS is reported only per class, and the price is
     the Class A share's. Tried after the company's undimensioned tags (priority + 100)."""
-    classes = {c["symbol"]: c["member"] for c in load_companies().get("share_class", [])}
+    entries = load_companies().get("share_class", [])
+    classes = {c["symbol"]: c["member"] for c in entries}
     by_class = tags[tags["taxonomy"] == "sec_class"]
     if not classes or by_class.empty:
+        return pd.DataFrame()
+    # Which concept gives which item, per company: the items' sec_class tags, or the tags an
+    # entry names for an item (`tags`, the concept that company files it under).
+    allowed = []
+    for c in entries:
+        own = c.get("tags", {})
+        for item, rows in by_class.groupby("item"):
+            if item in own:
+                for i, concept in enumerate(own[item]):
+                    allowed.append((c["symbol"], concept, item, int(rows["priority"].min()) + i,
+                                    float(rows["scale"].iloc[0])))  # fmt: skip
+            else:
+                allowed += [
+                    (c["symbol"], r.tag, item, r.priority, r.scale) for r in rows.itertuples()
+                ]
+    allowed = pd.DataFrame(allowed, columns=["symbol", "concept", "item", "priority", "scale"])
+    x = frame(
+        conn,
+        "SELECT DISTINCT ON (c.symbol, f.concept, f.member, f.unit, f.period_start, "
+        "f.period_end, f.accn) f.raw_id, f.fetch_id, c.symbol, f.concept, f.member, f.unit, "
+        "to_char(f.period_start, 'YYYY-MM-DD') AS period_start, "
+        "to_char(f.period_end, 'YYYY-MM-DD') AS period_end, f.value, f.form, "
+        "to_char(f.filed, 'YYYY-MM-DD') AS filed, "
+        "('x' || substr(md5(f.accn), 1, 16))::bit(64)::bigint AS accn "
+        "FROM raw_sec_xbrl_fact f JOIN core_company c ON c.cik = f.cik "
+        "WHERE c.symbol = ANY(:symbols) AND f.axis = :axis AND f.concept = ANY(:concepts) "
+        "AND f.unit = ANY(:units) AND f.period_end >= :first "
+        "ORDER BY c.symbol, f.concept, f.member, f.unit, f.period_start, f.period_end, f.accn, "
+        "f.fetch_id DESC",
+        {"symbols": list(classes), "axis": CLASS_AXIS, "concepts": list(set(allowed["concept"])),
+         "units": list(SEC_UNITS), "first": SEC_FIRST_PERIOD},
+    )  # fmt: skip
+    x = x[x["member"] == x["symbol"].map(classes)]
+    x = x.merge(allowed, on=["symbol", "concept"])
+    conv = converted_facts(conn, entries, tags)
+    x = pd.concat([d for d in (x, conv) if not d.empty], ignore_index=True) if len(conv) else x
+    if x.empty:
+        return pd.DataFrame()
+    return x.assign(
+        taxonomy="sec_class",
+        tag=x["concept"] + " [" + x["member"] + "]",
+        priority=x["priority"] + 100,
+        raw_table="raw_sec_xbrl_fact",
+    ).drop(columns=["concept", "member", "taxonomy_y"], errors="ignore")
+
+
+def local_name(member: pd.Series) -> pd.Series:
+    """'brka:EquivalentClassAMember' -> 'EquivalentClassAMember' (the data sets don't keep a
+    member's prefix, edgartools does)."""
+    return member.astype(str).str.split(":").str[-1]
+
+
+def converted_facts(conn: Connection, entries: list[dict], tags: pd.DataFrame) -> pd.DataFrame:
+    """[[share_class]] `convert`: an item the company reports only in another class's units,
+    multiplied by the fixed conversion ratio of its charter. Berkshire states its shares
+    outstanding in equivalent Class A shares; one A share converts into 1,500 B shares, so the
+    count in BRK.B's units is 1,500 times the reported one. Nothing is estimated."""
+    rules = [(c["symbol"], r) for c in entries for r in c.get("convert", [])]
+    if not rules:
         return pd.DataFrame()
     x = frame(
         conn,
@@ -438,19 +498,32 @@ def class_facts(conn: Connection, tags: pd.DataFrame) -> pd.DataFrame:
         "AND f.unit = ANY(:units) AND f.period_end >= :first "
         "ORDER BY c.symbol, f.concept, f.member, f.unit, f.period_start, f.period_end, f.accn, "
         "f.fetch_id DESC",
-        {"symbols": list(classes), "axis": CLASS_AXIS, "concepts": list(by_class["tag"]),
-         "units": list(SEC_UNITS), "first": SEC_FIRST_PERIOD},
+        {"symbols": sorted({s for s, _ in rules}), "axis": CLASS_AXIS,
+         "concepts": sorted({r["concept"] for _, r in rules}), "units": list(SEC_UNITS),
+         "first": SEC_FIRST_PERIOD},
     )  # fmt: skip
-    x = x[x["member"] == x["symbol"].map(classes)]
     if x.empty:
         return pd.DataFrame()
-    x = x.merge(by_class.rename(columns={"tag": "concept"}), on="concept")
-    return x.assign(
-        taxonomy="sec_class",
-        tag=x["concept"] + " [" + x["member"] + "]",
-        priority=x["priority"] + 100,
-        raw_table="raw_sec_xbrl_fact",
-    ).drop(columns=["concept", "member", "taxonomy_y"], errors="ignore")
+    out = []
+    for symbol, r in rules:
+        item_tags = tags[(tags["item"] == r["item"]) & (tags["taxonomy"] != "yahoo")]
+        priority = int(item_tags["priority"].min()) if len(item_tags) else 0
+        member = r["member"].split(":")[-1]
+        hit = x[(x["symbol"] == symbol) & (x["concept"] == r["concept"])
+                & (local_name(x["member"]) == member)]  # fmt: skip
+        if hit.empty:
+            continue
+        out.append(hit.assign(
+            value=hit["value"] * float(r["factor"]), item=r["item"], priority=priority,
+            scale=1.0, member=hit["member"] + f" x {r['factor']:g}",
+        ))  # fmt: skip
+    return pd.concat(out, ignore_index=True) if out else pd.DataFrame()
+
+
+def yahoo_excluded(entries: list[dict]) -> set[tuple[str, str]]:
+    """(symbol, item) pairs whose Yahoo values are in another class's units
+    ([[share_class]] `not_from_yahoo`): Yahoo gives BRK.B's shares in Class A units."""
+    return {(c["symbol"], item) for c in entries for item in c.get("not_from_yahoo", [])}
 
 
 def candidates(
@@ -477,6 +550,10 @@ def candidates(
     yahoo = yahoo[yahoo["symbol"].isin(companies)].merge(
         tags[tags["taxonomy"] == "yahoo"], left_on="line_item", right_on="tag"
     )
+    wrong_units = yahoo_excluded(load_companies().get("share_class", []))
+    if wrong_units and not yahoo.empty:
+        pairs = pd.Series(list(zip(yahoo["symbol"], yahoo["item"], strict=True)), index=yahoo.index)
+        yahoo = yahoo[~pairs.isin(wrong_units)]
     if not yahoo.empty:
         flow_type = np.where(yahoo["frequency"] == "annual", "FY", "Q")
         yahoo["period_type"] = np.where(yahoo["item"].map(kind) == "instant", "I", flow_type)

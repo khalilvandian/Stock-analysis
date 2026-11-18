@@ -105,9 +105,11 @@ COLUMNS = [
     "Recommend.All",
     "Perf.Y",
     "indexes",
+    "is_primary",
 ]
+# Primary listings only for the whole market; an index's members are taken as listed
+# (tradingview.one_per_company), since the S&P 500 holds BRK.B, BF.B and GM's secondary listing.
 FILTERS = [
-    {"left": "is_primary", "operation": "equal", "right": True},
     {"left": "type", "operation": "equal", "right": "stock"},
     {"left": "subtype", "operation": "equal", "right": "common"},
     # market values are in local currency; a low floor here, the real one after conversion
@@ -194,13 +196,16 @@ def fetch_universe(cfg: dict, today: str, refresh: bool = False) -> pd.DataFrame
             if region not in regions:
                 continue
             for m in markets:
-                d = tradingview.scan(m, COLUMNS, FILTERS, client=client)
+                filters = (
+                    FILTERS if universe.get("index") else [tradingview.PRIMARY_FILTER, *FILTERS]
+                )
+                d = tradingview.scan(m, COLUMNS, filters, client=client)
                 d["market"], d["region"] = m, region
                 frames.append(d)
     d = pd.concat(frames)
     d = d[~d.index.duplicated()]
     if universe.get("index"):
-        d = d[in_index(d["indexes"], universe["index"])]
+        d = tradingview.one_per_company(d[in_index(d["indexes"], universe["index"])])
     CACHE.mkdir(parents=True, exist_ok=True)
     d.to_pickle(cache)
     return d

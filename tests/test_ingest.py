@@ -33,10 +33,10 @@ def tv_rows(symbols: list[str]) -> dict:
     rows = []
     for s in symbols:
         d = [s, f"{s} Corp", "NYSE", "Utilities", "Electric Utilities", "United States", "USD",
-             2e10, "USD", [{"name": "S&P 500", "proname": "SP:SPX"}]]  # fmt: skip
+             2e10, "USD", [{"name": "S&P 500", "proname": "SP:SPX"}], True]  # fmt: skip
         rows.append({"s": f"NYSE:{s}", "d": d})
     rows.append({"s": "NYSE:ZZZ", "d": ["ZZZ", "Not in it", "NYSE", "Finance", "Major Banks",
-                 "United States", "USD", 5e9, "USD", []]})  # fmt: skip
+                 "United States", "USD", 5e9, "USD", [], True]})  # fmt: skip
     return {"totalCount": len(rows), "data": rows}
 
 

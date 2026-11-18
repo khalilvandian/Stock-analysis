@@ -68,11 +68,14 @@ def members(conn: Connection, index: str) -> list[str]:
 
 
 def xbrl_items() -> set[str]:
-    """The items config/db_items.toml reads per share class from full filings."""
-    from ..db.build import load_items
+    """The items read per share class from full filings: sec_class in config/db_items.toml,
+    and the items a [[share_class]] converts from another class's units (Berkshire's shares)."""
+    from ..db.build import load_companies, load_items
 
     _, tags = load_items()
-    return set(tags.loc[tags["taxonomy"] == "sec_class", "item"])
+    converted = {r["item"] for c in load_companies().get("share_class", [])
+                 for r in c.get("convert", [])}  # fmt: skip
+    return set(tags.loc[tags["taxonomy"] == "sec_class", "item"]) | converted
 
 
 def plan(conn: Connection, config: dict, now: datetime) -> dict[str, int]:

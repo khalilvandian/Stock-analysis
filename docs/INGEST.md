@@ -33,7 +33,8 @@ Every command takes `--target`. On Azure the job runs as `server-writer`.
      `config/companies.toml`): a company's filings from before a new holding company took
      over
 
-   The members are the newest TradingView snapshot. A company that leaves the index keeps
+   The members are the newest TradingView snapshot, one listing per company (the primary
+   listing where it is a member, otherwise the member listing: BRK.B, BF.B, GM). A company that leaves the index keeps
    its data, but its tasks become inactive. A new member gets its tasks and is fetched first.
 3. **Mode.** `backfill` while any task has never been fetched, or the last coverage snapshot
    has less than `present_share_to_maintain` (90%) of the required values. Otherwise

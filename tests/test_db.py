@@ -580,6 +580,83 @@ def test_custom_tags_are_summed_and_signed(con, monkeypatch) -> None:
     assert x["scale"].iloc[0] == -1.0  # stored negative, like the other capex
 
 
+def test_share_class_reads_the_listed_class_and_its_own_tag(con, monkeypatch) -> None:
+    """AAA's diluted EPS per class A (the item's sec_class tag); BBB files basic only
+    (Berkshire), named for it in [[share_class]] tags. Other classes and tags are ignored."""
+    from stock_analysis.db import build as b
+
+    rules = {"share_class": [
+        {"symbol": "AAA", "member": "us-gaap:CommonClassAMember"},
+        {"symbol": "BBB", "member": "us-gaap:EquivalentClassBMember",
+         "tags": {"eps_diluted": ["us-gaap:EarningsPerShareBasic"]}},
+    ]}  # fmt: skip
+    monkeypatch.setattr(b, "load_companies", lambda: rules)
+    facts = [
+        (1001, "us-gaap:EarningsPerShareDiluted", "us-gaap:CommonClassAMember", 2.5),
+        (1001, "us-gaap:EarningsPerShareDiluted", "us-gaap:CommonClassBMember", 9.0),
+        (1001, "us-gaap:EarningsPerShareBasic", "us-gaap:CommonClassAMember", 2.6),
+        (1002, "us-gaap:EarningsPerShareBasic", "us-gaap:EquivalentClassBMember", 41.27),
+        (1002, "us-gaap:EarningsPerShareBasic", "us-gaap:EquivalentClassAMember", 61900.0),
+    ]
+    with con.begin() as conn:
+        for sym, cik in (("AAA", 1001), ("BBB", 1002)):
+            conn.execute(text(
+                "INSERT INTO core_company (symbol, cik) VALUES (:s, :c) "
+                "ON CONFLICT (symbol) DO UPDATE SET cik = :c"
+            ), {"s": sym, "c": cik})  # fmt: skip
+        fetch = conn.execute(text(
+            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status) "
+            "VALUES ('sec_fsds', 'q', '2026-01-01', '2026-01-01', 'ok') RETURNING fetch_id"
+        )).scalar()  # fmt: skip
+        for cik, concept, member, v in facts:
+            conn.execute(text(
+                "INSERT INTO raw_sec_xbrl_fact (fetch_id, cik, accn, form, filed, concept, axis, "
+                "member, unit, period_start, period_end, value) VALUES (:f, :cik, 'a1', '10-K', "
+                "'2025-02-20', :c, :axis, :m, 'USD/shares', '2024-01-01', '2024-12-31', :v)"
+            ), {"f": fetch, "cik": cik, "c": concept, "axis": b.CLASS_AXIS, "m": member,
+                "v": v})  # fmt: skip
+        _, tags = b.load_items()
+        x = b.class_facts(conn, tags)
+    got = dict(zip(x["symbol"], x["value"], strict=True))
+    assert got == {"AAA": 2.5, "BBB": 41.27}
+    assert set(x["item"]) == {"eps_diluted"}
+
+
+def test_share_class_converts_units_and_drops_yahoo(con, monkeypatch) -> None:
+    """Berkshire states its shares in equivalent Class A shares (data-set member without a
+    prefix, edgartools with brka:); BRK.B's count is 1,500 times that, and Yahoo's A-unit
+    count is not used."""
+    from stock_analysis.db import build as b
+
+    rule = {"symbol": "BBB", "member": "us-gaap:EquivalentClassBMember",
+            "convert": [{"item": "shares_outstanding",
+                         "concept": "us-gaap:CommonStockSharesOutstanding",
+                         "member": "brka:EquivalentClassAMember", "factor": 1500}],
+            "not_from_yahoo": ["shares_outstanding"]}  # fmt: skip
+    monkeypatch.setattr(b, "load_companies", lambda: {"share_class": [rule]})
+    with con.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO core_company (symbol, cik) VALUES ('BBB', 1002) "
+            "ON CONFLICT (symbol) DO UPDATE SET cik = 1002"
+        ))  # fmt: skip
+        fetch = conn.execute(text(
+            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status) "
+            "VALUES ('sec_xbrl', 'k', '2026-01-01', '2026-01-01', 'ok') RETURNING fetch_id"
+        )).scalar()  # fmt: skip
+        for member, v in (("brka:EquivalentClassAMember", 1438223.0),
+                          ("us-gaap:CommonClassAMember", 547562.0)):  # fmt: skip
+            conn.execute(text(
+                "INSERT INTO raw_sec_xbrl_fact (fetch_id, cik, accn, form, filed, concept, axis, "
+                "member, unit, period_end, value) VALUES (:f, 1002, 'a1', '10-K', '2025-02-20', "
+                "'us-gaap:CommonStockSharesOutstanding', :axis, :m, 'shares', '2024-12-31', :v)"
+            ), {"f": fetch, "axis": b.CLASS_AXIS, "m": member, "v": v})  # fmt: skip
+        _, tags = b.load_items()
+        x = b.class_facts(conn, tags)
+    assert list(x["item"]) == ["shares_outstanding"]
+    assert list(x["value"]) == [1438223.0 * 1500]
+    assert b.yahoo_excluded([rule]) == {("BBB", "shares_outstanding")}
+
+
 def test_watchlist(con, tmp_path: Path, data_dir: Path) -> None:
     rows = q(
         con,
@@ -834,3 +911,19 @@ def test_data_open_picks_the_api_when_configured(monkeypatch) -> None:
     assert isinstance(data, ApiData)
     assert data.client.headers["X-API-Key"] == "k"
     assert str(data.client.base_url) == "https://example.test"
+
+
+def test_companies_config_is_well_formed() -> None:
+    """config/companies.toml parses and every entry has the keys the build reads."""
+    from stock_analysis.db.build import load_companies
+
+    cfg = load_companies()
+    for c in cfg.get("share_class", []):
+        assert c["symbol"] and c["member"]
+        for r in c.get("convert", []):
+            assert {"item", "concept", "member", "factor"} <= set(r) and float(r["factor"]) > 0
+        assert all(isinstance(v, list) for v in c.get("tags", {}).values())
+    for c in cfg.get("custom_tag", []):
+        assert c["symbol"] and c["item"] and c["tags"]
+    for c in cfg.get("predecessor", []):
+        assert c["symbol"] and int(c["cik"]) and c["until"]

@@ -686,7 +686,11 @@ Free cash flow, net debt and market value are calculated in the views, not store
    everything else too, such as TLN and the non-S&P 500 utilities. Each company gets its
    CIK from the SEC ticker file; two share classes (GOOG and GOOGL) share one. SEC values
    come from company facts (`raw_sec_fact`) and, for the filings it lacks, the companies'
-   own tags (`[[custom_tag]]`) and the values per share class (`[[share_class]]`), from the
+   own tags (`[[custom_tag]]`) and the values per share class (`[[share_class]]`, with `tags`
+   when the company files the item under another concept: Berkshire's basic EPS; `convert`
+   for an item stated only in another class's units, times the charter's fixed ratio:
+   Berkshire's shares, in Class A units, x 1,500 for BRK.B; `not_from_yahoo` for Yahoo values
+   in the wrong class's units), from the
    data sets and full filings (`raw_sec_xbrl_fact`). A company whose earlier filings are under a predecessor's CIK (`[[predecessor]]` in
    `config/companies.toml`) reads that CIK too, for periods ending before the new CIK's
    first 10-K or 10-Q.

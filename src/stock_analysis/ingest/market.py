@@ -25,9 +25,11 @@ TV_FIELDS = [
     "market_cap_basic",
     "fundamental_currency_code",
     "indexes",
+    "is_primary",
 ]
+# Every listing, not only primary ones: the index sometimes holds a secondary listing
+# (BRK.B, BF.B, GM); tradingview.one_per_company then keeps one listing per company.
 TV_FILTERS = [
-    {"left": "is_primary", "operation": "equal", "right": True},
     {"left": "type", "operation": "equal", "right": "stock"},
     {"left": "market_cap_basic", "operation": "greater", "right": 1e9},
 ]
@@ -46,7 +48,8 @@ def load_constituents(conn: Connection, http: httpx.Client, market: str, index: 
         if exc.response.status_code == 429:
             raise RateLimited(f"TradingView 429: {exc}") from exc
         raise
-    d = d[d["indexes"].map(lambda v: in_index(v, index))].reset_index()
+    d = d[d["indexes"].map(lambda v: in_index(v, index))]
+    d = tradingview.one_per_company(d).sort_index().reset_index()
     out = Outcome(requests=1)
     if d.empty:
         raise NoData(f"TradingView lists no members of {index} in {market}")
