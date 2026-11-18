@@ -437,7 +437,7 @@ def issue_rows(con, build_id) -> list:
 
 def test_incremental_build_rebuilds_only_what_changed_and_matches_a_full_one(con) -> None:
     first = build(con)
-    assert first["mode"] == "full" and first["why"] == "no earlier build to start from"
+    assert first["mode"] == "full" and first["why"] == "core is empty: first build"
     again = build(con)  # nothing changed since
     assert again["mode"] == "incremental" and again["rebuilt"] == 0
     assert again["quality_issues"] == first["quality_issues"]
@@ -462,6 +462,27 @@ def test_incremental_build_rebuilds_only_what_changed_and_matches_a_full_one(con
     # Asked for one company.
     only = build(con, symbols=["BBB"])
     assert only["rebuilt_symbols"] == ["BBB"] and core_rows(con) == incremental
+
+
+def test_check_sample_reports_changes_and_writes_nothing(con) -> None:
+    """A dry run on a sample: what a rebuild of AAA would change, then rolled back."""
+    build(con)
+    builds = one(con, "SELECT COUNT(*) FROM core_build")
+    with con.begin() as conn:  # a stored value that the sources don't give (a stale row)
+        conn.execute(text(
+            "UPDATE core_fundamental SET value = value + 1 WHERE company_id = (SELECT company_id "
+            "FROM core_company WHERE symbol = 'AAA') AND item = 'revenue' AND period_type = 'FY'"
+        ))  # fmt: skip
+    before = core_rows(con)
+    report = build(con, symbols=["AAA"], dry_run=True)
+    assert report["companies"] == ["AAA"] and "rolled back" in report["mode"]
+    changed = [c for c in report["changes"] if c["change"] == "changed"]
+    assert changed and {c["item"] for c in changed} == {"revenue"}
+    assert all(c["value_old"] == c["value_new"] + 1 for c in changed)
+    assert core_rows(con) == before  # nothing written
+    assert one(con, "SELECT COUNT(*) FROM core_build") == builds
+    with pytest.raises(ValueError):
+        build(con, dry_run=True)  # a dry run needs a sample
 
 
 def test_out_tables(con) -> None:

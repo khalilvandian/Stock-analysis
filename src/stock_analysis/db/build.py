@@ -1033,29 +1033,91 @@ def changed_since(conn: Connection, fetch_id: int) -> set[str]:
 def plan_build(
     conn: Connection, items_config: Path, before: dict, full: bool, symbols: list[str] | None
 ) -> tuple[list[str] | None, str]:
-    """(the companies to rebuild, or None for all; why). A full build when asked, when there is
-    no earlier build to start from, or when the item mapping or the build code changed, since
-    those can change any company's values."""
+    """(the companies to rebuild, or None for all; why). Only the companies with new raw data,
+    a changed company rule or a new CIK: the job adds what is new and never rebuilds the whole
+    database. A full build only when asked (--full) or when core is still empty. A changed
+    item mapping or build code does not rebuild anything by itself: check it on a sample
+    (db check-sample) and rebuild those companies (--symbols); the others keep their rows
+    until their sources bring new data."""
     if full:
         return None, "asked for a full build"
     if symbols:
         return sorted(symbols), "asked for these companies"
     last = last_build(conn)
-    if last is None or last.get("max_fetch_id") is None or "items_sha" not in last:
-        return None, "no earlier build to start from"
-    if last["items_sha"] != file_sha(items_config):
-        return None, "config/db_items.toml changed"
-    if last.get("code_sha") != file_sha(Path(__file__)):
-        return None, "the build code changed"
+    if last is None or last.get("max_fetch_id") is None:
+        return None, "core is empty: first build"
+    notes = []
+    if last.get("items_sha") and last["items_sha"] != file_sha(items_config):
+        notes.append("config/db_items.toml changed since the last build")
+    if last.get("code_sha") and last["code_sha"] != file_sha(Path(__file__)):
+        notes.append("the build code changed since the last build")
     scope = changed_since(conn, last["max_fetch_id"])
     rules, old_rules = company_rules(), last.get("company_rules", {})
     scope |= {s for s in rules.keys() | old_rules.keys() if rules.get(s) != old_rules.get(s)}
     after = {r[0]: r[1] for r in run(conn, "SELECT symbol, cik FROM core_company")}
     scope |= {s for s, cik in after.items() if s not in before or before[s] != cik}
     scope &= after.keys()
-    return sorted(scope), (
-        "raw data, company rules or CIKs changed" if scope else "nothing changed"
+    why = "new raw data, company rules or CIKs" if scope else "nothing new"
+    if notes:
+        why += " (" + "; ".join(notes) + ": existing rows keep their values; check samples)"
+    return sorted(scope), why
+
+
+class DryRun(Exception):  # noqa: N818 - not an error: ends a dry run and rolls it back
+    def __init__(self, report: dict):
+        super().__init__("dry run")
+        self.report = report
+
+
+SAMPLE_KEY = ["company_id", "item", "period_type", "period_end", "filed"]
+
+
+def sample_rows(conn: Connection, ids: list[int]) -> pd.DataFrame:
+    """The core values of these companies, every version."""
+    return frame(
+        conn,
+        "SELECT company_id, item, period_type, to_char(period_end, 'YYYY-MM-DD') AS period_end, "
+        "to_char(filed, 'YYYY-MM-DD') AS filed, value, source, tag FROM core_fundamental "
+        "WHERE company_id = ANY(:ids)",
+        {"ids": ids},
     )
+
+
+def compare_rows(old: pd.DataFrame, new: pd.DataFrame, todo: dict, seconds: dict) -> dict:
+    """What a dry run would change for each company: values added, removed or changed."""
+    names = {v: k for k, v in todo.items()}
+    m = old.merge(new, on=SAMPLE_KEY, how="outer", suffixes=("_old", "_new"), indicator=True)
+    same = (m["value_old"] - m["value_new"]).abs() <= 1e-9 * m["value_old"].abs().clip(lower=1)
+    m["change"] = np.select(
+        [m["_merge"] == "left_only", m["_merge"] == "right_only", ~same],
+        ["removed", "added", "changed"], "same",
+    )  # fmt: skip
+    m["symbol"] = m["company_id"].map(names)
+    counts = m.pivot_table(index="symbol", columns="change", values="item", aggfunc="count",
+                           fill_value=0)  # fmt: skip
+    shown = m[m["change"] != "same"].sort_values(["symbol", "item", "period_end", "filed"])
+    cols = ["symbol", "item", "period_type", "period_end", "filed", "change", "value_old",
+            "value_new", "source_old", "source_new"]  # fmt: skip
+    return {
+        "mode": "dry run (rolled back, nothing written)",
+        "companies": sorted(todo),
+        "per_company": {s: {k: int(v) for k, v in r.items()} for s, r in counts.iterrows()},
+        "changes": [
+            {k: plain(v) for k, v in r.items()} for r in shown[cols].head(200).to_dict("records")
+        ],
+        "seconds": seconds,
+    }
+
+
+def add_new_items(conn: Connection, items: pd.DataFrame, tags: pd.DataFrame) -> None:
+    """Items and tags added to config/db_items.toml since core_item was written, so an
+    incremental build can store them; existing rows stay as they are."""
+    item_df, tag_df = stored(items, tags)
+    have = {r[0] for r in run(conn, "SELECT item FROM core_item")}
+    insert_df(conn, "core_item", item_df[~item_df["item"].isin(have)])
+    have_tags = {tuple(r) for r in run(conn, "SELECT item, taxonomy, tag FROM core_item_tag")}
+    keys = list(zip(tag_df["item"], tag_df["taxonomy"], tag_df["tag"], strict=True))
+    insert_df(conn, "core_item_tag", tag_df[[k not in have_tags for k in keys]])
 
 
 def build(
@@ -1064,11 +1126,17 @@ def build(
     *,
     full: bool = False,
     symbols: list[str] | None = None,
+    dry_run: bool = False,
 ) -> dict:
-    """Rebuild core from raw in one transaction: only the companies whose raw data, company
-    rules (config/companies.toml) or CIK changed since the last build, or every company (a
-    full build: when asked, or when the item mapping or this code changed). Returns the
-    summary stored in core_build."""
+    """Build core from raw in one transaction, for the companies whose raw data, company rules
+    (config/companies.toml) or CIK changed since the last build (plan_build); every company
+    only with full=True or on an empty core. Returns the summary stored in core_build.
+
+    dry_run (needs symbols; db check-sample): build those companies, compare their new core
+    rows with the ones in the database, and roll everything back. The way to check a change
+    of the extraction on a sample before using it."""
+    if dry_run and not symbols:
+        raise ValueError("a dry run checks a sample: name the companies (symbols)")
     global _SCOPE
     started = now()
     seconds: dict[str, float] = {}
@@ -1103,6 +1171,8 @@ def build(
             else:
                 todo = {s: companies[s] for s in scope if s in companies}
                 ids = list(todo.values())
+                add_new_items(conn, items, tags)
+                old_rows = sample_rows(conn, ids) if dry_run else None
                 for table in CORE_TABLES:
                     run(conn, f"DELETE FROM {table} WHERE company_id = ANY(:ids)", {"ids": ids})
             lap("delete")
@@ -1128,6 +1198,8 @@ def build(
                     {"new": build_id, "old": prev["build_id"], "ids": list(todo.values())},
                 )
             lap("quality")
+            if dry_run:
+                raise DryRun(compare_rows(old_rows, sample_rows(conn, ids), todo, seconds))
 
             def count(sql: str) -> int:
                 return int(scalar(conn, sql) or 0)
@@ -1167,6 +1239,8 @@ def build(
             )
         hidden = ("company_rules", "items_sha", "code_sha")
         return {"build_id": build_id, **{k: v for k, v in summary.items() if k not in hidden}}
+    except DryRun as done:  # the transaction was rolled back: nothing was written
+        return done.report
     except Exception as exc:
         with db.begin() as conn:
             run(

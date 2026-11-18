@@ -12,8 +12,12 @@ reparse reads the kept SEC payloads again (company facts, full filings, the data
 inbox/) with today's mapping (config/db_items.toml), without asking SEC; run build afterwards.
 
 build rebuilds core for the companies whose raw data, config/companies.toml entry or CIK
-changed since the last build; --full rebuilds every company (also done by itself when
-config/db_items.toml or the build code changed); --symbols A,B rebuilds only those.
+changed since the last build (the job never rebuilds the whole database); --symbols A,B
+rebuilds only those; --full rebuilds every company (only when asked).
+
+check-sample --symbols A,B builds those companies with today's code and config, shows what
+would change against the values in the database, and rolls back: nothing is written. The
+way to check a change of the extraction on a sample.
 """
 
 from __future__ import annotations
@@ -37,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
             "init",
             "load-files",
             "build",
+            "check-sample",
             "status",
             "check",
             "ping",
@@ -103,6 +108,16 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "build":
         symbols = args.symbols.split(",") if args.symbols else None
         print("Build:", json.dumps(build(db, full=args.full, symbols=symbols), indent=2))
+    elif args.command == "check-sample":
+        if not args.symbols:
+            parser.error("check-sample needs --symbols A,B")
+        report = build(db, symbols=args.symbols.split(","), dry_run=True)
+        print(json.dumps({k: v for k, v in report.items() if k != "changes"}, indent=2))
+        for c in report["changes"]:
+            print(
+                f"  {c['symbol']:6} {c['item']:20} {c['period_type']:2} {c['period_end']} "
+                f"filed {c['filed']}  {c['change']:8} {c['value_old']} -> {c['value_new']}"
+            )
     elif args.command == "coverage":
         from .coverage import snapshot, summary_lines
 
