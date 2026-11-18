@@ -998,3 +998,320 @@ assert anchor in html
 html = html.replace(anchor, SECTION + "\n" + anchor, 1)
 PAGE.write_text(html, encoding="utf-8")
 print("ok", len(html))
+
+
+# ======================================================================= orchestration
+# "The nightly pipeline, in UML": the Airflow DAG stock_nightly (orchestration/dags/), the
+# run log it keeps (ops_pipeline_run) and where each piece runs. Follows
+# orchestration/dags/stock_nightly.py, src/stock_analysis/pipeline/ and
+# .github/workflows/pipeline-watch.yml.
+
+
+def hourglass(d, cx, cy, label=None, below=True):
+    """Accept time event action (UML 2.5): an hourglass."""
+    d.add(
+        f'<path class="u-node" d="M{cx - 9},{cy - 12} H{cx + 9} L{cx - 9},{cy + 12} H{cx + 9} z"/>'
+    )
+    if label:
+        n = len(label)
+        for i, s in enumerate(label):
+            y = cy + 28 + 13 * i if below else cy - 18 - 13 * (n - 1 - i)
+            d.t(cx, y, s, "u-g", "middle")
+
+
+def interrupt(d, x1, y1, x2, y2):
+    """Interrupting edge (UML 2.5): a zigzag ending in an arrow."""
+    mx = (x1 + x2) / 2
+    d.add(
+        f'<path class="u-line" d="M{x1},{y1} L{mx + 5},{y1} L{mx - 5},{y2} L{x2},{y2}" '
+        f'marker-end="url(#{d.p}-a)"/>'
+    )
+
+
+def node3d(d, x, y, w, h, kw, name, depth=10):
+    """Deployment node: a box with a top and a right face."""
+    d.add(f'<path class="u-node" d="M{x},{y} l{depth},-{depth} h{w} v{h} l-{depth},{depth} z"/>')
+    d.add(f'<rect class="u-node" x="{x}" y="{y}" width="{w}" height="{h}"/>')
+    d.add(f'<path class="u-line" d="M{x + w},{y} l{depth},-{depth}"/>')
+    d.t(x + 10, y + 16, kw, "u-kw")
+    d.t(x + 10, y + 31, name, "u-cname")
+    return box(x, y, w, h)
+
+
+def artifact(d, x, y, w, name, kw="«artifact»"):
+    h = 38
+    d.add(f'<rect class="u-node" x="{x}" y="{y}" width="{w}" height="{h}"/>')
+    fx, fy = x + w - 17, y + 6  # the document icon
+    d.add(f'<path class="u-line" d="M{fx},{fy} h7 l4,4 v10 h-11 z M{fx + 7},{fy} v4 h4"/>')
+    d.t(x + 8, y + 15, kw, "u-kw")
+    d.t(x + 8, y + 30, name, "u-attr")
+    return box(x, y, w, h)
+
+
+# ---------------------------------------------------------------- activity: one night
+o = D(
+    "u7",
+    1300,
+    660,
+    "act",
+    "stock_nightly",
+    "UML activity diagram of one weekday night in four partitions. The Azure ingest job runs "
+    "at 22:30 UTC and records its run in ops_run. Airflow's stock_nightly starts at 22:35, "
+    "opens its run log, waits for the finished ingest run, checks that the prices reached "
+    "the last close and marks the run ready. The Claude evening session reads the ready "
+    "marker, writes the notes and reports and commits them; GitHub publishes the site; "
+    "Airflow waits for that commit and its published site, then closes the run. Any failed "
+    "check interrupts the Airflow region: the run is marked failed and an alert is emailed. "
+    "At 07:00 UTC a GitHub workflow audits that the last trading day has a finished run.",
+)
+o.frame(10, 10, 1280, 640)
+o.add('<rect class="u-part" x="24" y="46" width="1252" height="590"/>')
+o.add('<path class="u-partl" d="M24,156 H1276 M24,396 H1276 M24,516 H1276 M50,46 V636"/>')
+o.lane_label(41, 101, "Azure job")
+o.lane_label(41, 276, "Airflow")
+o.lane_label(41, 456, "Claude")
+o.lane_label(41, 576, "GitHub")
+
+# lane 1: the ingest job
+Y1 = 101
+hourglass(o, 82, Y1 - 8, ["22:30 UTC"])
+ing = o.action(116, Y1 - 22, 190, 44, ["Ingest: fetch, build,", "coverage snapshot"], call=True)
+o.edge([(91, Y1 - 8), (ing.l, Y1 - 8)])
+opsrun = o.obj(350, Y1 - 20, 110, 40, ["ops_run"], store=True)
+o.edge([(ing.r, Y1), (opsrun.l, Y1)])
+o.note(
+    500,
+    74,
+    340,
+    [
+        "act Nightly ingest run, above; one row per run with",
+        "its mode, status, requests and rows stored",
+    ],
+    to=(opsrun.r, Y1),
+    frm=(500, Y1),
+)
+
+# lane 2: Airflow
+Y2 = 226
+hourglass(o, 82, Y2, ["22:35 UTC", "Mon–Fri"])
+st = o.action(108, Y2 - 20, 104, 40, ["Open the", "run log"])
+o.edge([(91, Y2), (st.l, Y2)])
+RX2, RY2, RW2, RH2 = 236, 168, 904, 218
+o.add(f'<rect class="u-region" x="{RX2}" y="{RY2}" width="{RW2}" height="{RH2}" rx="14"/>')
+o.t(RX2 + 12, RY2 + 16, "«interruptible»", "u-kw")
+wi = o.action(262, Y2 - 20, 116, 40, ["Wait for the", "ingest run"])
+o.edge([(st.r, Y2), (wi.l, Y2)])
+o.edge([(405, opsrun.b), (405, 190), (340, 190), (340, wi.t)])
+o.g(412, 184, "finished row")
+o.diamond(420, Y2)
+o.edge([(wi.r, Y2), (407, Y2)])
+o.edge([(420, Y2 + 13), (420, 282), (300, 282), (300, wi.b)])
+o.g(310, 297, "[not yet] / again in 5 min")
+cp = o.action(470, Y2 - 20, 112, 40, ["Check the", "prices"])
+o.edge([(433, Y2), (cp.l, Y2)])
+o.g(451, Y2 - 8, "[done]", "middle")
+o.diamond(620, Y2)
+o.edge([(cp.r, Y2), (607, Y2)])
+mr = o.action(676, Y2 - 20, 100, 40, ["Mark ready"])
+o.edge([(633, Y2), (mr.l, Y2)])
+o.g(650, Y2 - 40, "[≥ 95% of members", "middle")
+o.g(650, Y2 - 27, "have the last close]", "middle")
+pr = o.obj(664, 316, 124, 40, ["ops_pipeline_run"], store=True)
+o.edge([(726, mr.b), (726, pr.t)])
+o.g(734, 296, "[ready]")
+we = o.action(826, Y2 - 20, 120, 40, ["Wait for commit", "and the site"])
+o.edge([(mr.r, Y2), (we.l, Y2)])
+o.diamond(984, Y2)
+o.edge([(we.r, Y2), (971, Y2)])
+o.edge([(984, Y2 + 13), (984, 282), (926, 282), (926, we.b)])
+o.g(936, 297, "[not yet] / again in 10 min")
+fi = o.action(1030, Y2 - 20, 92, 40, ["Close the", "run (ok)"])
+o.edge([(997, Y2), (fi.l, Y2)])
+o.g(1013, Y2 - 27, "[published]", "middle")
+o.final(1076, 330)
+o.edge([(1076, fi.b), (1076, 319)])
+o.note(
+    250,
+    316,
+    360,
+    [
+        "a failed check, a crash after two retries, or a wait",
+        "past its limit (ingest 3.5 h, evening 4 h) interrupts",
+        "the region",
+    ],
+)
+al = o.action(1168, 250, 98, 44, ["Mark failed,", "email alert"])
+interrupt(o, RX2 + RW2, 352, al.l, 272)
+o.flow_final(1217, 346)
+o.edge([(1217, al.b), (1217, 337)])
+
+# lane 3: the Claude evening session
+Y3 = 446
+hourglass(o, 82, Y3 - 6, ["evening", "schedule"])
+rm = o.action(108, Y3 - 26, 122, 40, ["Read the ready", "marker (web API)"])
+o.edge([(91, Y3 - 6), (rm.l, Y3 - 6)])
+o.edge([(726, pr.b), (726, 406), (169, 406), (169, rm.t)])
+o.diamond(272, Y3 - 6)
+o.edge([(rm.r, Y3 - 6), (259, Y3 - 6)])
+nt = o.action(318, Y3 - 28, 160, 44, ["Notes, reports,", "validate"], call=True)
+o.edge([(285, Y3 - 6), (nt.l, Y3 - 6)])
+o.g(300, Y3 - 14, "[ready]", "middle")
+cm = o.action(510, Y3 - 26, 120, 40, ["Commit to main"])
+o.edge([(nt.r, Y3 - 6), (cm.l, Y3 - 6)])
+em = o.action(662, Y3 - 26, 110, 40, ["Email the run"])
+o.edge([(cm.r, Y3 - 6), (em.l, Y3 - 6)])
+o.final(806, Y3 - 6)
+o.edge([(em.r, Y3 - 6), (795, Y3 - 6)])
+sa = o.action(318, 478, 160, 28, ["Say so in the thread"])
+o.edge([(272, Y3 + 7), (272, 492), (sa.l, 492)])
+o.g(278, 476, "[not ready]")
+o.flow_final(506, 492)
+o.edge([(sa.r, 492), (497, 492)])
+o.note(
+    850,
+    410,
+    320,
+    ["docs/EVENING_RUN.md: the PDFs, the notes and", "the screener files are committed to main"],
+    to=(nt.r - 10, nt.t),
+    frm=(850, 425),
+)
+
+# lane 4: GitHub
+Y4 = 576
+pg = o.action(500, Y4 - 20, 140, 40, ["Pages publishes", "the site"])
+o.edge([(570, cm.b), (570, pg.t)])
+o.g(578, 532, "push")
+o.flow_final(676, Y4)
+o.edge([(pg.r, Y4), (667, Y4)])
+o.add(
+    f'<path class="u-line dash" d="M{pg.r - 20},{pg.t} V530 H876 V{we.b}" marker-end="url(#u7-a)"/>'
+)
+o.g(880, 526, "read through the GitHub API")
+hourglass(o, 82, Y4, ["07:00 UTC", "Tue–Sat"], below=False)
+au = o.action(108, Y4 - 20, 126, 40, ["Audit the last", "trading day"])
+o.edge([(91, Y4), (au.l, Y4)])
+o.diamond(276, Y4)
+o.edge([(au.r, Y4), (263, Y4)])
+o.final(276, 620)
+o.edge([(276, Y4 + 13), (276, 609)])
+o.g(284, 606, "[ok run]")
+wf = o.action(318, 556, 150, 40, ["Fail: GitHub", "emails the owner"])
+o.edge([(289, Y4), (wf.l, Y4)])
+o.g(303, Y4 - 8, "[none]", "middle")
+o.flow_final(490, 620)
+o.edge([(393, wf.b), (393, 620), (481, 620)])
+o.note(
+    740,
+    560,
+    320,
+    [
+        "pipeline-watch.yml reads ops_pipeline_run through",
+        "the web API: it catches a night Airflow never ran",
+        "(the PC was off, the DAG paused)",
+    ],
+)
+SVG7 = o.svg()
+
+# ---------------------------------------------------------------- state machine: one run
+r = D(
+    "u8",
+    1300,
+    230,
+    "stm",
+    "ops_pipeline_run",
+    "UML state machine of a pipeline run: it starts running, becomes ready when the data "
+    "checks pass, and ok when the evening commit is published; a failed step while running "
+    "or ready makes it failed. ok and failed are final.",
+)
+r.frame(10, 10, 1280, 210)
+RY = 90
+r.initial(60, RY)
+ru = r.state(90, RY - 20, 120, 40, "running")
+r.edge([(68, RY), (ru.l, RY)])
+re_ = r.state(500, RY - 20, 120, 40, "ready")
+r.edge([(ru.r, RY), (re_.l, RY)])
+r.g(355, RY - 8, "ingest finished, prices fresh / mark_ready", "middle")
+ok_ = r.state(890, RY - 20, 120, 40, "ok")
+r.edge([(re_.r, RY), (ok_.l, RY)])
+r.g(755, RY - 8, "evening commit published / finish", "middle")
+r.final(1070, RY)
+r.edge([(ok_.r, RY), (1059, RY)])
+fa = r.state(500, 160, 120, 40, "failed")
+r.edge([(150, ru.b), (150, 180), (fa.l, 180)])
+r.g(160, 174, "step failed / email alert")
+r.edge([(560, re_.b), (560, fa.t)])
+r.g(568, 140, "step failed / email alert")
+r.final(680, 180)
+r.edge([(fa.r, 180), (669, 180)])
+r.note(
+    1060,
+    130,
+    210,
+    ["each step is also a row in", ("ops_pipeline_step", "mono"), "(ok, waiting or failed)"],
+)
+SVG8 = r.svg()
+
+# ---------------------------------------------------------------- deployment
+p = D(
+    "u9",
+    1300,
+    480,
+    "deployment",
+    "Nightly pipeline",
+    "UML deployment diagram: Airflow's API server, scheduler, DAG processor and metadata "
+    "database run in Docker on the PC with the DAG stock_nightly; Azure runs the ingest "
+    "Container Apps Job, the PostgreSQL server stock-db-bk and the web API stock-api-bk; "
+    "Anthropic's cloud runs the Claude evening routine; GitHub runs the Pages and "
+    "pipeline-watch workflows; Brevo sends the emails.",
+)
+p.frame(10, 10, 1280, 460)
+pc = node3d(p, 30, 64, 400, 262, "«device»", "PC")
+node3d(p, 46, 110, 366, 200, "«executionEnvironment»", "Docker · orchestration/compose.yaml", 8)
+artifact(p, 62, 156, 160, "api-server", "«component»")
+artifact(p, 236, 156, 160, "scheduler", "«component»")
+artifact(p, 62, 206, 160, "dag-processor", "«component»")
+artifact(p, 236, 206, 160, "airflow-db", "«database»")
+artifact(p, 62, 256, 334, "stock_nightly.py · stock_analysis.pipeline")
+az = node3d(p, 500, 64, 400, 222, "«cloud»", "Microsoft Azure")
+artifact(p, 516, 110, 368, "stock-ingest · Container Apps Job", "«executionEnvironment»")
+artifact(p, 516, 168, 368, "stock-db-bk · PostgreSQL 16", "«database»")
+artifact(p, 516, 226, 368, "stock-api-bk · App Service, api/app.py", "«executionEnvironment»")
+an = node3d(p, 970, 64, 300, 100, "«cloud»", "Anthropic")
+artifact(p, 986, 108, 268, "Evening watch list routine", "«executionEnvironment»")
+gh = node3d(p, 970, 230, 300, 150, "«cloud»", "GitHub")
+artifact(p, 986, 276, 268, "pages.yml · pipeline-watch.yml", "«workflow»")
+artifact(p, 986, 326, 268, "Pages site", "«artifact»")
+bv = node3d(p, 500, 380, 220, 70, "«cloud»", "Brevo")
+# communication paths
+p.edge([(pc.r, 187), (516, 187)], arrow=False)
+p.g(473, 180, "SQL · TLS", "middle")
+p.edge([(700, 148), (700, 168)], arrow=False)
+p.edge([(700, 206), (700, 226)], arrow=False)
+p.edge([(986, 140), (930, 140), (930, 240), (884, 240)], arrow=False)
+p.g(936, 184, "HTTPS · marker")
+p.edge([(1150, an.b), (1150, gh.t - 10)], arrow=False)
+p.g(1158, 200, "git push")
+p.edge([(380, pc.b), (380, 356), (gh.l, 356)], arrow=False)
+p.g(760, 350, "HTTPS · GitHub API: commit and Pages run", "middle")
+p.edge([(200, pc.b), (200, 415), (bv.l, 415)], arrow=False)
+p.g(350, 409, "HTTPS · alert email", "middle")
+p.edge([(986, 295), (910, 295), (910, 256), (884, 256)], arrow=False)
+p.g(916, 310, "HTTPS · audit")
+p.edge([(1254, 127), (1282, 127), (1282, 430), (bv.r, 430)], arrow=False)
+p.g(800, 424, "HTTPS · evening email")
+SVG9 = p.svg()
+
+ORCH = f"""<section id="orchestration">
+  <h2>The nightly pipeline, in UML</h2>
+{fig(SVG7, "Activity diagram: one weekday night, partitioned by where the work runs; the Airflow DAG <code>stock_nightly</code> waits for each piece and alerts when one fails or doesn't come.")}
+{fig(SVG8, "State machine: the status of a run in <code>ops_pipeline_run</code>, the marker the evening session and the morning audit read.")}
+{fig(SVG9, "Deployment diagram: the nodes the pipeline runs on and how they talk.")}
+</section>
+"""
+
+html = PAGE.read_text(encoding="utf-8")
+html = re.sub(r'<section id="orchestration">.*?</section>\n\n?', "", html, flags=re.S)
+anchor = "<section>\n  <h2>One day, in UTC</h2>"
+html = html.replace(anchor, ORCH + "\n" + anchor, 1)
+PAGE.write_text(html, encoding="utf-8")
+print("orchestration ok")

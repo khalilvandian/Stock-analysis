@@ -1,0 +1,27 @@
+# The morning audit of the nightly pipeline (issue #30, docs/ORCHESTRATION.md): the last US
+# trading day must have a stock_nightly run with status ok in ops_pipeline_run. Airflow
+# emails its own failures, but it can't report a night it never ran (the PC was off, Docker
+# stopped, the DAG paused). This check runs elsewhere, and a failed run here makes GitHub
+# email the repository owner.
+name: Pipeline watch
+
+on:
+  schedule:
+    - cron: "0 7 * * 2-6"  # 07:00 UTC Tuesday to Saturday: Monday's to Friday's runs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.7"
+      - run: uv run --frozen --no-dev python -m stock_analysis.pipeline audit
+        env:
+          STOCK_API_URL: https://stock-api-bk.azurewebsites.net
+          STOCK_API_KEY: ${{ secrets.STOCK_API_KEY }}

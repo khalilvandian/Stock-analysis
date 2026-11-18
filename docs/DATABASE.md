@@ -630,6 +630,13 @@ From the repository files, 2026-11-16 (28 MB):
 | `ops_task` | Source and request key (a symbol, `CIK` + number for a predecessor's filings, or `SP:SPX`, `all`, `EUR`) | Status, consecutive failures, last attempt and success, when it is due again, the last fetch and error. Inactive once a company leaves the index |
 | `ops_run` | Run of the job | Mode, host, status, requests, tasks done and failed, rows stored, the build, and a JSON summary per source (what stopped it) |
 
+### Ops: the nightly pipeline's run log (migration `011`, issue #30)
+
+| Table | One row per | Notes |
+|---|---|---|
+| `ops_pipeline_run` | Run of the Airflow DAG `stock_nightly` | Airflow's run id, the trading day, started, ready and finished times, status `running`, `ready`, `ok` or `failed`. `ready` is the marker the evening session reads ([`ORCHESTRATION.md`](ORCHESTRATION.md)) |
+| `ops_pipeline_step` | Step of a run | `ok`, `waiting` or `failed`, when, and a JSON detail of what the check found |
+
 `out_coverage_snapshot` (one row per day: companies, covered, cells required and present,
 the mode, and the whole measurement in `detail_json`) is the coverage page's source.
 `out_coverage_gap` (one row per company, item and period the coverage measures but the

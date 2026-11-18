@@ -3,6 +3,11 @@
 Every weekday evening (Monday to Friday) at 21:00 Italy time a scheduled Claude session runs these steps on `main`.
 Babak approved committing the results straight to `main` (no pull request each night).
 
+0. **Is the data ready?** `uv run python -m stock_analysis.pipeline marker` reads the nightly
+   pipeline's marker through the web API ([`ORCHESTRATION.md`](ORCHESTRATION.md)). Exit 0:
+   go on. Exit 3 (not ready yet): check again every 10 minutes, for up to an hour. Exit 4
+   (the run failed), or still not ready after an hour: say so in the thread and stop. Don't
+   build reports on stale data. Airflow has already emailed the failure.
 1. **Set up:** `uv sync`. Check out `main` and pull.
 2. **Numbers first:** `uv run python analysis/screener.py` refreshes the market screener,
    then `uv run python analysis/watchlist.py --numbers` and

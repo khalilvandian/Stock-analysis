@@ -1,0 +1,44 @@
+# The orchestrated nightly pipeline (issue #30, docs/ORCHESTRATION.md): the Airflow DAG
+# `stock_nightly` (orchestration/dags/) and the checks it runs
+# (python -m stock_analysis.pipeline). Times are UTC.
+
+pipeline = "stock_nightly"
+
+[ingest]
+# The Azure Container Apps Job `stock-ingest` starts at 22:30 UTC (deploy/ingest-job.ps1).
+# The DAG waits for an ops_run row that started at most this long before the DAG's own
+# start, and gives up after `wait_hours`.
+started_within_minutes = 20
+wait_hours = 3.5
+
+[prices]
+# A US trading day counts as closed `close_utc` after midnight UTC of that day (16:00 New
+# York is 21:00 UTC in winter, 20:00 in summer; Yahoo has the bar a little later).
+close_utc = "21:30"
+# Share of the current S&P 500 members whose newest price must be the expected day.
+min_share_fresh = 0.95
+
+[evening]
+# After the ready marker, the Claude evening session must commit "Evening watch list
+# analyses ..." to main within `wait_hours`, and the Pages workflow must then publish it.
+repo = "khalilvandian/Stock-analysis"
+commit_prefix = "Evening watch list analyses"
+pages_workflow = "pages.yml"
+wait_hours = 4.0
+
+[alerts]
+# Failures are emailed through Brevo (the same account as the evening email). The
+# addresses come from the environment, never from this public file.
+to_env = "PIPELINE_ALERT_TO"       # falls back to WATCHLIST_EMAIL_TO
+from_env = "WATCHLIST_EMAIL_FROM"
+key_env = "BREVO_API_KEY"
+
+[nyse]
+# Days the New York Stock Exchange is closed (nyse.com, holidays and trading hours).
+# Extend this list each December; tests/test_pipeline.py fails when the next year is missing.
+holidays = [
+    "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25", "2026-06-19",
+    "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+    "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18",
+    "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
+]

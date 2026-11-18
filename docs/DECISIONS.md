@@ -326,3 +326,27 @@ lives in one file, `docs/pipeline.html`, which is both the Claude artifact and t
 Pipeline page: its styles are scoped under `.pipeline` with `--p-` tokens, so the site can
 include it unchanged, and a push that edits it republishes the site.
 
+## 2026-11-18
+
+### One orchestrated, logged and watched nightly pipeline (issue #30)
+
+- **Who:** Babak, after the evening routine had been switched off for three weekdays without
+  any warning.
+- **Decision:** Apache Airflow 3 (3.4.0) on the PC first: Docker Compose with the
+  LocalExecutor and its own metadata PostgreSQL (`orchestration/`). One DAG, `stock_nightly`,
+  at 22:35 UTC on weekdays. It waits for the Azure ingest job, checks that the prices
+  reached the last close, sets a **ready marker**, waits for the evening commit and its
+  published site, and logs every step in `ops_pipeline_run` and `ops_pipeline_step`. A
+  failure emails an alert. A GitHub workflow audits each morning that the last trading day
+  has a finished run, so a night when Airflow didn't run is caught too.
+- **The Claude step:** a ready marker, chosen over Airflow starting the routine or running
+  `claude -p` headless. The session keeps its own schedule and first checks the marker
+  (`python -m stock_analysis.pipeline marker`). It never builds on stale data, and Airflow
+  still checks that it ran.
+- **Why:** Airflow is the community standard (career value, issue #30). The checks live in
+  `stock_analysis.pipeline`, so they're tested without Airflow and run by hand, and the DAG
+  only orders them. Airflow and the project pin different SQLAlchemy versions, so the
+  project runs in its own environment inside the image.
+- **Rejected:** keeping separate clocks with no checks (the failure that started this);
+  putting the run log only in Airflow's metadata database, which the cloud session and
+  GitHub can't read.

@@ -1,0 +1,107 @@
+# Airflow 3 on this PC for the nightly pipeline (issue #30, docs/ORCHESTRATION.md):
+# LocalExecutor, its own metadata PostgreSQL (not the `stock` database), no Celery or Redis.
+#
+#   docker compose -f orchestration/compose.yaml up -d --build --wait   start (UI: http://127.0.0.1:8080)
+#   docker compose -f orchestration/compose.yaml down                   stop; history stays in airflow-db
+#
+# Settings come from the repository's .env (loaded into every container):
+# AIRFLOW__API_AUTH__JWT_SECRET (any long random text) is required; the pipeline also uses
+# the database passwords, BREVO_API_KEY, WATCHLIST_EMAIL_FROM and PIPELINE_ALERT_TO.
+# STOCK_PIPELINE_TARGET picks the stock database (server-writer here). Only this machine can
+# open the UI.
+
+x-airflow: &airflow
+  build:
+    context: ..
+    dockerfile: orchestration/Dockerfile
+  image: stock-airflow:3.4.0
+  restart: unless-stopped
+  env_file:
+    - path: ../.env
+      required: true
+  environment: &env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/stock/orchestration/dags
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Europe/Rome
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__API__BASE_URL: http://127.0.0.1:8080
+    # One local user and no password screen: the UI only listens on 127.0.0.1.
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    STOCK_PIPELINE_TARGET: ${STOCK_PIPELINE_TARGET-server-writer}
+    # A test against the local `stock` database: STOCK_PIPELINE_TARGET= (empty) and
+    # STOCK_PIPELINE_DATABASE_URL=postgresql://stock:...@host.docker.internal:5432/stock
+    DATABASE_URL: ${STOCK_PIPELINE_DATABASE_URL:-}
+  volumes:
+    - ..:/opt/stock:ro
+    - airflow-logs:/opt/airflow/logs
+  extra_hosts:
+    - host.docker.internal:host-gateway   # the local `stock` database, if targeted
+  depends_on: &depends
+    airflow-db:
+      condition: service_healthy
+
+services:
+  airflow-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow   # reachable only inside this compose network
+    volumes:
+      - airflow-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  airflow-init:
+    <<: *airflow
+    restart: "no"
+    command: ["db", "migrate"]
+
+  airflow-apiserver:
+    <<: *airflow
+    command: ["api-server"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/v2/version"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      <<: *depends
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow
+    command: ["scheduler"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8974/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      <<: *depends
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow
+    command: ["dag-processor"]
+    depends_on:
+      <<: *depends
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  airflow-db:
+  airflow-logs:

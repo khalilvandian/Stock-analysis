@@ -32,6 +32,11 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
   (reads as `stock_reader`, writes as `stock_writer`; `data.sql(...)` for any read-only query). On a
   PC it connects to the database directly; in cloud sessions it goes through the web API
   (`api/`, https://stock-api-bk.azurewebsites.net, used when `STOCK_API_URL` is set). The existing files stay, so older scripts keep working.
+- Orchestration (issue #30, `docs/ORCHESTRATION.md`): the Airflow 3 DAG `stock_nightly`
+  (`orchestration/`, Docker on the PC) waits for the ingest job, checks the prices, sets the
+  ready marker the evening session reads (`python -m stock_analysis.pipeline marker`), waits
+  for the evening commit and the site, logs each step in `ops_pipeline_run`/`ops_pipeline_step`
+  and emails failures; `pipeline-watch.yml` audits every morning that the night ran.
 - Tests must not hit the network; mock HTTP with `respx`. The database tests use the
   local Docker PostgreSQL (`stock_test` database) and skip when it isn't running.
 - Before committing: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
