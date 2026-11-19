@@ -78,6 +78,10 @@ SELECT * FROM v_watchlist ORDER BY position;                              -- wat
   written with `COPY`.
 - **Migrations:** `migrate` applies every number not yet in `schema_version`, in order, so
   a migration from another branch with a lower number than one already applied still runs.
+  On the server, apply a new migration as the owner before the job's next run:
+  `db init --target server`, then `db create-roles --target server` so the readers and the
+  writer get the new tables. The job connects as `stock_writer`, which can't change the
+  schema, so a migration left to the job fails its run ("permission denied for schema public").
 - **Code:** `src/stock_analysis/db/`, through SQLAlchemy and psycopg:
   - `__init__.py`: targets, the `Database` class, migrations, helpers
   - `migrations/`: numbered SQL files
