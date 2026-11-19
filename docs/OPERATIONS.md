@@ -42,6 +42,29 @@ There are none to manage: every number is in the database, refreshed by the inge
 | The evening steps | `docs/EVENING_RUN.md` | The scheduled session reads it every evening |
 | Run time | The scheduled task in Claude Code (not in the repository); `timezone` in `config/watchlist.toml` for file names | |
 
+## Deployment
+
+Everything on `main` deploys itself through GitHub Actions; nothing is deployed from a branch.
+
+| Workflow | When | What |
+|---|---|---|
+| `ingest-image.yml` | A push to `main` changing `src/`, `config/` or the dependencies | The jobs' image `stock-analysis-ingest`; each job run pulls the newest |
+| `airflow-image.yml` | A push changing `orchestration/`, `stock_analysis.pipeline` or `config/` | The Airflow image `stock-airflow` |
+| `deploy.yml` | After either build, or a push changing `api/`, the migrations or `deploy/airflow/` | The migrations (as the server's admin, through a firewall rule for the runner, removed at the end), the web API, a new revision of the Airflow UI app, and Airflow on the VM (through Azure's run-command: the compose file, the new image, the metadata schema, a restart) |
+| `pages.yml` | A push changing the site, or Airflow's `publish_site` | The public site |
+
+GitHub signs in to Azure with OpenID Connect, so no Azure password is stored in GitHub. The
+app registration `stock-analysis-deploy` may act only from this repository's `main` branch,
+as Contributor on `stock-rg`. Set it up once with
+`powershell -ExecutionPolicy Bypass -File deploy\github-oidc.ps1` (signed in to Azure and
+`gh`). It also stores the repository secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+`AZURE_SUBSCRIPTION_ID` and `STOCK_SERVER_DB_PASSWORD`. Without them, `deploy.yml` warns and
+deploys nothing.
+
+Creating the pieces the first time stays by hand, once: `deploy\ingest-job.ps1`,
+`deploy\quotes-job.ps1` and `deploy\airflow.ps1` ([`ORCHESTRATION.md`](ORCHESTRATION.md),
+"Going live").
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

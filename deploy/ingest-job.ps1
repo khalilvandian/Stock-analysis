@@ -1,6 +1,7 @@
 <#
 Deploys the ingest job to Azure (issue #18, docs/INGEST.md): an Azure Container Apps Job that
-runs `python -m stock_analysis.db ingest` on a schedule, from the image the "Build ingest image"
+runs `python -m stock_analysis.db` when Airflow starts it (issue #30, docs/ORCHESTRATION.md:
+one run per step of the night, each with its own command), from the image the "Build ingest image"
 workflow pushes to GitHub Container Registry. Safe to rerun: it creates what is missing and
 updates the rest.
 
@@ -8,7 +9,8 @@ What it sets up, all in resource group stock-rg:
   1. the database: migrations up to date and the working users' rights (as stock_admin)
   2. the Container Apps environment stock-jobs-env (Consumption: billed per second while a job
      runs, inside the monthly free grant)
-  3. the job stock-ingest: schedule, 1.5 vCPU / 3 GiB, at most 3 hours, no retries (the next run
+  3. the job stock-ingest: trigger Manual (Airflow starts every run; -Trigger Schedule brings
+     back the old cron), 1.5 vCPU / 3 GiB, at most 3 hours, no retries (the next run
      picks up where this one stopped), the secrets, and a system-assigned managed identity
   4. the identity's right to change the database server's firewall rules (Contributor on the
      server only), so each run can let its own address in and remove it afterwards
@@ -29,7 +31,8 @@ param(
     [string]$Job = "stock-ingest",
     [string]$Image = "ghcr.io/khalilvandian/stock-analysis-ingest:latest",
     [string]$Server = "stock-db-bk",
-    [string]$Cron = "30 22 * * *",   # UTC: 23:30 in Italy in winter, after the US close
+    [ValidateSet("Manual", "Schedule")][string]$Trigger = "Manual",
+    [string]$Cron = "30 22 * * *",   # only with -Trigger Schedule
     [switch]$RunNow
 )
 $ErrorActionPreference = "Stop"
@@ -71,7 +74,7 @@ if (-not $exists) {
         --environment-mode WorkloadProfiles --only-show-errors
 }
 
-Write-Host "3/4 Job $Job ($Cron UTC)"
+Write-Host "3/4 Job $Job (trigger $Trigger)"
 $envVars = @(
     "STOCK_DB_TARGET=server-writer",
     "STOCK_WRITER_DB_PASSWORD=secretref:writer-password",
@@ -83,16 +86,25 @@ if ($dispatch) {
     $secrets += "github-dispatch=$dispatch"
     $envVars += "GITHUB_DISPATCH_TOKEN=secretref:github-dispatch"
 }
-$exists = AzFind containerapp job show -n $Job -g $ResourceGroup --query name -o tsv
-if (-not $exists) {
+# Azure can't change a job's trigger type in place: a job with the other type is recreated
+# (step 4 then gives the new identity its rights again).
+$current = AzFind containerapp job show -n $Job -g $ResourceGroup --query properties.configuration.triggerType -o tsv
+if ($current -and $current -ne $Trigger) {
+    Write-Host "  recreating ${Job}: trigger $current -> $Trigger"
+    Az containerapp job delete -n $Job -g $ResourceGroup --yes --only-show-errors
+    $current = $null
+}
+$triggerArgs = if ($Trigger -eq "Schedule") { @("--trigger-type", "Schedule", "--cron-expression", $Cron) } else { @("--trigger-type", "Manual") }
+$cronArgs = if ($Trigger -eq "Schedule") { @("--cron-expression", $Cron) } else { @() }
+if (-not $current) {
     Az containerapp job create -n $Job -g $ResourceGroup --environment $Environment `
-        --trigger-type Schedule --cron-expression $Cron `
+        @triggerArgs `
         --replica-timeout 10800 --replica-retry-limit 0 --parallelism 1 --replica-completion-count 1 `
         --image $Image --cpu 1.5 --memory 3Gi --mi-system-assigned `
         --secrets @secrets --env-vars @envVars --only-show-errors
 } else {
     Az containerapp job secret set -n $Job -g $ResourceGroup --secrets @secrets --only-show-errors
-    Az containerapp job update -n $Job -g $ResourceGroup --cron-expression $Cron `
+    Az containerapp job update -n $Job -g $ResourceGroup @cronArgs `
         --image $Image --cpu 1.5 --memory 3Gi --replica-timeout 10800 `
         --set-env-vars @envVars --only-show-errors
 }

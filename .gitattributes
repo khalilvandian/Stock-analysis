@@ -1,0 +1,2 @@
+# Files read on Linux (the Airflow VM: cloud-init, Docker Compose) keep Unix line endings.
+deploy/airflow/* text eol=lf

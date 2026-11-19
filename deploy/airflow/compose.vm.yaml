@@ -1,0 +1,51 @@
+# Airflow's always-on parts on the Azure VM (issue #30, docs/ORCHESTRATION.md): scheduler
+# (LocalExecutor), DAG processor, triggerer and the execution API that tasks report to. The UI
+# runs elsewhere (a Container App that scales to zero), Airflow's metadata is the `airflow`
+# database on stock-db-bk, and the task logs go to Blob storage. deploy/airflow.ps1 copies
+# this file and the settings (.env, made by the script) to /opt/airflow on the VM.
+#
+#   docker compose -f compose.vm.yaml run --rm init     the metadata schema (airflow db migrate)
+#   docker compose -f compose.vm.yaml up -d             start; restarts with the VM
+#   docker compose -f compose.vm.yaml pull && ... up -d  a new image from main
+
+x-airflow: &airflow
+  image: ghcr.io/khalilvandian/stock-airflow:latest
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__PARALLELISM: "4"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE: "2"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW: "2"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://execution:8080/execution/
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Europe/Rome
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+  volumes:
+    - logs:/opt/airflow/logs
+
+services:
+  init:
+    <<: *airflow
+    restart: "no"
+    command: ["db", "migrate"]
+    profiles: ["init"]
+
+  execution:
+    <<: *airflow
+    command: ["api-server", "--apps", "execution", "--workers", "1"]
+
+  scheduler:
+    <<: *airflow
+    command: ["scheduler"]
+    depends_on: [execution]
+
+  dag-processor:
+    <<: *airflow
+    command: ["dag-processor"]
+
+  triggerer:
+    <<: *airflow
+    command: ["triggerer"]
+
+volumes:
+  logs:

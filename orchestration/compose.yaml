@@ -1,0 +1,136 @@
+# Airflow 3 for the stock pipeline, laid out as it runs on Azure (issue #30,
+# docs/ORCHESTRATION.md): on the VM the always-on parts (scheduler with the LocalExecutor,
+# DAG processor, triggerer, and the API server's `execution` app that tasks report to); the
+# UI (`--apps core`) as its own app. Locally Airflow's metadata has its own PostgreSQL; on
+# Azure it is an `airflow` database on stock-db-bk.
+#
+#   docker compose -f orchestration/compose.yaml up -d --build --wait   start (UI: http://127.0.0.1:8080)
+#   docker compose -f orchestration/compose.yaml down                   stop; the history stays
+#
+# Settings come from the repository's .env: AIRFLOW__API_AUTH__JWT_SECRET (required), the
+# database passwords, BREVO_API_KEY, WATCHLIST_EMAIL_FROM, PIPELINE_ALERT_TO,
+# GITHUB_DISPATCH_TOKEN, AZURE_SUBSCRIPTION_ID, and for local runs of the Azure jobs a short-
+# lived AZURE_ARM_TOKEN (`az account get-access-token`). STOCK_PIPELINE_TARGET picks the
+# stock database (server-writer); STOCK_PIPELINE_DB_URL overrides it with a full URL.
+
+x-airflow: &airflow
+  build:
+    context: ..
+    dockerfile: orchestration/Dockerfile
+  image: stock-airflow:3.4.0
+  restart: unless-stopped
+  env_file:
+    - path: ../.env
+      required: true
+  environment: &env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__PARALLELISM: "4"             # task slots: tasks mostly wait in the triggerer
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE: "2"   # stock-db-bk allows 50 connections in all
+    AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW: "2"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/stock/orchestration/dags
+    AIRFLOW__CORE__PLUGINS_FOLDER: /opt/stock/orchestration/plugins
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Europe/Rome
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-execution:8080/execution/
+    AIRFLOW__API__BASE_URL: http://127.0.0.1:8080
+    # One local user and no password screen: the UI only listens on 127.0.0.1.
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    PYTHONPATH: /opt/stock/src
+    STOCK_PIPELINE_TARGET: ${STOCK_PIPELINE_TARGET-server-writer}
+    STOCK_PIPELINE_DB_URL: ${STOCK_PIPELINE_DB_URL:-}
+    AZURE_ARM_TOKEN: ${AZURE_ARM_TOKEN:-}
+  volumes:
+    - ..:/opt/stock:ro
+    - airflow-logs:/opt/airflow/logs
+  extra_hosts:
+    - host.docker.internal:host-gateway   # the local `stock` database, if targeted
+  depends_on: &depends
+    airflow-db:
+      condition: service_healthy
+
+services:
+  airflow-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow   # reachable only inside this compose network
+    volumes:
+      - airflow-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  airflow-init:
+    <<: *airflow
+    restart: "no"
+    command: ["db", "migrate"]
+
+  airflow-execution:      # on the VM: the API tasks report to
+    <<: *airflow
+    command: ["api-server", "--apps", "execution", "--workers", "1"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/execution/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      <<: *depends
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-ui:             # on Azure: a Container App that scales to zero
+    <<: *airflow
+    command: ["api-server", "--apps", "core", "--workers", "1"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/v2/version"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      <<: *depends
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:      # on the VM: every wait (job runs, GitHub) happens here
+    <<: *airflow
+    command: ["triggerer"]
+    depends_on:
+      <<: *depends
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow
+    command: ["scheduler"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8974/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      <<: *depends
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow
+    command: ["dag-processor"]
+    depends_on:
+      <<: *depends
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  airflow-db:
+  airflow-logs:

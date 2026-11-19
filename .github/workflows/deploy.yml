@@ -1,0 +1,124 @@
+# Deploys main to Azure after every build (issue #30, docs/OPERATIONS.md, "Deployment"):
+#
+#   1. the database: migrations (as the server's admin, through a firewall rule for this
+#      runner's address, removed at the end)
+#   2. the web API (api/) on App Service stock-api-bk
+#   3. the Airflow UI's Container App airflow-ui: a new revision of ghcr.io/.../stock-airflow
+#   4. Airflow on the VM airflow-vm: its compose file, the new image, the metadata schema,
+#      restarted (through Azure's run-command: no SSH key in GitHub)
+#
+# The jobs stock-ingest and stock-quotes need nothing: each run pulls the newest image.
+# GitHub signs in to Azure with OpenID Connect (no password stored): the repository secrets
+# AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID come from
+# deploy\github-oidc.ps1, run once, which also stores STOCK_SERVER_DB_PASSWORD. Without them
+# the workflow says so and stops. The one-time creation of the VM, the UI app and the jobs is
+# deploy\airflow.ps1, deploy\ingest-job.ps1 and deploy\quotes-job.ps1.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["Build ingest image", "Build Airflow image"]
+    types: [completed]
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - "src/stock_analysis/db/migrations/**"
+      - "deploy/airflow/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: stock-rg
+  SERVER: stock-db-bk
+  WEB_APP: stock-api-bk
+  UI_APP: airflow-ui
+  VM: airflow-vm
+  AIRFLOW_IMAGE: ghcr.io/khalilvandian/stock-airflow:latest
+
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure settings present?
+        id: ready
+        env:
+          CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          if [ -z "$CLIENT_ID" ]; then
+            echo "::warning::No AZURE_CLIENT_ID secret: run deploy\\github-oidc.ps1 once. Nothing deployed."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: azure/login@v2
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: astral-sh/setup-uv@v6
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          version: "0.9.7"
+
+      - name: 1. Database migrations
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          STOCK_SERVER_DB_PASSWORD: ${{ secrets.STOCK_SERVER_DB_PASSWORD }}
+        run: |
+          ip=$(curl -fsS https://api.ipify.org)
+          az postgres flexible-server firewall-rule create -g "$RESOURCE_GROUP" --name "$SERVER" \
+            --rule-name github-deploy --start-ip-address "$ip" --end-ip-address "$ip" --only-show-errors -o none
+          trap 'az postgres flexible-server firewall-rule delete -g "$RESOURCE_GROUP" --name "$SERVER" --rule-name github-deploy --yes --only-show-errors' EXIT
+          uv run --frozen --no-dev python -m stock_analysis.db init --target server
+
+      - name: 2. Web API
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          (cd api && zip -q ../stock-api.zip app.py requirements.txt)
+          az webapp deploy -g "$RESOURCE_GROUP" -n "$WEB_APP" --src-path stock-api.zip --type zip --only-show-errors -o none
+
+      - name: 3. Airflow UI
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          if az containerapp show -g "$RESOURCE_GROUP" -n "$UI_APP" -o none 2>/dev/null; then
+            az containerapp update -g "$RESOURCE_GROUP" -n "$UI_APP" --image "$AIRFLOW_IMAGE" \
+              --revision-suffix "r${GITHUB_RUN_NUMBER}" --only-show-errors -o none
+          else
+            echo "::notice::No $UI_APP yet: deploy\\airflow.ps1 creates it."
+          fi
+
+      - name: 4. Airflow on the VM
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          if ! az vm show -g "$RESOURCE_GROUP" -n "$VM" -o none 2>/dev/null; then
+            echo "::notice::No $VM yet: deploy\\airflow.ps1 creates it."; exit 0
+          fi
+          compose=$(base64 -w0 deploy/airflow/compose.vm.yaml)
+          script="set -e; cd /opt/airflow; echo $compose | base64 -d > compose.vm.yaml; \
+            docker compose -f compose.vm.yaml pull -q; \
+            docker compose -f compose.vm.yaml --profile init run --rm init; \
+            docker compose -f compose.vm.yaml up -d --remove-orphans; \
+            docker compose -f compose.vm.yaml ps; echo DEPLOY-OK"
+          out=$(az vm run-command invoke -g "$RESOURCE_GROUP" -n "$VM" --command-id RunShellScript \
+            --scripts "$script" --query "value[0].message" -o tsv)
+          echo "$out"
+          echo "$out" | grep -q DEPLOY-OK || { echo "::error::Airflow on the VM: see above"; exit 1; }

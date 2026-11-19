@@ -6,8 +6,7 @@
 # recorded runs, the screener run, the coverage snapshot, the explorer's data): add the
 # repository secret STOCK_API_KEY (Settings > Secrets and variables > Actions). Without it
 # those pages say there is no data yet.
-# The daily schedule refreshes the page after the
-# ingest job (docs/INGEST.md).
+# No schedule of its own: Airflow starts it after each night (docs/ORCHESTRATION.md).
 name: Publish analyses page
 
 on:
@@ -21,8 +20,8 @@ on:
       - "analysis/live.js"
       - "docs/pipeline.html"
       - ".github/workflows/pages.yml"
-  schedule:
-    - cron: "15 5 * * *"  # every day 05:15 UTC, after the night's ingest run
+  # Rebuilt on a push, and by the Airflow DAG stock_nightly (its publish_site task, through
+  # workflow_dispatch) once the night's coverage and nightly numbers are stored (issue #30).
   workflow_dispatch:
 
 permissions:

@@ -38,6 +38,16 @@ from . import Database
 from .build import build
 from .check import check
 
+# The commands an Azure job runs, and the firewall rule each one opens.
+JOB_RULES = {
+    "ingest": "ingest-job",
+    "quotes": "quotes-job",
+    "build": "build-job",
+    "coverage": "coverage-job",
+    "nightly": "nightly-job",
+    "check": "check-job",
+}
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m stock_analysis.db", description=__doc__)
@@ -71,6 +81,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-minutes", type=float, help="ingest: stop starting tasks after")
     parser.add_argument("--limit", type=int, help="ingest: at most this many tasks per source")
     parser.add_argument("--no-build", action="store_true", help="ingest: skip build and coverage")
+    parser.add_argument(
+        "--no-nightly", action="store_true", help="ingest: skip the nightly analyses (db nightly)"
+    )
+    parser.add_argument(
+        "--no-site", action="store_true", help="ingest: don't ask GitHub to rebuild the site"
+    )
     parser.add_argument("--due-now", help="ingest: make SOURCE's tasks due now, then run")
     parser.add_argument("--json", help="coverage: also write the page's JSON to this file")
     parser.add_argument("file", nargs="?", help="import: the file to load")
@@ -81,6 +97,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--from", dest="source_db", help="push: the database to send from")
     args = parser.parse_args(argv)
+    if args.command in JOB_RULES:
+        # A run of an Azure job (Airflow starts one per task, issue #30) lets its own address
+        # through the database firewall for as long as it runs. One rule per command, so runs
+        # going at the same time (coverage, check, nightly) never remove each other's rule.
+        # Outside Azure (no managed identity) this does nothing.
+        from .azure import JobFirewall
+
+        rule = JOB_RULES[args.command]
+        with JobFirewall(args.target, rule=rule) as ip:
+            if ip:
+                print(f"Firewall rule {rule} allows this run's address {ip}")
+            return run_command(args, parser)
+    return run_command(args, parser)
+
+
+def run_command(args, parser) -> int:
     if args.command == "check":
         return check(args.target, args.strict)
     if args.command == "ping":
@@ -92,20 +124,10 @@ def main(argv: list[str] | None = None) -> int:
 
         print(allow_my_ip(args.target or "server", args.rule, args.ip))
         return 0
-    if args.command == "ingest":  # on Azure, open the database firewall for this run
-        from .azure import JobFirewall
-
-        with JobFirewall(args.target) as ip:
-            if ip:
-                print(f"Firewall rule ingest-job allows this run's address {ip}")
-            return run_ingest(args)
-    if args.command == "quotes":  # its own rule, so it never removes the ingest job's
-        from .azure import JobFirewall
-
-        with JobFirewall(args.target, rule="quotes-job") as ip:
-            if ip:
-                print(f"Firewall rule quotes-job allows this run's address {ip}")
-            return run_quotes(args)
+    if args.command == "ingest":
+        return run_ingest(args)
+    if args.command == "quotes":
+        return run_quotes(args)
     db = Database.open(args.target)  # applies any new migrations
     print(f"Database: {db.target} ({db.where})")
     if args.command == "create-roles":
@@ -120,7 +142,13 @@ def main(argv: list[str] | None = None) -> int:
         from ..data import DbData
         from ..nightly import run as run_nightly
 
-        print("Nightly analyses:", json.dumps(run_nightly(DbData(db, db)), indent=2, default=str))
+        summary = run_nightly(DbData(db, db))
+        print("Nightly analyses:", json.dumps(summary, indent=2, default=str))
+        # A failed part fails the command, so the job run (and the Airflow task) shows it.
+        failed = (summary.get("stocks") or {}).get("failed")
+        if failed or any(k in summary for k in ("screener_error", "market_error")):
+            db.close()
+            return 1
     elif args.command == "build":
         symbols = args.symbols.split(",") if args.symbols else None
         print("Build:", json.dumps(build(db, full=args.full, symbols=symbols), indent=2))
@@ -198,10 +226,13 @@ def run_ingest(args) -> int:
         limit=args.limit,
         do_build=not args.no_build,
         do_coverage=not args.no_build,
+        do_nightly=not args.no_nightly,
     )
     print("Ingest:", json.dumps(result, indent=2, default=str))
     db.close()
-    if result["status"] in ("ok", "partial"):
+    # Under the orchestrator (issue #30) Airflow runs the nightly analyses and rebuilds the
+    # site as tasks of their own: --no-nightly --no-site.
+    if result["status"] in ("ok", "partial") and not args.no_site:
         from ..ingest.notify import publish_site
 
         print(publish_site())
