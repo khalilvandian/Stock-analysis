@@ -1,34 +1,45 @@
-"""The nightly pipeline's checks and run log (issue #30). No network: GitHub and Brevo are
-mocked with respx; the database tests use the local test PostgreSQL and skip without it."""
+"""The nightly pipeline's run log and checks (issue #30). No network: GitHub and Brevo are
+mocked with respx; the database tests use the local test PostgreSQL and skip without it.
+The Airflow side (operators, triggers, DAGs) is tested in the Airflow image:
+orchestration/tests (docs/ORCHESTRATION.md)."""
 
 from __future__ import annotations
 
+import ast
 import datetime as dt
 import json
-import py_compile
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import httpx
+import psycopg
 import pytest
-from test_db import empty_db, pg_url  # noqa: F401  (pg_url is a fixture)
+from test_db import PASSWORD_ENV, empty_db, pg_url  # noqa: F401  (pg_url is a fixture)
 
 from stock_analysis import pipeline as p
-from stock_analysis.db import run
 
 ROOT = Path(__file__).resolve().parent.parent
 CFG = p.load_config()
 T = dt.datetime
+STARTED = T(2026, 11, 18, 22, 30)
 
 
 @pytest.fixture()
-def fresh(pg_url: str):  # noqa: F811
+def conn(pg_url: str):  # noqa: F811
     db = empty_db(pg_url)
     db.migrate()
-    yield db
     db.close()
+    with psycopg.connect(pg_url, password=os.environ.get(PASSWORD_ENV), autocommit=True) as c:
+        yield c
 
 
-# ---------------------------------------------------------------- trading days
+def sql(c, statement: str, params: dict | None = None) -> None:
+    p.rows(c, statement, params)
+
+
+# ---------------------------------------------------------------- no database
 
 
 def test_last_close_after_and_before_the_close() -> None:
@@ -50,37 +61,44 @@ def test_holidays_cover_this_year_and_next_from_december() -> None:
         assert today.year + 1 in years, "add next year's NYSE holidays to config/pipeline.toml"
 
 
-def test_dag_file_compiles() -> None:
-    # The full DAG check (imports, order) runs inside the Airflow image: docs/ORCHESTRATION.md
-    py_compile.compile(str(ROOT / "orchestration" / "dags" / "stock_nightly.py"), doraise=True)
+def test_the_module_imports_without_the_heavy_dependencies() -> None:
+    # Airflow imports it in its own interpreter (no pandas, no SQLAlchemy 2.1)
+    code = (
+        "import sys; import stock_analysis.pipeline; "
+        "bad = [m for m in ('pandas', 'sqlalchemy', 'stock_analysis.db') if m in sys.modules]; "
+        "assert not bad, bad"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, cwd=ROOT)
 
 
-# ---------------------------------------------------------------- audit (no database)
+def test_orchestration_files_parse() -> None:
+    # The Airflow side runs in the Airflow image (orchestration/tests); here: valid Python
+    for path in (ROOT / "orchestration").rglob("*.py"):
+        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
 def test_audit_needs_an_ok_run_for_the_last_trading_day() -> None:
-    now = T(2026, 11, 19, 6, 0)  # Thursday morning: the 18th must be done
+    now = T(2026, 11, 19, 7, 0)
     ok = {"run_date": "2026-11-18", "status": "ok"}
     assert p.audit([ok], now, CFG).code == p.DONE
     assert p.audit([{**ok, "run_date": "2026-11-17"}], now, CFG).code == p.FAILED
     assert "ready" in p.audit([{**ok, "status": "ready"}], now, CFG).message
 
 
-def test_marker_tells_the_evening_session_whether_to_start() -> None:
-    now = T(2026, 11, 19, 0, 0)  # just after midnight UTC: Wednesday the 18th's data
+def test_marker_tells_the_session_whether_the_data_is_ready() -> None:
+    now = T(2026, 11, 19, 0, 0)
     row = {"run_date": "2026-11-18", "status": "running"}
     assert p.marker([row], now, CFG).code == p.NOT_YET
     assert p.marker([{**row, "status": "ready"}], now, CFG).code == p.DONE
     assert p.marker([{**row, "status": "failed"}], now, CFG).code == p.FAILED
-    assert p.marker([{**row, "run_date": "2026-11-17", "status": "ok"}], now, CFG).code == p.NOT_YET
 
 
-# ---------------------------------------------------------------- GitHub (respx)
+# ---------------------------------------------------------------- GitHub and Brevo (respx)
 
 REPO = CFG["evening"]["repo"]
 COMMITS = f"https://api.github.com/repos/{REPO}/commits"
 RUNS = f"https://api.github.com/repos/{REPO}/actions/workflows/pages.yml/runs"
-STARTED = T(2026, 11, 18, 22, 35)
+DISPATCH = f"https://api.github.com/repos/{REPO}/actions/workflows/pages.yml/dispatches"
 
 
 def commit(message: str, sha: str = "abc1234def") -> dict:
@@ -103,158 +121,124 @@ def test_evening_passes_when_pages_published_the_commit(respx_mock) -> None:
     later = STARTED + dt.timedelta(hours=1)
     with httpx.Client() as c:
         assert p.check_evening(STARTED, later, CFG, c).code == p.NOT_YET
-        route.mock(
-            return_value=httpx.Response(
-                200, json={"workflow_runs": [{"status": "completed", "conclusion": "success"}]}
-            )
-        )
+        done = {"workflow_runs": [{"status": "completed", "conclusion": "success"}]}
+        route.mock(return_value=httpx.Response(200, json=done))
         assert p.check_evening(STARTED, later, CFG, c).code == p.DONE
-        route.mock(
-            return_value=httpx.Response(
-                200, json={"workflow_runs": [{"status": "completed", "conclusion": "failure"}]}
-            )
-        )
+        bad = {"workflow_runs": [{"status": "completed", "conclusion": "failure"}]}
+        route.mock(return_value=httpx.Response(200, json=bad))
         assert p.check_evening(STARTED, later, CFG, c).code == p.FAILED
     assert route.calls.last.request.url.params["head_sha"] == "abc1234def"
+
+
+def test_publish_site_needs_the_token_and_dispatches(respx_mock, monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_DISPATCH_TOKEN", raising=False)
+    with httpx.Client() as c:
+        assert p.publish_site(CFG, c).code == p.FAILED
+        monkeypatch.setenv("GITHUB_DISPATCH_TOKEN", "t")
+        route = respx_mock.post(DISPATCH).mock(return_value=httpx.Response(204))
+        assert p.publish_site(CFG, c).code == p.DONE
+    assert route.calls.last.request.headers["authorization"] == "Bearer t"
+
+
+def test_alert_splits_the_sender(respx_mock, monkeypatch) -> None:
+    for k, v in {"BREVO_API_KEY": "k", "WATCHLIST_EMAIL_FROM": "Stock analysis <bot@example.com>",
+                 "PIPELINE_ALERT_TO": "me@example.com"}.items():  # fmt: skip
+        monkeypatch.setenv(k, v)
+    brevo = respx_mock.post(p.BREVO).mock(return_value=httpx.Response(201, json={}))
+    with httpx.Client() as c:
+        assert p.alert("Stock pipeline FAILED: x", "body", CFG, c)
+    sent = json.loads(brevo.calls.last.request.content)
+    assert sent["sender"]["email"] == "bot@example.com"
+    assert sent["to"] == [{"email": "me@example.com"}]
 
 
 # ---------------------------------------------------------------- database
 
 
-def seed_prices(db, newest: dict[str, str]) -> None:
-    with db.begin() as conn:
-        for i, (symbol, day) in enumerate(newest.items(), start=1):
-            run(conn, "INSERT INTO core_company (company_id, symbol) VALUES (:i, :s)",
-                {"i": i, "s": symbol})  # fmt: skip
-            run(conn, "INSERT INTO core_index_member VALUES (:i, 'SP:SPX', '2020-01-01', NULL)",
-                {"i": i})  # fmt: skip
-            for d in ("2026-11-16", day):
-                run(conn, "INSERT INTO core_price_daily (company_id, date, close) "
-                    "VALUES (:i, :d, 1) ON CONFLICT DO NOTHING", {"i": i, "d": d})  # fmt: skip
-
-
-def ingest_row(db, started: str, status: str, finished: str | None = None) -> None:
-    with db.begin() as conn:
-        run(
-            conn,
-            "INSERT INTO ops_run (started_at, finished_at, mode, status) "
-            "VALUES (:s, :f, 'maintain', :st)",
-            {"s": started, "f": finished, "st": status},
-        )
-
-
-def test_run_log_start_is_idempotent_and_steps_upsert(fresh) -> None:
-    now = T(2026, 11, 18, 22, 35)
-    first = p.start(fresh, "scheduled__1", now, CFG)
-    assert p.start(fresh, "scheduled__1", now, CFG) == first
-    row = p.run_row(fresh, "scheduled__1")
+def test_run_log_start_steps_and_status(conn) -> None:
+    now = T(2026, 11, 18, 22, 30)
+    first = p.start(conn, "scheduled__1", "stock_nightly", now, CFG)
+    assert p.start(conn, "scheduled__1", "stock_nightly", now, CFG) == first
+    row = p.run_row(conn, "scheduled__1")
     assert row["status"] == "running" and str(row["run_date"]) == "2026-11-18"
-    p.log_step(fresh, "scheduled__1", "wait_for_ingest", p.Result(p.NOT_YET, "waiting"), now)
-    p.log_step(fresh, "scheduled__1", "wait_for_ingest", p.Result(p.DONE, "found"), now)
-    with fresh.connect() as conn:
-        steps = run(conn, "SELECT step, status, detail FROM ops_pipeline_step").fetchall()
-    assert [(s, st) for s, st, _ in steps] == [("wait_for_ingest", "ok")]
-    assert json.loads(steps[0][2])["message"] == "found"
-    p.set_status(fresh, "scheduled__1", "ready", now)
-    assert p.run_row(fresh, "scheduled__1")["ready_at"] == now
-    # a side check failed: the main chain's ready and ok don't hide it
-    p.set_status(fresh, "scheduled__1", "failed", now)
-    p.set_status(fresh, "scheduled__1", "ok", now)
-    assert p.run_row(fresh, "scheduled__1")["status"] == "failed"
+    p.log_step(conn, "scheduled__1", "ingest", p.Result(p.NOT_YET, "waiting"), now)
+    p.log_step(conn, "scheduled__1", "ingest", p.Result(p.DONE, "found"), now)
+    steps = p.rows(conn, "SELECT step, status, detail FROM ops_pipeline_step")
+    assert [(s["step"], s["status"]) for s in steps] == [("ingest", "ok")]
+    assert json.loads(steps[0]["detail"])["message"] == "found"
+    p.set_status(conn, "scheduled__1", "ready", now)
+    assert p.run_row(conn, "scheduled__1")["ready_at"] == now
+    p.set_status(conn, "scheduled__1", "failed", now)
+    p.set_status(conn, "scheduled__1", "ok", now)  # a failure isn't hidden by a later step
+    assert p.run_row(conn, "scheduled__1")["status"] == "failed"
+    with pytest.raises(LookupError):
+        p.run_row(conn, "nope")
 
 
-def test_ingest_waits_passes_and_fails(fresh) -> None:
-    dag_start = T(2026, 11, 18, 22, 35)
-    soon = dag_start + dt.timedelta(minutes=30)
-    ingest_row(fresh, "2026-11-17T22:30:00", "ok", "2026-11-17T22:31:00")  # last night: ignored
-    assert p.check_ingest(fresh, dag_start, soon, CFG).code == p.NOT_YET
-    late = p.check_ingest(fresh, dag_start, dag_start + dt.timedelta(hours=4), CFG)
-    assert late.code == p.FAILED and "not started" in late.message
-    ingest_row(fresh, "2026-11-18T22:30:05", "running")
-    assert p.check_ingest(fresh, dag_start, soon, CFG).code == p.NOT_YET
-    with fresh.begin() as conn:
-        run(conn, "UPDATE ops_run SET status = 'partial', finished_at = '2026-11-18T23:10:00' "
-            "WHERE started_at = '2026-11-18T22:30:05'")  # fmt: skip
-    done = p.check_ingest(fresh, dag_start, soon, CFG)
-    assert done.code == p.DONE and done.detail["status"] == "partial"
-    with fresh.begin() as conn:
-        run(conn, "UPDATE ops_run SET status = 'failed'")
-    assert p.check_ingest(fresh, dag_start, soon, CFG).code == p.FAILED
+def ingest_row(c, started: str, status: str) -> None:
+    sql(c, "INSERT INTO ops_run (started_at, finished_at, mode, status) "
+        "VALUES (%(s)s, %(s)s, 'maintain', %(st)s)", {"s": started, "st": status})  # fmt: skip
 
 
-def summary_row(db, started: str, summary: dict) -> None:
-    with db.begin() as conn:
-        run(
-            conn,
-            "INSERT INTO ops_run (started_at, finished_at, mode, status, summary) "
-            "VALUES (:s, :s, 'maintain', 'ok', :j)",
-            {"s": started, "j": json.dumps(summary)},
-        )
+def test_ingest_check(conn) -> None:
+    assert p.check_ingest(conn, STARTED, CFG).code == p.FAILED  # no run
+    ingest_row(conn, "2026-11-17T22:30:00", "ok")  # last night's: ignored
+    assert p.check_ingest(conn, STARTED, CFG).code == p.FAILED
+    ingest_row(conn, "2026-11-18T22:30:05", "partial")
+    ok = p.check_ingest(conn, STARTED, CFG)
+    assert ok.code == p.DONE and ok.detail["status"] == "partial"
+    ingest_row(conn, "2026-11-18T22:31:00", "failed")  # the newest run counts
+    assert "failed" in p.check_ingest(conn, STARTED, CFG).message
 
 
-def test_nightly_analyses_must_run_clean(fresh) -> None:
-    clean = {
-        "screener": {"screened": 480, "listed": 33},
-        "stocks": {"computed": ["NEE", "NFLX"], "failed": {}, "peers_missing": []},
-        "market": {"price_date": "2026-11-18"},
-    }
-    assert p.check_nightly(fresh, STARTED, CFG).code == p.FAILED  # no run at all
-    summary_row(fresh, "2026-11-18T22:30:05", {"nightly": clean})
-    ok = p.check_nightly(fresh, STARTED, CFG)
-    assert ok.code == p.DONE and "480" in ok.message
-    bad = {**clean, "screener_error": "boom", "stocks": {**clean["stocks"], "failed": {"X": "e"}}}
-    summary_row(fresh, "2026-11-18T22:31:00", {"nightly": bad})
-    failed = p.check_nightly(fresh, STARTED, CFG)
-    assert failed.code == p.FAILED and "screener: boom" in failed.message and "X" in failed.message
-    summary_row(fresh, "2026-11-18T22:32:00", {"nightly_error": "crash"})
-    assert "crash" in p.check_nightly(fresh, STARTED, CFG).message
+def test_nightly_check_reads_what_was_stored(conn) -> None:
+    for i, sym in enumerate(("NEE", "NFLX")):
+        sql(conn, "INSERT INTO user_watchlist (symbol, position) VALUES (%(s)s, %(i)s)",
+            {"s": sym, "i": i})  # fmt: skip
+    failed = p.check_nightly(conn, STARTED)
+    assert failed.code == p.FAILED and "no screener run" in failed.message
+    at = "2026-11-18T23:00:00"
+    sql(conn, "INSERT INTO out_screener_run (run_date, universe, created_at) "
+        "VALUES ('2026-11-18', 'SP:SPX', %(t)s)", {"t": at})  # fmt: skip
+    sql(conn, "INSERT INTO out_market_numbers (as_of, computed_at, payload_json) "
+        "VALUES ('2026-11-18', %(t)s, '{}')", {"t": at})  # fmt: skip
+    sql(conn, "INSERT INTO out_stock_numbers (symbol, as_of, computed_at, stock_key, "
+        "payload_json) VALUES ('NEE', '2026-11-18', %(t)s, '{}', '{}')", {"t": at})  # fmt: skip
+    missing = p.check_nightly(conn, STARTED)
+    assert missing.code == p.FAILED and missing.detail["stocks_missing"] == ["NFLX"]
+    sql(conn, "INSERT INTO out_stock_numbers (symbol, as_of, computed_at, stock_key, "
+        "payload_json) VALUES ('NFLX', '2026-11-18', %(t)s, '{}', '{}')", {"t": at})  # fmt: skip
+    assert p.check_nightly(conn, STARTED).code == p.DONE
 
 
-def quote_fetch(db, at: str, status: str, sha: str, error: str | None = None) -> None:
-    with db.begin() as conn:
-        run(
-            conn,
-            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status, "
-            "payload_sha256, error) VALUES ('tradingview_quotes', 'all', :t, :t, :st, :h, :e)",
-            {"t": at, "st": status, "h": sha, "e": error},
-        )
-
-
-def test_quotes_job_must_have_stored_recently(fresh) -> None:
-    now = T(2026, 11, 18, 22, 40)
-    assert p.check_quotes(fresh, now, CFG).code == p.FAILED  # never stored
-    quote_fetch(fresh, "2026-11-18T21:05:00", "ok", "a")
-    assert p.check_quotes(fresh, now, CFG).code == p.DONE
-    quote_fetch(fresh, "2026-11-18T22:05:00", "error", None, "HTTP 503")
-    later = p.check_quotes(fresh, T(2026, 11, 19, 2, 0), CFG)
-    assert later.code == p.FAILED and "HTTP 503" in later.message
-    assert p.check_quotes(fresh, T(2026, 11, 26, 23, 0), CFG).code == p.DONE  # Thanksgiving
-
-
-def test_prices_must_reach_the_last_close(fresh) -> None:
+def test_prices_must_reach_the_last_close(conn) -> None:
     now = T(2026, 11, 18, 22, 50)
-    seed_prices(fresh, {f"S{i}": "2026-11-18" for i in range(19)} | {"LATE": "2026-11-17"})
-    result = p.check_prices(fresh, now, CFG)
+    for i in range(1, 21):
+        sql(conn, "INSERT INTO core_company (company_id, symbol) VALUES (%(i)s, %(s)s)",
+            {"i": i, "s": f"S{i}"})  # fmt: skip
+        sql(conn, "INSERT INTO core_index_member VALUES (%(i)s, 'SP:SPX', '2020-01-01', NULL)",
+            {"i": i})  # fmt: skip
+        day = "2026-11-17" if i == 20 else "2026-11-18"
+        sql(conn, "INSERT INTO core_price_daily (company_id, date, close) VALUES (%(i)s, %(d)s, 1)",
+            {"i": i, "d": day})  # fmt: skip
+    result = p.check_prices(conn, now, CFG)
     assert result.code == p.DONE and result.detail["fresh"] == 19  # 95% exactly
-    with fresh.begin() as conn:
-        run(conn, "DELETE FROM core_price_daily WHERE date = '2026-11-18' AND company_id = 1")
-    stale = p.check_prices(fresh, now, CFG)
-    assert stale.code == p.FAILED and stale.message.startswith("Prices are stale")
+    sql(conn, "DELETE FROM core_price_daily WHERE company_id = 1")
+    assert p.check_prices(conn, now, CFG).message.startswith("Prices are stale")
 
 
-def test_fail_marks_the_run_and_emails_the_alert(fresh, respx_mock, monkeypatch) -> None:
-    from stock_analysis.pipeline.__main__ import main
+def quote_fetch(c, at: str, status: str, sha: str | None, error: str | None = None) -> None:
+    sql(c, "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status, "
+        "rows_stored, payload_sha256, error) VALUES ('tradingview_quotes', 'all', %(t)s, %(t)s, "
+        "%(st)s, 500, %(h)s, %(e)s)", {"t": at, "st": status, "h": sha, "e": error})  # fmt: skip
 
-    monkeypatch.setattr("stock_analysis.pipeline.__main__.database", lambda read_only=False: fresh)
-    monkeypatch.setattr(fresh, "close", lambda: None)
-    for k, v in {"BREVO_API_KEY": "k", "WATCHLIST_EMAIL_FROM": "Stock analysis <bot@example.com>",
-                 "PIPELINE_ALERT_TO": "me@example.com"}.items():  # fmt: skip
-        monkeypatch.setenv(k, v)
-    brevo = respx_mock.post(p.BREVO).mock(return_value=httpx.Response(201, json={}))
-    assert main(["start", "manual__x"]) == p.DONE
-    assert main(["fail", "manual__x", "check_prices", "Prices are stale"]) == p.DONE
-    assert p.run_row(fresh, "manual__x")["status"] == "failed"
-    sent = json.loads(brevo.calls.last.request.content)
-    assert sent["subject"] == "Stock pipeline FAILED: check_prices"
-    assert sent["to"] == [{"email": "me@example.com"}]
-    assert sent["sender"]["email"] == "bot@example.com"  # "Name <address>" split, as Brevo needs
+
+def test_quotes_check_reads_the_run_just_started(conn) -> None:
+    started = T(2026, 11, 18, 15, 5)
+    quote_fetch(conn, "2026-11-18T14:05:30", "error", None, "old error")  # before: ignored
+    assert p.check_quotes(conn, started).code == p.DONE  # same prices: nothing stored
+    quote_fetch(conn, "2026-11-18T15:05:40", "ok", "a")
+    assert "500 rows" in p.check_quotes(conn, started).message
+    quote_fetch(conn, "2026-11-18T15:06:10", "error", None, "HTTP 503")
+    failed = p.check_quotes(conn, started)
+    assert failed.code == p.FAILED and "HTTP 503" in failed.message

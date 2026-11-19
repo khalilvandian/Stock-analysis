@@ -368,6 +368,7 @@ def _run_job(
     limit: int | None = None,
     do_build: bool = True,
     do_coverage: bool = True,
+    do_nightly: bool = True,
     ctx: Context | None = None,
 ) -> dict:
     """One run, with the lock held."""
@@ -462,7 +463,7 @@ def _run_job(
         except Exception as exc:
             summary["coverage_error"] = repr(exc)[:500]
             status = "partial"
-    if do_build and config.get("nightly", False):
+    if do_build and do_nightly and config.get("nightly", False):
         # The evening run's numbers, computed here so the scheduled session only reads them
         # (stock_analysis.nightly): the screener, the watch list, the market report.
         from .. import nightly
