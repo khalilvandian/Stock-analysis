@@ -1,0 +1,10 @@
+# What goes into the Airflow image (orchestration/Dockerfile): the DAGs, the plugin, the
+# pipeline module and the settings. Overrides the root .dockerignore, which is the ingest
+# image's.
+*
+!config/
+!src/stock_analysis/__init__.py
+!src/stock_analysis/pipeline/
+!orchestration/dags/
+!orchestration/plugins/
+**/__pycache__

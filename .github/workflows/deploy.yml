@@ -85,9 +85,9 @@ jobs:
           STOCK_SERVER_DB_PASSWORD: ${{ secrets.STOCK_SERVER_DB_PASSWORD }}
         run: |
           ip=$(curl -fsS https://api.ipify.org)
-          az postgres flexible-server firewall-rule create -g "$RESOURCE_GROUP" --name "$SERVER" \
-            --rule-name github-deploy --start-ip-address "$ip" --end-ip-address "$ip" --only-show-errors -o none
-          trap 'az postgres flexible-server firewall-rule delete -g "$RESOURCE_GROUP" --name "$SERVER" --rule-name github-deploy --yes --only-show-errors' EXIT
+          az postgres flexible-server firewall-rule create -g "$RESOURCE_GROUP" --server-name "$SERVER" \
+            --name github-deploy --start-ip-address "$ip" --end-ip-address "$ip" --only-show-errors -o none
+          trap 'az postgres flexible-server firewall-rule delete -g "$RESOURCE_GROUP" --server-name "$SERVER" --name github-deploy --yes --only-show-errors' EXIT
           uv run --frozen --no-dev python -m stock_analysis.db init --target server
 
       - name: 2. Web API
