@@ -67,6 +67,14 @@ function Grant([string]$principal, [string]$role, [string]$scope) {
 }
 
 Write-Host "1/7 Settings"
+# A new subscription has few resource providers registered; Azure answers SubscriptionNotFound
+# for a resource of an unregistered one.
+foreach ($ns in "Microsoft.Storage", "Microsoft.Compute", "Microsoft.Network") {
+    if ((AzFind provider show --namespace $ns --query registrationState -o tsv) -ne "Registered") {
+        Write-Host "  registering $ns"
+        Az provider register --namespace $ns --wait | Out-Null
+    }
+}
 if (-not (Read-DotEnv "AIRFLOW_DB_PASSWORD" -Optional)) {
     $bytes = New-Object byte[] 24; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $generated = [Convert]::ToBase64String($bytes).Replace("+", "A").Replace("/", "B").Replace("=", "")
@@ -93,8 +101,8 @@ $logs = @(
 $logConn = '{"conn_type": "wasb", "host": "https://' + $Storage + '.blob.core.windows.net"}'
 
 Write-Host "2/7 Airflow's database on $Server"
-if (-not (AzFind postgres flexible-server db show -g $ResourceGroup -s $Server -d airflow --query name -o tsv)) {
-    Az postgres flexible-server db create -g $ResourceGroup -s $Server -d airflow --only-show-errors | Out-Null
+if (-not (AzFind postgres flexible-server db show -g $ResourceGroup --server-name $Server --name airflow --query name -o tsv)) {
+    Az postgres flexible-server db create -g $ResourceGroup --server-name $Server --name airflow --only-show-errors | Out-Null
 }
 $env:AIRFLOW_DB_PASSWORD_NEW = $airflowPw
 & $python deploy\airflow\metadata_db.py
@@ -127,16 +135,18 @@ if (-not $SkipUi) {
         "AZURE_DB_SERVER=$Server"
     ) + $logs
     $uiSecrets = @("metadata-url=$metadataUrl", "jwt-secret=$jwt")
-    $start = "python -m stock_orch.firewall airflow-ui && exec airflow api-server --apps core --workers 1 --port 8080"
+    # Opens its database firewall rule, then runs `airflow api-server --apps core`. No argument
+    # starts with a dash: the Azure CLI would take it for one of its own options.
+    $start = "/opt/stock/orchestration/plugins/stock_orch/ui.py"
     if (-not (AzFind containerapp show -n $UiApp -g $ResourceGroup --query name -o tsv)) {
         Az containerapp create -n $UiApp -g $ResourceGroup --environment $Environment --image $Image `
             --cpu 0.5 --memory 1Gi --min-replicas 0 --max-replicas 1 `
             --ingress external --target-port 8080 --system-assigned `
-            --secrets @uiSecrets --env-vars @uiEnv --command bash --args "-c" $start --only-show-errors | Out-Null
+            --secrets @uiSecrets --env-vars @uiEnv --command python --args $start --only-show-errors | Out-Null
     } else {
         Az containerapp secret set -n $UiApp -g $ResourceGroup --secrets @uiSecrets --only-show-errors | Out-Null
         Az containerapp update -n $UiApp -g $ResourceGroup --image $Image --set-env-vars @uiEnv `
-            --command bash --args "-c" $start --only-show-errors | Out-Null
+            --command python --args $start --only-show-errors | Out-Null
     }
     $uiPrincipal = (Az containerapp show -n $UiApp -g $ResourceGroup --query identity.principalId -o tsv)
     Grant $uiPrincipal "Contributor" $serverId            # its own firewall rule, as the jobs do
