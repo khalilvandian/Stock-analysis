@@ -329,6 +329,9 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 
 
 
+
+
+
 <section id="inside-the-database">
   <h2>Inside the database, in UML</h2>
   <figure>
@@ -1322,187 +1325,208 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <h2>The nightly pipeline, in UML</h2>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1300 660" role="img" aria-label="UML activity diagram of one weekday night in four partitions. Azure runs the ingest job at 22:30 UTC (fetch, build, coverage, nightly analyses, a row in ops_run) and the quotes job every hour. Airflow&#x27;s stock_nightly starts at 22:35 and forks: it checks the quotes job, waits for the finished ingest run, then forks again to check the nightly analyses and the prices; the prices lead to the ready marker and to waiting for the Claude session&#x27;s commit and its published site. A join closes the run. Any failed check interrupts the region: the run is marked failed and an alert is emailed. The Claude session runs at 00:00 Italy time, waits for the newest price, writes the notes and reports, commits and emails. At 07:00 UTC a GitHub workflow audits the last trading day.">
+<svg viewBox="0 0 1300 760" role="img" aria-label="UML activity diagram of one weekday night in four partitions. At 22:30 UTC Airflow on the VM opens its run log, then starts one run of the Azure job stock-ingest per heavy step and checks what each stored: fetch, then build; after the build it forks into the quality check, the coverage snapshot, the nightly analyses (then their check) and the price check (then the ready marker and the wait for the Claude session&#x27;s published commit). Coverage and the nightly check join before the site rebuild; everything joins before the run is closed. Any failure interrupts the region: the run is marked failed and an alert is emailed. The Claude session runs at 00:00 Italy time. Every 3 hours a GitHub workflow audits the run log.">
 <defs><marker id="u7-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
-<rect class="u-frame" x="10" y="10" width="1280" height="640"/>
+<rect class="u-frame" x="10" y="10" width="1280" height="740"/>
 <path class="u-frame-tag" d="M10,10 h144 v14 l-9,10 H10 z"/>
 <text class="u-tagk" x="18" y="26">act</text>
 <text class="u-tag" x="55.5" y="26">stock_nightly</text>
-<rect class="u-part" x="24" y="46" width="1252" height="590"/>
-<path class="u-partl" d="M24,156 H1276 M24,406 H1276 M50,46 V636"/>
-<path class="u-partl" d="M24,516 H1276"/>
-<text class="u-lane" x="41" y="101" text-anchor="middle" transform="rotate(-90 41 101)">Azure jobs</text>
-<text class="u-lane" x="41" y="281" text-anchor="middle" transform="rotate(-90 41 281)">Airflow</text>
-<text class="u-lane" x="41" y="461" text-anchor="middle" transform="rotate(-90 41 461)">Claude</text>
-<text class="u-lane" x="41" y="576" text-anchor="middle" transform="rotate(-90 41 576)">GitHub</text>
-<path class="u-node" d="M73,81 H91 L73,105 H91 z"/>
-<text class="u-g" x="82" y="121" text-anchor="middle">22:30 UTC</text>
-<rect class="u-node" x="116" y="79" width="200" height="44" rx="12"/>
-<text class="u-act" x="216" y="97.5" text-anchor="middle">Ingest, build, coverage,</text>
-<text class="u-act" x="216" y="112.5" text-anchor="middle">nightly analyses</text>
-<path class="u-rake" d="M302,109 v10 M297,119 v-5 h10 v5"/>
-<path class="u-line" d="M91,93 L116,93" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="352" y="81" width="110" height="40"/>
-<text class="u-kw" x="407" y="97.5" text-anchor="middle">«datastore»</text>
-<text class="u-obj" x="407" y="112.5" text-anchor="middle">ops_run</text>
-<path class="u-line" d="M316,101 L352,101" marker-end="url(#u7-a)"/>
-<path class="u-note" d="M496,62 H737 L746,71 V119 H496 z M737,62 V71 H746"/>
-<text class="u-n" x="504" y="80">its summary records any error of the</text>
-<text class="u-n" x="504" y="95">screener, the watch-list numbers or</text>
-<text class="u-n" x="504" y="110">the market numbers</text>
-<path class="u-line dash" d="M496,91 L462,91"/>
-<path class="u-node" d="M791,81 H809 L791,105 H809 z"/>
-<text class="u-g" x="800" y="121" text-anchor="middle">:05 hourly</text>
-<text class="u-g" x="800" y="134" text-anchor="middle">Mon–Fri</text>
-<rect class="u-node" x="832" y="81" width="130" height="40" rx="12"/>
-<text class="u-act" x="897" y="105" text-anchor="middle">Store the quotes</text>
-<path class="u-line" d="M809,93 L832,93" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="1000" y="81" width="120" height="40"/>
-<text class="u-kw" x="1060" y="97.5" text-anchor="middle">«datastore»</text>
-<text class="u-obj" x="1060" y="112.5" text-anchor="middle">raw_tv_quote</text>
-<path class="u-line" d="M962,101 L1000,101" marker-end="url(#u7-a)"/>
-<path class="u-node" d="M73,194 H91 L73,218 H91 z"/>
-<text class="u-g" x="82" y="234" text-anchor="middle">22:35 UTC</text>
-<text class="u-g" x="82" y="247" text-anchor="middle">Mon–Fri</text>
-<rect class="u-node" x="108" y="186" width="104" height="40" rx="12"/>
-<text class="u-act" x="160" y="202.5" text-anchor="middle">Open the</text>
-<text class="u-act" x="160" y="217.5" text-anchor="middle">run log</text>
-<path class="u-line" d="M91,206 L108,206" marker-end="url(#u7-a)"/>
-<rect class="u-region" x="232" y="166" width="908" height="230" rx="14"/>
-<text class="u-kw" x="244" y="182">«interruptible»</text>
-<rect class="u-solid" x="243.5" y="192" width="5" height="158"/>
-<path class="u-line" d="M212,206 L243.5,206" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="262" y="186" width="116" height="40" rx="12"/>
-<text class="u-act" x="320" y="202.5" text-anchor="middle">Wait for the</text>
-<text class="u-act" x="320" y="217.5" text-anchor="middle">ingest run</text>
-<path class="u-line" d="M248.5,206 L262,206" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="262" y="310" width="116" height="40" rx="12"/>
-<text class="u-act" x="320" y="326.5" text-anchor="middle">Check the</text>
-<text class="u-act" x="320" y="341.5" text-anchor="middle">quotes job</text>
-<path class="u-line" d="M248.5,330 L262,330" marker-end="url(#u7-a)"/>
-<path class="u-line" d="M407,121 L407,180 L350,180 L350,186" marker-end="url(#u7-a)"/>
-<text class="u-g" x="414" y="142" text-anchor="start">finished row</text>
-<path class="u-node" d="M412,193 L425,206 L412,219 L399,206 z"/>
-<path class="u-line" d="M378,206 L399,206" marker-end="url(#u7-a)"/>
-<path class="u-line" d="M412,219 L412,262 L290,262 L290,226" marker-end="url(#u7-a)"/>
-<text class="u-g" x="300" y="276" text-anchor="start">[not yet] / again in 5 min</text>
-<rect class="u-solid" x="443.5" y="192" width="5" height="120"/>
-<path class="u-line" d="M425,206 L443.5,206" marker-end="url(#u7-a)"/>
-<text class="u-g" x="430" y="180" text-anchor="middle">[done]</text>
-<rect class="u-node" x="466" y="186" width="112" height="40" rx="12"/>
-<text class="u-act" x="522" y="202.5" text-anchor="middle">Check the</text>
-<text class="u-act" x="522" y="217.5" text-anchor="middle">prices</text>
-<path class="u-line" d="M448.5,206 L466,206" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="466" y="280" width="112" height="40" rx="12"/>
-<text class="u-act" x="522" y="296.5" text-anchor="middle">Check the nightly</text>
-<text class="u-act" x="522" y="311.5" text-anchor="middle">analyses</text>
-<path class="u-line" d="M448.5,300 L466,300" marker-end="url(#u7-a)"/>
-<path class="u-node" d="M614,193 L627,206 L614,219 L601,206 z"/>
-<path class="u-line" d="M578,206 L601,206" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="662" y="186" width="100" height="40" rx="12"/>
-<text class="u-act" x="712" y="210" text-anchor="middle">Mark ready</text>
-<path class="u-line" d="M627,206 L662,206" marker-end="url(#u7-a)"/>
-<text class="u-g" x="640" y="224" text-anchor="middle">[≥ 95%</text>
-<text class="u-g" x="640" y="237" text-anchor="middle">fresh]</text>
-<rect class="u-node" x="650" y="282" width="124" height="40"/>
-<text class="u-kw" x="712" y="298.5" text-anchor="middle">«datastore»</text>
-<text class="u-obj" x="712" y="313.5" text-anchor="middle">ops_pipeline_run</text>
-<path class="u-line" d="M712,226 L712,282" marker-end="url(#u7-a)"/>
-<text class="u-g" x="720" y="262" text-anchor="start">[ready]</text>
-<rect class="u-node" x="800" y="186" width="120" height="40" rx="12"/>
-<text class="u-act" x="860" y="202.5" text-anchor="middle">Wait for commit</text>
-<text class="u-act" x="860" y="217.5" text-anchor="middle">and the site</text>
-<path class="u-line" d="M762,206 L800,206" marker-end="url(#u7-a)"/>
-<path class="u-node" d="M956,193 L969,206 L956,219 L943,206 z"/>
-<path class="u-line" d="M920,206 L943,206" marker-end="url(#u7-a)"/>
-<path class="u-line" d="M956,219 L956,262 L890,262 L890,226" marker-end="url(#u7-a)"/>
-<text class="u-g" x="860" y="276" text-anchor="start">[not yet] / again in 10 min</text>
-<rect class="u-solid" x="991.5" y="192" width="5" height="180"/>
-<path class="u-line" d="M969,206 L991.5,206" marker-end="url(#u7-a)"/>
-<text class="u-g" x="975" y="180" text-anchor="middle">[published]</text>
-<path class="u-line" d="M578,300 L620,300 L620,352 L991.5,352" marker-end="url(#u7-a)"/>
-<path class="u-line" d="M378,330 L390,330 L390,368 L991.5,368" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="1012" y="186" width="86" height="40" rx="12"/>
-<text class="u-act" x="1055" y="202.5" text-anchor="middle">Close the</text>
-<text class="u-act" x="1055" y="217.5" text-anchor="middle">run (ok)</text>
-<path class="u-line" d="M996.5,206 L1012,206" marker-end="url(#u7-a)"/>
-<circle class="u-node" cx="1120" cy="206" r="11"/>
-<circle class="u-solid" cx="1120" cy="206" r="6.5"/>
-<path class="u-line" d="M1098,206 L1109,206" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="1166" y="238" width="98" height="44" rx="12"/>
-<text class="u-act" x="1215" y="256.5" text-anchor="middle">Mark failed,</text>
-<text class="u-act" x="1215" y="271.5" text-anchor="middle">email alert</text>
-<path class="u-line" d="M1140,330 L1158.0,330 L1148.0,260 L1166,260" marker-end="url(#u7-a)"/>
-<circle class="u-node" cx="1215" cy="312" r="9"/>
-<path class="u-line" d="M1208.6,305.6 L1221.4,318.4 M1208.6,318.4 L1221.4,305.6"/>
-<path class="u-line" d="M1215,282 L1215,303" marker-end="url(#u7-a)"/>
-<path class="u-note" d="M1150,336 H1261 L1270,345 V408 H1150 z M1261,336 V345 H1270"/>
-<text class="u-n" x="1158" y="354">a failed check, a</text>
-<text class="u-n" x="1158" y="369">crash after retries</text>
-<text class="u-n" x="1158" y="384">or a wait past its</text>
-<text class="u-n" x="1158" y="399">limit interrupts</text>
-<path class="u-node" d="M73,438 H91 L73,462 H91 z"/>
-<text class="u-g" x="82" y="478" text-anchor="middle">00:00 Italy</text>
-<text class="u-g" x="82" y="491" text-anchor="middle">Tue–Sat</text>
-<rect class="u-node" x="108" y="430" width="150" height="40" rx="12"/>
-<text class="u-act" x="183" y="446.5" text-anchor="middle">Wait for the newest</text>
-<text class="u-act" x="183" y="461.5" text-anchor="middle">price (up to 1 h)</text>
-<path class="u-line" d="M91,450 L108,450" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="290" y="428" width="160" height="44" rx="12"/>
-<text class="u-act" x="370" y="446.5" text-anchor="middle">Notes, reports,</text>
-<text class="u-act" x="370" y="461.5" text-anchor="middle">validate</text>
-<path class="u-rake" d="M436,458 v10 M431,468 v-5 h10 v5"/>
-<path class="u-line" d="M258,450 L290,450" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="482" y="430" width="120" height="40" rx="12"/>
-<text class="u-act" x="542" y="454" text-anchor="middle">Commit to main</text>
-<path class="u-line" d="M450,450 L482,450" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="634" y="430" width="110" height="40" rx="12"/>
-<text class="u-act" x="689" y="454" text-anchor="middle">Email the run</text>
-<path class="u-line" d="M602,450 L634,450" marker-end="url(#u7-a)"/>
-<circle class="u-node" cx="778" cy="450" r="11"/>
-<circle class="u-solid" cx="778" cy="450" r="6.5"/>
-<path class="u-line" d="M744,450 L767,450" marker-end="url(#u7-a)"/>
-<path class="u-note" d="M820,426 H1171 L1180,435 V468 H820 z M1171,426 V435 H1180"/>
-<text class="u-n" x="828" y="444">docs/EVENING_RUN.md: reads the stored numbers through the</text>
-<text class="u-n" x="828" y="459">web API, writes the notes, renders the PDFs</text>
-<rect class="u-node" x="472" y="556" width="140" height="40" rx="12"/>
-<text class="u-act" x="542" y="572.5" text-anchor="middle">Pages publishes</text>
-<text class="u-act" x="542" y="587.5" text-anchor="middle">the site</text>
-<path class="u-line" d="M542,470 L542,556" marker-end="url(#u7-a)"/>
-<text class="u-g" x="550" y="532" text-anchor="start">push</text>
-<circle class="u-node" cx="648" cy="576" r="9"/>
-<path class="u-line" d="M641.6,569.6 L654.4,582.4 M641.6,582.4 L654.4,569.6"/>
-<path class="u-line" d="M612,576 L639,576" marker-end="url(#u7-a)"/>
-<path class="u-line dash" d="M592,556 V530 H860 V230" marker-end="url(#u7-a)"/>
-<text class="u-g" x="866" y="526" text-anchor="start">read through the GitHub API</text>
-<path class="u-node" d="M73,564 H91 L73,588 H91 z"/>
-<text class="u-g" x="82" y="545" text-anchor="middle">07:00 UTC</text>
-<text class="u-g" x="82" y="558" text-anchor="middle">Tue–Sat</text>
-<rect class="u-node" x="108" y="556" width="126" height="40" rx="12"/>
-<text class="u-act" x="171" y="572.5" text-anchor="middle">Audit the last</text>
-<text class="u-act" x="171" y="587.5" text-anchor="middle">trading day</text>
-<path class="u-line" d="M91,576 L108,576" marker-end="url(#u7-a)"/>
-<path class="u-node" d="M276,563 L289,576 L276,589 L263,576 z"/>
-<path class="u-line" d="M234,576 L263,576" marker-end="url(#u7-a)"/>
-<circle class="u-node" cx="276" cy="620" r="11"/>
-<circle class="u-solid" cx="276" cy="620" r="6.5"/>
-<path class="u-line" d="M276,589 L276,609" marker-end="url(#u7-a)"/>
-<text class="u-g" x="284" y="606" text-anchor="start">[ok run]</text>
-<rect class="u-node" x="318" y="556" width="126" height="40" rx="12"/>
-<text class="u-act" x="381" y="572.5" text-anchor="middle">Fail: GitHub</text>
-<text class="u-act" x="381" y="587.5" text-anchor="middle">emails the owner</text>
-<path class="u-line" d="M289,576 L318,576" marker-end="url(#u7-a)"/>
-<text class="u-g" x="303" y="568" text-anchor="middle">[none]</text>
-<circle class="u-node" cx="430" cy="620" r="9"/>
-<path class="u-line" d="M423.6,613.6 L436.4,626.4 M423.6,626.4 L436.4,613.6"/>
-<path class="u-line" d="M381,596 L381,620 L421,620" marker-end="url(#u7-a)"/>
-<path class="u-note" d="M740,560 H1051 L1060,569 V617 H740 z M1051,560 V569 H1060"/>
-<text class="u-n" x="748" y="578">pipeline-watch.yml reads ops_pipeline_run through</text>
-<text class="u-n" x="748" y="593">the web API: it catches a night Airflow never ran</text>
-<text class="u-n" x="748" y="608">(the PC was off, the DAG paused)</text>
+<rect class="u-part" x="24" y="46" width="1252" height="700"/>
+<path class="u-partl" d="M24,246 H1276 M24,476 H1276 M24,576 H1276 M50,46 V746"/>
+<text class="u-lane" x="37" y="146" text-anchor="middle" transform="rotate(-90 37 146)">Airflow · VM</text>
+<text class="u-lane" x="37" y="361" text-anchor="middle" transform="rotate(-90 37 361)">Azure job runs</text>
+<text class="u-lane" x="37" y="526" text-anchor="middle" transform="rotate(-90 37 526)">Claude</text>
+<text class="u-lane" x="37" y="661" text-anchor="middle" transform="rotate(-90 37 661)">GitHub</text>
+<path class="u-node" d="M61,108 H79 L61,132 H79 z"/>
+<text class="u-g" x="70" y="148" text-anchor="middle">22:30 UTC</text>
+<text class="u-g" x="70" y="161" text-anchor="middle">Mon–Fri</text>
+<rect class="u-region" x="94" y="60" width="1056" height="408" rx="14"/>
+<text class="u-kw" x="1040" y="76">«interruptible»</text>
+<rect class="u-node" x="104" y="100" width="82" height="40" rx="12"/>
+<text class="u-act" x="145" y="116.5" text-anchor="middle">Open the</text>
+<text class="u-act" x="145" y="131.5" text-anchor="middle">run log</text>
+<path class="u-line" d="M79,120 L104,120" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="198" y="280" width="90" height="40" rx="12"/>
+<text class="u-act" x="243" y="296.5" text-anchor="middle">Fetch</text>
+<text class="u-objm" x="243" y="311.5" text-anchor="middle">db ingest</text>
+<path class="u-line" d="M145,140 L145,300 L198,300" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="300" y="100" width="90" height="40" rx="12"/>
+<text class="u-act" x="345" y="116.5" text-anchor="middle">Check</text>
+<text class="u-act" x="345" y="131.5" text-anchor="middle">the fetch</text>
+<path class="u-line" d="M243,280 L243,120 L300,120" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="400" y="280" width="80" height="40" rx="12"/>
+<text class="u-act" x="440" y="296.5" text-anchor="middle">Build</text>
+<text class="u-objm" x="440" y="311.5" text-anchor="middle">db build</text>
+<path class="u-line" d="M345,140 L345,300 L400,300" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="492" y="100" width="90" height="40" rx="12"/>
+<text class="u-act" x="537" y="116.5" text-anchor="middle">Check</text>
+<text class="u-act" x="537" y="131.5" text-anchor="middle">the build</text>
+<path class="u-line" d="M440,280 L440,120 L492,120" marker-end="url(#u7-a)"/>
+<rect class="u-solid" x="597.5" y="100" width="5" height="340"/>
+<path class="u-line" d="M582,120 L597.5,120" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="616" y="100" width="90" height="40" rx="12"/>
+<text class="u-act" x="661" y="116.5" text-anchor="middle">Check</text>
+<text class="u-act" x="661" y="131.5" text-anchor="middle">the prices</text>
+<path class="u-line" d="M602.5,120 L616,120" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="722" y="100" width="80" height="40" rx="12"/>
+<text class="u-act" x="762" y="116.5" text-anchor="middle">Mark</text>
+<text class="u-act" x="762" y="131.5" text-anchor="middle">ready</text>
+<path class="u-line" d="M706,120 L722,120" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="818" y="100" width="110" height="40" rx="12"/>
+<text class="u-act" x="873" y="116.5" text-anchor="middle">Wait for the</text>
+<text class="u-act" x="873" y="131.5" text-anchor="middle">session&#x27;s commit</text>
+<path class="u-line" d="M802,120 L818,120" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="616" y="280" width="90" height="40" rx="12"/>
+<text class="u-act" x="661" y="296.5" text-anchor="middle">Nightly</text>
+<text class="u-objm" x="661" y="311.5" text-anchor="middle">db nightly</text>
+<path class="u-line" d="M602.5,300 L616,300" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="722" y="180" width="90" height="40" rx="12"/>
+<text class="u-act" x="767" y="196.5" text-anchor="middle">Check the</text>
+<text class="u-act" x="767" y="211.5" text-anchor="middle">nightly</text>
+<path class="u-line" d="M706,300 L714,300 L714,200 L722,200" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="616" y="340" width="90" height="40" rx="12"/>
+<text class="u-act" x="661" y="356.5" text-anchor="middle">Coverage</text>
+<text class="u-objm" x="661" y="371.5" text-anchor="middle">db coverage</text>
+<path class="u-line" d="M602.5,360 L616,360" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="616" y="400" width="90" height="40" rx="12"/>
+<text class="u-act" x="661" y="416.5" text-anchor="middle">Quality</text>
+<text class="u-objm" x="661" y="431.5" text-anchor="middle">db check</text>
+<path class="u-line" d="M602.5,420 L616,420" marker-end="url(#u7-a)"/>
+<rect class="u-solid" x="835.5" y="186" width="5" height="186"/>
+<path class="u-line" d="M812,200 L835.5,200" marker-end="url(#u7-a)"/>
+<path class="u-line" d="M706,360 L835.5,360" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="852" y="180" width="90" height="40" rx="12"/>
+<text class="u-act" x="897" y="196.5" text-anchor="middle">Rebuild</text>
+<text class="u-act" x="897" y="211.5" text-anchor="middle">the site</text>
+<path class="u-line" d="M840.5,200 L852,200" marker-end="url(#u7-a)"/>
+<rect class="u-solid" x="959.5" y="100" width="5" height="332"/>
+<path class="u-line" d="M928,120 L959.5,120" marker-end="url(#u7-a)"/>
+<path class="u-line" d="M942,200 L959.5,200" marker-end="url(#u7-a)"/>
+<path class="u-line" d="M706,420 L959.5,420" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="978" y="100" width="80" height="40" rx="12"/>
+<text class="u-act" x="1018" y="116.5" text-anchor="middle">Close the</text>
+<text class="u-act" x="1018" y="131.5" text-anchor="middle">run (ok)</text>
+<path class="u-line" d="M964.5,120 L978,120" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="1090" cy="120" r="11"/>
+<circle class="u-solid" cx="1090" cy="120" r="6.5"/>
+<path class="u-line" d="M1058,120 L1079,120" marker-end="url(#u7-a)"/>
+<path class="u-note" d="M978,286 H1133 L1142,295 V358 H978 z M1133,286 V295 H1142"/>
+<text class="u-n" x="986" y="304">each a run of stock-ingest,</text>
+<text class="u-n" x="986" y="319">started through Azure&#x27;s API;</text>
+<text class="u-n" x="986" y="334">Airflow waits in its</text>
+<text class="u-n" x="986" y="349">triggerer (deferred)</text>
+<path class="u-note" d="M452,160 H583 L592,169 V217 H452 z M583,160 V169 H592"/>
+<text class="u-n" x="460" y="178">checks: SQL on what</text>
+<text class="u-n" x="460" y="193">the step stored, in</text>
+<text class="u-nm" x="460" y="208">ops_pipeline_step</text>
+<rect class="u-node" x="1170" y="120" width="98" height="44" rx="12"/>
+<text class="u-act" x="1219" y="138.5" text-anchor="middle">Mark failed,</text>
+<text class="u-act" x="1219" y="153.5" text-anchor="middle">email alert</text>
+<path class="u-line" d="M1150,260 L1165.0,260 L1155.0,142 L1170,142" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="1219" cy="196" r="9"/>
+<path class="u-line" d="M1212.6,189.6 L1225.4,202.4 M1212.6,202.4 L1225.4,189.6"/>
+<path class="u-line" d="M1219,164 L1219,187" marker-end="url(#u7-a)"/>
+<path class="u-note" d="M1162,300 H1261 L1270,309 V372 H1162 z M1261,300 V309 H1270"/>
+<text class="u-n" x="1170" y="318">a failed step</text>
+<text class="u-n" x="1170" y="333">(after retries)</text>
+<text class="u-n" x="1170" y="348">or a wait past</text>
+<text class="u-n" x="1170" y="363">its limit</text>
+<path class="u-node" d="M61,514 H79 L61,538 H79 z"/>
+<text class="u-g" x="70" y="554" text-anchor="middle">00:00 Italy</text>
+<text class="u-g" x="70" y="567" text-anchor="middle">Tue–Sat</text>
+<rect class="u-node" x="98" y="506" width="140" height="40" rx="12"/>
+<text class="u-act" x="168" y="522.5" text-anchor="middle">Wait for the newest</text>
+<text class="u-act" x="168" y="537.5" text-anchor="middle">price (up to 1 h)</text>
+<path class="u-line" d="M79,526 L98,526" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="258" y="504" width="140" height="44" rx="12"/>
+<text class="u-act" x="328" y="522.5" text-anchor="middle">Notes, reports,</text>
+<text class="u-act" x="328" y="537.5" text-anchor="middle">validate</text>
+<path class="u-rake" d="M384,534 v10 M379,544 v-5 h10 v5"/>
+<path class="u-line" d="M238,526 L258,526" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="418" y="506" width="112" height="40" rx="12"/>
+<text class="u-act" x="474" y="530" text-anchor="middle">Commit to main</text>
+<path class="u-line" d="M398,526 L418,526" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="550" y="506" width="100" height="40" rx="12"/>
+<text class="u-act" x="600" y="530" text-anchor="middle">Email the run</text>
+<path class="u-line" d="M530,526 L550,526" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="680" cy="526" r="11"/>
+<circle class="u-solid" cx="680" cy="526" r="6.5"/>
+<path class="u-line" d="M650,526 L669,526" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="420" y="640" width="140" height="40" rx="12"/>
+<text class="u-act" x="490" y="656.5" text-anchor="middle">Pages publishes</text>
+<text class="u-act" x="490" y="671.5" text-anchor="middle">the site</text>
+<path class="u-line" d="M474,546 L474,640" marker-end="url(#u7-a)"/>
+<text class="u-g" x="480" y="600" text-anchor="start">push</text>
+<path class="u-line" d="M897,220 L897,668 L560,668" marker-end="url(#u7-a)"/>
+<text class="u-g" x="903" y="560" text-anchor="start">workflow_dispatch</text>
+<circle class="u-node" cx="490" cy="724" r="9"/>
+<path class="u-line" d="M483.6,717.6 L496.4,730.4 M483.6,730.4 L496.4,717.6"/>
+<path class="u-line" d="M490,680 L490,715" marker-end="url(#u7-a)"/>
+<path class="u-line dash" d="M540,640 V600 H826 V140" marker-end="url(#u7-a)"/>
+<text class="u-g" x="832" y="596" text-anchor="start">read through the GitHub API</text>
+<path class="u-node" d="M61,648 H79 L61,672 H79 z"/>
+<text class="u-g" x="70" y="642" text-anchor="middle">every 3 h</text>
+<rect class="u-node" x="98" y="640" width="120" height="40" rx="12"/>
+<text class="u-act" x="158" y="656.5" text-anchor="middle">Audit the</text>
+<text class="u-act" x="158" y="671.5" text-anchor="middle">run log</text>
+<path class="u-line" d="M79,660 L98,660" marker-end="url(#u7-a)"/>
+<path class="u-node" d="M254,647 L267,660 L254,673 L241,660 z"/>
+<path class="u-line" d="M218,660 L241,660" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="254" cy="720" r="11"/>
+<circle class="u-solid" cx="254" cy="720" r="6.5"/>
+<path class="u-line" d="M254,673 L254,709" marker-end="url(#u7-a)"/>
+<text class="u-g" x="262" y="706" text-anchor="start">[ok]</text>
+<rect class="u-node" x="292" y="640" width="108" height="40" rx="12"/>
+<text class="u-act" x="346" y="656.5" text-anchor="middle">Fail: GitHub</text>
+<text class="u-act" x="346" y="671.5" text-anchor="middle">emails you</text>
+<path class="u-line" d="M267,660 L292,660" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="346" cy="724" r="9"/>
+<path class="u-line" d="M339.6,717.6 L352.4,730.4 M339.6,730.4 L352.4,717.6"/>
+<path class="u-line" d="M346,680 L346,715" marker-end="url(#u7-a)"/>
+<path class="u-note" d="M600,682 H891 L900,691 V739 H600 z M891,682 V691 H900"/>
+<text class="u-n" x="608" y="700">pipeline-watch.yml, outside Airflow: the last due</text>
+<text class="u-n" x="608" y="715">night ran ok, and on weekdays a quotes run in the</text>
+<text class="u-n" x="608" y="730">last 2 hours; it catches Airflow being down</text>
 </svg>
     </div>
-    <figcaption>Activity diagram: one weekday night, partitioned by where the work runs; the Airflow DAG <code>stock_nightly</code> waits for each piece and alerts when one fails or doesn't come.</figcaption>
+    <figcaption>Activity diagram: one weekday night of the Airflow DAG <code>stock_nightly</code>. Airflow starts each heavy step as a run of the Azure job <code>stock-ingest</code>, checks what it stored, and alerts when a step fails or doesn't come.</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 190" role="img" aria-label="UML activity diagram of the hourly quotes: at 5 minutes past each hour on weekdays Airflow opens its run log, starts a run of the Azure job stock-quotes, checks it and closes the run; a failure marks the run failed and emails an alert.">
+<defs><marker id="u13-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="10" y="10" width="1280" height="170"/>
+<path class="u-frame-tag" d="M10,10 h137 v14 l-9,10 H10 z"/>
+<text class="u-tagk" x="18" y="26">act</text>
+<text class="u-tag" x="55.5" y="26">stock_quotes</text>
+<rect class="u-part" x="24" y="46" width="1252" height="130"/>
+<path class="u-partl" d="M24,111 H1276 M50,46 V176"/>
+<text class="u-lane" x="37" y="78" text-anchor="middle" transform="rotate(-90 37 78)">Airflow</text>
+<text class="u-lane" x="37" y="143" text-anchor="middle" transform="rotate(-90 37 143)">Azure</text>
+<path class="u-node" d="M71,66 H89 L71,90 H89 z"/>
+<text class="u-g" x="120" y="104">:05 every hour, Mon–Fri</text>
+<rect class="u-node" x="110" y="60" width="124" height="36" rx="12"/>
+<text class="u-act" x="172" y="82" text-anchor="middle">Open the run log</text>
+<path class="u-line" d="M89,78 L110,78" marker-end="url(#u13-a)"/>
+<rect class="u-node" x="260" y="125" width="160" height="36" rx="12"/>
+<text class="u-act" x="340" y="147" text-anchor="middle">Quotes  db quotes</text>
+<path class="u-line" d="M172,96 L172,143 L260,143" marker-end="url(#u13-a)"/>
+<rect class="u-node" x="460" y="60" width="110" height="36" rx="12"/>
+<text class="u-act" x="515" y="82" text-anchor="middle">Check the run</text>
+<path class="u-line" d="M340,125 L340,78 L460,78" marker-end="url(#u13-a)"/>
+<rect class="u-node" x="610" y="60" width="100" height="36" rx="12"/>
+<text class="u-act" x="660" y="82" text-anchor="middle">Close the run</text>
+<path class="u-line" d="M570,78 L610,78" marker-end="url(#u13-a)"/>
+<circle class="u-node" cx="750" cy="78" r="11"/>
+<circle class="u-solid" cx="750" cy="78" r="6.5"/>
+<path class="u-line" d="M710,78 L739,78" marker-end="url(#u13-a)"/>
+<path class="u-note" d="M800,60 H1091 L1100,69 V117 H800 z M1091,60 V69 H1100"/>
+<text class="u-n" x="808" y="78">the same as the night: a failed step marks the</text>
+<text class="u-n" x="808" y="93">run failed and emails the alert; stock-quotes has</text>
+<text class="u-n" x="808" y="108">no schedule of its own</text>
+</svg>
+    </div>
+    <figcaption>Activity diagram: the hourly DAG <code>stock_quotes</code>.</figcaption>
   </figure>
   <figure>
     <div class="scroll">
@@ -1542,114 +1566,133 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <text class="u-n" x="1068" y="178">(ok, waiting or failed)</text>
 </svg>
     </div>
-    <figcaption>State machine: the status of a run in <code>ops_pipeline_run</code>, the marker the evening session and the morning audit read.</figcaption>
+    <figcaption>State machine: the status of a run in <code>ops_pipeline_run</code>, which the session's marker and the audit read.</figcaption>
   </figure>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1300 520" role="img" aria-label="UML deployment diagram: Airflow&#x27;s API server, scheduler, DAG processor and metadata database run in Docker on the PC with the DAG stock_nightly; Azure runs the ingest and quotes Container Apps Jobs, the PostgreSQL server stock-db-bk and the web API stock-api-bk; Anthropic&#x27;s cloud runs the scheduled Claude session; GitHub runs the Pages and pipeline-watch workflows; Brevo sends the emails.">
+<svg viewBox="0 0 1300 560" role="img" aria-label="UML deployment diagram: in Azure, a free B2ats v2 virtual machine runs Airflow&#x27;s always-on parts in Docker (scheduler, DAG processor, triggerer, the execution API); a Container Apps environment runs the Airflow UI as an app that scales to zero and the stock-ingest and stock-quotes jobs, which Airflow starts; the PostgreSQL server stock-db-bk holds the stock and airflow databases; Blob storage keeps the task logs; App Service runs the web API. Anthropic runs the scheduled Claude session, GitHub the Pages and pipeline-watch workflows, Brevo sends the emails, and the PC runs the same Docker setup for development.">
 <defs><marker id="u9-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
-<rect class="u-frame" x="10" y="10" width="1280" height="500"/>
-<path class="u-frame-tag" d="M10,10 h214 v14 l-9,10 H10 z"/>
+<rect class="u-frame" x="10" y="10" width="1280" height="540"/>
+<path class="u-frame-tag" d="M10,10 h277 v14 l-9,10 H10 z"/>
 <text class="u-tagk" x="18" y="26">deployment</text>
-<text class="u-tag" x="108" y="26">Nightly pipeline</text>
-<path class="u-node" d="M30,64 l10,-10 h400 v262 l-10,10 z"/>
-<rect class="u-node" x="30" y="64" width="400" height="262"/>
-<path class="u-line" d="M430,64 l10,-10"/>
-<text class="u-kw" x="40" y="80">«device»</text>
-<text class="u-cname" x="40" y="95">PC</text>
-<path class="u-node" d="M46,110 l8,-8 h366 v200 l-8,8 z"/>
-<rect class="u-node" x="46" y="110" width="366" height="200"/>
-<path class="u-line" d="M412,110 l8,-8"/>
-<text class="u-kw" x="56" y="126">«executionEnvironment»</text>
-<text class="u-cname" x="56" y="141">Docker · orchestration/compose.yaml</text>
-<rect class="u-node" x="62" y="156" width="160" height="38"/>
-<path class="u-line" d="M205,162 h7 l4,4 v10 h-11 z M212,162 v4 h4"/>
-<text class="u-kw" x="70" y="171">«component»</text>
-<text class="u-attr" x="70" y="186">api-server</text>
-<rect class="u-node" x="236" y="156" width="160" height="38"/>
-<path class="u-line" d="M379,162 h7 l4,4 v10 h-11 z M386,162 v4 h4"/>
-<text class="u-kw" x="244" y="171">«component»</text>
-<text class="u-attr" x="244" y="186">scheduler</text>
-<rect class="u-node" x="62" y="206" width="160" height="38"/>
-<path class="u-line" d="M205,212 h7 l4,4 v10 h-11 z M212,212 v4 h4"/>
-<text class="u-kw" x="70" y="221">«component»</text>
-<text class="u-attr" x="70" y="236">dag-processor</text>
-<rect class="u-node" x="236" y="206" width="160" height="38"/>
-<path class="u-line" d="M379,212 h7 l4,4 v10 h-11 z M386,212 v4 h4"/>
-<text class="u-kw" x="244" y="221">«database»</text>
-<text class="u-attr" x="244" y="236">airflow-db</text>
-<rect class="u-node" x="62" y="256" width="334" height="38"/>
-<path class="u-line" d="M379,262 h7 l4,4 v10 h-11 z M386,262 v4 h4"/>
-<text class="u-kw" x="70" y="271">«artifact»</text>
-<text class="u-attr" x="70" y="286">stock_nightly.py · stock_analysis.pipeline</text>
-<path class="u-node" d="M500,64 l10,-10 h400 v300 l-10,10 z"/>
-<rect class="u-node" x="500" y="64" width="400" height="300"/>
-<path class="u-line" d="M900,64 l10,-10"/>
-<text class="u-kw" x="510" y="80">«cloud»</text>
-<text class="u-cname" x="510" y="95">Microsoft Azure</text>
-<rect class="u-node" x="516" y="106" width="360" height="38"/>
-<path class="u-line" d="M859,112 h7 l4,4 v10 h-11 z M866,112 v4 h4"/>
-<text class="u-kw" x="524" y="121">«executionEnvironment»</text>
-<text class="u-attr" x="524" y="136">stock-ingest · Container Apps Job</text>
-<rect class="u-node" x="516" y="156" width="360" height="38"/>
-<path class="u-line" d="M859,162 h7 l4,4 v10 h-11 z M866,162 v4 h4"/>
-<text class="u-kw" x="524" y="171">«executionEnvironment»</text>
-<text class="u-attr" x="524" y="186">stock-quotes · Container Apps Job</text>
-<rect class="u-node" x="516" y="206" width="360" height="38"/>
-<path class="u-line" d="M859,212 h7 l4,4 v10 h-11 z M866,212 v4 h4"/>
-<text class="u-kw" x="524" y="221">«database»</text>
-<text class="u-attr" x="524" y="236">stock-db-bk · PostgreSQL 16</text>
-<rect class="u-node" x="516" y="256" width="360" height="38"/>
-<path class="u-line" d="M859,262 h7 l4,4 v10 h-11 z M866,262 v4 h4"/>
-<text class="u-kw" x="524" y="271">«executionEnvironment»</text>
-<text class="u-attr" x="524" y="286">stock-api-bk · App Service, api/app.py</text>
-<path class="u-line" d="M876,125 L888,125 L888,275 L876,275"/>
-<path class="u-line" d="M876,175 L888,175"/>
-<path class="u-line" d="M876,225 L888,225"/>
-<path class="u-node" d="M970,64 l10,-10 h300 v100 l-10,10 z"/>
-<rect class="u-node" x="970" y="64" width="300" height="100"/>
+<text class="u-tag" x="108" y="26">Nightly pipeline on Azure</text>
+<path class="u-node" d="M26,64 l10,-10 h890 v470 l-10,10 z"/>
+<rect class="u-node" x="26" y="64" width="890" height="470"/>
+<path class="u-line" d="M916,64 l10,-10"/>
+<text class="u-kw" x="36" y="80">«cloud»</text>
+<text class="u-cname" x="36" y="95">Microsoft Azure</text>
+<path class="u-node" d="M42,110 l8,-8 h420 v230 l-8,8 z"/>
+<rect class="u-node" x="42" y="110" width="420" height="230"/>
+<path class="u-line" d="M462,110 l8,-8"/>
+<text class="u-kw" x="52" y="126">«device»</text>
+<text class="u-cname" x="52" y="141">VM · B2ats v2 (free), Linux</text>
+<path class="u-node" d="M56,152 l6,-6 h392 v176 l-6,6 z"/>
+<rect class="u-node" x="56" y="152" width="392" height="176"/>
+<path class="u-line" d="M448,152 l6,-6"/>
+<text class="u-kw" x="66" y="168">«executionEnvironment»</text>
+<text class="u-cname" x="66" y="183">Docker</text>
+<rect class="u-node" x="70" y="192" width="180" height="38"/>
+<path class="u-line" d="M233,198 h7 l4,4 v10 h-11 z M240,198 v4 h4"/>
+<text class="u-kw" x="78" y="207">«component»</text>
+<text class="u-attr" x="78" y="222">scheduler</text>
+<rect class="u-node" x="258" y="192" width="180" height="38"/>
+<path class="u-line" d="M421,198 h7 l4,4 v10 h-11 z M428,198 v4 h4"/>
+<text class="u-kw" x="266" y="207">«component»</text>
+<text class="u-attr" x="266" y="222">dag-processor</text>
+<rect class="u-node" x="70" y="238" width="180" height="38"/>
+<path class="u-line" d="M233,244 h7 l4,4 v10 h-11 z M240,244 v4 h4"/>
+<text class="u-kw" x="78" y="253">«component»</text>
+<text class="u-attr" x="78" y="268">triggerer</text>
+<rect class="u-node" x="258" y="238" width="180" height="38"/>
+<path class="u-line" d="M421,244 h7 l4,4 v10 h-11 z M428,244 v4 h4"/>
+<text class="u-kw" x="266" y="253">«component»</text>
+<text class="u-attr" x="266" y="268">api-server · execution</text>
+<rect class="u-node" x="70" y="284" width="368" height="38"/>
+<path class="u-line" d="M421,290 h7 l4,4 v10 h-11 z M428,290 v4 h4"/>
+<text class="u-kw" x="78" y="299">«artifact»</text>
+<text class="u-attr" x="78" y="314">DAGs · stock_orch · stock_analysis.pipeline</text>
+<path class="u-node" d="M478,110 l8,-8 h424 v230 l-8,8 z"/>
+<rect class="u-node" x="478" y="110" width="424" height="230"/>
+<path class="u-line" d="M902,110 l8,-8"/>
+<text class="u-kw" x="488" y="126">«executionEnvironment»</text>
+<text class="u-cname" x="488" y="141">Container Apps environment</text>
+<rect class="u-node" x="494" y="152" width="392" height="38"/>
+<path class="u-line" d="M869,158 h7 l4,4 v10 h-11 z M876,158 v4 h4"/>
+<text class="u-kw" x="502" y="167">«container app»</text>
+<text class="u-attr" x="502" y="182">airflow-ui · api-server · core, scales to zero</text>
+<rect class="u-node" x="494" y="204" width="392" height="38"/>
+<path class="u-line" d="M869,210 h7 l4,4 v10 h-11 z M876,210 v4 h4"/>
+<text class="u-kw" x="502" y="219">«job»</text>
+<text class="u-attr" x="502" y="234">stock-ingest · fetch, build, check, coverage, nightly</text>
+<rect class="u-node" x="494" y="256" width="392" height="38"/>
+<path class="u-line" d="M869,262 h7 l4,4 v10 h-11 z M876,262 v4 h4"/>
+<text class="u-kw" x="502" y="271">«job»</text>
+<text class="u-attr" x="502" y="286">stock-quotes · db quotes</text>
+<rect class="u-node" x="42" y="362" width="420" height="38"/>
+<path class="u-line" d="M445,368 h7 l4,4 v10 h-11 z M452,368 v4 h4"/>
+<text class="u-kw" x="50" y="377">«database»</text>
+<text class="u-attr" x="50" y="392">stock-db-bk · databases stock, airflow</text>
+<rect class="u-node" x="42" y="418" width="420" height="38"/>
+<path class="u-line" d="M445,424 h7 l4,4 v10 h-11 z M452,424 v4 h4"/>
+<text class="u-kw" x="50" y="433">«artifact»</text>
+<text class="u-attr" x="50" y="448">Blob storage · Airflow task logs</text>
+<rect class="u-node" x="478" y="362" width="424" height="38"/>
+<path class="u-line" d="M885,368 h7 l4,4 v10 h-11 z M892,368 v4 h4"/>
+<text class="u-kw" x="486" y="377">«executionEnvironment»</text>
+<text class="u-attr" x="486" y="392">stock-api-bk · App Service, api/app.py</text>
+<path class="u-line" d="M252,340 L252,362"/>
+<text class="u-g" x="232" y="354" text-anchor="start">SQL</text>
+<path class="u-line" d="M462,222 L478,222"/>
+<text class="u-g" x="470" y="214" text-anchor="middle">ARM</text>
+<path class="u-line" d="M690,340 L690,352 L440,352 L440,362"/>
+<path class="u-line" d="M690,362 L690,352"/>
+<text class="u-g" x="42" y="486" text-anchor="start">the scheduler writes the task logs to Blob; the UI reads them there</text>
+<text class="u-g" x="478" y="424" text-anchor="start">the jobs, the UI and the web API read and write stock-db-bk</text>
+<path class="u-node" d="M970,64 l10,-10 h300 v90 l-10,10 z"/>
+<rect class="u-node" x="970" y="64" width="300" height="90"/>
 <path class="u-line" d="M1270,64 l10,-10"/>
 <text class="u-kw" x="980" y="80">«cloud»</text>
 <text class="u-cname" x="980" y="95">Anthropic</text>
-<rect class="u-node" x="986" y="108" width="268" height="38"/>
-<path class="u-line" d="M1237,114 h7 l4,4 v10 h-11 z M1244,114 v4 h4"/>
-<text class="u-kw" x="994" y="123">«executionEnvironment»</text>
-<text class="u-attr" x="994" y="138">Scheduled Claude session</text>
-<path class="u-node" d="M970,230 l10,-10 h300 v150 l-10,10 z"/>
-<rect class="u-node" x="970" y="230" width="300" height="150"/>
-<path class="u-line" d="M1270,230 l10,-10"/>
-<text class="u-kw" x="980" y="246">«cloud»</text>
-<text class="u-cname" x="980" y="261">GitHub</text>
-<rect class="u-node" x="986" y="276" width="268" height="38"/>
-<path class="u-line" d="M1237,282 h7 l4,4 v10 h-11 z M1244,282 v4 h4"/>
-<text class="u-kw" x="994" y="291">«workflow»</text>
-<text class="u-attr" x="994" y="306">pages.yml · pipeline-watch.yml</text>
-<rect class="u-node" x="986" y="326" width="268" height="38"/>
-<path class="u-line" d="M1237,332 h7 l4,4 v10 h-11 z M1244,332 v4 h4"/>
-<text class="u-kw" x="994" y="341">«artifact»</text>
-<text class="u-attr" x="994" y="356">Pages site</text>
-<path class="u-node" d="M500,420 l10,-10 h220 v70 l-10,10 z"/>
-<rect class="u-node" x="500" y="420" width="220" height="70"/>
-<path class="u-line" d="M720,420 l10,-10"/>
-<text class="u-kw" x="510" y="436">«cloud»</text>
-<text class="u-cname" x="510" y="451">Brevo</text>
-<path class="u-line" d="M430,225 L516,225"/>
-<text class="u-g" x="473" y="218" text-anchor="middle">SQL · TLS</text>
-<path class="u-line" d="M986,140 L930,140 L930,262 L900,262"/>
-<text class="u-g" x="936" y="190" text-anchor="start">HTTPS · data</text>
-<path class="u-line" d="M1150,164 L1150,220"/>
-<text class="u-g" x="1158" y="200" text-anchor="start">git push</text>
-<path class="u-line" d="M380,326 L380,396 L1100,396 L1100,380"/>
-<text class="u-g" x="760" y="390" text-anchor="middle">HTTPS · GitHub API: commit and Pages run</text>
-<path class="u-line" d="M200,326 L200,455 L500,455"/>
-<text class="u-g" x="350" y="449" text-anchor="middle">HTTPS · alert email</text>
-<path class="u-line" d="M986,295 L944,295 L944,330 L900,330"/>
-<text class="u-g" x="950" y="320" text-anchor="start">HTTPS · audit</text>
-<path class="u-line" d="M1254,127 L1282,127 L1282,470 L720,470"/>
-<text class="u-g" x="800" y="464" text-anchor="start">HTTPS · evening email</text>
+<rect class="u-node" x="986" y="104" width="268" height="38"/>
+<path class="u-line" d="M1237,110 h7 l4,4 v10 h-11 z M1244,110 v4 h4"/>
+<text class="u-kw" x="994" y="119">«executionEnvironment»</text>
+<text class="u-attr" x="994" y="134">Scheduled Claude session</text>
+<path class="u-node" d="M970,196 l10,-10 h300 v140 l-10,10 z"/>
+<rect class="u-node" x="970" y="196" width="300" height="140"/>
+<path class="u-line" d="M1270,196 l10,-10"/>
+<text class="u-kw" x="980" y="212">«cloud»</text>
+<text class="u-cname" x="980" y="227">GitHub</text>
+<rect class="u-node" x="986" y="238" width="268" height="38"/>
+<path class="u-line" d="M1237,244 h7 l4,4 v10 h-11 z M1244,244 v4 h4"/>
+<text class="u-kw" x="994" y="253">«workflow»</text>
+<text class="u-attr" x="994" y="268">pages.yml · pipeline-watch.yml</text>
+<rect class="u-node" x="986" y="286" width="268" height="38"/>
+<path class="u-line" d="M1237,292 h7 l4,4 v10 h-11 z M1244,292 v4 h4"/>
+<text class="u-kw" x="994" y="301">«artifact»</text>
+<text class="u-attr" x="994" y="316">Pages site</text>
+<path class="u-node" d="M970,378 l10,-10 h300 v54 l-10,10 z"/>
+<rect class="u-node" x="970" y="378" width="300" height="54"/>
+<path class="u-line" d="M1270,378 l10,-10"/>
+<text class="u-kw" x="980" y="394">«cloud»</text>
+<text class="u-cname" x="980" y="409">Brevo</text>
+<path class="u-node" d="M970,466 l10,-10 h300 v66 l-10,10 z"/>
+<rect class="u-node" x="970" y="466" width="300" height="66"/>
+<path class="u-line" d="M1270,466 l10,-10"/>
+<text class="u-kw" x="980" y="482">«device»</text>
+<text class="u-cname" x="980" y="497">PC: Docker for development, browser</text>
+<path class="u-line" d="M986,123 L940,123 L940,381 L902,381"/>
+<text class="u-g" x="946" y="170" text-anchor="start">HTTPS</text>
+<path class="u-line" d="M1120,154 L1120,186"/>
+<text class="u-g" x="1126" y="180" text-anchor="start">git push</text>
+<path class="u-line" d="M916,260 L970,260"/>
+<text class="u-g" x="928" y="252" text-anchor="start">GitHub API</text>
+<path class="u-line" d="M916,405 L970,405"/>
+<text class="u-g" x="928" y="398" text-anchor="start">alerts</text>
+<path class="u-line" d="M970,500 L930,500 L930,171 L902,171"/>
+<text class="u-g" x="860" y="492" text-anchor="start">HTTPS, your IP only</text>
 </svg>
     </div>
-    <figcaption>Deployment diagram: the nodes the pipeline runs on and how they talk.</figcaption>
+    <figcaption>Deployment diagram: where each part runs on Azure, and how they talk.</figcaption>
   </figure>
 </section>
 
@@ -1657,7 +1700,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <h2>One day, in UTC</h2>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1330 216" role="img" aria-label="Daily timeline in UTC: the quotes job every hour on weekdays, around the clock; the Airflow DAG stock_nightly from 22:35, which checks each piece and waits for the Claude session; the Claude session at 00:00 Italy time (23:00 UTC in winter), which republishes the site when it commits; the ingest job from 22:30, usually about 25 minutes and at most until 01:30; the scheduled site build at 05:15; the pipeline audit at 07:00.">
+<svg viewBox="0 0 1330 216" role="img" aria-label="Daily timeline in UTC: the quotes job every hour on weekdays, around the clock; the Airflow DAG stock_nightly from 22:30, which starts and checks each job run and waits for the Claude session; the Claude session at 00:00 Italy time (23:00 UTC in winter), which republishes the site when it commits; the ingest job from 22:30, usually about 25 minutes and at most until 01:30; the site rebuilt by Airflow after the night; the pipeline audit every 3 hours.">
   <defs>
     <marker id="ta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
   </defs>
@@ -1679,9 +1722,9 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="k" x="610" y="45">Claude session (00:00 Italy, Tue–Sat): notes, PDFs from the nightly numbers, email</text>
 
   <!-- nightly pipeline (Airflow) -->
-  <rect class="cap" x="492" y="56" width="460" height="14" rx="3"/>
-  <rect class="run" x="492" y="56" width="176" height="14" rx="3"/>
-  <text class="k" x="482" y="67" text-anchor="end">Airflow stock_nightly (22:35): checks, ready marker, waits for the session</text>
+  <rect class="cap" x="484" y="56" width="460" height="14" rx="3"/>
+  <rect class="run" x="484" y="56" width="184" height="14" rx="3"/>
+  <text class="k" x="474" y="67" text-anchor="end">Airflow stock_nightly (22:30): starts each step, checks it, waits for the session</text>
 
   <!-- quotes job: every hour on weekdays, around the clock -->
   <rect class="run" x="75" y="143" width="6" height="6" rx="1" transform="rotate(45 78 146)"/>
@@ -1697,26 +1740,29 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <rect class="run" x="995" y="143" width="6" height="6" rx="1" transform="rotate(45 998 146)"/>
   <rect class="run" x="1087" y="143" width="6" height="6" rx="1" transform="rotate(45 1090 146)"/>
   <rect class="run" x="1179" y="143" width="6" height="6" rx="1" transform="rotate(45 1182 146)"/>
-  <text class="k" x="70" y="206">Small diamonds above the axis: the quotes job, every hour on weekdays around the clock (also before 18:00), a few seconds each</text>
+  <text class="k" x="70" y="206">Small diamonds above the axis: the quotes job, started by Airflow (stock_quotes) every hour on weekdays around the clock, a few seconds each</text>
 
   <!-- ingest -->
   <rect class="cap" x="484" y="80" width="276" height="14" rx="3"/>
   <rect class="run" x="484" y="80" width="38" height="14" rx="3"/>
-  <text class="k" x="770" y="91">Ingest job: usually about 25 minutes, stops by 01:30 at the latest</text>
+  <text class="k" x="770" y="91">Job runs Airflow starts: fetch, build, then check, coverage, nightly</text>
   <text class="s" x="484" y="112">22:30 start</text>
 
   <!-- site -->
+  <rect class="run" x="525" y="126" width="10" height="10" rx="2" transform="rotate(45 530 131)"/>
   <rect class="mute" x="594" y="126" width="10" height="10" rx="2" transform="rotate(45 599 131)"/>
-  <text class="s" x="584" y="135" text-anchor="end">site rebuilt on the session's commit</text>
-  <rect class="run" x="1256" y="100" width="10" height="10" rx="2" transform="rotate(45 1261 105)"/>
-  <text class="k" x="1246" y="109" text-anchor="end">Pipeline audit (07:00)</text>
-  <rect class="run" x="1100" y="126" width="10" height="10" rx="2" transform="rotate(45 1105 131)"/>
-  <text class="k" x="1090" y="135" text-anchor="end">Site and ticker explorer rebuilt from the database (05:15)</text>
+  <text class="s" x="515" y="135" text-anchor="end">site rebuilt by Airflow after the night, and on the session's commit</text>
+  <!-- pipeline audit: every 3 hours at :20 -->
+  <rect class="mute" x="96" y="96" width="9" height="9" rx="2" transform="rotate(45 100.5 100.5)"/>
+  <rect class="mute" x="372" y="96" width="9" height="9" rx="2" transform="rotate(45 376.5 100.5)"/>
+  <rect class="mute" x="648" y="96" width="9" height="9" rx="2" transform="rotate(45 652.5 100.5)"/>
+  <rect class="mute" x="924" y="96" width="9" height="9" rx="2" transform="rotate(45 928.5 100.5)"/>
+  <rect class="mute" x="1200" y="96" width="9" height="9" rx="2" transform="rotate(45 1204.5 100.5)"/>
+  <text class="k" x="1190" y="113" text-anchor="end">Pipeline audit, every 3 hours (grey diamonds)</text>
 </svg>
     </div>
-    <figcaption>The scheduled site build comes after the ingest job's latest possible end, so
-    the Data page is never more than a few hours behind the database. A token-based trigger
-    (<code>GITHUB_DISPATCH_TOKEN</code>) can rebuild it right after each run instead.</figcaption>
+    <figcaption>Airflow starts every timed piece except the Claude session, which keeps its own
+    schedule, and the audit, which runs outside Airflow so it can tell when Airflow is down.</figcaption>
   </figure>
 </section>
 
@@ -1726,14 +1772,14 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <table>
     <thead><tr><th>Piece</th><th>Runs on</th><th>Started by</th><th>Code</th></tr></thead>
     <tbody>
-      <tr><td>Ingest job</td><td>Azure Container Apps Job <code>stock-ingest</code> (1.5 vCPU, 3 GiB, Consumption)</td><td>Daily at 22:30 UTC</td><td><code>python -m stock_analysis.db ingest</code></td></tr>
-      <tr><td>Quotes job</td><td>Azure Container Apps Job <code>stock-quotes</code> (0.25 vCPU, 0.5 GiB, Consumption)</td><td>Every hour on weekdays, around the clock</td><td><code>python -m stock_analysis.db quotes</code>; every page with a price reads them through <code>GET /quotes</code> (<code>analysis/live.js</code>)</td></tr>
+      <tr><td>Ingest job</td><td>Azure Container Apps Job <code>stock-ingest</code> (1.5 vCPU, 3 GiB, Consumption)</td><td>Airflow (<code>stock_nightly</code>), weekdays from 22:30 UTC: one run per step</td><td><code>python -m stock_analysis.db ingest</code></td></tr>
+      <tr><td>Quotes job</td><td>Azure Container Apps Job <code>stock-quotes</code> (0.25 vCPU, 0.5 GiB, Consumption)</td><td>Airflow (<code>stock_quotes</code>), every hour on weekdays</td><td><code>python -m stock_analysis.db quotes</code>; every page with a price reads them through <code>GET /quotes</code> (<code>analysis/live.js</code>)</td></tr>
       <tr><td>Database</td><td>Azure Database for PostgreSQL <code>stock-db-bk</code>; Docker locally</td><td>Always on</td><td><code>src/stock_analysis/db/</code></td></tr>
       <tr><td>Web API</td><td>Azure App Service <code>stock-api-bk</code> (F1, wakes on request)</td><td>An HTTPS request</td><td><code>api/app.py</code></td></tr>
       <tr><td>Image build</td><td>GitHub Actions → GHCR</td><td>A push to <code>main</code> touching code or settings</td><td><code>.github/workflows/ingest-image.yml</code>, <code>Dockerfile</code></td></tr>
-      <tr><td>Site</td><td>GitHub Actions → GitHub Pages</td><td>A push to <code>main</code>, daily at 05:15 UTC, by hand</td><td><code>.github/workflows/pages.yml</code>, <code>analysis/site.py</code>, <code>analysis/explore.py</code></td></tr>
-      <tr><td>Nightly pipeline</td><td>Airflow 3 in Docker on the PC (<code>orchestration/compose.yaml</code>)</td><td>Weekdays at 22:35 UTC</td><td><code>orchestration/dags/stock_nightly.py</code>, <code>python -m stock_analysis.pipeline</code></td></tr>
-      <tr><td>Pipeline audit</td><td>GitHub Actions</td><td>Tuesday to Saturday at 07:00 UTC</td><td><code>.github/workflows/pipeline-watch.yml</code></td></tr>
+      <tr><td>Site</td><td>GitHub Actions → GitHub Pages</td><td>A push to <code>main</code>, Airflow after each night, by hand</td><td><code>.github/workflows/pages.yml</code>, <code>analysis/site.py</code>, <code>analysis/explore.py</code></td></tr>
+      <tr><td>Nightly pipeline</td><td>Airflow 3 on a free Azure VM (B2ats v2), the UI as a Container App that scales to zero; Docker on the PC for development (<code>orchestration/</code>)</td><td>Always on: <code>stock_nightly</code> weekdays at 22:30 UTC, <code>stock_quotes</code> hourly</td><td><code>orchestration/dags/stock_nightly.py</code>, <code>python -m stock_analysis.pipeline</code></td></tr>
+      <tr><td>Pipeline audit</td><td>GitHub Actions</td><td>Every 3 hours</td><td><code>.github/workflows/pipeline-watch.yml</code></td></tr>
       <tr><td>Evening run</td><td>A scheduled Claude Code session</td><td>00:00 Italy time, Tuesday to Saturday</td><td><code>analysis/watchlist.py</code>, <code>docs/EVENING_RUN.md</code></td></tr>
       <tr><td>Analyses by hand</td><td>Your PC or a Claude session</td><td>You</td><td><code>analysis/*.py</code>, <code>Data.open()</code></td></tr>
     </tbody>
