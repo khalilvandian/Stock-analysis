@@ -393,6 +393,11 @@ def audit(found: list[dict], now: dt.datetime, cfg: dict) -> Result:
     if any(r["status"] == "ok" for r in mine):
         return Result(DONE, f"The {day} pipeline run finished ok", {})
     if not mine:
+        # `found` is the newest 20 runs: when there are fewer and all are later than `day`,
+        # Airflow wasn't live yet on that day (go-live), which isn't a failure.
+        dates = [str(r["run_date"]) for r in found]
+        if found and len(found) < 20 and all(d > day.isoformat() for d in dates):
+            return Result(DONE, f"No run for {day}: the pipeline started after it", {})
         return Result(FAILED, f"No pipeline run for {day}: was Airflow down?", {})
     states = ", ".join(sorted({r["status"] for r in mine}))
     return Result(FAILED, f"The {day} pipeline run did not finish ok ({states})", {})

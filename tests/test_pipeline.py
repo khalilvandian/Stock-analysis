@@ -93,6 +93,13 @@ def test_audit_waits_until_the_night_should_be_over() -> None:
     assert p.audit([running, friday_ok], T(2026, 11, 19, 7, 0), CFG).code == p.FAILED
 
 
+def test_audit_skips_the_days_before_the_first_run() -> None:
+    now = T(2026, 11, 20, 1, 0)  # Friday 01:00: Wednesday the 18th is the day checked
+    first = {"run_date": "2026-11-19", "status": "running"}  # go-live on Thursday
+    assert p.audit([first], now, CFG).code == p.DONE
+    assert p.audit([], now, CFG).code == p.FAILED  # no run at all: never silent
+
+
 def test_quotes_audit_on_weekdays_only() -> None:
     now = T(2026, 11, 18, 15, 20)  # Wednesday
     fresh = {"status": "ok", "started_at": T(2026, 11, 18, 14, 5)}
