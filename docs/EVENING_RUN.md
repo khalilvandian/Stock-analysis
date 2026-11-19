@@ -20,20 +20,43 @@ are the last close the ingest stored (the previous trading day), and the PDFs sa
    includes the screener's top names). "Stored numbers (computed on the server)" lists the
    stocks read as stored; a stock computed now had none since the last build, or its
    watch-list settings changed since (a new target, peer or EPS correction).
-3. **Update Claude's notes** where the story changed, and set `Updated:` to today:
-   - `analyses/<SYMBOL>/notes.md` for each stock in `config/watchlist.toml`: Verdict,
-     Summary (4 one-line bullets: cheap, strong, weak, uncertain), Business, Risks, News
-     (dated, newest first), What to watch. Search the news for each stock; after an
-     earnings report, update the verdict, entry price and, if a quarter's adjusted EPS
+3. **Research and write Claude's notes.** The numbers come from the server; the words are
+   Claude's, and they are only worth reading if they are deep, current and sourced. Write for
+   Babak: plain English, short sentences, every claim tied to a number or a linked source,
+   and always say what it means for the decision (buy, add, wait), not just what happened.
+   - **Research first.** Search the news for the market's last session(s) since the previous
+     run (what moved, by how much, and why) and for each stock in `config/watchlist.toml`
+     (results, guidance, analyst moves, deals, regulation, insider trades). Open the article
+     when the snippet is unclear, prefer primary sources (company releases, filings) and
+     established outlets, check the article's date, and leave out anything that cannot be
+     dated to the period or that does not bear on the investment case. Say so when a source
+     is weak or two sources disagree.
+   - `analyses/<SYMBOL>/notes.md` for each stock: **Verdict** (the decision in 3-4
+     sentences, with price, P/E and entry), **Today** (what the stock did since the last run,
+     why, and *What it means for you*), **Summary** (4 one-line bullets: cheap, strong, weak,
+     uncertain), **Business**, **Risks**, **News** (dated `- YYYY-MM-DD:` items, newest first,
+     at most 10, each new item with a source link; a price move is not news, it goes in
+     Today), **What to watch** (each item with a coming date, or marked "(ongoing)"). After
+     an earnings report, update the verdict, entry price and, if a quarter's adjusted EPS
      includes a one-off, add an `eps_override` in the config.
-   - `analyses/market/notes.md`: Verdict, Summary, What is driving the market, Stocks to
-     look at (comment on the screener's top names from step 2), What to watch. Rewrite
-     every section each run, not only the Verdict: drop events that have passed (an
-     election, a meeting, a report already out) so nothing is described as still to come.
-   - `analyses/summaries/notes.md`: Verdict across the watch list, and Analysis.
+   - `analyses/market/notes.md`: **Verdict**, **Summary**, **What happened** (the
+     sessions since the last run, with index levels and moves), **Why it happened** (the
+     causes, each with its source), **What it means** (the interpretation for a long-term,
+     Lynch-style investor), **Stocks to look at** (comment on the screener's top names from
+     step 2), **What to watch** (coming events with dates), **Sources** (at least 3 links).
+   - `analyses/summaries/notes.md`: **Verdict** across the watch list, and **Analysis**
+     (what changed across the list, where to act, where to wait).
    - A new stock on the watch list with no `notes.md` gets a short first analysis.
-   Every report keeps the same template: a high-level summary first, then the numbers,
-   then the detail. Keep the summaries short and free of detail.
+   - **Review every section, every run.** Each section starts with
+     `<!-- reviewed YYYY-MM-DD -->` (the run's date, Italy time), added only after the
+     section was re-read and rewritten or confirmed as still true, and `Updated:` is the run's
+     date. Remove events that have passed (an election, a meeting, a report already out);
+     keep Business and Risks unless something changed, but re-read them.
+   - `stock_analysis.notes_check` enforces this: a section not reviewed for the run, news
+     without a date or a source, a "what to watch" item with no date or a past one, or a
+     sentence describing a past date as still to come. `analysis/watchlist.py` refuses to
+     build until the notes pass (`--allow-stale-notes` overrides it; then say so in the
+     email), and `analysis/validate.py` reports the same checks.
 4. **Build:** `uv run python analysis/watchlist.py`. It copies `config/watchlist.toml` to the
    database if it changed (the ingest and the nightly analyses read the stocks and peers
    from there) and saves the notes that changed (`out_note`). Then it renders the market

@@ -200,11 +200,15 @@ Europe/Rome. What happens, in order:
 2. **Read the numbers.** `uv run python analysis/watchlist.py --numbers` and
    `uv run python analysis/market.py --numbers` print the figures the nightly analyses
    stored after the ingest (the market numbers include the screener's top names).
-3. **Update Claude's notes** where the story changed (`Updated:` set to today): each stock's
-   `notes.md` (search the news; after earnings update the verdict, the entry price and any
-   `eps_override`), `analyses/market/notes.md` (the "Stocks to look at" section comments on
-   the screener's names), `analyses/summaries/notes.md`.
+3. **Research and write Claude's notes** (`Updated:` and every section's
+   `<!-- reviewed DATE -->` set to the run's date): each stock's `notes.md` (search the
+   news; Today says what the stock did and what it means; dated, sourced News; after
+   earnings update the verdict, the entry price and any `eps_override`),
+   `analyses/market/notes.md` (what happened, why, what it means, the screener's names,
+   sources), `analyses/summaries/notes.md`. Details in `docs/EVENING_RUN.md`.
 4. **Build.** `uv run python analysis/watchlist.py`. In order:
+   0. Check the notes with `stock_analysis.notes_check`; with any failure nothing is built
+      (`--allow-stale-notes` overrides it).
    1. Copy `config/watchlist.toml` to the database if it changed (the ingest and the
       nightly analyses read the stocks and peers from there) and save the notes that changed
       (`out_note`). Read each stock's stored numbers (`out_stock_numbers`); a stock with none
