@@ -36,15 +36,26 @@ if (-not $appId) { $appId = (Az ad app create --display-name $App --sign-in-audi
 if (-not (AzFind ad sp show --id $appId --query id -o tsv)) { Az ad sp create --id $appId -o none }
 $principal = (Az ad sp show --id $appId --query id -o tsv)
 
-Write-Host "2/4 Federated credential for $Repository, branch main"
-$subject = "repo:${Repository}:ref:refs/heads/main"
-$has = AzFind ad app federated-credential list --id $appId --query "[?subject=='$subject'].name" -o tsv
-if (-not $has) {
-    $file = Join-Path $env:TEMP "github-federated.json"
-    @{ name = "github-main"; issuer = "https://token.actions.githubusercontent.com"; subject = $subject;
-       audiences = @("api://AzureADTokenExchange") } | ConvertTo-Json | Set-Content -Path $file -Encoding ascii
-    Az ad app federated-credential create --id $appId --parameters "@$file" -o none
-    Remove-Item $file -Force
+Write-Host "2/4 Federated credentials for $Repository, branch main"
+# GitHub presents one of two subjects: the plain one, or (newer repositories and owners) one
+# with the owner's and the repository's numeric IDs. Both are registered.
+$owner, $name = $Repository.Split("/")
+$ownerId = (gh api "repos/$Repository" --jq ".owner.id")
+$repoId = (gh api "repos/$Repository" --jq ".id")
+$subjects = @{
+    "github-main" = "repo:${Repository}:ref:refs/heads/main";
+    "github-main-ids" = "repo:${owner}@${ownerId}/${name}@${repoId}:ref:refs/heads/main"
+}
+foreach ($credential in $subjects.Keys) {
+    $subject = $subjects[$credential]
+    $has = AzFind ad app federated-credential list --id $appId --query "[?subject=='$subject'].name" -o tsv
+    if (-not $has) {
+        $file = Join-Path $env:TEMP "github-federated.json"
+        @{ name = $credential; issuer = "https://token.actions.githubusercontent.com"; subject = $subject;
+           audiences = @("api://AzureADTokenExchange") } | ConvertTo-Json | Set-Content -Path $file -Encoding ascii
+        Az ad app federated-credential create --id $appId --parameters "@$file" -o none
+        Remove-Item $file -Force
+    }
 }
 
 Write-Host "3/4 Contributor on $ResourceGroup"
