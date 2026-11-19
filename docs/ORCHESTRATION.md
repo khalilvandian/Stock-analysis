@@ -112,7 +112,7 @@ Developed and tested locally in Docker; production on Azure (decided 2026-11-19,
 
 | Part | Production | Cost |
 |---|---|---|
-| Scheduler (LocalExecutor, 4 task slots), DAG processor, triggerer, `api-server --apps execution` (the API tasks report to) | A free **B2ats v2** Linux VM (2 vCPU, 1 GiB; 750 free hours a month), in Docker | $0 |
+| Scheduler (LocalExecutor, 4 task slots), DAG processor, triggerer, `api-server --apps execution` (the API tasks report to) | A free **B2ats v2** Linux VM `airflow-vm` (2 vCPU, 1 GiB; 750 free hours a month), in Docker, in **Spain Central**: the subscription may deploy only in five regions, and only Spain Central offers it this size (outside zone 1) | $0 |
 | The UI and REST API: `api-server --apps core` | A **Container App that scales to zero**, open only to your IP | about $0 |
 | Airflow's own database | An `airflow` database on `stock-db-bk`, with small connection pools (the server allows 50 connections in all) | $0 |
 | Task logs | Blob storage (Airflow's remote logging), so the UI can read what the VM wrote | cents |

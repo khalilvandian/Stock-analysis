@@ -12,7 +12,7 @@ What it sets up, in resource group stock-rg:
   4. the UI: the Container App airflow-ui (api-server --apps core) in stock-jobs-env, scaling to
      zero, open only to this PC's address; its identity may set its own database firewall rule
      and read the logs
-  5. the VM airflow-vm: B2ats v2 (the free-account size), Ubuntu, Docker and 3 GiB of swap at
+  5. the VM airflow-vm in Spain Central: B2ats v2 (the free-account size), Ubuntu, Docker and 3 GiB of swap at
      first boot, SSH only from this PC's address, a fixed public IP allowed on the database
   6. the VM's identity: Container Apps Jobs Operator on stock-ingest and stock-quotes only,
      and Storage Blob Data Contributor on the logs
@@ -39,6 +39,10 @@ param(
     [string]$Server = "stock-db-bk",
     [string]$Vm = "airflow-vm",
     [string]$VmSize = "Standard_B2ats_v2",
+    # The subscription may deploy only in italynorth, switzerlandnorth, germanywestcentral,
+    # spaincentral and polandcentral, and of those only Spain Central offers B2ats v2 to it
+    # (not in zone 1, so the VM has no zone). Checked 2026-11-19 with az vm list-skus.
+    [string]$VmLocation = "spaincentral",
     [string]$Storage = "stockairflowlogs",
     [string]$UiApp = "airflow-ui",
     [string]$Image = "ghcr.io/khalilvandian/stock-airflow:latest",
@@ -165,7 +169,7 @@ if ($SkipVm) { Write-Host "5-7/7 VM: skipped"; Write-Host "Done. UI: $uiUrl"; ex
 
 Write-Host "5/7 VM $Vm ($VmSize)"
 if (-not (AzFind vm show -n $Vm -g $ResourceGroup --query name -o tsv)) {
-    Az vm create -n $Vm -g $ResourceGroup -l $Location --size $VmSize `
+    Az vm create -n $Vm -g $ResourceGroup -l $VmLocation --size $VmSize `
         --image "Canonical:ubuntu-24_04-lts:server:latest" --admin-username azureuser --generate-ssh-keys `
         --assign-identity "[system]" --public-ip-sku Standard --public-ip-address-allocation static `
         --os-disk-size-gb 64 --storage-sku Premium_LRS --nsg-rule NONE `
@@ -210,7 +214,9 @@ $ssh = @("-o", "StrictHostKeyChecking=accept-new")
 Remove-Item $envFile -Force
 & ssh @ssh $target ("cd /opt/airflow && chmod 600 .env && docker compose -f compose.vm.yaml pull -q && " +
     "docker compose -f compose.vm.yaml run --rm init && docker compose -f compose.vm.yaml up -d && " +
-    "sleep 60 && docker compose -f compose.vm.yaml exec -T scheduler airflow dags unpause stock_nightly && " +
+    # Wait until the DAG processor has read both DAGs: an unpause before that does nothing.
+    "for i in `$(seq 1 30); do n=`$(docker compose -f compose.vm.yaml exec -T scheduler airflow dags list 2>/dev/null | grep -c 'stock_'); [ `"`$n`" -ge 2 ] && break; sleep 10; done && " +
+    "docker compose -f compose.vm.yaml exec -T scheduler airflow dags unpause stock_nightly && " +
     "docker compose -f compose.vm.yaml exec -T scheduler airflow dags unpause stock_quotes")
 if ($LASTEXITCODE -ne 0) { throw "starting Airflow on the VM failed: ssh $target, then docker compose logs" }
 Write-Host "Done. UI: $uiUrl  VM: ssh $target (cd /opt/airflow; docker compose -f compose.vm.yaml ps)"

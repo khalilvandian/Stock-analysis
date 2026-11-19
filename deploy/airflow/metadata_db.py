@@ -8,13 +8,17 @@ existing role gets the password again."""
 from __future__ import annotations
 
 import os
+import re
 
+import psycopg
+from dotenv import load_dotenv
 from psycopg import sql
 
-from stock_analysis.db import Database
+from stock_analysis.db import ROOT, Database, target_settings
 
 
 def main() -> None:
+    load_dotenv(ROOT / ".env")
     password = os.environ["AIRFLOW_DB_PASSWORD_NEW"]
     db = Database.open("server")  # the admin; also applies the stock migrations (011)
     with db.engine.connect() as conn:
@@ -29,6 +33,13 @@ def main() -> None:
             cur.execute("GRANT airflow TO CURRENT_USER")  # Azure's admin may only hand over its own
             cur.execute("ALTER DATABASE airflow OWNER TO airflow")
     db.close()
+    # Owning the database isn't enough on Azure: the schema public inside it belongs to the
+    # admin, so Airflow could create no tables. Hand it over, connected to that database.
+    settings = target_settings("server")
+    url = re.sub(r"/stock(\?|$)", r"/airflow\1", settings["url"])
+    with psycopg.connect(url, password=os.environ[settings["password_env"]], autocommit=True) as c:
+        c.execute("ALTER SCHEMA public OWNER TO airflow")
+        c.execute("GRANT ALL ON SCHEMA public TO airflow")
     print(f"Role airflow {verb.lower()}d; it owns the database airflow")
 
 
