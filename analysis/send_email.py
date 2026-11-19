@@ -52,7 +52,7 @@ def recipients(to: str) -> list[str]:
 
 def build_message(run: dict, to: str, sender: str, test: bool = False) -> dict:
     """The run's email in Brevo's transactional email format, every PDF attached."""
-    body = (ROOT / run["html"]).read_text()
+    body = (ROOT / run["html"]).read_text(encoding="utf-8")
     subject = run["subject"]
     if test:
         subject = f"[Test] {subject}"
@@ -98,7 +98,7 @@ def main() -> None:
         sys.exit("BREVO_API_KEY is not set")
     if not sender:
         sys.exit("WATCHLIST_EMAIL_FROM is not set (a sender verified in the Brevo account)")
-    run = json.loads(LAST_RUN.read_text())
+    run = json.loads(LAST_RUN.read_text(encoding="utf-8"))
     msg = build_message(run, args.to, sender, args.test)
     result = send(msg, key)
     print(f"Sent {len(msg['attachment'])} PDFs: {result.get('id')}")

@@ -34,8 +34,15 @@ Every command takes `--target`. On Azure the job runs as `server-writer`.
      over
 
    The members are the newest TradingView snapshot, one listing per company (the primary
-   listing where it is a member, otherwise the member listing: BRK.B, BF.B, GM). A company that leaves the index keeps
-   its data, but its tasks become inactive. A new member gets its tasks and is fetched first.
+   listing where it is a member, otherwise the member listing: BRK.B, BF.B, GM). The watch
+   list's stocks and peers (the database's `user_watchlist` and `user_watchlist_peer`, which
+   the evening run mirrors from `config/watchlist.toml`) and `extra_symbols` get the same
+   per-company tasks, in the index or not, and the market report's instruments
+   (`config/market.toml`) a `yahoo_market` task each. A company that leaves all of these keeps
+   its data, but its tasks become inactive. A new one gets its tasks and is fetched first.
+   Earnings dates are made due on every run from a company's report day until a fetch at
+   least a day after it (reports of the last four days), so a reported EPS is in the database
+   the night it comes out or the next.
 3. **Mode.** `backfill` while any task has never been fetched, or the last coverage snapshot
    has less than `present_share_to_maintain` (90%) of the required values. Otherwise
    `maintain`. Backfill means "fetch everything once"; the gaps left after it are mapping work,
@@ -54,7 +61,15 @@ Every command takes `--target`. On Azure the job runs as `server-writer`.
    days. A rate limit isn't a failure: the task stays due for the next run.
 5. **Build** the core layer, if anything new was stored ([`DATABASE.md`](DATABASE.md), "Build rules").
 6. **Coverage snapshot** of the day (`out_coverage_snapshot`).
-7. **Site.** It asks GitHub to rebuild the site (the Pages workflow, through `workflow_dispatch`),
+7. **Nightly analyses** (`nightly = true`; `stock_analysis.nightly`): everything the evening
+   run used to compute, done here so the scheduled Claude session only reads it and
+   interprets: the market screener (`out_screener_run`, `out_screener_result`), each
+   watch-list stock's numbers (`out_stock_numbers`) and the market report's numbers
+   (`out_market_numbers`). A failure here is recorded in the run's summary
+   (`nightly_error`, or `screener_error` / `market_error` inside `nightly`) and makes the run
+   `partial`; the evening run then computes what is missing on the spot.
+   `python -m stock_analysis.db nightly` runs this step alone.
+8. **Site.** It asks GitHub to rebuild the site (the Pages workflow, through `workflow_dispatch`),
    so the Data page shows the new coverage a few minutes later. This needs
    `GITHUB_DISPATCH_TOKEN`: a fine-grained personal access token for this repository only,
    with "Actions: Read and write". Without it, the workflow's daily schedule (05:15 UTC)
@@ -67,20 +82,22 @@ Every command takes `--target`. On Azure the job runs as `server-writer`.
 
 | Task | What it stores | Calls | Limit | Due again (backfill / maintain) |
 |---|---|---|---|---|
-| `tradingview` | The S&P 500 members (`raw_tv_constituent`): one scan of the US market, filtered to the index | 1 | None published | 1 / 1 day |
+| `tradingview` | The S&P 500 members (`raw_tv_constituent`): one scan of the US market, filtered to the index, with every field the screener reads (`tradingview.SCREENER_FIELDS`, in `extra_json`) | 1 | None published | 1 / 1 day |
+| `tradingview_watchlist` | The same fields for the watch list's stocks and peers (and `extra_symbols`) outside the index (request key `watchlist`): names, sectors, forward EPS, beta, analysts' target and rating. A ticker TradingView doesn't list (delisted) is simply absent | 1 | as above | 1 / 1 day |
 | `sec_tickers` | Ticker to CIK (`raw_sec_ticker`) | 1 | 10 a second | 7 / 7 days |
 | `ecb_rates` | Exchange rates, last 10 days (`raw_ecb_rate`) | 1 | None | 1 / 1 day |
 | `sec_companyfacts` | Every filed value of the mapped tags (`raw_sec_fact`), with the real filing date | 1 per company | 10 a second; a `SEC_USER_AGENT` naming you is required | 30 / 7 days |
 | `sec_xbrl` | The full XBRL of a 10-K or 10-Q (edgartools), for the facts company facts leaves out: a value reported only per share class (`raw_sec_xbrl_fact`, with its axis and member). Only the filings that report a missing value of a company with a `[[share_class]]` in `config/companies.toml` | About 8 per filing | Shares the SEC group's rate and budget | Once (3650 days) |
 | `yahoo_prices` | Daily prices (`raw_yahoo_price`): from 2015-12-01 the first time, then from 10 days before the newest stored day. A split in the new days fetches the whole history again (it rescales every price) | 1, or 2 after a split | Yahoo throttles; budget 4,000 / 1,200 calls per run | 1 / 1 day |
-| `yahoo_earnings` | Earnings dates with estimated and reported EPS (`raw_yahoo_earnings`) | 1 | as above | 30 / 7 days |
+| `yahoo_market` | Daily closes of the market report's instruments (`config/market.toml`: indices, the VIX, the 10-year yield, oil, gold, the euro, bitcoin, the sector ETFs) into `raw_yahoo_price`; the build keeps them in `core_market_daily` | 1 | as above | 1 / 1 day |
+| `yahoo_earnings` | Earnings dates with estimated and reported EPS (`raw_yahoo_earnings`) | 1 | as above | 30 / 7 days, and every run in the days after a report |
 | `yahoo_statements` | Six statements, annual and quarterly (`raw_yahoo_statement`) | 6 | as above | 30 / 7 days |
 
 Every payload is kept as the source returned it, gzip-compressed, in `raw_payload` (one row
 per distinct payload, on its `raw_fetch`): the SEC files, TradingView's scan, the ECB's CSV,
 and the tables yfinance returns. The raw tables hold what is parsed from them. Payloads seen
 before are not stored again, and only new or changed rows go into the raw tables. This
-follows the same rules as `load-files`: every row points to its `raw_fetch`.
+stores only rows that are new or changed: every row points to its `raw_fetch`.
 
 `raw_sec_fact` keeps only the SEC tags in `config/db_items.toml`, about 4,700 of a company's
 roughly 27,000 facts; the whole file (about 0.25 MB compressed, 4 MB as JSON) is in

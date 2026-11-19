@@ -6,17 +6,16 @@ dated analyses, the site, the email) and the formats of its main files.
 
 ## Data sources
 
-All sources in use are free and need no key. Each one's limits and fallbacks are listed so
-a gap in one can be traced.
+All sources in use are free and need no key. Only the ingest job calls them
+([`INGEST.md`](INGEST.md)); the analyses read what it stored in the database. Each one's
+limits and fallbacks are listed so a gap in one can be traced.
 
 | Source | Access | What it gives | Used by | Limits | Fallback |
 |---|---|---|---|---|---|
-| **Yahoo Finance** (`yfinance`) | No key. Hosts `query1/query2.finance.yahoo.com`, `fc.yahoo.com` (cookie) | Prices (daily and monthly, split-adjusted), statements (about 4 annual years and 5-6 quarters), company info, sector screener, earnings dates with **reported (adjusted) quarterly EPS** and estimates, splits, FX pairs (`EURUSD=X` style) | `sector.py`, `history.py` (gaps, prices), `watchlist.py`, `market.py`, `stage1.fill_gaps`, `stage2.py`, `stock_analysis.fetch` | Unofficial: fields and the cookie/crumb handshake change; rate limits under heavy use; GAAP EBITDA and EPS include one-offs; capex can include stakes (BSX's MiRus) | SEC for history; TradingView for the screener; retries in `watchlist.fetch_row` |
-| **SEC EDGAR** | No key; send `SEC_USER_AGENT`. Hosts `www.sec.gov`, `data.sec.gov` | `company_tickers.json` (ticker to CIK); **company facts** (every XBRL fact a company filed: annual 10-K, 20-F, 40-F figures, back to 2016 here); **frames API** (`/api/xbrl/frames/us-gaap/<concept>/<unit>/CY<year>.json`: one concept for every filer in a calendar year) | `history.py`, `watchlist.sec_years` (company facts); `stage2.sec_check` (frames, `EarningsPerShareDiluted`) | US filers only; tag choice varies by company (the tag lists in `history.py`); values keep the share basis of the filing (split adjustment needed); about 250 MB for the utilities; frames are by calendar year | Yahoo annual statements fill gaps; every value records its `source` |
-| **TradingView screener** | No key. `POST scanner.tradingview.com/<market>/scan` | Every listed company per market: current fundamentals, ratios, Piotroski and Altman scores, up to 20 years of yearly EPS, revenue, EBITDA and dividends (`*_fy_h`), technicals (SMA50, SMA200, RSI, 52-week range, technical rating), index membership (`indexes`) | `stage1.fetch_universe` via `stock_analysis.tradingview` | Unofficial interface; field names can change (note the `ebitda_interst_cover_ttm` spelling); market values and statements in the company's own currency, prices in the trading currency (London in pence); sectors are TradingView's 20, not GICS | Yahoo fills debt, cash, EBITDA, interest and cash-flow gaps; each fill is named in `filled` |
-| **ECB** | No key. `data-api.ecb.europa.eu` | Latest daily euro reference rates, turned into US dollars per unit, plus GBX | `stage1.run` via `stock_analysis.ecb` | About 30 currencies; a company whose statement or trading currency the ECB doesn't publish is dropped from the screener | None (such companies are left out) |
-| **Financial Modeling Prep** | `FMP_API_KEY` | Quotes, statements, ratios (`stable` endpoints) | `FMPClient` only; no analysis uses it | Free plan returns HTTP 402 for most symbols; the current key is invalid | Yahoo, SEC, TradingView |
-| **Wikipedia S&P 500 list** | By hand | `config/market_universe.csv`: symbol, name, GICS sector, GICS sub-industry (503 share classes) | `market.py` (breadth: share of S&P 500 stocks above their 200-day average, near 52-week highs and lows) | Refreshed by hand, occasionally; not the screener's universe (that is TradingView's `SP:SPX` membership, 497 companies) | None needed |
+| **Yahoo Finance** (`yfinance`) | No key. Hosts `query1/query2.finance.yahoo.com`, `fc.yahoo.com` (cookie) | Daily prices (split-adjusted) with dividends and splits, statements (about 4 annual years and 5-6 quarters), earnings dates with **reported (adjusted) quarterly EPS** and estimates, the market report's indices, ETFs, rates, commodities and FX pairs | The ingest (`yahoo_prices`, `yahoo_statements`, `yahoo_earnings`, `yahoo_market`) | Unofficial: fields and the cookie/crumb handshake change; rate limits under heavy use; GAAP EBITDA and EPS include one-offs; capex can include stakes (BSX's MiRus) | SEC first for fundamentals; a failed task is retried on a later run |
+| **SEC EDGAR** | No key; send `SEC_USER_AGENT`. Hosts `www.sec.gov`, `data.sec.gov` | `company_tickers.json` (ticker to CIK); **company facts** (every XBRL fact a company filed, back to 2016 here); full filings (edgartools); the bulk Financial Statement Data Sets | The ingest (`sec_tickers`, `sec_companyfacts`, `sec_xbrl`, `db import`) | US-GAAP tags only (a 20-F filer reporting in IFRS gets Yahoo's figures); tag choice varies by company (`config/db_items.toml`); values keep the share basis of the filing (the build records the split factor) | Yahoo statements fill gaps; every value records its `source` |
+| **TradingView screener** | No key. `POST scanner.tradingview.com/<market>/scan` | Every listed company per market: current fundamentals, ratios, Piotroski and Altman scores, up to 20 years of yearly EPS, revenue, EBITDA and dividends (`*_fy_h`), technicals (SMA50, SMA200, RSI, 52-week range, technical rating), index membership (`indexes`) | The ingest (`tradingview`: the index members; `tradingview_watchlist`: the watch list's symbols outside the index), with every screener field (`tradingview.SCREENER_FIELDS`) kept in `raw_tv_constituent.extra_json`; also forward EPS, 1-year beta, analysts' average target and rating for the rows | Unofficial interface; field names can change (note the `ebitda_interst_cover_ttm` spelling); market values and statements in the company's own currency, prices in the trading currency (London in pence); sectors are TradingView's 20, not GICS; a delisted ticker is simply absent | The core values fill debt, cash, EBITDA, interest and cash-flow gaps; each fill is named in `filled` |
+| **ECB** | No key. `data-api.ecb.europa.eu` | Daily euro reference rates, turned into US dollars per unit, plus GBX | The ingest (`ecb_rates`, `raw_ecb_rate`); read by `stocks.fx_rates` | About 30 currencies; a company whose statement or trading currency the ECB doesn't publish is dropped from the screener | None (such companies are left out) |
 | **Web search** | Built into Claude | Guidance, deal terms, news for `notes.md` | Claude, during analyses and the evening run | Not reproducible by a script | Filings on SEC EDGAR |
 
 ## Absolute values
@@ -43,10 +42,10 @@ Screened first for every company, before any ratio or score (`config/absolute_va
 | | Capex | `capex` | $bn | `capex` |
 | | Free cash flow | `free_cf` | $bn | `free_cf` |
 
-`column` must exist in `data/sector/utilities.csv` (from `sector.py`) and `history` in
-`data/sector/history.csv` (from `history.py`); `tests/test_absolute.py` checks both. The
+`column` must be a column of `stock_analysis.stocks.rows()` and `history` one of
+`stocks.history()`; `tests/test_absolute.py` checks both. The
 screener's own absolute-values table uses TradingView's fields in US dollars
-(`screen_common.ABSOLUTE`).
+(`stock_analysis.screener.common.ABSOLUTE`).
 
 ## Metrics dictionary
 
@@ -124,15 +123,16 @@ updated in place, with a new date, when its analysis is redone.
 
 ## Dated analyses
 
-Everything the evening run writes lives in `analyses/`. Nothing is overwritten.
+The evening run writes its PDFs and dated lists in `analyses/` and records each run in the
+database (`out_watchlist_run`, `out_market_run`, [`DATABASE.md`](DATABASE.md)). Nothing is
+overwritten.
 
 | Path | What it is |
 |---|---|
 | `analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf` | One stock's analysis: summary, the numbers, analysis. A second run in the same minute gets `-2`, `-3` |
-| `analyses/<SYMBOL>/runs.csv` | One line per run (format below) |
 | `analyses/<SYMBOL>/notes.md` | Claude's notes, copied into the PDF: `Updated:` line, then `## Verdict`, `## Summary`, `## Business`, `## Risks`, `## News`, `## What to watch` |
-| `analyses/<SYMBOL>/README.md` | The stock's dated list, newest first, rebuilt each run |
-| `analyses/market/YYYY-MM-DD_HHMM.pdf`, `runs.csv`, `notes.md` | The market report. Notes sections: Verdict, Summary, What is driving the market, Stocks to look at, What to watch |
+| `analyses/<SYMBOL>/README.md` | The stock's dated list, newest first, rebuilt each run from `out_watchlist_run` |
+| `analyses/market/YYYY-MM-DD_HHMM.pdf`, `notes.md` | The market report. Notes sections: Verdict, Summary, What is driving the market, Stocks to look at, What to watch |
 | `analyses/summaries/YYYY-MM-DD_HHMM.pdf`, `notes.md` | The watch-list summary. Notes sections: Verdict, Analysis |
 | `analyses/README.md` | The overview: latest run per stock, links to every dated list, and the market and summary PDFs |
 
@@ -142,7 +142,8 @@ A stock removed from the watch list keeps its folder and appears as "off the lis
 
 https://khalilvandian.github.io/Stock-analysis/, built by `analysis/site.py` (standard
 library only) and published by `.github/workflows/pages.yml` on pushes to `main` that
-touch `analyses/`, `data/screener/`, `analysis/site.py`, `docs/pipeline.html` or the workflow,
+touch `analyses/`, `analysis/site.py`, `docs/pipeline.html` or the workflow, at the end of
+each ingest run,
 every day at 05:15 UTC, or by hand (`workflow_dispatch`). The top bar has four menus
 (`MENU` in `analysis/site.py`; add a page there) and a "Find a ticker" box:
 
@@ -168,11 +169,13 @@ every day at 05:15 UTC, or by hand (`workflow_dispatch`). The top bar has four m
   The layout follows the free tabs of The Smart Investor Tool's metrics page, without what we
   have no source for (news, insiders, holders, segments, analyst ratings and targets).
 - **Markets:** **Market reports** (latest strip and every dated report) and **Screener** (the
-  latest Stage 1 pass counts by category and the top 3 per sector from `data/screener/`).
+  latest Stage 1 pass counts by category and the top 3 per sector, from the database's
+  newest screener run).
 - **Project:** **Pipeline** (the diagram in `docs/pipeline.html`, shown as it is) and **Data
   coverage** (`docs/COVERAGE.md`).
 
-PDFs are copied next to the pages.
+PDFs are copied next to the pages; the run lists, the screener, the coverage and the
+explorer come from the database (the web API in the workflow).
 
 ## The email
 
@@ -199,31 +202,31 @@ repository. The only automation inside the repository is the Pages workflow.
 
 ## File formats
 
-### `analyses/<SYMBOL>/runs.csv`
+### A recorded run (`out_watchlist_run`)
 
 | Column | Meaning |
 |---|---|
-| `run` | Run label, `YYYY-MM-DD HH:MM <zone>` (for example `2026-10-27 20:55 CET`) |
-| `file` | PDF name in the same folder |
-| `price` | Latest price |
+| `symbol`, `run_at` | The stock and the run's time in UTC (the dated lists show it in Rome time) |
+| `file` | PDF name in the stock's folder |
+| `price` | Latest close in the database |
 | `eps_adj_ttm` | Trailing 12-month adjusted EPS (sum of the last four reported quarters, with overrides) |
-| `pe_adj` | `price / eps_adj_ttm` |
+| `pe_adj` | `(price - stakes_per_share) / eps_adj_ttm` |
 | `pe_median_10y` | Median of the yearly P/E over the last 10 years |
-| `target_pe` | From the watch list |
-| `entry_price` | `target_pe x eps_adj_ttm` |
+| `target_pe`, `stakes_per_share` | From the watch list |
+| `entry_price` | `target_pe x eps_adj_ttm + stakes_per_share` |
 | `to_entry` | `entry_price / price - 1` (negative: the entry price is below today's price) |
 | `verdict` | First sentence of the Verdict in `notes.md` |
 
-### `analyses/market/runs.csv`
+### A market report's run (`out_market_run`)
 
 | Column | Meaning |
 |---|---|
-| `run`, `file` | As above |
+| `run_at`, `file` | As above |
 | `sp500`, `sp500_day` | S&P 500 level and day change |
 | `vix` | VIX level |
 | `above_200d` | Share of S&P 500 stocks above their 200-day average |
-| `stocks_to_look_at` | Tickers of the screener's 10 cheapest listed names, cheapest first (before 2026-10-27 night: the panic-sell screen's names) |
-| `screener_date` | Date of the screener run used (the latest `data/screener/YYYY-MM-DD.csv`) |
+| `stocks_to_look_at` | Tickers of the screener's 10 cheapest listed names, cheapest first |
+| `screener_date` | Date of the screener run used |
 | `screener_screened`, `screener_passed`, `screener_listed` | Companies screened in Stage 1, passed Stage 1, listed by Stage 2 |
 
 ### `.cache/watchlist/last_run.json`
@@ -234,10 +237,10 @@ repository. The only automation inside the repository is the Pages workflow.
 | `html` | Path of the email body, `.cache/watchlist/email.html` |
 | `files` | Paths of every PDF the run wrote (market, each stock, summary) |
 
-### `data/screener/stage1.csv`
+### A screener run's Stage 1 (`out_screener_result`, stage 1)
 
-One row per company screened, indexed by TradingView symbol (`EXCHANGE:TICKER`), sorted by
-region, sector and market value. Key columns:
+One row per company screened; `symbol` is the ticker, `tv_symbol` (`EXCHANGE:TICKER`) and every
+column below that has no field of its own are in `detail_json`. Key columns:
 
 | Column | Meaning |
 |---|---|
@@ -249,11 +252,11 @@ region, sector and market value. Key columns:
 | `failed` | Rules failed, `; ` separated |
 | `missing` | Required rules with no data (status incomplete) |
 | `flags` | Optional rules skipped for lack of data, and other warnings |
-| `filled` | Values filled from Yahoo or derived (short-term debt as total minus long-term, net debt as debt minus cash) |
+| `filled` | Values filled from the database's core values or derived (short-term debt as total minus long-term, net debt as debt minus cash) |
 | `close`, `cap_usd_bn`, `*_usd_bn`, `eps` | Absolute values: price (trading currency), market value and statement amounts in US$ billions, 12-month diluted EPS |
 | Ratios and history measures | `cash_to_short_term_debt`, `cash_to_long_term_debt`, `cash_to_total_debt`, `net_debt_to_ebitda`, `net_debt_to_avg_ebitda`, `net_cash_to_cap`, `interest_cover`, `debt_to_equity`, `price_book_fq`, `return_on_equity_fq`, growth medians, `eps_growth_3y`, `eps_vs_5y_peak`, `loss_now`, `no_profit_5y`, `eps_big_drops_10y`, `eps_avg_10y`, `recession_eps_change`, `dividend_years_10y`, `dividend_payout_ratio_ttm`, `piotroski_f_score_ttm`, `altman_z_score_ttm` |
 
-### `data/screener/top.csv`
+### A screener run's Stage 2 (`out_screener_result`, stage 2)
 
 The top `top_per_sector` (3) per region and sector, among Stage 1 passes that are cheap or
 close to cheap. It carries every Stage 1 column except the yearly lists, plus Stage 2's.
@@ -263,7 +266,7 @@ Key columns:
 |---|---|
 | `tv_symbol` | TradingView symbol (index) |
 | `name`, `description` | Ticker and company name |
-| `region`, `sector`, `category`, `type` | As in `stage1.csv` |
+| `region`, `sector`, `category`, `type` | As in Stage 1 |
 | `close`, `currency` | Price and trading currency |
 | `eps`, `eps_basis` | EPS used for the cheap price, `adjusted` (Yahoo) or `diluted` (TradingView) |
 | `pe_now` | Price / EPS (in the statements' currency) |
@@ -277,10 +280,5 @@ Key columns:
 | `rank_in_sector` | 1 to 3 |
 | `trend`, `rsi_read`, `in_52w_range`, `tv_rating` | Technicals, for timing only |
 | `pe_vs_sector`, `ev_ebitda_vs_sector`, `fcf_yield` | Context measures, not used in the ranking |
-| `sec_eps` | SEC EDGAR diluted EPS for the latest fiscal year (US only) |
+| `sec_eps` | The SEC filing's diluted EPS for the latest fiscal year, on today's share basis (US only) |
 | `why` | One line: P/E against the cheap multiple, 10-year median, leverage, growth, trend |
-
-### `data/screener/YYYY-MM-DD.csv`
-
-Every company of the day's run with both stages' columns (no yearly lists). `market.py` and
-`site.py` take the screener's run date from the newest of these files.

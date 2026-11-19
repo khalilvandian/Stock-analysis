@@ -131,12 +131,12 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <div class="legend" aria-hidden="true">
     <span><i class="hot"></i>the scheduled data path (ingest → database → site)</span>
     <span><i></i>code, deploy and analysis flows</span>
-    <span><i class="dash"></i>still separate: moves to the database next</span>
+    <span><i class="dash"></i>opens the firewall for the run</span>
     <span><i class="fw"></i>database firewall (listed addresses only)</span>
   </div>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; every hour on weekdays the quotes job stores TradingView's latest price of every company; the web API reads the newest coverage snapshot and every ticker's data for the GitHub Pages build, and serves the latest prices to the site's pages; GitHub Actions builds the job's image, which the job pulls at each run; the evening run and your analyses use the database and the repository.">
+<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; every hour on weekdays the quotes job stores TradingView's latest price of every company; the web API reads the newest coverage snapshot and every ticker's data for the GitHub Pages build, and serves the latest prices to the site's pages; GitHub Actions builds the job's image, which the job pulls at each run; only the ingest job calls the sources, and after each run it computes what the evening run reads (the screener, the watch list's and the market's numbers); the evening run reads those and records its runs through the web API and commits its PDFs and notes, and your analyses read the database directly.">
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
     <marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahh" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -155,11 +155,11 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 
   <!-- sources -->
   <rect class="box" x="26" y="100" width="164" height="52" rx="6"/>
-  <text class="t" x="38" y="122">Yahoo Finance</text><text class="s" x="38" y="139">prices, statements, EPS</text>
+  <text class="t" x="38" y="122">Yahoo Finance</text><text class="s" x="38" y="139">prices, statements, EPS, indices</text>
   <rect class="box" x="26" y="170" width="164" height="52" rx="6"/>
   <text class="t" x="38" y="192">SEC EDGAR</text><text class="s" x="38" y="209">XBRL company facts</text>
   <rect class="box" x="26" y="240" width="164" height="52" rx="6"/>
-  <text class="t" x="38" y="262">TradingView</text><text class="s" x="38" y="279">S&amp;P 500 members, sectors</text>
+  <text class="t" x="38" y="262">TradingView</text><text class="s" x="38" y="279">members, screener fields</text>
   <rect class="box" x="26" y="310" width="164" height="52" rx="6"/>
   <text class="t" x="38" y="332">ECB</text><text class="s" x="38" y="349">exchange rates</text>
 
@@ -179,8 +179,9 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="k" x="254" y="218">3  fetch to budget → <tspan class="m">raw_*</tspan></text>
   <text class="k" x="254" y="244">4  build <tspan class="m">raw_*</tspan> → <tspan class="m">core_*</tspan></text>
   <text class="k" x="254" y="270">5  coverage → <tspan class="m">out_*</tspan></text>
-  <text class="k" x="254" y="296">6  close firewall rule</text>
-  <text class="s" x="254" y="330">backfill until 90% present, then maintain</text>
+  <text class="k" x="254" y="296">6  nightly analyses → <tspan class="m">out_*</tspan></text>
+  <text class="k" x="254" y="322">7  close firewall rule</text>
+  <text class="s" x="254" y="342">backfill until 90% present, then maintain</text>
 
   <!-- quotes job (issue #35) -->
   <polyline class="e hot" points="190,284 214,284 214,408 238,408" marker-end="url(#h)"/>
@@ -208,7 +209,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <rect class="band" x="602" y="182" width="196" height="30" rx="4"/>
   <text class="m" x="612" y="201">core_*</text><text class="s" x="668" y="201">prices, fundamentals</text>
   <rect class="band" x="602" y="218" width="196" height="30" rx="4"/>
-  <text class="m" x="612" y="237">out_*</text><text class="s" x="668" y="237">screener, coverage</text>
+  <text class="m" x="612" y="237">out_*</text><text class="s" x="668" y="237">runs, screener, coverage</text>
   <rect class="band" x="602" y="254" width="196" height="30" rx="4"/>
   <text class="m" x="612" y="273">user_*</text><text class="s" x="668" y="273">watch list</text>
   <rect class="band" x="602" y="290" width="196" height="30" rx="4"/>
@@ -229,7 +230,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="mm" x="904" y="176">src/</text>
   <text class="mm" x="904" y="194">config/</text>
   <text class="mm" x="904" y="212">analyses/</text>
-  <text class="mm" x="904" y="230">data/screener/</text>
+  <text class="mm" x="904" y="230">docs/</text>
   <text class="mm" x="904" y="248">reports/</text>
 
   <rect class="box" x="1030" y="120" width="130" height="56" rx="6"/>
@@ -268,7 +269,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 
   <rect class="box" x="590" y="540" width="220" height="66" rx="6"/>
   <text class="t" x="604" y="563">Your analyses</text>
-  <text class="s" x="604" y="580">analysis/*.py · Data.open()</text>
+  <text class="s" x="604" y="580">absolute.py · stocks · Data</text>
   <text class="s" x="604" y="596">on your PC or in a session</text>
 
   <rect class="box" x="890" y="540" width="134" height="66" rx="6"/>
@@ -282,14 +283,13 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="el" x="748" y="492">HTTPS (cloud)</text>
 
   <polyline class="e" points="350,540 350,520 852,520 852,250 888,250" marker-end="url(#a)"/>
-  <text class="el" x="470" y="513" text-anchor="middle">commits PDFs + screener</text>
+  <text class="el" x="470" y="513" text-anchor="middle">commits PDFs + notes</text>
 
   <polyline class="e" points="350,606 350,630 957,630 957,608" marker-end="url(#a)"/>
   <text class="el" x="700" y="624" text-anchor="middle">PDFs + summary</text>
 
-  <polyline class="e dash" points="108,452 108,573 238,573" marker-end="url(#a)"/>
-  <text class="el" x="116" y="500">still fetches</text>
-  <text class="el" x="116" y="514">its own data</text>
+  <polyline class="e" points="450,538 450,488 700,488 700,439" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="el" x="458" y="483">HTTPS: numbers, runs</text>
 </svg>
     </div>
     <figcaption>The highlighted path runs by itself every night: the ingest job opens the
@@ -297,7 +297,11 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
     coverage snapshot; the site build reads that snapshot, and exports every ticker for the explorer pages, through the web API.
     Every hour on weekdays the quotes job stores the latest price of every company, and each page that shows a price asks
     the web API for them and recomputes every value that depends on the price. GitHub Actions
-    turns code into the image the job runs and turns the repository into the site.</figcaption>
+    turns code into the image the job runs and turns the repository into the site. Nothing
+    else calls the sources: after its build the ingest job runs the nightly analyses (the
+    screener, the watch list's and the market report's numbers), the evening run reads
+    them and records its runs through the web API, and your analyses read the database
+    directly.</figcaption>
   </figure>
 </section>
 
@@ -1327,7 +1331,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 
   <!-- evening run -->
   <rect class="mute" x="254" y="34" width="69" height="14" rx="3"/>
-  <text class="k" x="334" y="45">Evening run (21:00 Italy, weekdays): notes, PDFs, screener, email</text>
+  <text class="k" x="334" y="45">Evening run (21:00 Italy, weekdays): notes, PDFs from the nightly numbers, email</text>
 
   <!-- quotes job: every hour on weekdays, around the clock -->
   <rect class="run" x="75" y="143" width="6" height="6" rx="1" transform="rotate(45 78 146)"/>
@@ -1387,7 +1391,6 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <h2>Keeping this drawing current</h2>
   <ol>
     <li>Edit <code>docs/pipeline.html</code> in the same change that adds, moves or reschedules a piece.</li>
-    <li>Change the dashed line when the evening run reads from the database instead of the sources.</li>
     <li>"Inside the database, in UML" follows <code>src/stock_analysis/db/build.py</code>, <code>db/coverage.py</code>, <code>ingest/job.py</code> and the migrations: redraw an action, table or state when the code changes it, in <code>docs/pipeline_uml.py</code> (run it with this file as its argument); keep the notes to the structure: no counts, dates or plans.</li>
     <li>Update the date under the title and republish the artifact; the link is in <code>docs/ARCHITECTURE.md</code>.</li>
   </ol>

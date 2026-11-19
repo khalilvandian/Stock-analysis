@@ -1,20 +1,19 @@
-import pandas as pd
-from analysis_absolute import DATA, columns, load_config
+from analysis_absolute import columns, load_config
+
+from stock_analysis import stocks
 
 
-def test_every_configured_value_exists_in_sector_data():
-    header = pd.read_csv(DATA, nrows=0, index_col=0).columns
-    missing = [c["column"] for c in columns(load_config()) if c["column"] not in header]
-    assert not missing, f"add these to analysis/sector.py or fix the config: {missing}"
+def test_every_configured_value_exists_in_the_rows():
+    have = set(stocks.row_columns())
+    missing = [c["column"] for c in columns(load_config()) if c["column"] not in have]
+    assert not missing, f"add these to stock_analysis/stocks.py or fix the config: {missing}"
 
 
 def test_config_units_are_known():
     assert {c["unit"] for c in columns(load_config())} <= {"$", "$bn"}
 
 
-def test_history_names_exist_in_history_data():
-    from analysis_absolute import HISTORY
-
-    have = set(pd.read_csv(HISTORY, usecols=["column"])["column"])
+def test_history_names_exist_in_the_history():
     wanted = {c.get("history", c["column"]) for c in columns(load_config())} - {""}
-    assert wanted <= have, f"missing from history.csv: {wanted - have}"
+    have = set(stocks.HISTORY_NAMES)
+    assert wanted <= have, f"missing from stocks.history: {wanted - have}"

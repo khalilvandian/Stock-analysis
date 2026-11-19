@@ -22,7 +22,7 @@ from sqlalchemy.engine import Connection
 
 from .. import tradingview
 from ..db import frame, insert_df
-from ..db.load_files import UNIVERSE, finish_fetch
+from ..db.raw import UNIVERSE, finish_fetch
 from .common import NoData, Outcome, RateLimited, log_error, sha256, start_fetch
 
 SOURCE = "tradingview_quotes"

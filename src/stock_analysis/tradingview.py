@@ -15,6 +15,70 @@ import pandas as pd
 SCAN_URL = "https://scanner.tradingview.com/{market}/scan"
 PAGE = 2000
 
+# The fields the ingest keeps for every company of its snapshots (raw_tv_constituent: the
+# first few in columns of their own, the rest in extra_json). The market screener
+# (stock_analysis.screener) and the watch list read them from there. Statements and market values
+# are in the company's own currency (fundamental_currency_code), prices in the trading currency.
+SCREENER_FIELDS = [
+    "name",
+    "description",
+    "exchange",
+    "country",
+    "sector",
+    "industry",
+    "market_cap_basic",
+    "fundamental_currency_code",
+    "currency",
+    "close",
+    # absolute values (fundamental currency)
+    "total_debt_fq",
+    "net_debt_fq",
+    "short_term_debt_fq",
+    "long_term_debt_fq",
+    "cash_n_short_term_invest_fq",
+    "total_revenue_ttm",
+    "ebitda_ttm",
+    "net_income_ttm",
+    "earnings_per_share_diluted_ttm",
+    "cash_f_operating_activities_ttm",
+    "capital_expenditures_ttm",
+    "free_cash_flow_ttm",
+    # ratios and scores
+    "ebitda_interst_cover_ttm",
+    "return_on_equity_fq",
+    "net_margin_ttm",
+    "piotroski_f_score_ttm",
+    "altman_z_score_ttm",
+    "price_earnings_ttm",
+    "enterprise_value_ebitda_ttm",
+    "price_book_fq",
+    "total_equity_fq",
+    "book_tangible_per_share_fq",
+    "dividends_yield",
+    "earnings_per_share_forecast_next_fy",
+    "beta_1_year",
+    "price_target_average",
+    "recommendation_mark",
+    # yearly history, newest first
+    "fiscal_period_fy_h",
+    "fiscal_period_end_fy",
+    "earnings_per_share_diluted_fy_h",
+    "total_revenue_fy_h",
+    "ebitda_fy_h",
+    "dps_common_stock_prim_issue_fy_h",
+    "dividend_payout_ratio_ttm",
+    "debt_to_equity_fq",
+    # technicals
+    "SMA50",
+    "SMA200",
+    "RSI",
+    "price_52_week_high",
+    "price_52_week_low",
+    "Recommend.All",
+    "Perf.Y",
+    "indexes",
+]
+
 
 def scan(
     market: str,

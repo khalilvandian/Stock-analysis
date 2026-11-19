@@ -107,8 +107,9 @@ free cash flow includes the fee.
 
 ### Method
 
-- `analysis/sector.py`'s `analyse()` provides the latest values and ratios, and
-  `analysis/history.py`'s `sec_history()` the yearly history.
+- When written, `analysis/sector.py`'s `analyse()` provided the latest values and ratios,
+  and `analysis/history.py`'s `sec_history()` the yearly history. Both now come from the
+  database (`stock_analysis.stocks`, issue #33); the commands below read it.
 - `analysis/screen.py` rules and weights are unchanged. Peers replace the utilities
   universe, with one peer median for P/E and EV / EBITDA.
 - Peers: DIS, WBD, CMCSA, SPOT, ROKU, GOOGL (YouTube), META (viewing time), PSKY, the same

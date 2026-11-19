@@ -7,7 +7,7 @@ One definition, in `config/coverage.toml`, is used by three things: the
 
 ```bash
 uv run python -m stock_analysis.db coverage                           # print, save today's snapshot
-uv run python -m stock_analysis.db coverage --json data/coverage/latest.json   # for a local site build
+uv run python -m stock_analysis.db coverage --json coverage.json   # the page's JSON, to look at
 ```
 
 ## What is required
@@ -110,7 +110,7 @@ columns (the trend) and everything else in `detail_json`. A rerun on the same da
 (`.github/workflows/pages.yml`) runs when the ingest job finishes (the job starts it through
 GitHub's API), every day at 05:15 UTC as a fallback, and on every push. It reads the newest snapshot through the web API (`/query`, with the repository
 secret `STOCK_API_KEY`), so the site stays static and no data is committed. Without the
-secret, a local build uses `data/coverage/latest.json` (not committed) if present, or says
-there is no snapshot yet. The page shows counts and shares only, no secrets and no raw data.
+secret, a local build reads the database directly (`stock_analysis.data`), or says there
+is no snapshot yet. The page shows counts and shares only, no secrets and no raw data.
 
 Code: `src/stock_analysis/db/coverage.py`; tests in `tests/test_ingest.py`.

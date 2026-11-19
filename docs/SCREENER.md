@@ -3,14 +3,14 @@
 The screener finds companies worth owning and then those whose price is cheap. It has two
 stages, run as separate programs:
 
-- **Stage 1, good financial statements** (`analysis/stage1.py`): puts each company in one of
+- **Stage 1, good financial statements** (`stock_analysis/screener/stage1.py`): puts each company in one of
   Peter Lynch's categories and keeps those that pass every rule for their category or kind
   of business. The price plays no part.
-- **Stage 2, cheapness** (`analysis/stage2.py`): reads only Stage 1's output, sets each
+- **Stage 2, cheapness** (`stock_analysis/screener/stage2.py`): reads only Stage 1's output, sets each
   survivor's own cheap price, and lists the top 3 cheap or close-to-cheap names per sector.
   Technicals are shown for timing and never change the ranking.
 
-`analysis/screener.py` runs both. Settings: `config/screeners.toml`. Results and their
+`stock_analysis.screener` runs both. Settings: `config/screeners.toml`. Results and their
 discussion: [report 13](../reports/13-market-screener.md). The methods doc with every rule's
 source, "Stage 1 screening methods and their sources", is at
 https://claude.ai/artifact/XXxnx8ZMtM8GwfnsfS4mza. Commands and the step-by-step run are in
@@ -26,14 +26,16 @@ https://claude.ai/artifact/XXxnx8ZMtM8GwfnsfS4mza. Commands and the step-by-step
 | `cheap_percentile` | 0.25 | The cheap P/E is the bottom quarter of the stock's own yearly P/Es |
 | `history_years` | 10 | Fiscal years of P/E history looked at |
 | `min_history_years` | 6 | Years of positive P/E needed for a cheap price |
-| `[universe] index` | `"SP:SPX"` | Only S&P 500 members (TradingView's index code). `""` = every company above the floor |
+| `[universe] index` | `"SP:SPX"` | Only S&P 500 members (TradingView's index code): the ingest's universe, whose snapshot the screener reads from the database. `""` (every company above the floor) needs the ingest to snapshot whole markets first, and is refused until then |
 | `[universe] regions` | `["US"]` | Regions scanned (`[]` = all) |
 | `[regions] US` | `america` | TradingView market for the US |
 | `[regions] Europe` | 17 markets | UK, Germany, France, Italy, Spain, Netherlands, Switzerland, Sweden, Denmark, Norway, Finland, Belgium, Austria, Portugal, Ireland, Poland, Greece |
 
 **Scope for now: the S&P 500** (Babak, 2026-10-27: "for now, we're focusing on the S&P 500").
-The code screens the US and 17 European markets with one setting change (`index = ""`,
-`regions = []`); the earlier all-market run that day covered 3,432 companies.
+Before issue #33 the screener scanned TradingView itself, and the US and 17 European markets
+were one setting change away (`index = ""`, `regions = []`; an all-market run on 2026-10-27
+covered 3,432 companies). Now it reads the ingest's snapshot, so a wider universe starts in
+the ingest (`config/ingest.toml`).
 
 ## Universe
 
@@ -93,7 +95,7 @@ passes that rule whatever the ratio.
 | `cash_to_long_term_debt` | Cash / long-term debt, at least the value | No long-term debt passes |
 | `max_net_debt_to_ebitda` | Net debt / 12-month EBITDA, at most the value | Net cash passes; EBITDA at or below 0 fails |
 | `max_net_debt_to_avg_ebitda` | Net debt / average yearly EBITDA over up to 10 years (5 needed), at most the value | Net cash passes; average EBITDA at or below 0 fails |
-| `min_interest_cover` | EBITDA / interest expense (TradingView, or Yahoo EBITDA / interest when blank), at least the value | Net cash passes |
+| `min_interest_cover` | EBITDA / interest expense (TradingView, or the database's EBITDA / interest when blank), at least the value | Net cash passes |
 | `max_debt_to_equity` | Total debt / equity, at most the value | Net cash passes. **Negative equity** (equity below 0, or debt/equity and price/book both blank, with debt): net debt / EBITDA at most 2.0x instead; EBITDA at or below 0 fails |
 | `min_cash_to_total_debt` | Cash / total debt, at least the value | No debt passes |
 | `profitable` | 12-month net income, diluted EPS and EBITDA all above 0 | Banks and insurers: EBITDA not checked |
@@ -228,7 +230,7 @@ on manufacturers and does not fit regulated companies.
 ### Cheap price
 
 1. **Own yearly P/E (diluted).** For each of the last 10 fiscal years: the average of
-   Yahoo's monthly closes over the fiscal year (at least 9 months, converted to the
+   The monthly closes in the database over the fiscal year (at least 9 months, converted to the
    statements' currency) divided by TradingView's diluted EPS for that year. Years with EPS
    at or below 0 are left out.
 2. **Own cheap P/E** = the 25th percentile of those P/Es, with at least 6 years. With fewer,
@@ -238,7 +240,7 @@ on manufacturers and does not fit regulated companies.
    P/E.** `cheap_basis` says which set it. The sector median is a cap, not a substitute for a
    short history.
 4. **Cheap price** = cheap multiple x 12-month EPS, in the trading currency.
-5. **Adjusted EPS.** For the 9 closest names in each region and sector, Yahoo's reported
+5. **Adjusted EPS.** For the 9 closest names in each region and sector, Yahoo's reported (from the database)
    quarterly EPS (adjusted, split-adjusted, the watch list's method) replaces diluted EPS,
    and its own calendar-year P/E history replaces the diluted one, when that history has at
    least 6 years and the adjusted 12-month EPS is between half and twice diluted EPS. Outside
@@ -271,11 +273,12 @@ scores, technicals) changes the ranking.
 ### Cross-checks and fills
 
 - **SEC EDGAR.** For US names on the list, TradingView's latest-year diluted EPS is compared
-  with SEC's frames API (`us-gaap/EarningsPerShareDiluted/USD-per-shares/CY<year>`). A gap
-  above 10% is written to `flags`; `sec_eps` holds SEC's figure. On 2026-10-27 all 29 names
-  were found and none was off by more than 10%.
+  with the company's own 10-K figure in the database (`v_fundamental_latest`, source sec, the
+  fiscal year itself, on today's share basis with the splits since). A gap above 10% is
+  written to `flags`; `sec_eps` holds SEC's figure. (Until issue #33 it used SEC's
+  calendar-year frames API.)
 - **Cash flows.** Blank 12-month operating cash flow, capex or free cash flow of a listed name
-  is filled from Yahoo's last four quarters and named in `filled`.
+  is filled from the database's latest twelve months and named in `filled`.
 
 ## Judgement calls
 
@@ -295,12 +298,10 @@ scores, technicals) changes the ranking.
 
 ## Caveats
 
-- TradingView's and Yahoo's interfaces are unofficial; field names can change and Yahoo
-  rate-limits heavy use. Each run caches its downloads for the day in `.cache/screener/`.
+- TradingView's and Yahoo's interfaces are unofficial; field names can change. The
+  screener reads what the night's ingest stored, so it sees the previous close.
 - Own history is not destiny: a stock far below its cheap price may have been re-rated for a
   reason. The screen finds candidates; each needs the full single-stock analysis.
 - Cyclicals at low P/Es may be at peak earnings (Lynch's warning).
-- The SEC check uses calendar-year frames; for companies whose fiscal year doesn't end in
-  December it may compare a different 12 months.
 - Sectors are TradingView's 20, not GICS.
 - DCF fair value is not part of the screener yet.

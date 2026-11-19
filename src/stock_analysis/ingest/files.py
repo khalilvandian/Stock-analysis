@@ -38,7 +38,7 @@ import pandas as pd
 
 from ..db import Database, frame, run
 from ..db.build import load_companies
-from ..db.load_files import finish_fetch, store_changed
+from ..db.raw import finish_fetch, store_changed
 from . import xbrl
 from .common import sha256, start_fetch
 from .job import load_config

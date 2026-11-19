@@ -1,10 +1,13 @@
 """Command line: python -m stock_analysis.db
-{init,load-files,build,status,check,ping,allow-my-ip,create-roles,ingest,import,reparse,push,
-coverage,tasks,quotes} [--target].
+{init,build,status,check,ping,allow-my-ip,create-roles,ingest,import,reparse,push,
+coverage,tasks,quotes,nightly} [--target].
 
 quotes fetches the last price of every company in the index (TradingView, one request, 15
 minutes delayed) into raw_tv_quote; the hourly job stock-quotes runs it (ingest/quotes.py).
 --symbols A,B fetches only those (a sample).
+
+nightly computes what the evening run reads (stock_analysis.nightly); the ingest runs it after
+its build when `nightly = true` in config/ingest.toml.
 
 push sends what this PC ingested (kept SEC payloads, imported data-set files) to --target
 (the server) without asking SEC again (ingest/push.py); --from picks the source database.
@@ -34,7 +37,6 @@ from pathlib import Path
 from . import Database
 from .build import build
 from .check import check
-from .load_files import load_all
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,7 +45,6 @@ def main(argv: list[str] | None = None) -> int:
         "command",
         choices=[
             "init",
-            "load-files",
             "build",
             "check-sample",
             "status",
@@ -58,10 +59,10 @@ def main(argv: list[str] | None = None) -> int:
             "coverage",
             "tasks",
             "quotes",
+            "nightly",
         ],
     )
     parser.add_argument("--target", help="a target in config/database.toml (default: selected)")
-    parser.add_argument("--data", help="load-files: folder to import from (default: data/)")
     parser.add_argument("--strict", action="store_true", help="check: exit 1 on WARN too")
     parser.add_argument("--ip", help="allow-my-ip: allow this address instead of this PC's")
     parser.add_argument("--rule", default="home", help="allow-my-ip: firewall rule name")
@@ -115,8 +116,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(create_roles(db), indent=2))
         db.close()
         return 0
-    if args.command == "load-files":
-        print("Rows added:", json.dumps(load_all(db, args.data), indent=2))
+    if args.command == "nightly":
+        from ..data import DbData
+        from ..nightly import run as run_nightly
+
+        print("Nightly analyses:", json.dumps(run_nightly(DbData(db, db)), indent=2, default=str))
     elif args.command == "build":
         symbols = args.symbols.split(",") if args.symbols else None
         print("Build:", json.dumps(build(db, full=args.full, symbols=symbols), indent=2))
