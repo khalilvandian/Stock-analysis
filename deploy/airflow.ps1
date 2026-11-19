@@ -166,7 +166,7 @@ $nsg = (Az network nic show --ids (Az vm show -n $Vm -g $ResourceGroup --query "
 Az network nsg rule create -g $ResourceGroup --nsg-name $nsg -n ssh-home --priority 1000 `
     --source-address-prefixes "$homeIp/32" --destination-port-ranges 22 --access Allow --protocol Tcp --only-show-errors | Out-Null
 $vmIp = (Az vm show -d -n $Vm -g $ResourceGroup --query publicIps -o tsv)
-Az postgres flexible-server firewall-rule create -g $ResourceGroup --name $Server --rule-name airflow-vm `
+Az postgres flexible-server firewall-rule create -g $ResourceGroup --server-name $Server --name airflow-vm `
     --start-ip-address $vmIp --end-ip-address $vmIp --only-show-errors | Out-Null
 
 Write-Host "6/7 The VM's rights: start the jobs, write the logs"
