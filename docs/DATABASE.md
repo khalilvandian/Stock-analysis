@@ -159,10 +159,11 @@ question: it runs SQL, and the database users' rights decide what is allowed.
 | Route | Runs as | Does |
 |---|---|---|
 | `GET /health` | | `{"ok": true}`, no key needed |
+| `GET /quotes` | `stock_reader` | No key: the newest quote of every company from `v_quote_latest` (issue #35), for the explorer pages. One fixed query (no input reaches SQL), quotes of the last 10 days only, cached 5 minutes in the app and in browsers, gzip, CORS open to `QUOTES_ORIGINS` (default `https://khalilvandian.github.io`). Answer `{"fetched_at", "columns": ["price", "change_pct", "session", "price_at", "delay_s", "currency"], "quotes": {SYMBOL: [...]}}`; `analysis/live.js` reads the columns by name, shows the delay ("15 min delayed") from `delay_s` and applies a quote only in the page's currency |
 | `POST /query` `{"sql", "params", "limit"}` | `stock_reader` | One SELECT or WITH statement in a read-only transaction, 30 s limit, at most 50,000 rows. Answer `{"columns", "rows", "truncated"}` |
 | `POST /execute` `{"steps": [{"sql", "rows"}]}` | `stock_writer` | INSERT, UPDATE, DELETE (or WITH, MERGE) steps in one transaction, all or nothing; each step runs once per row. Answer `{"rowcounts"}` |
 
-Parameters are `:name` placeholders. Every route but `/health` needs `X-API-Key:
+Parameters are `:name` placeholders. Every route but `/health` and `/quotes` needs `X-API-Key:
 <STOCK_API_KEY>`. App settings: `DATABASE_URL` (stock_reader), `DATABASE_WRITER_URL`
 (stock_writer), `STOCK_API_KEY`. The database firewall allows the app's outbound addresses
 (rules `stock-api`, `stock-api-2`). Protection, in layers: the key; HTTPS; one statement per
@@ -609,6 +610,7 @@ From the repository files, 2026-11-16 (28 MB):
 | `raw_payload` | Distinct payload fetched | The payload as the source returned it, gzip-compressed (`content`, `size_bytes` before compression, `media_type`): the SEC files, TradingView's scan, the ECB's CSV, the tables yfinance returns. The other raw tables hold what is parsed from it, so a changed parsing rule (a newly mapped SEC tag) reads the kept copy (`db reparse`) instead of the source. About 0.25 MB per SEC company file |
 | `raw_sec_xbrl_fact` | Fact of a full 10-K or 10-Q, per dimension | Read from the filing's XBRL (edgartools, source `sec_xbrl`) for the values company facts leaves out: `axis` and `member` give the share class (Visa's Class A diluted EPS). Only the concepts in `sec_class` in `config/db_items.toml`. Also filled from SEC's Financial Statement Data Sets (`db import`, kind `sec_fsds`): the companies' own tags (`custom`, read through `[[custom_tag]]` in `config/companies.toml`) and the values per share class. `statement` is BS, IS, CF, EQ or CI |
 | `raw_tv_constituent` | Company in one S&P 500 snapshot | The whole snapshot is stored, since its prices change daily. `extra_json` holds the columns that have no field of their own |
+| `raw_tv_quote` | Listing in one hourly quote fetch | TradingView's last price of the regular session (15 minutes delayed), the day's change (% and $), volume, currency, `session` and `delay_s`. Source `tradingview_quotes`; a fetch with the same prices as the last one is skipped. Migration `013` (issue #35; `011` and `012` are kept for the orchestrator branch, #30) |
 | `raw_yahoo_price` | Symbol, day and version | Open, high, low and close (split-adjusted), volume, dividends and splits. The dividend-adjusted close is **computed in core**, so a dividend does not rewrite the history here, and Yahoo's own adjusted close isn't stored. Open, high and low were added by migration `002` for technical analysis |
 | `raw_yahoo_statement` | Line item, period and version | Yahoo's own names (`Total Revenue`) |
 | `raw_project_history` | Value in `history.csv` and version | As in the file: money in $bn |
@@ -668,6 +670,7 @@ reason (docs/COVERAGE.md).
 | `v_daily` | Company and trading day | The close, the adjusted close and the absolute values as known that day. Flows are trailing twelve months (`_ttm`). Also `market_cap`, `net_debt` and `free_cf_ttm` |
 | `v_watchlist` | Watch list stock | Its settings and its latest evening run (price, P/E, entry price, distance to entry, verdict) |
 | `v_fundamental_latest` | Company, item and period | The latest filed version |
+| `v_quote_latest` | Company (symbol) | Its newest intraday quote: price, change, volume, session, `fetched_at` and `price_at` (fetch time less the delay while the market is open; empty outside the session, when the price is the latest close). Reads `raw_tv_quote` directly, on purpose: a quote is shown as it came, and rebuilding core every hour would cost far more than it adds |
 
 ## The 17 items
 

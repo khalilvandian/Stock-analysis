@@ -16,6 +16,9 @@ on:
       - "analyses/**"
       - "data/screener/**"
       - "analysis/site.py"
+      - "analysis/explore.py"
+      - "analysis/explorer.js"
+      - "analysis/live.js"
       - "docs/pipeline.html"
       - ".github/workflows/pages.yml"
   schedule:

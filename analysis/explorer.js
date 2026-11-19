@@ -182,7 +182,7 @@ function summary(t, idx) {
   const peers = (idx?.tickers || []).filter((x) => x.sector === t.profile.sector);
   const med = (key) => median(peers.map((x) => x[key]));
   const abs = tiles([
-    tile("Price", price(s.price), esc(t.asof || "")),
+    tile("Price", price(s.price), priceWhen(t)),
     tile("Market value", money(s.market_cap)),
     tile("Our DCF fair value", dcf ? price(dcf.fair_value) : DASH, dcf ? esc(dcf.as_of) : "not run"),
     tile("Revenue (TTM)", money(s.revenue)),
@@ -252,7 +252,7 @@ function summary(t, idx) {
     tile("P/E (TTM)", mult(r.pe)), tile("EV / EBITDA (TTM)", mult(r.ev_ebitda)), tile("Dividends (TTM)", price(t.dividends?.ttm), pct(t.dividends?.yield, 2)),
     tile("Volume", ok(k.volume) ? k.volume.toLocaleString("en-US") : DASH, ok(k.avg_volume_3m) ? `3-month average ${k.avg_volume_3m.toLocaleString("en-US")}` : ""),
   ]);
-  return `<h2>Absolute values</h2>${abs}<p class="note">Flows over the last twelve months to ${esc(s.period_end || "—")}; balance sheet at that date; price and market value at the close of ${esc(t.asof || "—")}.</p>
+  return `<h2>Absolute values</h2>${abs}<p class="note">Flows over the last twelve months to ${esc(s.period_end || "—")}; balance sheet at that date; price, market value and the ratios that use them at ${t.live ? `the latest quote (${priceWhen(t, true)}; TradingView, refreshed every hour during the US session)` : `the close of ${esc(t.asof || "—")}`}.</p>
     ${tenCards ? `<h2>Last fiscal year, and the ten years before it</h2>${tenCards}` : ""}
     <h2>Price</h2><div class="card xpanel">${priceChart(t)}</div>${stats}
     <h2>Financial health</h2>${health}
@@ -370,13 +370,13 @@ function valuation(t, idx) {
     tile("Sector median P/E", mult(medPE), `${peers.length} peer${peers.length === 1 ? "" : "s"}`), tile("Price at the sector P/E", price(relPE), up(relPE)),
     tile("Sector median EV / EBITDA", mult(medEV)), tile("Price at the sector EV / EBITDA", price(relEV && relEV > 0 ? relEV : null), relEV > 0 ? up(relEV) : ""),
   ])}<p class="note">Price at the sector EV / EBITDA = (median multiple × TTM EBITDA − net debt) ÷ shares. Peers: the other companies of the ${esc(t.profile.sector || "")} sector in the database.</p>`;
-  return valuationBody(t, v, s, up) + relative + valuationDcf(v);
+  return valuationBody(t, v, s, up) + relative + valuationDcf(v, s.price);
 }
 
 function valuationBody(t, v, s, up) {
   const pe = t.annual_ratios.pe || [];
   return `<h2>EPS fair value: the company's own P/E history</h2>${tiles([
-    tile("Price", price(s.price), esc(t.asof || "")),
+    tile("Price", price(s.price), priceWhen(t)),
     tile("P/E now (TTM)", mult(v.pe_now)),
     tile(`Median P/E, last ${v.pe_years || 0} yrs`, mult(v.pe_median_10y)),
     tile("Price at the median P/E", price(v.price_at_median_pe), up(v.price_at_median_pe)),
@@ -389,9 +389,10 @@ function valuationBody(t, v, s, up) {
   ${panel("P/E at each fiscal year end", barChart(t.annual.years.map(String), pe, "mult", "P/E"))}`;
 }
 
-function valuationDcf(v) {
-  const dcf = (v.dcf || []).map((d) => `<tr><td>${esc(d.method)}</td><td class="d">${esc(d.as_of)}</td><td class="n">${price(d.fair_value)}</td><td class="n">${price(d.price)}</td><td class="n">${ok(d.fair_value) && ok(d.price) ? spct(d.fair_value / d.price - 1, 0) : DASH}</td></tr>`).join("");
-  return `<h2>DCF fair value: our discounted cash flow</h2>${dcf ?panel("", `<div class="wrap"><table><thead><tr><th>Method</th><th>As of</th><th class="n">Fair value</th><th class="n">Price then</th><th class="n">Upside then</th></tr></thead><tbody>${dcf}</tbody></table></div>`) : "<p class='empty'>No DCF has been run for this company yet (analysis/dcf_firm.py).</p>"}`;
+function valuationDcf(v, now) {
+  const upside = (fv, p) => (ok(fv) && ok(p) ? spct(fv / p - 1, 0) : DASH);
+  const dcf = (v.dcf || []).map((d) => `<tr><td>${esc(d.method)}</td><td class="d">${esc(d.as_of)}</td><td class="n">${price(d.fair_value)}</td><td class="n">${price(d.price)}</td><td class="n">${upside(d.fair_value, d.price)}</td><td class="n"><b>${upside(d.fair_value, now)}</b></td></tr>`).join("");
+  return `<h2>DCF fair value: our discounted cash flow</h2>${dcf ?panel("", `<div class="wrap"><table><thead><tr><th>Method</th><th>As of</th><th class="n">Fair value</th><th class="n">Price then</th><th class="n">Upside then</th><th class="n">Upside now</th></tr></thead><tbody>${dcf}</tbody></table></div>`) : "<p class='empty'>No DCF has been run for this company yet (analysis/dcf_firm.py).</p>"}`;
 }
 
 function dividendsTab(t) {
@@ -465,8 +466,22 @@ const TABS = [
   ["screener", "Screener", (t) => t.screener?.stage1],
 ];
 
+// --- live price (issue #35) -------------------------------------------------------------
+// The hourly quotes and the recomputation live in live.js (window.Live), shared with the list
+// pages; this page applies them to its company and its sector's peers.
+
+// When the price shown was traded, in words: for the tiles (short) and the header (long).
+function priceWhen(t, long = false) {
+  if (!t.live) return long ? `close of ${esc(t.asof || "—")}` : esc(t.asof || "");
+  return esc(Live.when(t.live, t.live.fetched_at, long));
+}
+
 // The day's change against the previous close, with its sign in words as well as colour.
 function change(t) {
+  if (t.live && ok(t.live.change_pct)) {
+    const now = t.live.price, prev = now / (1 + t.live.change_pct / 100), diff = now - prev;
+    return `<span class="chg ${diff >= 0 ? "up" : "down"}">${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)} (${spct(diff / prev, 2)})</span>`;
+  }
   const d = t.prices.daily;
   if (d.length < 2 || !ok(d[d.length - 1][1]) || !ok(d[d.length - 2][1])) return "";
   const now = d[d.length - 1][1], prev = d[d.length - 2][1], diff = now - prev;
@@ -512,12 +527,15 @@ async function main() {
   const watch = p.watchlist ? ` · <a href="${esc(t.symbol)}.html">On the watch list: dated analyses</a>` : "";
   root.innerHTML = `<div class="xhead"><div><h1>${esc(p.name || t.symbol)} <span class="muted">${esc(t.symbol)}</span></h1>
     <p class="sub">${esc(p.sector || "")}${p.industry ? " · " + esc(p.industry) : ""}${p.exchange ? " · " + esc(p.exchange) : ""}${p.sp500_since ? " · S&amp;P 500" : ""}${watch}</p></div>
-    <div class="xprice"><b>${price(t.snapshot.price)}</b>${change(t)}<small>close of ${esc(t.asof || "—")}</small></div></div>
+    <div class="xprice" aria-live="polite"></div></div>
     <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" data-tab="${k}">${l}</button>`).join("")}</div>
-    <div id="tab"></div><p class="note">Data as of ${esc(t.asof || "—")}, rebuilt ${esc(t.built)} from the project database (SEC EDGAR, Yahoo, TradingView). Not investment advice.</p>`;
-  let finMode = "A", chartMode = "A";
+    <div id="tab"></div><p class="note">Data as of ${esc(t.asof || "—")}, rebuilt ${esc(t.built)} from the project database (SEC EDGAR, Yahoo, TradingView). The price is refreshed every hour during the US session (15 min delayed). Not investment advice.</p>`;
+  const head = () => { $(".xprice", root).innerHTML = `<b>${price(t.snapshot.price)}</b>${change(t)}<small>${priceWhen(t, true)}</small>`; };
+  head();
+  let finMode = "A", chartMode = "A", current = "summary";
   const show = (k) => {
     if (!tabs.some(([x]) => x === k)) k = "summary";
+    current = k;
     root.querySelectorAll("[data-tab]").forEach((b) => { b.classList.toggle("on", b.dataset.tab === k); b.setAttribute("aria-selected", b.dataset.tab === k); });
     const el = $("#tab");
     const render = {
@@ -531,6 +549,12 @@ async function main() {
   };
   root.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => show(b.dataset.tab)));
   show(location.hash.slice(1) || "summary");
+  const quotes = await Live.getQuotes();
+  if (quotes && Live.applyQuote(t, quotes.quotes[t.symbol], quotes.fetched_at)) {
+    for (const x of idx?.tickers || []) Live.applyQuoteToRow(x, quotes.quotes[x.symbol], quotes.fetched_at);
+    head();
+    show(current);
+  }
 }
 
 main();

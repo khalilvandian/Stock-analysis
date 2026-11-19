@@ -3,6 +3,11 @@ reach the internet over HTTPS, not PostgreSQL directly). Not one route per quest
 with the database users' rights deciding what is allowed.
 
     GET  /health    no key; says the app is up
+    GET  /quotes    no key; the newest intraday quote of every company (issue #35), for the
+                    explorer pages on GitHub Pages: one fixed read-only query, cached for
+                    QUOTES_CACHE_S, CORS open to QUOTES_ORIGINS. Answer: {"fetched_at",
+                    "columns", "quotes": {SYMBOL: [price, change_pct, session, price_at,
+                    delay_s, currency]}}; the page reads the columns by name
     POST /query     {"sql": "SELECT ...", "params": {...}, "limit": 50000}
                     one SELECT or WITH statement, run as stock_reader in a read-only
                     transaction (30 s limit). Answer: {"columns", "rows", "truncated"}
@@ -11,10 +16,11 @@ with the database users' rights deciding what is allowed.
                     nothing); each step runs once per row, or once if it has no rows.
                     Answer: {"rowcounts": [...]}
 
-Parameters use :name placeholders (SQLAlchemy style). Every route but /health needs the header
-`X-API-Key: <STOCK_API_KEY>`. App settings: DATABASE_URL (stock_reader), DATABASE_WRITER_URL
-(stock_writer), STOCK_API_KEY. stock_writer can't change the schema, can't touch
-schema_version and can't change or delete raw data, so neither can this API.
+Parameters use :name placeholders (SQLAlchemy style). Every route but /health and /quotes
+needs the header `X-API-Key: <STOCK_API_KEY>`. App settings: DATABASE_URL (stock_reader),
+DATABASE_WRITER_URL (stock_writer), STOCK_API_KEY, optionally QUOTES_ORIGINS. stock_writer
+can't change the schema, can't touch schema_version and can't change or delete raw data, so
+neither can this API.
 No dependency on the rest of the repository, so it deploys as this folder alone.
 """
 
@@ -25,9 +31,12 @@ import decimal
 import hmac
 import os
 import re
+import time
 from functools import cache
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -39,7 +48,20 @@ EXECUTE_TIMEOUT_S = 120
 READ_START = ("select", "with")
 WRITE_START = ("insert", "update", "delete", "with", "merge")
 
+QUOTES_CACHE_S = 300  # the quotes change once an hour; this keeps the free plan's CPU quota
+QUOTES_ORIGINS = os.environ.get("QUOTES_ORIGINS", "https://khalilvandian.github.io").split(",")
+QUOTES_SQL = (
+    "SELECT symbol, price, change_pct, session, price_at, delay_s, currency, fetched_at "
+    "FROM v_quote_latest "
+    "WHERE fetched_at > now() AT TIME ZONE 'UTC' - interval '10 days' ORDER BY symbol"
+)
+
 app = FastAPI(title="stock-api", docs_url=None, redoc_url=None, openapi_url=None)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(
+    CORSMiddleware, allow_origins=QUOTES_ORIGINS, allow_methods=["GET"], allow_headers=[]
+)
+_quotes: dict = {"at": 0.0, "body": None}
 
 
 class Query(BaseModel):
@@ -97,6 +119,31 @@ def database_error(exc: Exception) -> HTTPException:
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
+
+
+@app.get("/quotes")
+def quotes(response: Response) -> dict:
+    """Public: prices are public data, and the query is fixed (no input reaches SQL)."""
+    response.headers["Cache-Control"] = f"public, max-age={QUOTES_CACHE_S}"
+    if _quotes["body"] is not None and time.monotonic() - _quotes["at"] < QUOTES_CACHE_S:
+        return _quotes["body"]
+    try:
+        with engine("DATABASE_URL").connect() as conn, conn.begin() as trans:
+            conn.exec_driver_sql("SET TRANSACTION READ ONLY")
+            conn.exec_driver_sql(f"SET LOCAL statement_timeout = '{QUERY_TIMEOUT_S}s'")
+            rows = conn.execute(text(QUOTES_SQL)).fetchall()
+            trans.rollback()
+    except (DBAPIError, StatementError) as exc:
+        if _quotes["body"] is not None:  # an older answer beats none
+            return _quotes["body"]
+        raise database_error(exc) from exc
+    body = {
+        "fetched_at": max((plain(r[7]) for r in rows), default=None),
+        "columns": ["price", "change_pct", "session", "price_at", "delay_s", "currency"],
+        "quotes": {r[0]: [plain(r[1]), plain(r[2]), r[3], plain(r[4]), r[5], r[6]] for r in rows},
+    }
+    _quotes.update(at=time.monotonic(), body=body)
+    return body
 
 
 @app.post("/query")

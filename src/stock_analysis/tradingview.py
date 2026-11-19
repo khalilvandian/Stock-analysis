@@ -56,6 +56,39 @@ def scan(
     return pd.DataFrame(rows).set_index("tv_symbol")
 
 
+def lookup(
+    market: str,
+    tickers: list[str],
+    columns: list[str],
+    client: httpx.Client | None = None,
+) -> tuple[pd.DataFrame, bytes]:
+    """`columns` for exactly these listings ("NYSE:NEE", ...), in one request: TradingView
+    drops the ones it doesn't know. Returns the rows (index: the TradingView symbol) and the
+    response body as received."""
+    own = client is None
+    client = client or httpx.Client(timeout=60)
+    try:
+        body = {"columns": columns, "symbols": {"tickers": tickers}}
+        r = client.post(SCAN_URL.format(market=market), json=body)
+        r.raise_for_status()
+    finally:
+        if own:
+            client.close()
+    rows = [
+        {"tv_symbol": x["s"], **dict(zip(columns, x["d"], strict=False))}
+        for x in r.json().get("data") or []
+    ]
+    d = pd.DataFrame(rows, columns=["tv_symbol", *columns]).set_index("tv_symbol")
+    return d, r.content
+
+
+def delay_seconds(update_mode) -> int:
+    """How old a price is, from TradingView's update mode: 'delayed_streaming_900' -> 900,
+    'streaming' (real time) -> 0."""
+    tail = str(update_mode or "").rsplit("_", 1)[-1]
+    return int(tail) if tail.isdigit() else 0
+
+
 PRIMARY_FILTER = {"left": "is_primary", "operation": "equal", "right": True}
 
 

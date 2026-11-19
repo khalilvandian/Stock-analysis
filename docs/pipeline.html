@@ -123,7 +123,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <p class="lede">How data gets from the free sources into the database, and from there to the
   analyses, the public site and the evening email. One repository and one Python package, run in
   four places that meet in one PostgreSQL database.</p>
-  <div class="meta">Updated 2026-11-18 · issues #18, #20, #29 · source: docs/pipeline.html</div>
+  <div class="meta">Updated 2026-11-19 · issues #18, #20, #29, #35 · source: docs/pipeline.html</div>
 </header>
 
 <section>
@@ -136,7 +136,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   </div>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; the web API reads the newest coverage snapshot and every ticker's data for the GitHub Pages build; GitHub Actions builds the job's image, which the job pulls at each run; the evening run and your analyses use the database and the repository.">
+<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; every hour on weekdays the quotes job stores TradingView's latest price of every company; the web API reads the newest coverage snapshot and every ticker's data for the GitHub Pages build, and serves the latest prices to the site's pages; GitHub Actions builds the job's image, which the job pulls at each run; the evening run and your analyses use the database and the repository.">
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
     <marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahh" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -181,6 +181,14 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="k" x="254" y="270">5  coverage → <tspan class="m">out_*</tspan></text>
   <text class="k" x="254" y="296">6  close firewall rule</text>
   <text class="s" x="254" y="330">backfill until 90% present, then maintain</text>
+
+  <!-- quotes job (issue #35) -->
+  <polyline class="e hot" points="190,284 214,284 214,408 238,408" marker-end="url(#h)"/>
+  <rect class="box hot" x="240" y="380" width="222" height="56" rx="6"/>
+  <text class="t" x="254" y="403">Quotes job</text>
+  <text class="s" x="254" y="420">every hour on weekdays · every company</text>
+  <polyline class="e hot" points="462,400 580,400 580,330 588,330" marker-end="url(#h)"/>
+  <text class="el hot" x="470" y="394">own firewall rule · writes raw_tv_quote</text>
 
   <!-- firewall -->
   <text class="fwl" x="525" y="84" text-anchor="middle">firewall</text>
@@ -249,6 +257,8 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <!-- API to the site build -->
   <polyline class="e hot" points="810,408 1095,408 1095,348" marker-end="url(#h)"/>
   <text class="el hot" x="960" y="401" text-anchor="middle">coverage snapshot, ticker data</text>
+  <polyline class="e hot" points="810,428 1245,428 1245,348" marker-end="url(#h)"/>
+  <text class="el hot" x="1030" y="444" text-anchor="middle">GET /quotes: live prices, read by each visitor's browser</text>
 
   <!-- PC and Claude sessions -->
   <rect class="box" x="240" y="540" width="222" height="66" rx="6"/>
@@ -284,7 +294,9 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
     </div>
     <figcaption>The highlighted path runs by itself every night: the ingest job opens the
     firewall for its own address, fills the raw layer, rebuilds the core layer and writes a
-    coverage snapshot; the site build reads that snapshot, and exports every ticker for the explorer pages, through the web API. GitHub Actions
+    coverage snapshot; the site build reads that snapshot, and exports every ticker for the explorer pages, through the web API.
+    Every hour on weekdays the quotes job stores the latest price of every company, and each page that shows a price asks
+    the web API for them and recomputes every value that depends on the price. GitHub Actions
     turns code into the image the job runs and turns the repository into the site.</figcaption>
   </figure>
 </section>
@@ -1296,7 +1308,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <h2>One day, in UTC</h2>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1330 210" role="img" aria-label="Daily timeline in UTC: the evening run at 20:00, which republishes the site when it commits; the ingest job from 22:30, usually about 25 minutes and at most until 01:30; the scheduled site build at 05:15.">
+<svg viewBox="0 0 1330 216" role="img" aria-label="Daily timeline in UTC: the quotes job every hour on weekdays, around the clock; the evening run at 20:00, which republishes the site when it commits; the ingest job from 22:30, usually about 25 minutes and at most until 01:30; the scheduled site build at 05:15.">
   <defs>
     <marker id="ta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
   </defs>
@@ -1316,6 +1328,22 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <!-- evening run -->
   <rect class="mute" x="254" y="34" width="69" height="14" rx="3"/>
   <text class="k" x="334" y="45">Evening run (21:00 Italy, weekdays): notes, PDFs, screener, email</text>
+
+  <!-- quotes job: every hour on weekdays, around the clock -->
+  <rect class="run" x="75" y="143" width="6" height="6" rx="1" transform="rotate(45 78 146)"/>
+  <rect class="run" x="167" y="143" width="6" height="6" rx="1" transform="rotate(45 170 146)"/>
+  <rect class="run" x="259" y="143" width="6" height="6" rx="1" transform="rotate(45 262 146)"/>
+  <rect class="run" x="351" y="143" width="6" height="6" rx="1" transform="rotate(45 354 146)"/>
+  <rect class="run" x="443" y="143" width="6" height="6" rx="1" transform="rotate(45 446 146)"/>
+  <rect class="run" x="535" y="143" width="6" height="6" rx="1" transform="rotate(45 538 146)"/>
+  <rect class="run" x="627" y="143" width="6" height="6" rx="1" transform="rotate(45 630 146)"/>
+  <rect class="run" x="719" y="143" width="6" height="6" rx="1" transform="rotate(45 722 146)"/>
+  <rect class="run" x="811" y="143" width="6" height="6" rx="1" transform="rotate(45 814 146)"/>
+  <rect class="run" x="903" y="143" width="6" height="6" rx="1" transform="rotate(45 906 146)"/>
+  <rect class="run" x="995" y="143" width="6" height="6" rx="1" transform="rotate(45 998 146)"/>
+  <rect class="run" x="1087" y="143" width="6" height="6" rx="1" transform="rotate(45 1090 146)"/>
+  <rect class="run" x="1179" y="143" width="6" height="6" rx="1" transform="rotate(45 1182 146)"/>
+  <text class="k" x="70" y="206">Small diamonds above the axis: the quotes job, every hour on weekdays around the clock (also before 18:00), a few seconds each</text>
 
   <!-- ingest -->
   <rect class="cap" x="484" y="80" width="276" height="14" rx="3"/>
@@ -1343,6 +1371,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
     <thead><tr><th>Piece</th><th>Runs on</th><th>Started by</th><th>Code</th></tr></thead>
     <tbody>
       <tr><td>Ingest job</td><td>Azure Container Apps Job <code>stock-ingest</code> (1.5 vCPU, 3 GiB, Consumption)</td><td>Daily at 22:30 UTC</td><td><code>python -m stock_analysis.db ingest</code></td></tr>
+      <tr><td>Quotes job</td><td>Azure Container Apps Job <code>stock-quotes</code> (0.25 vCPU, 0.5 GiB, Consumption)</td><td>Every hour on weekdays, around the clock</td><td><code>python -m stock_analysis.db quotes</code>; every page with a price reads them through <code>GET /quotes</code> (<code>analysis/live.js</code>)</td></tr>
       <tr><td>Database</td><td>Azure Database for PostgreSQL <code>stock-db-bk</code>; Docker locally</td><td>Always on</td><td><code>src/stock_analysis/db/</code></td></tr>
       <tr><td>Web API</td><td>Azure App Service <code>stock-api-bk</code> (F1, wakes on request)</td><td>An HTTPS request</td><td><code>api/app.py</code></td></tr>
       <tr><td>Image build</td><td>GitHub Actions → GHCR</td><td>A push to <code>main</code> touching code or settings</td><td><code>.github/workflows/ingest-image.yml</code>, <code>Dockerfile</code></td></tr>
