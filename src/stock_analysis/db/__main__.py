@@ -38,6 +38,16 @@ from . import Database
 from .build import build
 from .check import check
 
+# The commands an Azure job runs, and the firewall rule each one opens.
+JOB_RULES = {
+    "ingest": "ingest-job",
+    "quotes": "quotes-job",
+    "build": "build-job",
+    "coverage": "coverage-job",
+    "nightly": "nightly-job",
+    "check": "check-job",
+}
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m stock_analysis.db", description=__doc__)
@@ -87,6 +97,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--from", dest="source_db", help="push: the database to send from")
     args = parser.parse_args(argv)
+    if args.command in JOB_RULES:
+        # A run of an Azure job (Airflow starts one per task, issue #30) lets its own address
+        # through the database firewall for as long as it runs. One rule per command, so runs
+        # going at the same time (coverage, check, nightly) never remove each other's rule.
+        # Outside Azure (no managed identity) this does nothing.
+        from .azure import JobFirewall
+
+        rule = JOB_RULES[args.command]
+        with JobFirewall(args.target, rule=rule) as ip:
+            if ip:
+                print(f"Firewall rule {rule} allows this run's address {ip}")
+            return run_command(args, parser)
+    return run_command(args, parser)
+
+
+def run_command(args, parser) -> int:
     if args.command == "check":
         return check(args.target, args.strict)
     if args.command == "ping":
@@ -98,20 +124,10 @@ def main(argv: list[str] | None = None) -> int:
 
         print(allow_my_ip(args.target or "server", args.rule, args.ip))
         return 0
-    if args.command == "ingest":  # on Azure, open the database firewall for this run
-        from .azure import JobFirewall
-
-        with JobFirewall(args.target) as ip:
-            if ip:
-                print(f"Firewall rule ingest-job allows this run's address {ip}")
-            return run_ingest(args)
-    if args.command == "quotes":  # its own rule, so it never removes the ingest job's
-        from .azure import JobFirewall
-
-        with JobFirewall(args.target, rule="quotes-job") as ip:
-            if ip:
-                print(f"Firewall rule quotes-job allows this run's address {ip}")
-            return run_quotes(args)
+    if args.command == "ingest":
+        return run_ingest(args)
+    if args.command == "quotes":
+        return run_quotes(args)
     db = Database.open(args.target)  # applies any new migrations
     print(f"Database: {db.target} ({db.where})")
     if args.command == "create-roles":

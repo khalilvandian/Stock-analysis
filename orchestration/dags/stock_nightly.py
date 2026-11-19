@@ -1,20 +1,26 @@
 """stock_nightly: the weekday night after the US close (issue #30, docs/ORCHESTRATION.md).
 
-Airflow runs every piece as a task; the Azure jobs have no schedule of their own.
+Airflow runs every piece as a task; the Azure jobs have no schedule of their own. Each heavy
+step is its own run of the job `stock-ingest`, so a failure reruns only that step.
 
-    start ─► ingest ─► check_ingest ─┬─► check_prices ─► mark_ready ─► wait_for_evening ──┐
-                                     └─► nightly ─► check_nightly ─► publish_site ────────┴─► finish
+    start → fetch → check_fetch → build → check_build, then in parallel:
+        quality                                         ─┐
+        coverage ─────────────────────┐                  ├→ finish
+        nightly → check_nightly ──────┴→ publish_site    ─┤
+        check_prices → mark_ready → wait_for_evening     ─┘
 
-- ingest: a run of the Container Apps Job `stock-ingest` (`db ingest --no-nightly
-  --no-site`): fetch, build, coverage snapshot.
-- nightly: another run of the same job (`db nightly`): the screener, the watch list's
-  numbers and the market numbers, which the Claude session reads.
-- check_*: SQL on what the run stored (stock_analysis.pipeline), recorded in
+- fetch: `db ingest --no-build --no-site`: the sources into the raw layer (ops_run).
+- build: `db build`: the core layer from what changed (core_build).
+- quality: `db check`: the database's own checks; a FAIL fails the task.
+- coverage: `db coverage`: the day's coverage snapshot, shown on the site's Data page.
+- nightly: `db nightly`: the screener, the watch list's numbers and the market numbers, which
+  the Claude session reads.
+- check_*: SQL on what the step stored (stock_analysis.pipeline), recorded in
   ops_pipeline_step; a failed check fails at once (no retry).
 - mark_ready: the marker the Claude session can read (python -m stock_analysis.pipeline marker).
 - wait_for_evening: the Claude session (its own schedule, 00:00 Italy time) committed
   "Watch list analyses ..." and the site published it; waited for in the triggerer.
-- publish_site: the Pages workflow, so the site shows the night's screener and coverage.
+- publish_site: the Pages workflow, once the coverage and the nightly numbers are stored.
 
 A failure (a job run that failed after its retries, a failed check, a wait that ran out)
 marks the run failed and emails the alert address.
@@ -31,6 +37,7 @@ from stock_orch.azure_jobs import ContainerAppJobOperator
 from stock_orch.github import WaitForEveningOperator
 
 KEY = "{{ run_id }}"  # Airflow's run id: the run log's run_key
+JOB = "stock-ingest"  # one image, one job: each step is a run with its own command
 
 DEFAULTS = {
     "retries": 2,
@@ -40,9 +47,20 @@ DEFAULTS = {
 }
 
 
+def job_step(task_id: str, args: list[str], hours: float, retries: int = 1):
+    return ContainerAppJobOperator(
+        task_id=task_id,
+        job=JOB,
+        args=args,
+        run_key=KEY,
+        execution_timeout=timedelta(hours=hours),
+        retries=retries,
+    )
+
+
 @dag(
     dag_id="stock_nightly",
-    description="Weekday night: ingest, nightly analyses, checks, ready marker, the session",
+    description="Weekday night: fetch, build, quality, coverage, nightly analyses, the session",
     schedule=CronTriggerTimetable("30 22 * * 1-5", timezone="UTC"),
     start_date=datetime(2026, 11, 19),
     catchup=False,
@@ -58,8 +76,12 @@ def stock_nightly():
         return runlog.begin(key, "stock_nightly")
 
     @task(retries=0)
-    def check_ingest(key: str) -> str:
-        return runlog.check(key, "check_ingest", "ingest")
+    def check_fetch(key: str) -> str:
+        return runlog.check(key, "check_fetch", "ingest")
+
+    @task(retries=0)
+    def check_build(key: str) -> str:
+        return runlog.check(key, "check_build", "build")
 
     @task(retries=0)
     def check_prices(key: str) -> str:
@@ -81,27 +103,23 @@ def stock_nightly():
     def finish(key: str) -> str:
         return runlog.set_status(key, "finish", "ok", "Run finished ok")
 
-    ingest = ContainerAppJobOperator(
-        task_id="ingest",
-        job="stock-ingest",
-        args=["ingest", "--no-nightly", "--no-site"],
-        execution_timeout=timedelta(hours=3, minutes=30),
-        retries=1,
-    )
-    nightly = ContainerAppJobOperator(
-        task_id="nightly",
-        job="stock-ingest",
-        args=["nightly"],
-        execution_timeout=timedelta(hours=1),
-        retries=1,
-    )
+    fetch = job_step("fetch", ["ingest", "--no-build", "--no-site"], hours=3)
+    build = job_step("build", ["build"], hours=1.5)
+    quality = job_step("quality", ["check"], hours=0.5)
+    coverage = job_step("coverage", ["coverage"], hours=0.5)
+    nightly = job_step("nightly", ["nightly"], hours=1)
     evening = WaitForEveningOperator(task_id="wait_for_evening", run_key=KEY, retries=0)
-    done = finish(KEY)
-    checked = check_ingest(KEY)
 
-    start(KEY) >> ingest >> checked
-    checked >> check_prices(KEY) >> mark_ready(KEY) >> evening >> done
-    checked >> nightly >> check_nightly(KEY) >> publish_site(KEY) >> done
+    built = check_build(KEY)
+    site = publish_site(KEY)
+    done = finish(KEY)
+
+    start(KEY) >> fetch >> check_fetch(KEY) >> build >> built
+    built >> [quality, coverage, nightly]
+    nightly >> check_nightly(KEY) >> site
+    coverage >> site
+    built >> check_prices(KEY) >> mark_ready(KEY) >> evening
+    [quality, site, evening] >> done
 
 
 stock_nightly()

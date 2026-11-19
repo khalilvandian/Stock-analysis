@@ -85,6 +85,23 @@ def test_audit_needs_an_ok_run_for_the_last_trading_day() -> None:
     assert "ready" in p.audit([{**ok, "status": "ready"}], now, CFG).message
 
 
+def test_audit_waits_until_the_night_should_be_over() -> None:
+    running = {"run_date": "2026-11-18", "status": "running"}
+    friday_ok = {"run_date": "2026-11-17", "status": "ok"}
+    # 01:00 Thursday: Wednesday's run may still be going, so Tuesday's is the one checked
+    assert p.audit([running, friday_ok], T(2026, 11, 19, 1, 0), CFG).code == p.DONE
+    assert p.audit([running, friday_ok], T(2026, 11, 19, 7, 0), CFG).code == p.FAILED
+
+
+def test_quotes_audit_on_weekdays_only() -> None:
+    now = T(2026, 11, 18, 15, 20)  # Wednesday
+    fresh = {"status": "ok", "started_at": T(2026, 11, 18, 14, 5)}
+    old = {"status": "ok", "started_at": T(2026, 11, 18, 11, 5)}
+    assert p.audit_quotes([fresh], now, CFG).code == p.DONE
+    assert p.audit_quotes([old, {**fresh, "status": "failed"}], now, CFG).code == p.FAILED
+    assert p.audit_quotes([], T(2026, 11, 21, 15, 0), CFG).code == p.DONE  # Saturday
+
+
 def test_marker_tells_the_session_whether_the_data_is_ready() -> None:
     now = T(2026, 11, 19, 0, 0)
     row = {"run_date": "2026-11-18", "status": "running"}
@@ -189,6 +206,17 @@ def test_ingest_check(conn) -> None:
     assert ok.code == p.DONE and ok.detail["status"] == "partial"
     ingest_row(conn, "2026-11-18T22:31:00", "failed")  # the newest run counts
     assert "failed" in p.check_ingest(conn, STARTED, CFG).message
+
+
+def test_build_check(conn) -> None:
+    assert p.check_build(conn, STARTED).code == p.FAILED  # no build
+    sql(conn, "INSERT INTO core_build (started_at, status, summary) VALUES "
+        "('2026-11-18T22:40:00', 'failed', '{\"error\": \"boom\"}')")  # fmt: skip
+    failed = p.check_build(conn, STARTED)
+    assert failed.code == p.FAILED and "boom" in failed.message
+    sql(conn, "INSERT INTO core_build (started_at, status, summary) VALUES "
+        "('2026-11-18T22:50:00', 'ok', '{}')")  # fmt: skip
+    assert p.check_build(conn, STARTED).code == p.DONE
 
 
 def test_nightly_check_reads_what_was_stored(conn) -> None:

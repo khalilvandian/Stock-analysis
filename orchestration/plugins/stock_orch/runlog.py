@@ -39,6 +39,7 @@ def check(run_key: str, step: str, name: str) -> str:
         started = p.run_row(conn, run_key)["started_at"]
         result = {
             "ingest": lambda: p.check_ingest(conn, started, cfg),
+            "build": lambda: p.check_build(conn, started),
             "nightly": lambda: p.check_nightly(conn, started),
             "prices": lambda: p.check_prices(conn, now, cfg),
             "quotes": lambda: p.check_quotes(conn, started),

@@ -33,6 +33,7 @@ from . import (
     Result,
     alert,
     audit,
+    audit_quotes,
     check_evening,
     check_ingest,
     check_nightly,
@@ -73,14 +74,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.command in ("marker", "audit"):  # read-only; through the web API in the cloud
         from ..data import Data
 
-        found = Data.open().sql(
-            "SELECT run_key, run_date, status FROM ops_pipeline_run "
-            f"WHERE pipeline = '{cfg['pipeline']}' ORDER BY run_id DESC LIMIT 20"
-        )
-        check = marker if args.command == "marker" else audit
-        result = check(found.to_dict("records"), now, cfg)
-        print(result.message)
-        return result.code
+        data = Data.open()
+
+        def runs(pipeline: str) -> list[dict]:
+            return data.sql(
+                "SELECT run_key, run_date, status, started_at FROM ops_pipeline_run "
+                f"WHERE pipeline = '{pipeline}' ORDER BY run_id DESC LIMIT 20"
+            ).to_dict("records")
+
+        nightly = runs(cfg["pipeline"])
+        if args.command == "marker":
+            results = [marker(nightly, now, cfg)]
+        else:
+            results = [audit(nightly, now, cfg), audit_quotes(runs("stock_quotes"), now, cfg)]
+        for r in results:
+            print(r.message)
+        return max(r.code for r in results)
     if args.command == "publish-site":
         with httpx.Client() as client:
             result = publish_site(cfg, client)

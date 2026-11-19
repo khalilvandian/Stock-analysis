@@ -55,6 +55,7 @@ def stock_quotes():
         task_id="quotes",
         job="stock-quotes",
         args=["quotes"],
+        run_key=KEY,
         execution_timeout=timedelta(minutes=20),
         poll_seconds=15,
     )

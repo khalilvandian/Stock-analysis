@@ -111,12 +111,21 @@ class ContainerAppJobOperator(BaseOperator):
     """Run an Azure Container Apps Job once with `args`, deferred while it runs. A failed
     run fails the task (and is retried as a new run, by the task's retries)."""
 
-    template_fields = ("args",)
+    template_fields = ("args", "run_key")
     ui_color = "#c9e7ec"
 
-    def __init__(self, *, job: str, args: list[str], poll_seconds: float = 30.0, **kwargs):
+    def __init__(
+        self,
+        *,
+        job: str,
+        args: list[str],
+        run_key: str | None = None,
+        poll_seconds: float = 30.0,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.job, self.args, self.poll_seconds = job, args, poll_seconds
+        self.run_key = run_key  # set: the run is recorded in ops_pipeline_step
 
     def execute(self, context):
         with httpx.Client() as client:
@@ -136,4 +145,10 @@ class ContainerAppJobOperator(BaseOperator):
                 f"{event['job']} run {event['name']} ended {event['status']}: see its logs in "
                 "Azure (Container Apps, the job's execution history)"
             )
+        if self.run_key:
+            from stock_analysis import pipeline as p
+            from stock_orch import runlog
+
+            message = f"{event['job']} run {event['name']} succeeded ({' '.join(self.args)})"
+            runlog.record(self.run_key, self.task_id, p.Result(p.DONE, message, event))
         return event["name"]

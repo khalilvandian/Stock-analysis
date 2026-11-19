@@ -34,6 +34,13 @@ wait_hours = 5.0
 source = "tradingview_quotes"
 max_age_hours = 4
 
+[audit]
+# pipeline-watch.yml, every 3 hours from GitHub Actions, so it works when Airflow is down: the
+# last trading day's stock_nightly run once it should be over (`grace_hours` after the
+# close), and on weekdays an ok stock_quotes run within `quotes_max_age_hours`.
+grace_hours = 8
+quotes_max_age_hours = 2
+
 [alerts]
 # Failures are emailed through Brevo (the same account as the evening email). The
 # addresses come from the environment, never from this public file.

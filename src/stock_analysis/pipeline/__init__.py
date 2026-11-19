@@ -186,6 +186,27 @@ def check_ingest(conn, started: dt.datetime, cfg: dict) -> Result:
     )
 
 
+def check_build(conn, started: dt.datetime) -> Result:
+    """The build of the core layer (db build) since the run started: its row in core_build."""
+    row = one(
+        conn,
+        "SELECT build_id, status, started_at, finished_at, summary FROM core_build "
+        "WHERE started_at >= %(t)s ORDER BY build_id DESC LIMIT 1",
+        {"t": started},
+    )
+    if row is None:
+        return Result(FAILED, f"No build since {stamp(started)}", {})
+    try:
+        summary = json.loads(row["summary"] or "{}")
+    except ValueError:
+        summary = {"text": row["summary"]}
+    detail = {"build_id": row["build_id"], "status": row["status"]}
+    if row["status"] != "ok":
+        error = summary.get("error") or summary.get("text") or ""
+        return Result(FAILED, f"Build {row['build_id']} is {row['status']} {error}".strip(), detail)
+    return Result(DONE, f"Build {row['build_id']} ok", detail)
+
+
 def check_nightly(conn, started: dt.datetime) -> Result:
     """What the nightly analyses (db nightly) stored since the run started: a screener run,
     the market numbers, and the numbers of every watch-list stock."""
@@ -365,8 +386,9 @@ def marker(found: list[dict], now: dt.datetime, cfg: dict) -> Result:
 
 
 def audit(found: list[dict], now: dt.datetime, cfg: dict) -> Result:
-    """The morning check: the last trading day has an ok stock_nightly run."""
-    day = last_close(now, cfg)
+    """The nightly run of the last trading day whose run should be over by now (`grace_hours`
+    after the close, config [audit]) finished ok. `found`: stock_nightly runs."""
+    day = last_close(now - dt.timedelta(hours=cfg["audit"]["grace_hours"]), cfg)
     mine = [r for r in found if str(r["run_date"]) == day.isoformat()]
     if any(r["status"] == "ok" for r in mine):
         return Result(DONE, f"The {day} pipeline run finished ok", {})
@@ -374,6 +396,27 @@ def audit(found: list[dict], now: dt.datetime, cfg: dict) -> Result:
         return Result(FAILED, f"No pipeline run for {day}: was Airflow down?", {})
     states = ", ".join(sorted({r["status"] for r in mine}))
     return Result(FAILED, f"The {day} pipeline run did not finish ok ({states})", {})
+
+
+def audit_quotes(found: list[dict], now: dt.datetime, cfg: dict) -> Result:
+    """On weekdays (the quotes run every hour, Monday to Friday UTC), an ok stock_quotes run
+    within `quotes_max_age_hours`. `found`: stock_quotes runs with their started_at."""
+    if now.weekday() >= 5 or (now.weekday() == 0 and now.hour < 2):
+        return Result(DONE, "The quotes don't run now", {})
+    limit = now - dt.timedelta(hours=cfg["audit"]["quotes_max_age_hours"])
+    ok = [r for r in found if r["status"] == "ok" and _naive(r["started_at"]) >= limit]
+    if ok:
+        return Result(DONE, f"Quotes ran ok at {ok[0]['started_at']}", {})
+    return Result(
+        FAILED,
+        f"No ok quotes run since {stamp(limit)} UTC: is Airflow or the quotes job down?",
+        {},
+    )
+
+
+def _naive(value) -> dt.datetime:
+    t = value if isinstance(value, dt.datetime) else dt.datetime.fromisoformat(str(value))
+    return t.replace(tzinfo=None)
 
 
 # ---------------------------------------------------------------- alerts

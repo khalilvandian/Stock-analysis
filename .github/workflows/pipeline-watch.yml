@@ -1,13 +1,14 @@
-# The morning audit of the nightly pipeline (issue #30, docs/ORCHESTRATION.md): the last US
-# trading day must have a stock_nightly run with status ok in ops_pipeline_run. Airflow
-# emails its own failures, but it can't report a night it never ran (the PC was off, Docker
-# stopped, the DAG paused). This check runs elsewhere, and a failed run here makes GitHub
-# email the repository owner.
+# The watch on the orchestrator (issue #30, docs/ORCHESTRATION.md), from outside it: Airflow
+# emails its own failures, but it can't report that it isn't running (the VM is down, the DAG
+# is paused). Every 3 hours this checks the run log through the web API: the last trading
+# day's stock_nightly run finished ok (once it should be over), and on weekdays a stock_quotes
+# run went ok in the last 2 hours. A failed check fails the workflow, and GitHub emails the
+# repository owner.
 name: Pipeline watch
 
 on:
   schedule:
-    - cron: "0 7 * * 2-6"  # 07:00 UTC Tuesday to Saturday: Monday's to Friday's runs
+    - cron: "20 */3 * * *"  # every 3 hours, 20 minutes past (the quotes run at :05)
   workflow_dispatch:
 
 permissions:
