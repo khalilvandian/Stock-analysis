@@ -119,3 +119,31 @@ def test_the_dags_load_with_the_intended_order() -> None:
     assert [t.task_id for t in quotes.topological_sort()] == [
         "start", "quotes", "check_quotes", "finish"
     ]  # fmt: skip
+
+
+@respx.mock
+def test_the_ui_opens_its_own_database_firewall_rule(monkeypatch) -> None:
+    from stock_orch import firewall
+
+    monkeypatch.setenv("IDENTITY_ENDPOINT", "http://identity.local/token")
+    monkeypatch.setenv("IDENTITY_HEADER", "h")
+    respx.get("http://identity.local/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "mi-token"})
+    )
+    respx.get(firewall.IP_SERVICE).mock(return_value=httpx.Response(200, text="20.1.2.3"))
+    rule = respx.put(url__regex=r".*/firewallRules/airflow-ui\?api-version=.*").mock(
+        return_value=httpx.Response(200, json={})
+    )
+    with httpx.Client() as c:
+        assert firewall.open_rule("airflow-ui", c, sleep=lambda s: None) == "20.1.2.3"
+    sent = json.loads(rule.calls.last.request.content)["properties"]
+    assert sent == {"startIpAddress": "20.1.2.3", "endIpAddress": "20.1.2.3"}
+    assert rule.calls.last.request.headers["authorization"] == "Bearer mi-token"
+
+
+def test_no_rule_outside_azure(monkeypatch) -> None:
+    from stock_orch import firewall
+
+    monkeypatch.delenv("IDENTITY_ENDPOINT", raising=False)
+    with httpx.Client() as c:
+        assert firewall.open_rule("airflow-ui", c) is None

@@ -1,0 +1,18 @@
+#cloud-config
+# First boot of the Airflow VM (deploy/airflow.ps1, issue #30): Docker with Compose, and a
+# 3 GiB swap file, because the VM has 1 GiB and Airflow's four parts take about 930 MiB at rest.
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+runcmd:
+  - fallocate -l 3G /swapfile
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  - sysctl -w vm.swappiness=60
+  - systemctl enable --now docker
+  - usermod -aG docker azureuser
+  - mkdir -p /opt/airflow
+  - chown azureuser:azureuser /opt/airflow

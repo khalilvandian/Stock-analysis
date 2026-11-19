@@ -9,7 +9,8 @@ Deploys the live prices to Azure (issue #35, docs/INGEST.md, "Hourly quotes"), i
   4. the web API (api/), whose public GET /quotes the site's pages read
 Safe to rerun. Run it after the branch is merged into main: the image is built from main.
 
-The schedule is every hour on weekdays, around the clock (5 * * * 1-5 UTC), so every market's
+Airflow starts it (the DAG stock_quotes, issue #30): trigger Manual by default; -Trigger
+Schedule brings back its own cron. Every hour on weekdays, around the clock, so every market's
 session is covered whatever exchanges the universe holds: New York, Europe, Tokyo. A run when
 no market has moved stores nothing; each run takes seconds, inside the free grant.
 
@@ -29,7 +30,8 @@ param(
     [string]$Job = "stock-quotes",
     [string]$Image = "ghcr.io/khalilvandian/stock-analysis-ingest:latest",
     [string]$Server = "stock-db-bk",
-    [string]$Cron = "5 * * * 1-5",   # UTC: every hour, Monday to Friday
+    [ValidateSet("Manual", "Schedule")][string]$Trigger = "Manual",
+    [string]$Cron = "5 * * * 1-5",   # only with -Trigger Schedule
     [string]$WebApp = "stock-api-bk",
     [switch]$SkipApi,
     [switch]$RunNow
@@ -54,22 +56,30 @@ $python = if (Test-Path .venv\Scripts\python.exe) { ".venv\Scripts\python.exe" }
 & $python -m stock_analysis.db init --target server
 if ($LASTEXITCODE -ne 0) { throw "database init failed (is this PC's IP allowed? allow-my-ip)" }
 
-Write-Host "2/4 Job $Job ($Cron UTC)"
+Write-Host "2/4 Job $Job (trigger $Trigger)"
 $envVars = @(
     "STOCK_DB_TARGET=server-writer",
     "STOCK_WRITER_DB_PASSWORD=secretref:writer-password",
     "AZURE_SUBSCRIPTION_ID=$subscription"
 )
-$exists = AzFind containerapp job show -n $Job -g $ResourceGroup --query name -o tsv
-if (-not $exists) {
+# Azure can't change a job's trigger type in place: recreate it (step 3 regrants its rights).
+$current = AzFind containerapp job show -n $Job -g $ResourceGroup --query properties.configuration.triggerType -o tsv
+if ($current -and $current -ne $Trigger) {
+    Write-Host "  recreating ${Job}: trigger $current -> $Trigger"
+    Az containerapp job delete -n $Job -g $ResourceGroup --yes --only-show-errors
+    $current = $null
+}
+$triggerArgs = if ($Trigger -eq "Schedule") { @("--trigger-type", "Schedule", "--cron-expression", $Cron) } else { @("--trigger-type", "Manual") }
+$cronArgs = if ($Trigger -eq "Schedule") { @("--cron-expression", $Cron) } else { @() }
+if (-not $current) {
     Az containerapp job create -n $Job -g $ResourceGroup --environment $Environment `
-        --trigger-type Schedule --cron-expression $Cron `
+        @triggerArgs `
         --replica-timeout 900 --replica-retry-limit 0 --parallelism 1 --replica-completion-count 1 `
         --image $Image --args quotes --cpu 0.25 --memory 0.5Gi --mi-system-assigned `
         --secrets "writer-password=$writer" --env-vars @envVars --only-show-errors
 } else {
     Az containerapp job secret set -n $Job -g $ResourceGroup --secrets "writer-password=$writer" --only-show-errors
-    Az containerapp job update -n $Job -g $ResourceGroup --cron-expression $Cron `
+    Az containerapp job update -n $Job -g $ResourceGroup @cronArgs `
         --image $Image --args quotes --cpu 0.25 --memory 0.5Gi --replica-timeout 900 `
         --set-env-vars @envVars --only-show-errors
 }

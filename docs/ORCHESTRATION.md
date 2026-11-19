@@ -148,16 +148,53 @@ docker compose -f orchestration/compose.yaml down                   # stop; the 
 
 ## Checks
 
-- `tests/test_pipeline.py`: trading days, every check against the local test database,
-  GitHub and Brevo mocked with `respx`, and a test that the module imports without pandas or
-  SQLAlchemy.
-- Inside the Airflow image: `airflow dags list-import-errors` ("No data found" means none)
-  and `airflow tasks list stock_nightly`.
+- `tests/test_pipeline.py` (the usual `uv run pytest`): trading days, every check against the
+  local test database, GitHub and Brevo mocked with `respx`, and a test that the module
+  imports without pandas or SQLAlchemy.
+- `orchestration/tests/` runs in the Airflow image: the job operator and its trigger, the
+  evening trigger, the UI's firewall rule, and the DAGs' task order.
+
+  ```bash
+  docker compose -f orchestration/compose.yaml run --rm --no-deps --entrypoint bash airflow-scheduler \
+      -c "pip install -q pytest respx && cd /opt/stock/orchestration/plugins && \
+          python -m pytest -q -p no:cacheprovider /opt/stock/orchestration/tests"
+  ```
+- Checked against Azure from local Airflow (2026-11-19):
+  - a `stock_quotes` run started by Airflow ran on Azure and stored 514 quotes on the server;
+  - two `stock-ingest` runs started at the same time both succeeded, so the parallel
+    quality, coverage and nightly steps work.
+
+## Memory on the VM
+
+Measured at rest in this layout (2026-11-19): scheduler 261 MiB, execution API 251 MiB,
+triggerer 224 MiB, DAG processor 194 MiB, about 930 MiB together. Ubuntu needs about 200 MiB
+more, so the free 1 GiB VM gets a 3 GiB swap file at first boot
+(`deploy/airflow/cloud-init.yaml`). The execution API and the triggerer sit idle most of the
+day and can swap out. If the VM is slow or a process is killed for memory, resize it to B1ms
+(2 GiB, about $18 a month), with nothing to reinstall: `az vm resize -g stock-rg -n airflow-vm
+--size Standard_B1ms`.
+
+## Going live
+
+All after the merge to `main`, in this order. The jobs' cron and Airflow change hands in one
+evening: never before (nothing would run) and never after (everything would run twice).
+
+1. The workflows build `stock-analysis-ingest` (with `--no-nightly`, `--no-site` and the
+   firewall rule per command) and `stock-airflow`. Make the `stock-airflow` package public
+   (GitHub, Packages, its settings), as the ingest image is.
+2. Add `GITHUB_DISPATCH_TOKEN` to `.env`: a fine-grained token for this repository with
+   "Actions: write".
+3. `powershell -ExecutionPolicy Bypass -File deploy\ingest-job.ps1`, then
+   `deploy\quotes-job.ps1`: both jobs are recreated with trigger Manual (no schedule).
+4. `powershell -ExecutionPolicy Bypass -File deploy\airflow.ps1`. It creates Airflow's
+   database (and applies migration `011`), Blob logging, the UI app, and the VM with Airflow
+   running, then unpauses both DAGs. To use a VM made on Azure's "Free account virtual
+   machine" page instead, create it first as `airflow-vm`; the script then skips that step.
+5. Open the UI (the script prints its address), trigger `stock_quotes` once, and watch the
+   first night. The audit checks it from the next 3-hour slot on.
 
 ## Not done yet
 
-- The deployment: `deploy/airflow-vm.ps1` (the VM, swap, Docker, the firewall rule, the
-  managed identity's rights), the UI's Container App, Blob logging, and removing the jobs'
-  cron (`--trigger-type Manual`). It goes live with the merge.
-- Follow-ups (a separate issue): housekeeping (`airflow db clean`, log retention), warnings
-  before credentials expire, manual DAGs for `db reparse`, and the bulk SEC files.
+Follow-ups (a separate issue): housekeeping (`airflow db clean`, log retention), warnings
+before credentials expire, manual DAGs for `db reparse`, and the bulk SEC files. A stricter
+hourly check (the quotes must come from the current US session) is optional.

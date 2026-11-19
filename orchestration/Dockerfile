@@ -13,7 +13,7 @@ COPY --chown=airflow src/stock_analysis/pipeline /opt/stock/src/stock_analysis/p
 COPY --chown=airflow orchestration/dags /opt/stock/orchestration/dags
 COPY --chown=airflow orchestration/plugins /opt/stock/orchestration/plugins
 
-ENV PYTHONPATH=/opt/stock/src \
+ENV PYTHONPATH=/opt/stock/src:/opt/stock/orchestration/plugins \
     AIRFLOW__CORE__DAGS_FOLDER=/opt/stock/orchestration/dags \
     AIRFLOW__CORE__PLUGINS_FOLDER=/opt/stock/orchestration/plugins \
     AIRFLOW__CORE__LOAD_EXAMPLES=false
