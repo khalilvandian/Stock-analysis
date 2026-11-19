@@ -18,6 +18,7 @@ Each report covers one piece of analysis. It states the data date, the method, t
 | 12 | [Booking Holdings](12-bkng-fundamentals.md) | Summary, then BKNG absolute values, ratios and screens against 6 online-travel peers, then analysis (adjusted P/E vs its own history, entry prices) |
 | 13 | [Market screener](13-market-screener.md) | The S&P 500 (497 companies; the US and Europe above $1bn with one setting). Stage 1: Peter Lynch's six categories and financial-statement rules per category (banks, insurers, REITs by kind of business). Stage 2: each survivor's own cheap price, top 3 cheap or close-to-cheap names per sector, technicals for timing |
 | 14 | [Metrics dictionary](14-metrics-dictionary.md) | Every fundamental metric used so far, defined with formula, source and a worked example; the proposed first vector and the choices to make (issue #8) |
+| 17 | [Alphabet and an AI-adjusted P/E](17-googl-ai-adjusted-pe.md) | Summary, then GOOGL absolute values, ratios and screens against 5 megacap peers, then a P/E adjusted for circular AI money: stake marks out of earnings, after-tax stakes (Anthropic, SpaceX) out of the price, self-funded revenue checked; P/E vs its own history and entry prices |
 
 ## Writing a new report
 
