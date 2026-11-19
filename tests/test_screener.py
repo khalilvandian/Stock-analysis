@@ -437,3 +437,21 @@ def test_split_factor_since(monkeypatch):
     assert stage2.split_factor_since("BKNG", 2025) == 25.0
     assert stage2.split_factor_since("BKNG", 2019) == 50.0
     assert stage2.split_factor_since(None, 2025) == 1.0
+
+
+def test_one_listing_per_company_keeps_secondary_members() -> None:
+    """The index holds BRK.B (primary listing BRK.A, not a member), both Alphabet classes and
+    GM's non-primary listing: one listing per company, the primary one where it is a member."""
+    d = pd.DataFrame(
+        {
+            "description": ["Alphabet Inc. Class A", "Alphabet Inc. Class C",
+                            "Berkshire Hathaway Inc. Class B", "General Motors Company",
+                            "Fox Corporation Class B", "Fox Corporation Class A"],
+            "is_primary": [True, False, False, False, True, False],
+            "market_cap_basic": [3.4e12, 3.4e12, 1.2e12, 7e10, 3e10, 3.6e10],
+        },
+        index=["NASDAQ:GOOGL", "NASDAQ:GOOG", "NYSE:BRK.B", "NASDAQ:GM", "NASDAQ:FOX",
+               "NASDAQ:FOXA"],
+    )  # fmt: skip
+    kept = tradingview.one_per_company(d)
+    assert sorted(kept.index) == ["NASDAQ:FOX", "NASDAQ:GM", "NASDAQ:GOOGL", "NYSE:BRK.B"]

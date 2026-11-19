@@ -142,12 +142,37 @@ A stock removed from the watch list keeps its folder and appears as "off the lis
 
 https://khalilvandian.github.io/Stock-analysis/, built by `analysis/site.py` (standard
 library only) and published by `.github/workflows/pages.yml` on pushes to `main` that
-touch `analyses/`, `data/screener/`, `analysis/site.py` or the workflow, or by hand
-(`workflow_dispatch`). Pages: **Watch list** (one summary panel per stock, sidebar of current
-and former stocks), one page per stock (verdict, key numbers, a PDF viewer over every dated
-analysis, Claude's notes, the dated table), **Market** (latest strip and every dated report),
-**Screener** (the latest Stage 1 pass counts by category and the top 3 per sector from
-`data/screener/`), and **Summaries**. PDFs are copied next to the pages.
+touch `analyses/`, `data/screener/`, `analysis/site.py`, `docs/pipeline.html` or the workflow,
+every day at 05:15 UTC, or by hand (`workflow_dispatch`). The top bar has four menus
+(`MENU` in `analysis/site.py`; add a page there) and a "Find a ticker" box:
+
+- **Analyses:** **Watch list** (one summary panel per stock, sidebar of current and former
+  stocks; one page per stock with the verdict, key numbers, a PDF viewer over every dated
+  analysis, Claude's notes and the dated table) and **Summaries**.
+- **Explore** (issue #20): the ticker explorer for every company in the database.
+  `analysis/explore.py` exports one JSON file per ticker (`tickers/<SYMBOL>.json`) and an
+  index (`tickers/index.json`) at build time, through the web API.
+  - **All tickers:** search, filter by sector, sort.
+  - **Ticker explorer:** `ticker.html?s=NVDA`, drawn by `analysis/explorer.js`, with these tabs:
+    - Summary: absolute values first, 10-year cards, price chart, financial health, ratios
+      against the sector, growth, technicals.
+    - Financials: income statement, balance sheet and cash flow, annual or quarterly.
+    - Ratios: against the sector and the 5-year average, then every fiscal year.
+    - Fair value: own P/E history, Graham number, relative (sector multiples), our DCF.
+    - Dividends, Earnings, Charts, and Screener (Stage 1 and 2).
+
+    A tab with no data is left out.
+  - **Sector valuations:** medians per sector, and each sector's companies.
+  - **Earnings calendar:** the next 8 weeks of reports.
+
+  The layout follows the free tabs of The Smart Investor Tool's metrics page, without what we
+  have no source for (news, insiders, holders, segments, analyst ratings and targets).
+- **Markets:** **Market reports** (latest strip and every dated report) and **Screener** (the
+  latest Stage 1 pass counts by category and the top 3 per sector from `data/screener/`).
+- **Project:** **Pipeline** (the diagram in `docs/pipeline.html`, shown as it is) and **Data
+  coverage** (`docs/COVERAGE.md`).
+
+PDFs are copied next to the pages.
 
 ## The email
 

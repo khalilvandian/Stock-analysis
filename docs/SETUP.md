@@ -92,3 +92,20 @@ A Project in the Claude chat app is useful for discussion, and for keeping the r
 
 - The FMP key pasted into the original chat should be replaced (see section 2).
 - An early commit of `analysis/history.py` included the owner's email address as the SEC contact. The current code reads it from `SEC_USER_AGENT` instead, but the old value remains in git history. Rewriting history can remove it if needed.
+
+## Database access from cloud sessions
+
+Cloud sessions can't connect to PostgreSQL (their network only carries web traffic), so they use
+the web API `stock-api-bk` (docs/DATABASE.md, "The web API"); `Data.open()` switches to it on
+its own. Per cloud environment, once:
+
+1. **Environment variable** (*Edit* → *Environment variables*):
+   `STOCK_API_URL=https://stock-api-bk.azurewebsites.net`
+2. **Network secret** (*Edit* → *Network secrets* → *Add secret*): allowed website
+   `stock-api-bk.azurewebsites.net`, header `X-API-Key`, no prefix, value `STOCK_API_KEY` from
+   `.env` on Babak's PC (also in the gitignored `.env.cloud`). The proxy attaches it outside the
+   session, so the key is never visible there. No database passwords go into the environment.
+3. **Test** in a new session:
+   `uv run python -c "from stock_analysis.data import Data; print(Data.open().status())"`
+   prints the schema version and company count; a `401` means the secret is missing or on
+   another environment.

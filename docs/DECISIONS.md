@@ -172,3 +172,160 @@ their date.
   9. **Cash-balance growth:** drop it (it jumps with deals and debt raises).
 - **Why:** The vector work can go on while Babak reviews; each default is the one Claude
   recommended in report 14 and can be changed in `config/metrics.toml`.
+
+## 2026-11-16
+
+### One database behind an API; the apps are added only when they are built
+
+- **Who:** Babak, on Claude's proposal (issue #16).
+- **Decision:** The project's purpose is an analysis interface that shows each company's
+  fundamental and technical analysis, built from data gathered from several sources and
+  stored in one database, to help with investment decisions. The target layout:
+  - **db:** PostgreSQL. It is the single place the data lives, and it is never exposed
+    to the internet.
+  - **worker:** the loaders, the build and the analyses, run on a schedule. It writes
+    to the database.
+  - **api:** the only way in for every interface, served over HTTPS with a token.
+  - **ui:** the analysis interface. It reads through the API, as can the GitHub Pages
+    site and the evening run.
+
+  They will run as Docker Compose services on one Oracle Cloud machine, set up by us,
+  with the same Compose file used locally. `src/stock_analysis` stays the one shared
+  library that the worker and the API are thin layers over.
+- **Kept minimal on purpose:** the design is still being explored, so a folder, service or
+  file appears only when there is code for it. Today there is the database package
+  (`stock_analysis.db`), its migrations and `check`. No `apps/`, Compose file or API code
+  exists yet. The order when they come:
+  1. local Compose with PostgreSQL, with the loaders and build on SQLAlchemy
+  2. the API
+  3. the worker with the API loaders
+  4. the Oracle Cloud server
+  5. the evening run and the site reading the API
+  6. the UI
+- **Why:**
+  - Several interfaces will share the data, so one entry point (the API) keeps the
+    schema free to change and access control in one place.
+  - A private database removes the open question of whether the cloud session can reach
+    port 5432, because it calls the API over HTTPS instead.
+  - Compose gives the same setup on the PC and the server, and Kubernetes isn't needed
+    at this size.
+
+### PostgreSQL only; SQLite dropped
+
+- **Who:** Babak.
+- **Decision:** The database is PostgreSQL 16 only: in Docker on this machine now (target
+  `local`), and on the Oracle Cloud server later (`server`). The SQLite file and code path
+  are removed.
+- **Why:** PostgreSQL is what the server will run, and keeping two engines meant writing for
+  the common subset of both. On 2026-11-16, both engines were built from the same files and
+  gave identical tables, so nothing is lost.
+- **Consequence:** the database tests need PostgreSQL. They use the `stock_test` database in
+  the local container and are skipped where none is running (for example the cloud
+  sessions), while the rest of the suite still runs.
+
+### The server is Azure Database for PostgreSQL (Azure for Students), not Oracle Cloud
+
+- **Who:** Babak.
+- **Decision:** The project's PostgreSQL server is **Azure Database for PostgreSQL – Flexible
+  Server** `stock-db-bk` (Italy North, Burstable B1ms, 32 GiB, PostgreSQL 16) on the **Azure
+  for Students** subscription, opened with the university account.
+- **Why:**
+  - Oracle Cloud's free ARM machine (A1) in Milan, the home region and the only one free
+    resources can use, was "out of capacity" for every size tried.
+  - Upgrading to Pay As You Go needed a temporary hold of about €93 on the card, which
+    Babak declined for a project this size.
+  - Azure for Students needs no card, and its free services cover a B1ms PostgreSQL server
+    with 32 GB for 12 months.
+  - The server is managed, so Azure handles updates and backups. That's less work than
+    running PostgreSQL ourselves.
+- **Weekly cadence:** the data is gathered and cleaned **weekly** (Saturday), not daily. The
+  worker that does this (a small VM or GitHub Actions) is still to be set up.
+- **Access:** firewall rules for listed IPs only; `allow-my-ip` updates the home rule when the
+  IP changes. Later, only the worker's address.
+- **Later:** after 12 months the free services end and the server would use the student
+  credit (about $19 a month at list price). Decide then whether to keep, shrink or move it;
+  a `pg_dump` moves it anywhere.
+
+### Scripts connect straight to the database; cloud sessions go through a small, general API
+
+- **Who:** Babak.
+- **Decision:** On a PC, scripts and Claude read and write PostgreSQL directly with two working
+  users: `stock_reader` (read only) and `stock_writer` (data, not schema). Claude's cloud
+  sessions use a small web API on Azure (`api/app.py`, App Service `stock-api-bk`, free F1)
+  with two general routes instead of one per question: `/query` (any single read-only
+  statement, as `stock_reader`) and `/execute` (write steps in one transaction, as
+  `stock_writer`). `Data.open()` picks the backend, so scripts are the same everywhere. The key
+  reaches cloud sessions as a network secret, never as a variable. The existing files stay, so
+  Claude can still use them.
+- **Why:** tested 2026-11-16: cloud sessions can't reach PostgreSQL in any way (direct
+  connections are refused; the proxy's CONNECT tunnel passes only web traffic), while HTTPS
+  works. Considered and rejected: a copy of the database per session (not the live database),
+  a remote MCP server (tools don't suit scripts that pull thousands of rows), moving to a
+  provider with an HTTP driver (Neon; unofficial Python drivers), a WebSocket tunnel
+  (unproven), self-hosted cloud environments (Team and Enterprise plans only). An API per
+  use case was rejected too: every new analysis would need a new route.
+- **Safety:** the key, HTTPS only, one statement per request, a read-only transaction for
+  `/query`, and the database users' rights (the writer can't change the schema or
+  `schema_version`, or change or delete raw data). The database firewall admits only the
+  API's addresses and the home PC.
+
+## 2026-11-17
+
+### The ingest job: a backfill to the request limits, then maintenance (issue #18)
+
+- **Who:** Babak asked for it; the settings below are Claude's proposal, to review.
+- **Decision:** One job, `python -m stock_analysis.db ingest`, fills the database from
+  TradingView, SEC EDGAR, Yahoo and the ECB. Each run works through a to-do list (`ops_task`,
+  one task per source and company), never-fetched tasks first, until each source's budget,
+  its rate limit or the run's time limit. It backfills until the S&P 500 is complete, then
+  maintains it with fewer calls. Details: `docs/INGEST.md`.
+- **What "complete" means** (`config/coverage.toml`, `docs/COVERAGE.md`):
+  - 2016 onwards (or since listing), every required item for each fiscal year and for the
+    last 8 quarters
+  - daily prices on 98% of trading days, current
+  - Yahoo's reported EPS for the last 8 reports
+  - interest and the three debt lines optional
+  - operating income, EBITDA, D&A and capex not required for banks, insurers and asset
+    managers; operating income and EBITDA not required for REITs
+  - backfill ends when every task has been fetched once and 90% of the required values are
+    in (first full backfill, 2026-11-17: 95%); the gaps left are mapping work, not fetching
+- **Build:** SEC facts are now in the build, first-ranked, with their real filing dates.
+  - The fourth quarter is the year less three quarters.
+  - Every period is dated at its nearest month end, so SEC's 52/53-week dates and Yahoo's
+    month ends are the same period.
+  - SEC values start in 2015, because the splits before the price history are unknown.
+- **Why:** the free sources limit requests, not data. Yahoo throttles when called too often,
+  and SEC allows 10 requests a second. A queue that resumes where it stopped fills the
+  database over a few nights and then needs little.
+
+### The ingest job runs as an Azure Container Apps Job
+
+- **Who:** Babak, after comparing the options with Claude.
+- **Decision:** An Azure Container Apps **Job** (`stock-ingest`, Consumption environment
+  `stock-jobs-env`, schedule `30 22 * * *` UTC, 1.5 vCPU, 3 GiB: the full build peaks at 1.7 GiB). Its image is built from this
+  repository by GitHub Actions and kept on GitHub Container Registry. Each run lets itself
+  through the database firewall with its managed identity (rule `ingest-job`, deleted at the
+  end), so *Allow Azure services* stays off. When a run ends it starts the Pages workflow, so
+  the Data page updates within minutes; a daily schedule is the fallback.
+- **Why:** the job starts, runs for one to two hours and stops. A Container Apps Job is
+  billed per second while running and the free monthly grant covers it.
+- **Rejected:**
+  - **The API's App Service F1:** it only runs during requests, cuts each one off at 230
+    seconds, allows 60 CPU minutes a day shared with the API, and can't run scheduled jobs
+    without Always On (B1, paid).
+  - **Azure Functions:** the Consumption plan caps a run at 10 minutes, and Flex Consumption
+    would mean repackaging the code as a function app.
+  - **Azure Container Registry:** about $5 a month, while GitHub's registry is free for a
+    public repository.
+  - **Opening the firewall to all of Azure:** the database stays limited to listed
+    addresses.
+
+### The site gets grouped menus, and the pipeline diagram is one of its pages
+
+Seven pages no longer fit one row of tabs, least of all on a phone, so the top bar has three
+menus: Analyses, Markets and Project. They are plain `<details>` elements, so they work
+without JavaScript; a few lines of script only close the other menus. The pipeline diagram
+lives in one file, `docs/pipeline.html`, which is both the Claude artifact and the site's
+Pipeline page: its styles are scoped under `.pipeline` with `--p-` tokens, so the site can
+include it unchanged, and a push that edits it republishes the site.
+

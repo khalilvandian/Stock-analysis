@@ -1,12 +1,12 @@
 # Market report: Claude's notes
 
-Updated: 2026-11-04
+Updated: 2026-11-13
 
 The evening run copies these sections into the market PDF. Keep it short.
 
 ## Verdict
 
-**A broad relief rally after the US midterm elections: the S&P 500 up about 1.7%, the Dow about 3% and the VIX down to about 17. The S&P 500 is back within about 1.5% of its high. The sold-off software and data names are still the cheapest against their own history.**
+**Another soft day led by tech: the S&P 500 down about 0.6% to about 7,546 (3.5% below its high) and the Nasdaq down about 1% (9% below its high), as AI names keep sliding. The VIX is near 19 and the US 10-year yield about 5.15%. The sold-off software and data names (Adobe, Gartner, Intuit) are still the cheapest against their own history.**
 
 ## Summary
 

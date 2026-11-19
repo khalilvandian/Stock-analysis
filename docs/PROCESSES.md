@@ -131,9 +131,11 @@ threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the ful
 ### Stage 1: good financial statements (`analysis/stage1.py`)
 
 1. **Universe.** TradingView's screener is scanned market by market for the regions in
-   `[universe] regions` (now `["US"]`, the `america` market). Only primary listings of common
-   stock are kept. With `[universe] index = "SP:SPX"` only S&P 500 members remain (497
-   companies); with `index = ""` every company in the regions does. Cached for the day in
+   `[universe] regions` (now `["US"]`, the `america` market). With `[universe] index =
+   "SP:SPX"` the index's members remain, one listing per company (`tradingview.one_per_company`:
+   the primary listing where it is a member, else the member listing, so BRK.B, BF.B and GM
+   stay in; 500 companies); with `index = ""` every primary listing of common stock in the
+   regions. Cached for the day in
    `.cache/screener/tradingview_<index>_<regions>_<date>.pkl`.
 2. **FX.** ECB rates convert each company's statements (`fundamental_currency_code`) and
    price (`currency`, GBX for London) to US dollars. Companies in a currency the ECB doesn't
@@ -265,11 +267,26 @@ _site` and deploys `_site/` to GitHub Pages. To run it by hand: GitHub, Actions,
 analyses page", Run workflow. To preview locally:
 
 ```bash
+uv run python analysis/explore.py data/explore   # the explorer's data, from the database
 python analysis/site.py _site
 python -m http.server -d _site 8000     # then open http://localhost:8000/
 ```
 
 `site.py` uses the standard library only, so it needs no `uv` environment.
+
+The ticker explorer's data (issue #20) comes from `analysis/explore.py`. `STOCK_EXPLORE`
+sets where `site.py` gets it:
+
+| `STOCK_EXPLORE` | Source |
+|---|---|
+| `api` | The web API. This is the default when `STOCK_API_URL` and `STOCK_API_KEY` are set, as in the workflow. |
+| `local` | `stock_analysis.data`, the database straight from your PC. |
+| `files` | A copy of `data/explore/tickers/`. This is the default when that folder exists. |
+| `off` | No data. The explorer pages say there is none. |
+
+`analysis/explore.py data/explore --symbols NVDA,NEE` exports only a few tickers, for a quick
+look. The export reads the database in about 30 bulk queries, by blocks of symbols, so none
+returns more than the API's 50,000 rows.
 
 ## 9. Sending the email
 
@@ -353,3 +370,20 @@ Babak's own Gmail.
 2. Add it to a named set if it belongs there.
 3. `uv run python -m stock_analysis.metrics doc` to regenerate `docs/METRICS.md`.
 4. `uv run pytest tests/test_metrics.py` (it fails if the doc is stale or a field is missing).
+
+## 14. Filling the database (the ingest job)
+
+The job runs by itself on Azure every night ([`INGEST.md`](INGEST.md)). By hand:
+
+1. **Locally**, against the Docker database: `docker compose up -d --wait`, then
+   `uv run python -m stock_analysis.db ingest --target local --limit 3` for a quick test, or
+   without `--limit` for a full run (about an hour for the S&P 500 the first time).
+2. **Watch it:** `uv run python -m stock_analysis.db tasks` (the to-do list by source and
+   status) and `uv run python -m stock_analysis.db coverage` (how complete the data is).
+3. **After adding an SEC tag** to `config/db_items.toml`:
+   `uv run python -m stock_analysis.db ingest --due-now sec_companyfacts`.
+4. **Deploy or change the Azure job** (schedule, size, secrets):
+   `powershell -ExecutionPolicy Bypass -File deploy\ingest-job.ps1`. Code changes need only
+   a push to `main`: the image is rebuilt and the next run uses it.
+5. **Change what counts as complete:** edit `config/coverage.toml`
+   ([`COVERAGE.md`](COVERAGE.md)). The next snapshot and the Data page use it.
