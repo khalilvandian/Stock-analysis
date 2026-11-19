@@ -1,6 +1,6 @@
 # Metrics dictionary
 
-Generated from `config/metrics.toml` by `uv run python -m stock_analysis.metrics doc`; edit the TOML, not this file. Report 14 explains the choices to make.
+Generated from `config/metrics.toml` by `uv run python -m stock_analysis.metrics doc`; edit the TOML, not this file. docs/DECISIONS.md records the choices made.
 
 Worked examples are Boston Scientific (BSX) unless they say otherwise. Yahoo figures (sector.py, peer screen) are as of the 2026-10-26 close; TradingView figures (Stage 1) as of 2026-10-27; adjusted EPS and P/E history from the 2026-10-27 20:55 watch-list run. Booking (BKNG) is used where BSX can't show a case (net cash, negative equity).
 
@@ -924,7 +924,7 @@ Percentile (0-100) within the peer group, averaged over cash / short-term debt, 
 - **Unit:** score; **better:** higher; **period:** fq
 - **Source:** sector: `debt_score`
 - **Used in:** weighted screen (50% of the total)
-- **Example (BSX, 2026-10-27):** 29.5 = against 9 medical-device peers (report 11)
+- **Example (BSX, 2026-10-27):** 29.5 = against 9 medical-device peers
 - **Vector:** derived
 - **Note:** Relative to whichever peers it is run on, so not a property of the stock. Built from the ratios above; the vector can take the ratios instead.
 
@@ -937,7 +937,7 @@ Weighted percentile of net margin (2), margin change avg and median (1 each), OC
 - **Unit:** score; **better:** higher; **period:** history
 - **Source:** sector: `quality_score`
 - **Used in:** weighted screen (25%)
-- **Example (BSX, 2026-10-27):** 77 = against 9 medical-device peers (report 11)
+- **Example (BSX, 2026-10-27):** 77 = against 9 medical-device peers
 - **Vector:** derived
 
 <a id="cheap-score"></a>
@@ -949,7 +949,7 @@ Percentile of price vs DCF, P/E vs industry median, EV/EBITDA vs industry median
 - **Unit:** score; **better:** higher; **period:** now
 - **Source:** sector: `cheap_score`
 - **Used in:** weighted screen (25%)
-- **Example (BSX, 2026-10-27):** 80.6 = against 9 medical-device peers (report 11)
+- **Example (BSX, 2026-10-27):** 80.6 = against 9 medical-device peers
 - **Vector:** derived
 
 <a id="total-score"></a>
@@ -961,7 +961,7 @@ Babak's weighted score: debt 50%, profitability and cash 25%, cheapness 25%.
 - **Unit:** score; **better:** higher; **period:** now
 - **Source:** sector: `total_score`
 - **Used in:** weighted screen ranking
-- **Example (BSX, 2026-10-27):** 54.1 = 0.5 x 29.5 + 0.25 x 77.0 + 0.25 x 80.6; 5th of 9 (report 11)
+- **Example (BSX, 2026-10-27):** 54.1 = 0.5 x 29.5 + 0.25 x 77.0 + 0.25 x 80.6; 5th of 9
 - **Vector:** derived
 
 ### Valuation (needs the price)

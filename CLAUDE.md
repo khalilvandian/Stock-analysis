@@ -57,7 +57,7 @@ Ratios and scores hide important information, so they come after, never instead.
 - Run it with `uv run python analysis/absolute.py TICKERS` (any company in the database;
   one the database lacks is added to `extra_symbols` in `config/ingest.toml` or the watch
   list's peers). For a peer group, `uv run python analysis/peer_screen.py NAME TICKERS`
-  adds the strict and weighted screens, as reports 11 and 12 do.
+  adds the strict and weighted screens.
 - **Always look at the history, not just the latest year:** `uv run python
   analysis/absolute.py --history TICKERS` shows every fiscal year on record (at least
   the last 5; SEC filings back to 2016, Yahoo fills gaps, each value records its source)
@@ -66,7 +66,7 @@ Ratios and scores hide important information, so they come after, never instead.
   for US-dollar filers.
 - In answers, present the absolute-values table first, then ratios, scores and conclusions.
 - Market screener: `uv run python -m stock_analysis.screener` screens the S&P 500 (the
-  ingest's universe; settings in `config/screeners.toml`, report 13) in two stages from the
+  ingest's universe; settings in `config/screeners.toml`, `docs/SCREENER.md`) in two stages from the
   database (the TradingView snapshot, prices, earnings dates, core values) and saves the run
   there. Stage 1 (`stock_analysis/screener/stage1.py`) puts
   each company in one of Peter Lynch's six categories and keeps those with good financial
@@ -86,7 +86,7 @@ Every fundamental metric is defined once in `config/metrics.toml` (definition, f
 source columns, worked example, draft vector status). When a new metric is used, add it
 there and regenerate `docs/METRICS.md` with `uv run python -m stock_analysis.metrics doc`
 (`tests/test_metrics.py` fails if the doc is stale). `stock_analysis.metrics.build_vectors`
-builds a per-stock vector from any chosen set (report 14).
+builds a per-stock vector from any chosen set.
 
 ## Watch list and the evening run
 

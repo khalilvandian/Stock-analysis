@@ -2,7 +2,7 @@
 # once, so that a chosen set can become each stock's vector (issue #8, "Quantification").
 #
 # Read by src/stock_analysis/metrics.py, which lists the metrics, picks a set and builds the
-# vector for any stock. reports/14-metrics-dictionary.md is the readable version, built from
+# vector for any stock. docs/METRICS.md is the readable version, built from
 # this file with `uv run python -m stock_analysis.metrics doc`.
 #
 # Each [[metric]]:
@@ -33,7 +33,7 @@
 #               derived    = depends on a peer group or a model, not the stock alone
 #   notes       caveats and open choices
 #   clip        optional {lower, upper}: bounds applied when the vector is built, before
-#               standardizing (report 14, open choice 6: net debt ratios at 0, so every
+#               standardizing (open choice 6, docs/DECISIONS.md: net debt ratios at 0, so every
 #               net-cash company counts the same; cover ratios at 50x, so "no debt" (an
 #               infinite ratio) counts as the best value rather than a blank)
 
@@ -944,7 +944,7 @@ definition = "Percentile (0-100) within the peer group, averaged over cash / sho
 formula = "mean(percentile ranks of the 4 debt ratios)"
 sources = { sector = "debt_score" }
 used_in = ["weighted screen (50% of the total)"]
-example = { symbol = "BSX", value = 29.5, as_of = "2026-10-27", working = "against 9 medical-device peers (report 11)" }
+example = { symbol = "BSX", value = 29.5, as_of = "2026-10-27", working = "against 9 medical-device peers" }
 vector = "derived"
 notes = "Relative to whichever peers it is run on, so not a property of the stock. Built from the ratios above; the vector can take the ratios instead."
 
@@ -959,7 +959,7 @@ definition = "Weighted percentile of net margin (2), margin change avg and media
 formula = "weighted mean of percentile ranks"
 sources = { sector = "quality_score" }
 used_in = ["weighted screen (25%)"]
-example = { symbol = "BSX", value = 77.0, as_of = "2026-10-27", working = "against 9 medical-device peers (report 11)" }
+example = { symbol = "BSX", value = 77.0, as_of = "2026-10-27", working = "against 9 medical-device peers" }
 vector = "derived"
 
 [[metric]]
@@ -973,7 +973,7 @@ definition = "Percentile of price vs DCF, P/E vs industry median, EV/EBITDA vs i
 formula = "mean(percentile ranks, reversed)"
 sources = { sector = "cheap_score" }
 used_in = ["weighted screen (25%)"]
-example = { symbol = "BSX", value = 80.6, as_of = "2026-10-27", working = "against 9 medical-device peers (report 11)" }
+example = { symbol = "BSX", value = 80.6, as_of = "2026-10-27", working = "against 9 medical-device peers" }
 vector = "derived"
 
 [[metric]]
@@ -987,7 +987,7 @@ definition = "Babak's weighted score: debt 50%, profitability and cash 25%, chea
 formula = "0.5 x debt_score + 0.25 x quality_score + 0.25 x cheap_score"
 sources = { sector = "total_score" }
 used_in = ["weighted screen ranking"]
-example = { symbol = "BSX", value = 54.1, as_of = "2026-10-27", working = "0.5 x 29.5 + 0.25 x 77.0 + 0.25 x 80.6; 5th of 9 (report 11)" }
+example = { symbol = "BSX", value = 54.1, as_of = "2026-10-27", working = "0.5 x 29.5 + 0.25 x 77.0 + 0.25 x 80.6; 5th of 9" }
 vector = "derived"
 
 # --- Valuation ------------------------------------------------------------------------

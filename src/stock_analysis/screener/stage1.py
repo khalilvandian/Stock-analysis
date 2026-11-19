@@ -1,8 +1,8 @@
 """Stage 1 of the market screener: good financial statements.
 
 Finds the companies worth owning, before any thought of price. Settings in
-config/screeners.toml; every rule, threshold and source is explained in report 13 and
-the methods doc.
+config/screeners.toml; every rule, threshold and source is explained in docs/SCREENER.md
+and the methods doc.
 
   1. Universe: the members of `[universe] index` (the S&P 500), from the newest TradingView
      snapshot the ingest job stored in the database (current figures, 20 years of yearly
