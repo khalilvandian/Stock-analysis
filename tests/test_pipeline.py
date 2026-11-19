@@ -194,7 +194,7 @@ def test_fail_marks_the_run_and_emails_the_alert(fresh, respx_mock, monkeypatch)
 
     monkeypatch.setattr("stock_analysis.pipeline.__main__.database", lambda read_only=False: fresh)
     monkeypatch.setattr(fresh, "close", lambda: None)
-    for k, v in {"BREVO_API_KEY": "k", "WATCHLIST_EMAIL_FROM": "bot@example.com",
+    for k, v in {"BREVO_API_KEY": "k", "WATCHLIST_EMAIL_FROM": "Stock analysis <bot@example.com>",
                  "PIPELINE_ALERT_TO": "me@example.com"}.items():  # fmt: skip
         monkeypatch.setenv(k, v)
     brevo = respx_mock.post(p.BREVO).mock(return_value=httpx.Response(201, json={}))
@@ -204,3 +204,4 @@ def test_fail_marks_the_run_and_emails_the_alert(fresh, respx_mock, monkeypatch)
     sent = json.loads(brevo.calls.last.request.content)
     assert sent["subject"] == "Stock pipeline FAILED: check_prices"
     assert sent["to"] == [{"email": "me@example.com"}]
+    assert sent["sender"]["email"] == "bot@example.com"  # "Name <address>" split, as Brevo needs

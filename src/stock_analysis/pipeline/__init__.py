@@ -26,6 +26,7 @@ import os
 import socket
 import tomllib
 from dataclasses import dataclass, field
+from email.utils import parseaddr
 from pathlib import Path
 
 import httpx
@@ -289,8 +290,9 @@ def alert(subject: str, body: str, cfg: dict, client: httpx.Client) -> bool:
     to = os.environ.get(a["to_env"]) or os.environ.get("WATCHLIST_EMAIL_TO")
     if not (key and sender and to):
         return False
+    _, address = parseaddr(sender)  # "Name <address>", as the evening email takes it
     message = {
-        "sender": {"email": sender, "name": "Stock pipeline"},
+        "sender": {"email": address, "name": "Stock pipeline"},
         "to": [{"email": t.strip()} for t in to.split(",") if t.strip()][:5],
         "subject": subject,
         "textContent": body,
