@@ -4,6 +4,7 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-19 11:59 CET | $69.40 | 22.2x | 22.3x | $62.40 | -10.1% | Fairly priced, not cheap. | [2026-11-19_1159.pdf](2026-11-19_1159.pdf) |
 | 2026-11-19 11:30 CET | $69.40 | 22.2x | 22.3x | $62.40 | -10.1% | Q3 (Nov 4) was solid: gross bookings +20% to $59.8bn, non-GAAP EPS $0.88 (+35%), and Q4 guided to $0.95-0.99 (+34-39%). | [2026-11-19_1130.pdf](2026-11-19_1130.pdf) |
 | 2026-11-19 11:18 CET | $69.40 | 22.2x | 22.3x | $62.40 | -10.1% | Q3 (Nov 4) was solid: gross bookings +20% to $59.8bn, non-GAAP EPS $0.88 (+35%), and Q4 guided to $0.95-0.99 (+34-39%). | [2026-11-19_1118.pdf](2026-11-19_1118.pdf) |
 | 2026-11-13 20:53 CET | $69.42 | 22.2x | 22.3x | $62.40 | -10.1% | Q3 (Nov 4) was solid: gross bookings +20% to $59.8bn, non-GAAP EPS $0.88 (+35%), and Q4 guided to $0.95-0.99 (+34-39%). | [2026-11-13_2053.pdf](2026-11-13_2053.pdf) |
