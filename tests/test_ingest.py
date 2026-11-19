@@ -34,10 +34,10 @@ def tv_rows(symbols: list[str]) -> dict:
     rows = []
     for s in symbols:
         d = [s, f"{s} Corp", "NYSE", "Utilities", "Electric Utilities", "United States", "USD",
-             2e10, "USD", [{"name": "S&P 500", "proname": "SP:SPX"}]]  # fmt: skip
+             2e10, "USD", [{"name": "S&P 500", "proname": "SP:SPX"}], True]  # fmt: skip
         rows.append({"s": f"NYSE:{s}", "d": d})
     rows.append({"s": "NYSE:ZZZ", "d": ["ZZZ", "Not in it", "NYSE", "Finance", "Major Banks",
-                 "United States", "USD", 5e9, "USD", []]})  # fmt: skip
+                 "United States", "USD", 5e9, "USD", [], True]})  # fmt: skip
     return {"totalCount": len(rows), "data": rows}
 
 
@@ -768,3 +768,15 @@ def test_earnings_are_due_again_after_a_report(fresh) -> None:
                 f"'{later}', '{before}')"
             )
         assert job.earnings_due(conn, now) == 1  # AAA reported yesterday; BBB long ago
+
+
+def test_xbrl_units_named_as_company_facts_names_them() -> None:
+    """A filing names its own unit ids (Berkshire: 'U_shares', 'U_xbrlishares')."""
+    from stock_analysis.ingest.xbrl import unit_of
+
+    assert [unit_of(u, None) for u in ("shares", "U_shares", "U_xbrlishares", "Shares")] == [
+        "shares"
+    ] * 4
+    assert unit_of("U_USDPerShare", "USD") == "USD/shares"
+    assert unit_of("usd", None) == "USD" and unit_of("U_iso4217USD", "USD") == "USD"
+    assert unit_of("pure", None) == "pure"

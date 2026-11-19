@@ -1,4 +1,4 @@
-"""Draws the "Inside the database, in UML" section of docs/pipeline.html (four UML 2.5
+"""Draws the "Inside the database, in UML" section of docs/pipeline.html (UML 2.5
 diagrams and their notes). Rerun after a change: python docs/pipeline_uml.py docs/pipeline.html"""
 
 # ruff: noqa: E501  (the SVG and the HTML notes are kept on one line each)
@@ -167,8 +167,9 @@ a = D(
     "act",
     "Nightly ingest run",
     "UML activity diagram of the nightly ingest run in three partitions: the ingest job "
-    "plans tasks, chooses its mode and fetches each due task into the raw layer; if rows "
-    "were stored the build rebuilds the core layer in one transaction; coverage takes the "
+    "plans tasks, chooses its mode and fetches each due task into the raw layer; if new rows "
+    "were stored the build rebuilds, in one transaction, only the companies with new raw "
+    "data; coverage takes the "
     "snapshot that the next run reads to choose its mode.",
 )
 a.frame(10, 10, 1280, 600)
@@ -250,13 +251,13 @@ a.note(
 
 a.diamond(1110, CY)
 a.edge([(RX + RW, CY), (1097, CY)])
-a.g(1130, CY - 7, "[nothing stored]")
+a.g(1130, CY - 7, "[nothing new]")
 
 # lane B, right to left
 BY, BH = 328, 44
 labels = [
-    ["Clear core and", "load items, tags"],
     ["Build companies", "and index spells"],
+    ["Pick companies", "with new raw data"],
     ["Build daily", "prices"],
     ["Build fundamentals"],
     ["Build trailing", "twelve months"],
@@ -269,7 +270,7 @@ bs = [
     for i, (c, lab) in enumerate(zip(centres, labels, strict=True))
 ]
 a.edge([(1110, CY + 13), (1110, BY)])
-a.g(1118, 200, "[rows stored]")
+a.g(1118, 200, "[new rows]")
 for i in range(6):
     a.edge([(bs[i].l, BY + BH / 2), (bs[i + 1].r, BY + BH / 2)])
 
@@ -882,8 +883,284 @@ m.note(
 )
 SVG6 = m.svg()
 
+# ======================================================================= 0. sources and their data
+src = D(
+    "u10",
+    1300,
+    760,
+    "class",
+    "Sources and the data they deliver",
+    "UML diagram of each source artifact with its format and contents, how it arrives, the "
+    "loader that reads it and the raw table it is stored in; every raw table feeds the build "
+    "of the core layer, and every payload is kept as received.",
+)
+src.frame(10, 10, 1280, 740)
+for x, s in (
+    (274, "what arrives · format · how"),
+    (690, "loader"),
+    (965, "raw table"),
+    (1190, "then"),
+):
+    src.t(x, 62, s, "u-lane", "middle")
+src.add('<path class="u-partl" d="M24,72 H1276"/>')
+ROWS = [
+    (
+        "SEC company facts",
+        "JSON per company: every reported fact, by tag, unit and period",
+        "API · the nightly job, one company a request",
+    ),
+    (
+        "SEC companyfacts.zip",
+        "ZIP of the same JSON files, every company at once",
+        "bulk file you download → inbox/sec_companyfacts/ · db import",
+    ),
+    (
+        "SEC Financial Statement Data Sets",
+        "ZIP a quarter of tab-separated text: filings, numbers, statement lines",
+        "bulk file you download → inbox/sec_fsds/ · db import",
+    ),
+    (
+        "SEC full filing (XBRL)",
+        "XML of one 10-K or 10-Q: instance, schema, linkbases",
+        "API through edgartools · values still missing per share class",
+    ),
+    ("SEC company tickers", "JSON: every ticker with its CIK", "API · the nightly job"),
+    (
+        "Yahoo daily prices",
+        "table a company: open, high, low, close, volume, dividends, splits",
+        "yfinance · the nightly job",
+    ),
+    (
+        "Yahoo statements",
+        "tables a company: income, balance sheet, cash flow, annual and quarterly",
+        "yfinance · Yahoo keeps about four years",
+    ),
+    (
+        "Yahoo earnings dates",
+        "table: report dates with reported and expected EPS",
+        "yfinance · the nightly job",
+    ),
+    (
+        "TradingView screener",
+        "JSON: listings with index membership, sector, industry, market value",
+        "one scan request a night",
+    ),
+    ("ECB reference rates", "CSV: daily euro exchange rates", "API · the nightly job"),
+    (
+        "project files",
+        "CSV in data/: history.csv and the files fetched before the database",
+        "on this PC · db load-files",
+    ),
+]
+RY0, RS, RHT = 82, 54, 46
+arts = []
+for i, (name, what, how) in enumerate(ROWS):
+    y = RY0 + i * RS
+    arts.append(
+        src.obj(24, y, 500, RHT, [(f"«artifact» {name}", "u-act"), (what, "u-n"), (how, "u-nm")])
+    )
+# loaders and tables: (first row, last row, loader lines, table)
+GROUPS = [
+    (0, 1, ["Parse company facts", ("sec.load_companyfacts", "u-objm")], "raw_sec_fact"),
+    (2, 2, ["Read a quarter", ("files.import_fsds", "u-objm")], None),
+    (3, 3, ["Read a filing", ("xbrl.load_filing", "u-objm")], None),
+    (4, 4, ["Read tickers", ("sec.load_tickers", "u-objm")], "raw_sec_ticker"),
+    (5, 5, ["Load prices", ("yahoo.load_prices", "u-objm")], "raw_yahoo_price"),
+    (6, 6, ["Load statements", ("yahoo.load_statements", "u-objm")], "raw_yahoo_statement"),
+    (7, 7, ["Load earnings", ("yahoo.load_earnings", "u-objm")], "raw_yahoo_earnings"),
+    (8, 8, ["Load members", ("market.load_constituents", "u-objm")], "raw_tv_constituent"),
+    (9, 9, ["Load rates", ("market.load_rates", "u-objm")], "raw_ecb_rate"),
+    (10, 10, ["Load files", ("load_files.load_all", "u-objm")], "raw_project_history"),
+]
+tables = []
+for first, last, lines, table in GROUPS:
+    y0, y1 = RY0 + first * RS, RY0 + last * RS + RHT
+    ld = src.action(590, y0, 200, y1 - y0, lines)
+    for i in range(first, last + 1):
+        cy = arts[i].cy
+        src.edge([(arts[i].r, cy), (ld.l, cy)])
+    if table:
+        tb = src.obj(860, y0, 210, y1 - y0, [(table, "u-objm")], store=True)
+        tables.append(tb)
+        src.edge([(ld.r, (y0 + y1) / 2), (tb.l, (y0 + y1) / 2)])
+    else:  # the data sets and the full filings share raw_sec_xbrl_fact
+        if first == 2:
+            xb = src.obj(860, y0, 210, RS + RHT, [("raw_sec_xbrl_fact", "u-objm")], store=True)
+            tables.append(xb)
+        src.edge([(ld.r, (y0 + y1) / 2), (860, (y0 + y1) / 2)])
+BUS = 1100
+src.add(f'<path class="u-line" d="M{BUS},{tables[0].cy} V{tables[-1].cy}"/>')
+for tb in tables:
+    src.edge([(tb.r, tb.cy), (BUS, tb.cy)], arrow=False)
+src.add(f'<circle class="u-solid" cx="{BUS}" cy="{tables[4].cy}" r="4"/>')
+bd = src.action(
+    1130, tables[4].cy - 30, 140, 60, ["Build core", ("act Nightly run", "u-st")], call=True
+)
+src.edge([(BUS, tables[4].cy), (bd.l, tables[4].cy)])
+co = src.obj(1130, tables[4].cy + 70, 140, 44, [("core layer", "u-obj")], store=True)
+src.edge([(bd.cx, bd.b), (bd.cx, co.t)])
+src.note(
+    24,
+    RY0 + len(ROWS) * RS + 6,
+    1046,
+    [
+        "every payload is kept as received in raw_payload (gzip), with its raw_fetch row: source, request, time, fingerprint; a data-set quarter stays a file in inbox/",
+        "the raw tables keep only new or changed rows, so a payload fetched again stores nothing; db reparse reads the kept payloads again after a mapping change",
+    ],
+)
+SVG0 = src.svg()
+
+# ======================================================================= 6. check a change on a sample
+cs = D(
+    "u11",
+    1300,
+    250,
+    "act",
+    "Check a change on a sample",
+    "UML activity diagram of changing the extraction: re-read kept payloads if the parsing "
+    "changed, build a sample of companies in a transaction, compare with the stored values and "
+    "roll back; if the sample is right, write only those companies, otherwise change again.",
+)
+cs.frame(10, 10, 1280, 230)
+SY = 120
+cs.initial(40, SY)
+ch = cs.action(
+    64,
+    SY - 30,
+    200,
+    60,
+    ["Change the extraction", ("db_items.toml", "u-objm"), ("companies.toml · build.py", "u-objm")],
+)
+cs.edge([(48, SY), (ch.l, SY)])
+cs.diamond(300, SY)
+cs.edge([(ch.r, SY), (287, SY)])
+rp = cs.action(340, 34, 150, 44, ["Re-read kept payloads", ("db reparse", "u-objm")])
+cs.edge([(300, SY - 13), (300, rp.cy), (rp.l, rp.cy)])
+cs.g(308, 98, "[parsing changed]")
+cs.diamond(530, SY)
+cs.edge([(rp.r, rp.cy), (530, rp.cy), (530, SY - 13)])
+cs.edge([(313, SY), (517, SY)])
+cs.g(380, SY + 18, "[mapping only]")
+bsm = cs.action(
+    566,
+    SY - 26,
+    170,
+    52,
+    ["Build the sample", "in one transaction", ("check-sample --symbols A,B", "u-objm")],
+)
+cs.edge([(543, SY), (bsm.l, SY)])
+cmp_ = cs.action(764, SY - 22, 150, 44, ["Compare with the", "stored values"])
+cs.edge([(bsm.r, SY), (cmp_.l, SY)])
+rb = cs.action(942, SY - 22, 90, 44, ["Roll back"])
+cs.edge([(cmp_.r, SY), (rb.l, SY)])
+cs.diamond(1066, SY)
+cs.edge([(rb.r, SY), (1053, SY)])
+wr = cs.action(1100, SY - 26, 150, 52, ["Write the sample", ("build --symbols A,B", "u-objm")])
+cs.edge([(1079, SY), (wr.l, SY)])
+cs.g(1072, SY - 32, "[as expected]")
+cs.final(1270, SY)
+cs.edge([(wr.r, SY), (1259, SY)])
+cs.edge([(1066, SY + 13), (1066, 214), (164, 214), (164, ch.b)])
+cs.g(1074, 200, "[not as expected]")
+cs.note(
+    600,
+    170,
+    440,
+    [
+        "added · removed · changed per company; nothing is written",
+        "the other companies keep their rows and take the change when",
+        "their sources bring new data; build --full only when asked",
+    ],
+    to=(cmp_.cx, cmp_.b),
+    frm=(cmp_.cx, 170),
+)
+SVG7 = cs.svg()
+
+# ======================================================================= 7. PC to server
+ps_ = D(
+    "u12",
+    1300,
+    430,
+    "act",
+    "PC to server",
+    "UML activity diagram in three partitions: on this PC bulk files are downloaded and "
+    "imported, then db push sends every kept payload the server lacks through the same "
+    "loaders; the server database stores it and marks the tasks fetched; the server job then "
+    "fetches only its cheap daily sources and builds only the companies with new raw data.",
+)
+ps_.frame(10, 10, 1280, 410)
+ps_.add('<rect class="u-part" x="24" y="46" width="1252" height="360"/>')
+ps_.add('<path class="u-partl" d="M24,166 H1276 M24,286 H1276 M50,46 V406"/>')
+ps_.lane_label(41, 106, "this PC")
+ps_.lane_label(41, 226, "server database")
+ps_.lane_label(41, 346, "server job")
+PY1, PY2, PY3 = 106, 226, 346
+ps_.initial(74, PY1)
+dl = ps_.action(96, PY1 - 24, 150, 48, ["Download bulk files", ("inbox/<kind>/", "u-objm")])
+ps_.edge([(82, PY1), (dl.l, PY1)])
+im = ps_.action(276, PY1 - 24, 150, 48, ["Import and analyse", ("db import FILE", "u-objm")])
+ps_.edge([(dl.r, PY1), (im.l, PY1)])
+pu = ps_.action(
+    456, PY1 - 24, 170, 48, ["Find what the server lacks", ("db push --target server", "u-objm")]
+)
+ps_.edge([(im.r, PY1), (pu.l, PY1)])
+ps_.note(
+    660,
+    62,
+    420,
+    [
+        "same source, request and fingerprint already there: skipped",
+        "a data-set quarter is imported from its file in inbox/",
+        ("sec_companyfacts · sec_xbrl · sec_fsds", "mono"),
+    ],
+    to=(pu.r, PY1 - 10),
+    frm=(660, 84),
+)
+PX, PW = 140, 760
+ps_.add(f'<rect class="u-region" x="{PX}" y="182" width="{PW}" height="92" rx="14"/>')
+ps_.t(PX + 330, 198, "«iterative»", "u-kw")
+ps_.t(PX + 398, 198, "each payload the server lacks, parsed on this PC", "u-g")
+ps_.exp_node(235, 176, False)
+ps_.edge([(541, pu.b), (541, 150), (250, 150), (250, 176)])
+kp2 = ps_.action(
+    170, PY2 - 18, 160, 44, ["Store the payload", ("raw_payload · raw_fetch", "u-objm")]
+)
+pl2 = ps_.action(370, PY2 - 18, 180, 44, ["Store new or changed rows", "with the source's loader"])
+mk2 = ps_.action(590, PY2 - 18, 160, 44, ["Mark its tasks fetched", ("ops_task", "u-objm")])
+ps_.edge([(250, 188), (250, kp2.t)])
+ps_.edge([(kp2.r, kp2.cy), (pl2.l, pl2.cy)])
+ps_.edge([(pl2.r, pl2.cy), (mk2.l, mk2.cy)])
+ps_.flow_final(800, mk2.cy)
+ps_.edge([(mk2.r, mk2.cy), (791, mk2.cy)])
+rawsv = ps_.obj(960, PY2 - 22, 160, 44, [("raw layer", "u-obj")], store=True)
+ps_.edge([(pl2.cx, pl2.b), (pl2.cx, 262), (1000, 262), (1000, rawsv.b)])
+ps_.initial(74, PY3)
+pt2 = ps_.action(96, PY3 - 22, 130, 44, ["Plan tasks"])
+ps_.edge([(82, PY3), (pt2.l, PY3)])
+fe2 = ps_.action(
+    256,
+    PY3 - 26,
+    220,
+    52,
+    [
+        "Fetch only the due tasks",
+        ("TradingView · Yahoo · ECB daily;", "u-st"),
+        ("SEC: what was not pushed", "u-st"),
+    ],
+)
+ps_.edge([(pt2.r, PY3), (fe2.l, PY3)])
+bu2 = ps_.action(506, PY3 - 22, 220, 44, ["Build the companies", "with new raw data"], call=True)
+ps_.edge([(fe2.r, PY3), (bu2.l, PY3)])
+cv2 = ps_.action(756, PY3 - 22, 150, 44, ["Take coverage", "snapshot"])
+ps_.edge([(bu2.r, PY3), (cv2.l, PY3)])
+ps_.final(940, PY3)
+ps_.edge([(cv2.r, PY3), (929, PY3)])
+ps_.edge([(1080, rawsv.b), (1080, 300), (616, 300), (616, bu2.t)])
+ps_.g(1088, 296, "read by the build")
+SVG8 = ps_.svg()
+
 # ======================================================================= notation key
-k = D("u5", 1300, 112, "", "", "Key to the UML symbols used in the four diagrams.")
+k = D("u5", 1300, 112, "", "", "Key to the UML symbols used in the diagrams.")
 x = 24
 row = 30
 k.initial(x + 8, row)
@@ -948,11 +1225,14 @@ def fig(svg, cap):
 
 SECTION = f"""<section id="inside-the-database">
   <h2>Inside the database, in UML</h2>
+{fig(SVG0, "Class diagram: every source, what it delivers (format, contents, how it arrives), the loader that reads it and the raw table that stores it.")}
 {fig(SVG1, "Activity diagram: one run of the <code>stock-ingest</code> job, partitioned by who does the work.")}
 {fig(SVG2, "Activity diagram: the call behaviour <em>Build fundamentals</em> from the run above, partitioned by step; boxes between actions are the data in each state.")}
+{fig(SVG7, "Activity diagram: a change of the extraction is checked on a sample of companies (<code>db check-sample</code>), never by rebuilding the database.")}
 {fig(SVG3, "Class diagram: the tables of the data path, with their keys and links (migrations 001 to 010).")}
 {fig(SVG4, "State machine: the life of one ingest task, row by row in <code>ops_task</code>.")}
 {fig(SVG6, "Activity diagram: a file downloaded by hand loaded into the pipeline (<code>db import</code>).")}
+{fig(SVG8, "Activity diagram: what this PC loaded, sent to the server (<code>db push</code>), and the server job's own run.")}
 {fig(SVG5, "Key to the symbols (UML 2.5).")}
 </section>
 """

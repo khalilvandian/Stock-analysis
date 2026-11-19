@@ -1,5 +1,5 @@
 """What every source loader shares: the result of a task, the errors that stop a source, and
-logging a fetched payload in raw_fetch (the same rules as load_files: a payload seen before is
+logging a fetched payload in raw_fetch (a payload seen before is
 not stored again, and only new or changed rows go into the raw tables), and keeping the payload
 itself as the source returned it (raw_payload), so parsing it again never needs the source."""
 

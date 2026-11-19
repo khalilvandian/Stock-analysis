@@ -36,9 +36,15 @@ REQUESTS_PER_FILING = 8
 
 
 def mapped_concepts(items_config=ITEMS_CONFIG) -> set[str]:
-    """The concepts config/db_items.toml reads per share class (sec_class)."""
+    """The concepts read per share class: sec_class in config/db_items.toml, and the tags a
+    [[share_class]] entry in config/companies.toml names for an item (Berkshire's basic EPS)."""
     _, tags = load_items(items_config)
-    return set(tags.loc[tags["taxonomy"] == "sec_class", "tag"])
+    entries = load_companies().get("share_class", [])
+    own = {
+        concept for c in entries for concepts in c.get("tags", {}).values() for concept in concepts
+    }
+    converted = {r["concept"] for c in entries for r in c.get("convert", [])}
+    return set(tags.loc[tags["taxonomy"] == "sec_class", "tag"]) | own | converted
 
 
 def share_classes() -> dict[str, str]:
@@ -76,8 +82,10 @@ def parse_files(files: dict):
 
 
 def unit_of(unit_ref: str, currency) -> str:
-    """The fact's unit as SEC's company facts names it."""
-    ref = str(unit_ref or "").lower()
+    """The fact's unit as SEC's company facts names it. A filing names its units itself
+    ('shares', 'U_shares', 'U_xbrlishares' in Berkshire's filings), so the id's prefix and
+    the xbrli namespace are dropped first."""
+    ref = re.sub(r"^u[_-]", "", str(unit_ref or "").lower()).replace("xbrli", "")
     if "pershare" in ref or "per_share" in ref:
         return "USD/shares"
     if ref.startswith("share"):

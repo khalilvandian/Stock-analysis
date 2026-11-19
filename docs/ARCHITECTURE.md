@@ -22,6 +22,7 @@ state machine of an ingest task.
 | Piece | Runs on | Started by | Code |
 |---|---|---|---|
 | Ingest job | Azure Container Apps Job `stock-ingest` | A schedule (22:30 UTC daily) | `python -m stock_analysis.db ingest` ([`INGEST.md`](INGEST.md)) |
+| Quotes job | Azure Container Apps Job `stock-quotes` | Every hour on weekdays, around the clock | `python -m stock_analysis.db quotes`: every company in the database ([`INGEST.md`](INGEST.md), "Hourly quotes"); the site's pages read them through `GET /quotes` (`analysis/live.js`) |
 | Database | Azure Database for PostgreSQL `stock-db-bk` (and Docker locally) | Always on | `src/stock_analysis/db/` |
 | Web API | Azure App Service `stock-api-bk` (F1) | An HTTPS request | `api/app.py` |
 | Evening run | A scheduled Claude Code session | Weekdays 21:00 Italy time | `analysis/watchlist.py` ([`EVENING_RUN.md`](EVENING_RUN.md)) |

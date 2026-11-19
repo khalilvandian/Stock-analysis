@@ -11,7 +11,11 @@
 # us-gaap:StatementClassOfStockAxis), not in total; `member` is the class whose shares are
 # listed under the symbol. The sec_xbrl source reads those values from the full filings
 # (edgartools) and the build takes this class's. Checked in each latest 10-K on 2026-11-17:
-# diluted EPS reported only per class.
+# diluted EPS reported only per class. `tags` (optional) names the concept the company files
+# an item under when it isn't the item's sec_class tag, {item = [concepts]}, this company only.
+# `convert` (optional) reads an item the company states only in another class's units and
+# multiplies it by the fixed ratio of its charter; `not_from_yahoo` lists the items whose
+# Yahoo values are in another class's units.
 #
 # [[custom_tag]]: an item a company reports only under its own tags (not in SEC's company
 # facts), summed per filing and period; read from SEC's Financial Statement Data Sets or full
@@ -107,6 +111,32 @@ note = "Common Stock is listed; Class B is held by the Hershey Trust"
 [[share_class]]
 symbol = "KKR"
 member = "us-gaap:CommonStockMember"
+
+[[share_class]]
+symbol = "BRK.B"
+member = "us-gaap:EquivalentClassBMember"
+tags = { eps_diluted = ["us-gaap:EarningsPerShareBasic"] }
+not_from_yahoo = ["shares_outstanding"]
+note = """Berkshire reports net earnings per average equivalent Class A and Class B share, basic
+only: it has no dilutive securities, so basic is its diluted figure (10-K 2024: $41.27 per
+Class B share, $61,900 per Class A share). BRK.B is listed. Shares outstanding are stated in
+equivalent Class A shares (1,438,223 at the end of 2024 = 547,562 A + 1,335,992,139 B / 1,500);
+a Class A share converts into 1,500 Class B shares by the charter, so BRK.B's count is 1,500
+times that. Yahoo's count is the Class A one, so it isn't used."""
+
+[[share_class.convert]]
+item = "shares_outstanding"
+concept = "us-gaap:CommonStockSharesOutstanding"
+member = "brka:EquivalentClassAMember"
+factor = 1500
+
+[[custom_tag]]
+symbol = "BF.B"
+item = "revenue"
+tags = ["NetSalesExcludingExciseTaxes"]
+note = """Net sales after excise taxes, as every later year: fiscal 2016 ($3,089m) is reported
+so in the 10-Ks for 2017 and 2018. The 2016 10-K's "Net sales" (SalesRevenueGoodsNet, $4,011m)
+includes the $922m of excise taxes, so it is not used."""
 
 [[custom_tag]]
 symbol = "D"

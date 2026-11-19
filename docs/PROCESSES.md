@@ -112,7 +112,9 @@ reference.
 
 1. **Universe.** The index members (`[universe] index = "SP:SPX"`, the ingest's universe)
    of the newest TradingView snapshot the ingest stored (`v_tv_latest`: every screener field
-   in `extra_json`, refreshed every night).
+   in `extra_json`, refreshed every night), one listing per company (the ingest keeps the
+   primary listing where it is a member, else the member listing, so BRK.B, BF.B and GM stay
+   in; 500 companies).
 2. **FX.** The ECB rates in the database convert each company's statements (`fundamental_currency_code`) and
    price (`currency`, GBX for London) to US dollars. Companies in a currency the ECB doesn't
    publish are dropped. Then the market-value floor applies: `min_market_cap_usd` ($1bn).

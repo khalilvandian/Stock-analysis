@@ -27,6 +27,7 @@ import re
 import shutil
 import sys
 import tomllib
+from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -52,6 +53,7 @@ MENU = [
     ("Project", [("pipeline", "Pipeline"), ("coverage", "Data coverage")]),
 ]
 EXPLORER_JS = ROOT / "analysis/explorer.js"  # the ticker page's script
+LIVE_JS = ROOT / "analysis/live.js"  # live prices for every page (issue #35)
 URL = "https://khalilvandian.github.io/Stock-analysis/"
 
 CSS = """
@@ -306,17 +308,9 @@ def query(sql: str) -> list[dict]:
         return []
 
 
-def timezone() -> ZoneInfo:
-    if CONFIG.exists():
-        return ZoneInfo(tomllib.loads(CONFIG.read_text()).get("timezone", "Europe/Rome"))
-    return ZoneInfo("Europe/Rome")
-
-
 def run_label(run_at: str) -> str:
-    """A run time stored in UTC, as it reads in the watch list's time zone."""
-    t = dt.datetime.fromisoformat(str(run_at)[:19]).replace(tzinfo=dt.UTC)
-    t = t.astimezone(timezone())
-    return t.strftime("%Y-%m-%d %H:%M ") + t.tzname()
+    """A run time stored in UTC, as it reads in Italy (cet())."""
+    return cet(str(run_at)[:19])
 
 
 @cache
@@ -411,6 +405,20 @@ def stamp(name: str) -> str:
     """'2026-10-27_1657.pdf' -> '2026-10-27 16:57'."""
     m = re.match(r"(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})", name)
     return f"{m.group(1)} {m.group(2)}:{m.group(3)}" if m else name
+
+
+CET = ZoneInfo("Europe/Rome")
+
+
+def cet(when) -> str:
+    """A UTC time from the database (naive or ISO text) as Italy time: '2026-11-19 16:30 CET'
+    (CEST in summer). Every hour the site shows is in this zone."""
+    try:
+        t = when if isinstance(when, datetime) else datetime.fromisoformat(str(when))
+    except ValueError:
+        return str(when)[:16].replace("T", " ")
+    t = (t if t.tzinfo else t.replace(tzinfo=UTC)).astimezone(CET)
+    return t.strftime("%Y-%m-%d %H:%M ") + t.tzname()
 
 
 def esc(s) -> str:
@@ -1058,7 +1066,7 @@ def coverage_page(menu, d: dict | None = None) -> str:
         for k, v in sorted(p["sources"].items())
     )
     runs = "".join(
-        f"<tr><td class='d'>{esc(str(r['started_at'])[:16].replace('T', ' '))}</td>"
+        f"<tr><td class='d'>{esc(cet(r['started_at']))}</td>"
         f"<td>{esc(r['mode'])}</td><td>{esc(r['status'])}</td>"
         f"<td class='n'>{r['requests']:,}</td><td class='n'>{r['tasks_ok']:,}</td>"
         f"<td class='n'>{r['tasks_failed']:,}</td><td class='n'>{r['rows_stored']:,}</td>"
@@ -1069,7 +1077,7 @@ def coverage_page(menu, d: dict | None = None) -> str:
         "<h2>The ingest job</h2><div class='cols'>"
         + table(["Source", "Tasks", "Fetched", "Waiting", "Failed"], src)
         + table(
-            ["Run (UTC)", "Mode", "Result", "Requests", "Done", "Failed", "Rows", "Stopped by"],
+            ["Run (CET)", "Mode", "Result", "Requests", "Done", "Failed", "Rows", "Stopped by"],
             runs,
         )
         + "</div>"
@@ -1180,6 +1188,27 @@ def no_explore_data(title_: str, active: str, menu) -> str:
     )
 
 
+# Values that move with the price, and the live.js format of each site.py pattern (issue #35).
+LIVE_KEYS = {"price", "market_cap", "pe", "ps", "pb", "ev_ebitda", "fcf_yield", "div_yield"}
+LIVE_FMT = {"${:,.2f}": "price", None: "money", "{:.1f}x": "mult", "{:.1%}": "pct"}
+LIVE_SCRIPT = '<script src="live.js" defer></script>'
+LIVE_NOTE = "<span data-live-asof></span>"
+
+
+def live(sym: str, key: str, pattern: str | None) -> str:
+    """The data-live attribute of a cell live.js keeps current, or nothing."""
+    if key not in LIVE_KEYS or pattern not in LIVE_FMT:
+        return ""
+    return f' data-live="{esc(sym)} {key} {LIVE_FMT[pattern]}"'
+
+
+def live_med(group: str, key: str, pattern: str | None) -> str:
+    """The data-live-med attribute of a sector median ("*" = every company), or nothing."""
+    if key not in LIVE_KEYS or pattern not in LIVE_FMT:
+        return ""
+    return f' data-live-med="{esc(group)} {key} {LIVE_FMT[pattern]}"'
+
+
 def ticker_link(sym: str) -> str:
     return f'<a href="ticker.html?s={esc(sym)}"><b>{esc(sym)}</b></a>'
 
@@ -1219,7 +1248,7 @@ def ticker_page(menu) -> str:
     body = (
         '<div id="explorer"><p class="sub">Loading…</p></div>'
         "<noscript><p>The ticker explorer needs JavaScript.</p></noscript>"
-        '<script src="explorer.js" defer></script>'
+        '<script src="live.js" defer></script><script src="explorer.js" defer></script>'
     )
     return layout("Ticker explorer", "ticker", body, menu)
 
@@ -1254,7 +1283,8 @@ def tickers_page(menu, idx: dict | None) -> str:
     for r in rows:
         key = f"{r['symbol']} {r.get('name') or ''} {r.get('industry') or ''}".lower()
         cells = "".join(
-            f"<td class='n' data-v=\"{'' if r.get(k) is None else r[k]}\">"
+            f"<td class='n' data-v=\"{'' if r.get(k) is None else r[k]}\""
+            f"{live(r['symbol'], k, p)}>"
             f"{fmt_money(r.get(k)) if p is None else fmt(r.get(k), p)}</td>"
             for _, k, p in cols
         )
@@ -1269,7 +1299,7 @@ def tickers_page(menu, idx: dict | None) -> str:
         "<h1>All tickers</h1>"
         f"<p class='sub'><span id='count'>{len(rows)}</span> companies in the database, data "
         f"as of {esc(idx.get('asof') or '—')}. Absolute values over the last twelve months; "
-        "click a column to sort, a ticker to explore it.</p>"
+        f"click a column to sort, a ticker to explore it. {LIVE_NOTE}</p>"
         "<div class='tools'><input type='search' id='q' placeholder='Ticker, name or industry'"
         " aria-label='Search'><select id='sector' aria-label='Sector'><option value=''>"
         "Every sector</option>"
@@ -1279,6 +1309,7 @@ def tickers_page(menu, idx: dict | None) -> str:
         + "".join(trs)
         + "</tbody></table></div>"
         + SORT_JS
+        + LIVE_SCRIPT
     )
     return layout("All tickers", "tickers", body, menu)
 
@@ -1312,14 +1343,19 @@ def sectors_page(menu, idx: dict | None) -> str:
 
     def line(name: str, rows: list[dict], link: bool) -> str:
         cap = sum(r.get("market_cap") or 0 for r in rows)
+        group = name if link else "*"
         cells = ""
         for _, k, p in SECTOR_COLS:
             m = median_of(r.get(k) for r in rows)
-            cells += f"<td class='n' data-v=\"{'' if m is None else m}\">{fmt(m, p)}</td>"
+            cells += (
+                f"<td class='n' data-v=\"{'' if m is None else m}\"{live_med(group, k, p)}>"
+                f"{fmt(m, p)}</td>"
+            )
         label = f'<a href="#{esc(slug(name))}">{esc(name)}</a>' if link else f"<b>{esc(name)}</b>"
         return (
             f"<tr><td>{label}</td><td class='n'>{len(rows)}</td>"
-            f"<td class='n' data-v='{cap}'>{fmt_money(cap)}</td>{cells}</tr>"
+            f"<td class='n' data-v='{cap}' data-live-sum=\"{esc(group)} market_cap\">"
+            f"{fmt_money(cap)}</td>{cells}</tr>"
         )
 
     body = [
@@ -1327,7 +1363,7 @@ def sectors_page(menu, idx: dict | None) -> str:
         f"<p class='sub'>Medians per TradingView sector, data as of "
         f"{esc(idx.get('asof') or '—')}. P/E, P/B and EV/EBITDA only count positive "
         "earnings, equity and EBITDA. Each sector lists its companies below, cheapest P/E "
-        "first.</p>",
+        f"first. {LIVE_NOTE}</p>",
         f"<div class='card wrap'><table class='sort'><thead><tr>{head}</tr></thead><tbody>",
         *[line(s, by[s], True) for s in sorted(by)],
         "</tbody><tfoot>" + line("All companies", every, False) + "</tfoot></table></div>",
@@ -1341,14 +1377,18 @@ def sectors_page(menu, idx: dict | None) -> str:
             + "</tr>"
             + "".join(
                 f"<tr><td>{ticker_link(r['symbol'])}</td><td>{esc(r.get('name') or '')}</td>"
-                f"<td class='n'>{fmt_money(r.get('market_cap'))}</td>"
-                + "".join(f"<td class='n'>{fmt(r.get(k), p)}</td>" for _, k, p in SECTOR_COLS[:8])
+                f"<td class='n'{live(r['symbol'], 'market_cap', None)}>"
+                f"{fmt_money(r.get('market_cap'))}</td>"
+                + "".join(
+                    f"<td class='n'{live(r['symbol'], k, p)}>{fmt(r.get(k), p)}</td>"
+                    for _, k, p in SECTOR_COLS[:8]
+                )
                 + "</tr>"
                 for r in rows
             )
             + "</table></div>"
         )
-    return layout("Sector valuations", "sectors", "\n".join(body) + SORT_JS, menu)
+    return layout("Sector valuations", "sectors", "\n".join(body) + SORT_JS + LIVE_SCRIPT, menu)
 
 
 def slug(s: str) -> str:
@@ -1358,7 +1398,6 @@ def slug(s: str) -> str:
 def calendar_page(menu, idx: dict | None, weeks: int = 8) -> str:
     if not idx:
         return no_explore_data("Earnings calendar", "calendar", menu)
-    import datetime as dt
 
     start = dt.date.fromisoformat(idx.get("built") or dt.date.today().isoformat())
     end = (start + dt.timedelta(weeks=weeks)).isoformat()
@@ -1371,7 +1410,7 @@ def calendar_page(menu, idx: dict | None, weeks: int = 8) -> str:
         f"<p class='sub'>The next {weeks} weeks of quarterly reports: {len(rows)} companies. "
         "EPS estimate = the analysts' consensus for that quarter; last surprise = reported "
         "EPS against the estimate a quarter earlier. Source: Yahoo, rebuilt "
-        f"{esc(idx.get('built') or '—')}.</p>",
+        f"{esc(idx.get('built') or '—')}. {LIVE_NOTE}</p>",
     ]
     day = None
     for r in rows:
@@ -1390,16 +1429,18 @@ def calendar_page(menu, idx: dict | None, weeks: int = 8) -> str:
         body.append(
             f"<tr><td>{ticker_link(r['symbol'])}</td><td>{esc(r.get('name') or '')}</td>"
             f"<td>{esc(r.get('sector') or '')}</td>"
-            f"<td class='n'>{fmt_money(r.get('market_cap'))}</td>"
+            f"<td class='n'{live(r['symbol'], 'market_cap', None)}>"
+            f"{fmt_money(r.get('market_cap'))}</td>"
             f"<td class='n'>{fmt(r.get('next_eps_estimate'), '${:,.2f}')}</td>"
             f"<td class='n'>{fmt(surprise, '{:+.1%}')}</td>"
-            f"<td class='n'>{fmt(r.get('pe'), '{:.1f}x')}</td></tr>"
+            f"<td class='n'{live(r['symbol'], 'pe', '{:.1f}x')}>"
+            f"{fmt(r.get('pe'), '{:.1f}x')}</td></tr>"
         )
     if day:
         body.append("</table></div>")
     else:
         body.append("<p class='empty'>No reports in the coming weeks.</p>")
-    return layout("Earnings calendar", "calendar", "\n".join(body), menu)
+    return layout("Earnings calendar", "calendar", "\n".join(body) + LIVE_SCRIPT, menu)
 
 
 def build(out: Path = SITE) -> Path:
@@ -1408,6 +1449,7 @@ def build(out: Path = SITE) -> Path:
     out.mkdir(parents=True)
     idx = explore_index(out)
     shutil.copy2(EXPLORER_JS, out / "explorer.js")
+    shutil.copy2(LIVE_JS, out / "live.js")
     for pdf in ANALYSES.glob("*/*.pdf"):
         dst = out / pdf.parent.name / pdf.name
         dst.parent.mkdir(exist_ok=True)

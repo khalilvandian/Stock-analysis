@@ -1,6 +1,10 @@
 """Command line: python -m stock_analysis.db
 {init,build,status,check,ping,allow-my-ip,create-roles,ingest,import,reparse,push,
-coverage,tasks,nightly} [--target].
+coverage,tasks,quotes,nightly} [--target].
+
+quotes fetches the last price of every company in the index (TradingView, one request, 15
+minutes delayed) into raw_tv_quote; the hourly job stock-quotes runs it (ingest/quotes.py).
+--symbols A,B fetches only those (a sample).
 
 nightly computes what the evening run reads (stock_analysis.nightly); the ingest runs it after
 its build when `nightly = true` in config/ingest.toml.
@@ -13,6 +17,14 @@ import FILE loads a file downloaded or found by hand into the raw layer of the t
 
 reparse reads the kept SEC payloads again (company facts, full filings, the data-set quarters in
 inbox/) with today's mapping (config/db_items.toml), without asking SEC; run build afterwards.
+
+build rebuilds core for the companies whose raw data, config/companies.toml entry or CIK
+changed since the last build (the job never rebuilds the whole database); --symbols A,B
+rebuilds only those; --full rebuilds every company (only when asked).
+
+check-sample --symbols A,B builds those companies with today's code and config, shows what
+would change against the values in the database, and rolls back: nothing is written. The
+way to check a change of the extraction on a sample.
 """
 
 from __future__ import annotations
@@ -34,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         choices=[
             "init",
             "build",
+            "check-sample",
             "status",
             "check",
             "ping",
@@ -45,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
             "push",
             "coverage",
             "tasks",
+            "quotes",
             "nightly",
         ],
     )
@@ -61,7 +75,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", help="coverage: also write the page's JSON to this file")
     parser.add_argument("file", nargs="?", help="import: the file to load")
     parser.add_argument("--kind", help="import: the kind of file (default: its folder's name)")
-    parser.add_argument("--symbols", help="import: only these companies (comma-separated)")
+    parser.add_argument("--symbols", help="import, build: only these companies (comma-separated)")
+    parser.add_argument(
+        "--full", action="store_true", help="build: every company, not only what changed"
+    )
     parser.add_argument("--from", dest="source_db", help="push: the database to send from")
     args = parser.parse_args(argv)
     if args.command == "check":
@@ -82,6 +99,13 @@ def main(argv: list[str] | None = None) -> int:
             if ip:
                 print(f"Firewall rule ingest-job allows this run's address {ip}")
             return run_ingest(args)
+    if args.command == "quotes":  # its own rule, so it never removes the ingest job's
+        from .azure import JobFirewall
+
+        with JobFirewall(args.target, rule="quotes-job") as ip:
+            if ip:
+                print(f"Firewall rule quotes-job allows this run's address {ip}")
+            return run_quotes(args)
     db = Database.open(args.target)  # applies any new migrations
     print(f"Database: {db.target} ({db.where})")
     if args.command == "create-roles":
@@ -98,7 +122,18 @@ def main(argv: list[str] | None = None) -> int:
 
         print("Nightly analyses:", json.dumps(run_nightly(DbData(db, db)), indent=2, default=str))
     elif args.command == "build":
-        print("Build:", json.dumps(build(db), indent=2))
+        symbols = args.symbols.split(",") if args.symbols else None
+        print("Build:", json.dumps(build(db, full=args.full, symbols=symbols), indent=2))
+    elif args.command == "check-sample":
+        if not args.symbols:
+            parser.error("check-sample needs --symbols A,B")
+        report = build(db, symbols=args.symbols.split(","), dry_run=True)
+        print(json.dumps({k: v for k, v in report.items() if k != "changes"}, indent=2))
+        for c in report["changes"]:
+            print(
+                f"  {c['symbol']:6} {c['item']:20} {c['period_type']:2} {c['period_end']} "
+                f"filed {c['filed']}  {c['change']:8} {c['value_old']} -> {c['value_new']}"
+            )
     elif args.command == "coverage":
         from .coverage import snapshot, summary_lines
 
@@ -135,6 +170,17 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{name:28} {n:>10,}")
     db.close()
     return 0
+
+
+def run_quotes(args) -> int:
+    from ..ingest.quotes import fetch_quotes
+
+    db = Database.open(args.target)
+    print(f"Database: {db.target} ({db.where})")
+    result = fetch_quotes(db, args.symbols.split(",") if args.symbols else None)
+    print("Quotes:", json.dumps(result, default=str))
+    db.close()
+    return 0 if result["status"] in ("ok", "unchanged") else 1
 
 
 def run_ingest(args) -> int:

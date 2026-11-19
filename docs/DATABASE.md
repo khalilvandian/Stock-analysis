@@ -26,7 +26,8 @@ Only what those need is stored.
 # once: put STOCK_DB_PASSWORD=<a long random value> in .env (see .env.example)
 docker compose up -d --wait                     # PostgreSQL 16 on 127.0.0.1:5432, healthy
 uv run python -m stock_analysis.db init         # create the tables (apply the migrations)
-uv run python -m stock_analysis.db build        # rebuild the core layer from raw
+uv run python -m stock_analysis.db build        # build core for what is new (--symbols A,B)
+uv run python -m stock_analysis.db check-sample --symbols A,B  # what a rebuild would change; writes nothing
 uv run python -m stock_analysis.db status       # rows per table
 uv run python -m stock_analysis.db check        # connection, schema and data (see below)
 uv run python -m stock_analysis.db ingest       # fetch from the sources (docs/INGEST.md)
@@ -60,9 +61,23 @@ SELECT * FROM v_watchlist ORDER BY position;                              -- wat
   container. `docker compose down` stops it and keeps the data; `down -v` deletes the data.
 - **Not committed:** the database is never committed. The data lives in the Docker volume,
   and the repository holds only the code and the migrations that build it.
-- **Rerunning:** the ingest stores only what is new or changed. `build` rewrites core each
-  time, in one transaction. A migration from another branch with a lower number than one
-  already applied still runs: `migrate` applies every number not in `schema_version`.
+- **Rerunning:** the ingest stores only what is new or changed. `build` builds core in one transaction, only for the companies with something
+  new since the last build: raw rows stored after its `max_fetch_id`, a changed entry in
+  `config/companies.toml`, a new company or a changed CIK. The other companies' core rows
+  and quality issues stay as they are: the job adds what is new and never rebuilds the
+  whole database. A change of the extraction (`config/db_items.toml`, `build.py`) is checked
+  on a sample, not by rebuilding everything: `check-sample --symbols A,B` builds those
+  companies with today's code, lists every value that would be added, removed or changed
+  against the database, and rolls back (nothing is written); if the sample is right,
+  `build --symbols A,B` writes it. Items newly added to `config/db_items.toml` are added to
+  `core_item` without touching existing rows. `build --full` (every company) only when asked,
+  or by itself on an empty core. Each step works company by company, so a company's rows
+  are the same whichever way it was built
+  (`test_incremental_build_rebuilds_only_what_changed_and_matches_a_full_one`). The summary
+  records the mode, the reason, the companies built and the seconds per step. Rows are
+  written with `COPY`.
+- **Migrations:** `migrate` applies every number not yet in `schema_version`, in order, so
+  a migration from another branch with a lower number than one already applied still runs.
 - **Code:** `src/stock_analysis/db/`, through SQLAlchemy and psycopg:
   - `__init__.py`: targets, the `Database` class, migrations, helpers
   - `migrations/`: numbered SQL files
@@ -148,10 +163,11 @@ question: it runs SQL, and the database users' rights decide what is allowed.
 | Route | Runs as | Does |
 |---|---|---|
 | `GET /health` | | `{"ok": true}`, no key needed |
+| `GET /quotes` | `stock_reader` | No key: the newest quote of every company from `v_quote_latest` (issue #35), for the explorer pages. One fixed query (no input reaches SQL), quotes of the last 10 days only, cached 5 minutes in the app and in browsers, gzip, CORS open to `QUOTES_ORIGINS` (default `https://khalilvandian.github.io`). Answer `{"fetched_at", "columns": ["price", "change_pct", "session", "price_at", "delay_s", "currency"], "quotes": {SYMBOL: [...]}}`; `analysis/live.js` reads the columns by name, shows the delay ("15 min delayed") from `delay_s` and applies a quote only in the page's currency |
 | `POST /query` `{"sql", "params", "limit"}` | `stock_reader` | One SELECT or WITH statement in a read-only transaction, 30 s limit, at most 50,000 rows. Answer `{"columns", "rows", "truncated"}` |
 | `POST /execute` `{"steps": [{"sql", "rows"}]}` | `stock_writer` | INSERT, UPDATE, DELETE (or WITH, MERGE) steps in one transaction, all or nothing; each step runs once per row. Answer `{"rowcounts"}` |
 
-Parameters are `:name` placeholders. Every route but `/health` needs `X-API-Key:
+Parameters are `:name` placeholders. Every route but `/health` and `/quotes` needs `X-API-Key:
 <STOCK_API_KEY>`. App settings: `DATABASE_URL` (stock_reader), `DATABASE_WRITER_URL`
 (stock_writer), `STOCK_API_KEY`. The database firewall allows the app's outbound addresses
 (rules `stock-api`, `stock-api-2`). Protection, in layers: the key; HTTPS; one statement per
@@ -611,6 +627,7 @@ the top per sector; the columns without a field of their own in `detail_json`).
 | `raw_payload` | Distinct payload fetched | The payload as the source returned it, gzip-compressed (`content`, `size_bytes` before compression, `media_type`): the SEC files, TradingView's scan, the ECB's CSV, the tables yfinance returns. The other raw tables hold what is parsed from it, so a changed parsing rule (a newly mapped SEC tag) reads the kept copy (`db reparse`) instead of the source. About 0.25 MB per SEC company file |
 | `raw_sec_xbrl_fact` | Fact of a full 10-K or 10-Q, per dimension | Read from the filing's XBRL (edgartools, source `sec_xbrl`) for the values company facts leaves out: `axis` and `member` give the share class (Visa's Class A diluted EPS). Only the concepts in `sec_class` in `config/db_items.toml`. Also filled from SEC's Financial Statement Data Sets (`db import`, kind `sec_fsds`): the companies' own tags (`custom`, read through `[[custom_tag]]` in `config/companies.toml`) and the values per share class. `statement` is BS, IS, CF, EQ or CI |
 | `raw_tv_constituent` | Company in one S&P 500 snapshot | The whole snapshot is stored, since its prices change daily. `extra_json` holds the columns that have no field of their own |
+| `raw_tv_quote` | Listing in one hourly quote fetch | TradingView's last price of the regular session (15 minutes delayed), the day's change (% and $), volume, currency, `session` and `delay_s`. Source `tradingview_quotes`; a fetch with the same prices as the last one is skipped. Migration `013` (issue #35; `011` and `012` are kept for the orchestrator branch, #30) |
 | `raw_yahoo_price` | Symbol, day and version | Open, high, low and close (split-adjusted), volume, dividends and splits. The dividend-adjusted close is **computed in core**, so a dividend does not rewrite the history here, and Yahoo's own adjusted close isn't stored. Open, high and low were added by migration `002` for technical analysis |
 | `raw_yahoo_statement` | Line item, period and version | Yahoo's own names (`Total Revenue`) |
 | `raw_project_history` | Value in `history.csv` and version | As in the file: money in $bn |
@@ -670,6 +687,7 @@ reason (docs/COVERAGE.md).
 | `v_daily` | Company and trading day | The close, the adjusted close and the absolute values as known that day. Flows are trailing twelve months (`_ttm`). Also `market_cap`, `net_debt` and `free_cf_ttm` |
 | `v_watchlist` | Watch list stock | Its settings and its latest evening run (price, P/E, entry price, distance to entry, verdict) |
 | `v_fundamental_latest` | Company, item and period | The latest filed version |
+| `v_quote_latest` | Company (symbol) | Its newest intraday quote: price, change, volume, session, `fetched_at` and `price_at` (fetch time less the delay while the market is open; empty outside the session, when the price is the latest close). Reads `raw_tv_quote` directly, on purpose: a quote is shown as it came, and rebuilding core every hour would cost far more than it adds |
 
 ## The 17 items
 
@@ -703,7 +721,11 @@ Free cash flow, net debt and market value are calculated in the views, not store
    everything else too, such as TLN and the non-S&P 500 utilities. Each company gets its
    CIK from the SEC ticker file; two share classes (GOOG and GOOGL) share one. SEC values
    come from company facts (`raw_sec_fact`) and, for the filings it lacks, the companies'
-   own tags (`[[custom_tag]]`) and the values per share class (`[[share_class]]`), from the
+   own tags (`[[custom_tag]]`) and the values per share class (`[[share_class]]`, with `tags`
+   when the company files the item under another concept: Berkshire's basic EPS; `convert`
+   for an item stated only in another class's units, times the charter's fixed ratio:
+   Berkshire's shares, in Class A units, x 1,500 for BRK.B; `not_from_yahoo` for Yahoo values
+   in the wrong class's units), from the
    data sets and full filings (`raw_sec_xbrl_fact`). A company whose earlier filings are under a predecessor's CIK (`[[predecessor]]` in
    `config/companies.toml`) reads that CIK too, for periods ending before the new CIK's
    first 10-K or 10-Q.
