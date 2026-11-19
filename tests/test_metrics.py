@@ -40,8 +40,10 @@ def test_sets_name_known_metrics(d):
 
 
 def test_sector_columns_exist():
+    from stock_analysis import stocks
+
     d = metrics.load()
-    header = set(pd.read_csv(ROOT / "data/peers/medtech.csv", nrows=0).columns)
+    header = set(stocks.row_columns())
     screen_src = (ROOT / "analysis/screen.py").read_text()
     for m in d["metric"]:
         col, _ = metrics._source(m, "sector")

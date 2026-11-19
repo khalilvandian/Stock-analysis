@@ -15,12 +15,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from dotenv import load_dotenv
+from seed_files import load_all
 from sqlalchemy import text
 
 from stock_analysis.db import ROOT, Database, iso, migrations, statements, target_settings
 from stock_analysis.db.build import adjusted_close, build, build_ttm
 from stock_analysis.db.check import Reader, run_checks
-from stock_analysis.db.load_files import load_all
 
 load_dotenv(ROOT / ".env")
 TEST_URL = os.environ.get("STOCK_TEST_PG_URL", "postgresql://stock@127.0.0.1:5432/stock_test")

@@ -7,7 +7,9 @@ One run:
 2. picks the due tasks source by source, the never-fetched ones first, and runs each in its
    own transaction, until the source group's request budget is used, the source answers
    "too many requests", too many fail in a row, or the run's time is up;
-3. rebuilds the core layer if anything was stored, and takes the day's coverage snapshot.
+3. rebuilds the core layer if anything was stored, and takes the day's coverage snapshot;
+4. runs the nightly analyses (stock_analysis.nightly: the screener, the watch list's and the
+   market report's numbers) for the evening run to read.
 
 The mode is "backfill" until the universe is complete (config/coverage.toml), then
 "maintain": smaller budgets and the refresh intervals of that mode. Every run is a row in
@@ -36,8 +38,15 @@ from . import market, sec, xbrl, yahoo
 from .common import NoData, Outcome, RateLimited, log_error
 
 CONFIG = ROOT / "config" / "ingest.toml"
-GLOBAL = {"tradingview": None, "sec_tickers": "all", "ecb_rates": "EUR"}
+GLOBAL = {
+    "tradingview": None,
+    "tradingview_watchlist": market.WATCHLIST_KEY,
+    "sec_tickers": "all",
+    "ecb_rates": "EUR",
+}
 PER_COMPANY = ["sec_companyfacts", "yahoo_prices", "yahoo_earnings", "yahoo_statements"]
+MARKET_CONFIG = ROOT / "config" / "market.toml"
+EARNINGS_WINDOW_DAYS = 4  # earnings dates are fetched daily this long after a report
 
 
 def load_config(path: Path = CONFIG) -> dict:
@@ -67,6 +76,23 @@ def members(conn: Connection, index: str) -> list[str]:
     return sorted(set(df["symbol"]))
 
 
+def watch_symbols(conn: Connection, config: dict | None = None) -> list[str]:
+    """The watch list's stocks and their peers (user_watchlist, user_watchlist_peer) and the
+    config's extra_symbols: fetched like the index members, whether in the index or not."""
+    df = frame(
+        conn,
+        "SELECT symbol FROM user_watchlist UNION SELECT peer FROM user_watchlist_peer",
+    )
+    extra = [s.upper() for s in (config or {}).get("extra_symbols", [])]
+    return sorted(set(df["symbol"]) | set(extra))
+
+
+def instruments(path: Path | None = None) -> list[str]:
+    """The market report's indices, rates, commodities, currencies and sector ETFs."""
+    cfg = tomllib.loads(Path(path or MARKET_CONFIG).read_text(encoding="utf-8"))
+    return sorted({s for group in cfg.values() for s in group})
+
+
 def xbrl_items() -> set[str]:
     """The items config/db_items.toml reads per share class from full filings."""
     from ..db.build import load_items
@@ -84,7 +110,8 @@ def plan(conn: Connection, config: dict, now: datetime) -> dict[str, int]:
         for s, key in GLOBAL.items()
         if s in config["sources"]
     ]
-    symbols = members(conn, index)
+    index_members = members(conn, index)
+    symbols = sorted(set(index_members) | set(watch_symbols(conn, config)))
     rows += [
         {"source": s, "key": sym, "symbol": sym}
         for s in PER_COMPANY
@@ -104,6 +131,8 @@ def plan(conn: Connection, config: dict, now: datetime) -> dict[str, int]:
             for f in xbrl.filings_for_gaps(conn, items)
             if f["symbol"] in symbols
         ]
+    market_symbols = instruments() if "yahoo_market" in config["sources"] else []
+    rows += [{"source": "yahoo_market", "key": s, "symbol": None} for s in market_symbols]
     if rows:
         run(
             conn,
@@ -117,10 +146,33 @@ def plan(conn: Connection, config: dict, now: datetime) -> dict[str, int]:
             "UPDATE ops_task SET active = (symbol = ANY(:symbols)) WHERE symbol IS NOT NULL",
             {"symbols": symbols},
         )
+    if "yahoo_market" in config["sources"]:  # instruments taken off config/market.toml
+        run(
+            conn,
+            "UPDATE ops_task SET active = (request_key = ANY(:k)) WHERE source = 'yahoo_market'",
+            {"k": market_symbols},
+        )
+    if "yahoo_earnings" in config["sources"]:
+        earnings_due(conn, now)
     counts = run(
         conn, "SELECT source, COUNT(*) FROM ops_task WHERE active GROUP BY source"
     ).fetchall()
     return {s: n for s, n in counts}
+
+
+def earnings_due(conn: Connection, now: datetime) -> int:
+    """Make a company's earnings dates due on every run from its report day until a fetch at
+    least a day after it, for reports in the last EARNINGS_WINDOW_DAYS days: the reported EPS
+    is in the database the night it comes out (or the next), not up to a week later."""
+    return run(
+        conn,
+        "UPDATE ops_task t SET next_due_at = :t WHERE t.source = 'yahoo_earnings' AND t.active "
+        "AND t.next_due_at > :t AND EXISTS (SELECT 1 FROM raw_yahoo_earnings e "
+        "WHERE e.symbol = t.request_key AND e.report_date <= CAST(:t AS DATE) "
+        "AND e.report_date >= CAST(:t AS DATE) - :days "
+        "AND (t.last_success_at IS NULL OR CAST(t.last_success_at AS DATE) < e.report_date + 1))",
+        {"t": stamp(now), "days": EARNINGS_WINDOW_DAYS},
+    ).rowcount
 
 
 def choose_mode(conn: Connection, threshold: float) -> str:
@@ -204,6 +256,9 @@ def handle(conn: Connection, task: dict, ctx: Context) -> Outcome:
     source, key, cfg = task["source"], task["request_key"], ctx.config
     if source == "tradingview":
         return market.load_constituents(conn, ctx.http, cfg.get("market", "america"), key)
+    if source == "tradingview_watchlist":
+        extra = set(watch_symbols(conn, cfg)) - set(members(conn, cfg["universe"]))
+        return market.load_watch_companies(conn, ctx.http, cfg.get("market", "america"), extra)
     if source == "sec_tickers":
         out = sec.load_tickers(conn, ctx.sec_http)
         ctx._ciks = None
@@ -218,6 +273,11 @@ def handle(conn: Connection, task: dict, ctx: Context) -> Outcome:
             raise NoData(f"no CIK for {key} in the SEC ticker file")
         return sec.load_companyfacts(conn, ctx.sec_http, cik, ctx.tags())
     if source == "yahoo_prices":
+        return yahoo.load_prices(
+            conn, ctx.yahoo, key, cfg.get("prices_from", "2015-12-01"),
+            int(cfg.get("price_overlap_days", 10)),
+        )  # fmt: skip
+    if source == "yahoo_market":
         return yahoo.load_prices(
             conn, ctx.yahoo, key, cfg.get("prices_from", "2015-12-01"),
             int(cfg.get("price_overlap_days", 10)),
@@ -398,6 +458,17 @@ def _run_job(
             }
         except Exception as exc:
             summary["coverage_error"] = repr(exc)[:500]
+            status = "partial"
+    if do_build and config.get("nightly", False):
+        # The evening run's numbers, computed here so the scheduled session only reads them
+        # (stock_analysis.nightly): the screener, the watch list, the market report.
+        from .. import nightly
+        from ..data import DbData
+
+        try:
+            summary["nightly"] = nightly.run(DbData(db, db))
+        except Exception as exc:
+            summary["nightly_error"] = repr(exc)[:500]
             status = "partial"
     failed = sum(g.failed for g in groups.values())
     if status == "ok" and (failed or timed_out or any(g.stopped for g in groups.values())):

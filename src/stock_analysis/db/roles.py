@@ -1,9 +1,9 @@
 """The two working users of the database, created or updated by the owner (admin) account.
 
 - stock_reader: reads every table and view. Used by analyses, viewers and the API's reads.
-- stock_writer: reads, adds and changes data (load-files, build, the API's writes), but can't
-  change the schema or schema_version, and can only add to the raw tables (append only:
-  no UPDATE or DELETE there, except raw_fetch's row counts).
+- stock_writer: reads, adds and changes data (the ingest, build, the analyses' results, the
+  API's writes), but can't change the schema or schema_version, and can only add to the raw
+  tables (append only: no UPDATE or DELETE there, except raw_fetch's row counts).
 
     python -m stock_analysis.db create-roles --target server
 

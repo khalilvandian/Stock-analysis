@@ -21,7 +21,7 @@ from sqlalchemy.engine import Connection
 
 from ..db import frame
 from ..db.build import ITEMS_CONFIG, load_companies, load_items
-from ..db.load_files import finish_fetch, store_changed
+from ..db.raw import finish_fetch, store_changed
 from .common import NoData, Outcome, read_payload, sha256, start_fetch
 from .sec import user_agent
 

@@ -1,5 +1,12 @@
 # Reports
 
+> **Reproducing older reports.** Since issue #33 (2026-11-18) every number is in the
+> database and only the scripts the evening run and the site use remain. Reports 01-12 name
+> scripts that were removed then (`sector.py`, `history.py`, `dcf.py`, `dcf_firm.py`,
+> `compare.py`, `valuation.py`, `debt.py`, `debt_to_ebitda.py`, the dashboards) and files
+> under `data/`; their numbers stay as written on their data date. To redo one, read the same
+> values with `analysis/absolute.py`, `analysis/peer_screen.py` or `stock_analysis.stocks`.
+
 Each report covers one piece of analysis. It states the data date, the method, the findings, the caveats, and the command that reproduces it. Figures are as of the date in each report; rerun the commands to refresh them.
 
 | # | Report | What it covers |

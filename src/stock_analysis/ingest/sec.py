@@ -18,7 +18,7 @@ from sqlalchemy.engine import Connection
 
 from ..db import frame, insert_df
 from ..db.build import ITEMS_CONFIG, load_items
-from ..db.load_files import finish_fetch, store_changed
+from ..db.raw import finish_fetch, store_changed
 from .common import NoData, Outcome, RateLimited, read_payload, sha256, start_fetch
 
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"

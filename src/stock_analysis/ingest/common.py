@@ -13,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from ..db import run, scalar
-from ..db.load_files import now
+from ..db.raw import now
 
 
 class RateLimited(Exception):

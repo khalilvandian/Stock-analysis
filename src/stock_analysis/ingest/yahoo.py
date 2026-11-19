@@ -9,13 +9,14 @@ to Yahoo through curl_cffi, which respx can't mock).
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, timedelta
 
 import pandas as pd
 from sqlalchemy.engine import Connection
 
 from ..db import scalar
-from ..db.load_files import PRICE_COLUMNS, STATEMENT_FILES, finish_fetch, store_changed
+from ..db.raw import PRICE_COLUMNS, STATEMENT_FILES, finish_fetch, store_changed
 from .common import NoData, Outcome, RateLimited, sha256, start_fetch
 
 STATEMENTS = {
@@ -31,7 +32,8 @@ PRICE_VALUES = ["open", "high", "low", "close", "volume", "dividends", "stock_sp
 
 
 def yahoo_symbol(symbol: str) -> str:
-    return symbol.replace(".", "-")  # BRK.B on TradingView is BRK-B on Yahoo
+    """BRK.B on TradingView is BRK-B on Yahoo; an exchange suffix (FTSEMIB.MI) stays."""
+    return re.sub(r"\.([A-Z])$", r"-\1", symbol)
 
 
 class YahooClient:

@@ -20,10 +20,12 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from . import ROOT, Database, frame, insert_df, records, run, scalar
-from .load_files import UNIVERSE, now
+from .raw import UNIVERSE, now
 
 ITEMS_CONFIG = ROOT / "config" / "db_items.toml"
 COMPANIES_CONFIG = ROOT / "config" / "companies.toml"
+MARKET_CONFIG = ROOT / "config" / "market.toml"
+WATCHLIST_KEY = "watchlist"  # TradingView snapshot of the watch list's own symbols
 
 
 def load_companies(path: Path = COMPANIES_CONFIG) -> dict:
@@ -99,11 +101,14 @@ def parse_derive(expr: str) -> list[tuple[int, str, bool]]:
 
 
 def build_companies(conn: Connection) -> dict[str, int]:
+    """Every company of the index snapshots and of the watch list's own snapshots (the watch
+    list's stocks and peers outside the index); membership comes from the index's alone."""
     tv = frame(
         conn,
-        "SELECT c.*, f.fetched_at FROM raw_tv_constituent c JOIN raw_fetch f "
-        "ON f.fetch_id = c.fetch_id WHERE f.source = 'tradingview' AND f.request_key = :u",
-        {"u": UNIVERSE},
+        "SELECT c.*, f.fetched_at, f.request_key FROM raw_tv_constituent c JOIN raw_fetch f "
+        "ON f.fetch_id = c.fetch_id WHERE f.source = 'tradingview' "
+        "AND f.request_key IN (:u, :w)",
+        {"u": UNIVERSE, "w": WATCHLIST_KEY},
     )
     if not tv.empty:
         last = tv.sort_values("fetch_id", kind="stable").drop_duplicates("symbol", keep="last")
@@ -131,6 +136,8 @@ def build_companies(conn: Connection) -> dict[str, int]:
             records(sec[["cik", "symbol"]]),  # share classes (GOOG, GOOGL) share the CIK
         )
     companies = {r[0]: r[1] for r in run(conn, "SELECT symbol, company_id FROM core_company")}
+    if not tv.empty:
+        tv = tv[tv["request_key"] == UNIVERSE]
     build_membership(conn, tv, companies)
     return companies
 
@@ -194,6 +201,28 @@ def build_prices(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
     out["volume"] = out["volume"].astype("Int64")
     insert_df(conn, "core_price_daily", out)
     return out
+
+
+def market_symbols(path: Path | None = None) -> list[str]:
+    path = path or MARKET_CONFIG
+    if not Path(path).exists():
+        return []
+    cfg = tomllib.loads(Path(path).read_text(encoding="utf-8"))
+    return sorted({s for group in cfg.values() for s in group})
+
+
+def build_market_prices(conn: Connection, symbols: list[str]) -> int:
+    """The market instruments' closes (config/market.toml), the latest version of each day."""
+    if not symbols:
+        return 0
+    m = frame(
+        conn,
+        "SELECT DISTINCT ON (symbol, date) symbol, date, close FROM raw_yahoo_price "
+        "WHERE symbol = ANY(:s) AND date >= :start AND close IS NOT NULL "
+        "ORDER BY symbol, date, fetch_id DESC",
+        {"s": symbols, "start": FIRST_DATE},
+    )
+    return insert_df(conn, "core_market_daily", m)
 
 
 def all_splits(conn: Connection, companies: dict[str, int]) -> pd.DataFrame:
@@ -880,6 +909,7 @@ def build(db: Database, items_config: Path = ITEMS_CONFIG) -> dict:
                 "core_fundamental_ttm",
                 "core_fundamental",
                 "core_price_daily",
+                "core_market_daily",
                 "core_index_member",
                 "core_item_tag",
                 "core_item",
@@ -890,6 +920,7 @@ def build(db: Database, items_config: Path = ITEMS_CONFIG) -> dict:
                 insert_df(conn, table, df)
             companies = build_companies(conn)
             prices = build_prices(conn, companies)
+            market_rows = build_market_prices(conn, market_symbols())
             f, c = build_fundamentals(conn, companies, items, tags, all_splits(conn, companies))
             ttm = build_ttm(conn, f)
             issues = quality_checks(prices, f, c)
@@ -903,6 +934,7 @@ def build(db: Database, items_config: Path = ITEMS_CONFIG) -> dict:
                 ),
                 "companies_with_prices": int(prices["company_id"].nunique()),
                 "core_price_daily": len(prices),
+                "core_market_daily": market_rows,
                 "core_fundamental": len(f),
                 "companies_with_fundamentals": int(f["company_id"].nunique()) if len(f) else 0,
                 "core_fundamental_ttm": len(ttm),

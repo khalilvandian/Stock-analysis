@@ -55,20 +55,6 @@ def test_yearly_pe_uses_eps_at_the_q4_report_and_average_price():
     assert y.loc[2025, "pe"] == 20.0
 
 
-def test_split_adjust_rescales_pre_split_eps_and_shares():
-    hist = pd.DataFrame(
-        {
-            "symbol": "X",
-            "fiscal_year_end": pd.to_datetime(["2024-12-31"] * 2 + ["2026-12-31"] * 2),
-            "column": ["_shares", "eps", "_shares", "eps"],
-            "value": [40.0, 100.0, 1000.0, 4.0],
-        }
-    )
-    splits = pd.Series([25.0], index=pd.to_datetime(["2025-06-01"]).tz_localize("UTC"))
-    out = watchlist.split_adjust(hist, splits, shares_now=1000.0)
-    assert list(out["value"]) == [1000.0, 4.0, 1000.0, 4.0]
-
-
 def test_notes_sections_and_first_sentence(tmp_path, monkeypatch):
     monkeypatch.setattr(watchlist, "OUT", tmp_path)
     (tmp_path / "X").mkdir()
@@ -149,16 +135,23 @@ def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
     (analyses / "BSX/README.md").write_text(
         "# Boston Scientific Corporation (BSX): dated analyses\n"
     )
-    (analyses / "BSX/runs.csv").write_text(
-        "run,file,price,eps_adj_ttm,pe_adj,pe_median_10y,target_pe,entry_price,to_entry,verdict\n"
-        "2026-10-26 21:00 CET,2026-10-26_2100.pdf,44,3.2,13.8,25.2,13,41.7,-0.05,Old.\n"
-        "2026-10-27 21:00 CET,2026-10-27_2100.pdf,45,3.2,14.0,25.2,13,41.7,-0.07,Cheap.\n"
-    )
     (analyses / "OLD").mkdir()  # analysed before, since removed from the watch list
-    (analyses / "OLD/runs.csv").write_text(
-        "run,file,price,eps_adj_ttm,pe_adj,pe_median_10y,target_pe,entry_price,to_entry,verdict\n"
-        "2026-10-20 21:00 CEST,2026-10-20_2100.pdf,10,1,10,12,9,9,-0.1,Gone.\n"
-    )
+
+    def run(symbol, run_at, file, price, verdict):
+        return {"symbol": symbol, "run_at": run_at, "file": file, "price": price,
+                "eps_adj_ttm": 3.2, "pe_adj": 14.0, "pe_median_10y": 25.2, "target_pe": 13,
+                "entry_price": 41.7, "to_entry": -0.07, "verdict": verdict}  # fmt: skip
+
+    runs = [  # out_watchlist_run keeps the times in UTC
+        run("BSX", "2026-10-26T20:00:00", "2026-10-26_2100.pdf", 44, "Old."),
+        run("BSX", "2026-10-27T20:00:00", "2026-10-27_2100.pdf", 45, "Cheap."),
+        run("OLD", "2026-10-20T19:00:00", "2026-10-20_2100.pdf", 10, "Gone."),
+    ]
+
+    def query(sql):
+        return [dict(r) for r in runs] if "out_watchlist_run" in sql else []
+
+    monkeypatch.setattr(site, "db", lambda: query)
     for p in ("BSX/2026-10-26_2100.pdf", "BSX/2026-10-27_2100.pdf", "market/2026-10-27_2100.pdf"):
         (analyses / p).write_bytes(b"%PDF-1.4")
     (tmp_path / "watchlist.toml").write_text('[[stock]]\nsymbol = "BSX"\n')
@@ -186,10 +179,9 @@ def test_site_has_grouped_menus_and_the_pipeline_page(tmp_path, monkeypatch):
     )
     site = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(site)
-    monkeypatch.delenv("STOCK_API_KEY", raising=False)
+    monkeypatch.setattr(site, "db", lambda: None)  # no database: the pages still build
     monkeypatch.setattr(site, "ANALYSES", tmp_path / "analyses")
     monkeypatch.setattr(site, "CONFIG", tmp_path / "watchlist.toml")
-    monkeypatch.setattr(site, "COVERAGE", tmp_path / "none.json")
     (tmp_path / "analyses").mkdir()
     (tmp_path / "watchlist.toml").write_text("")
     out = site.build(tmp_path / "_site")

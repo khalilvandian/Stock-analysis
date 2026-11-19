@@ -10,6 +10,7 @@ API (api/app.py) where PostgreSQL can't be reached, as in Claude's cloud session
     data.daily("NEE", start="2025-01-01")
     data.sql("SELECT symbol, revenue FROM v_annual WHERE fiscal_year = 2025")
     data.save_note("NFLX", "## Thesis ...")
+    data.save_screener_run("2026-11-18", "SP:SPX", "analysis/screener.py", results)
 
 Backend: when STOCK_API_URL is set (the cloud environment sets it), the web API, with the key
 from STOCK_API_KEY if set (on a PC) or attached by the cloud's network secret. Otherwise the
@@ -167,6 +168,47 @@ class Data:
     def set_watchlist(self, stocks: list[dict]) -> int:
         raise NotImplementedError
 
+    def save_screener_run(
+        self, run_date: str, universe: str, source: str, results: list[dict]
+    ) -> int:
+        """One screener run (out_screener_run) and its rows (out_screener_result: stage,
+        symbol, sector, category, status, rank_in_sector, close, cheap_price, detail_json).
+        A second run on the same day replaces the first."""
+        steps = screener_steps(run_date, universe, source, results)
+        return self.write_steps(steps)[-1]
+
+    def write_steps(self, steps: list[tuple[str, list[dict]]]) -> list[int]:
+        raise NotImplementedError
+
+
+SCREENER_COLUMNS = ["stage", "symbol", "sector", "category", "status", "rank_in_sector",
+                    "close", "cheap_price", "detail_json"]  # fmt: skip
+
+
+def screener_steps(
+    run_date: str, universe: str, source: str, results: list[dict]
+) -> list[tuple[str, list[dict]]]:
+    key = {"d": str(run_date), "u": universe}
+    run_of = "(SELECT run_id FROM out_screener_run WHERE run_date = :d AND universe = :u)"
+    unknown = {k for r in results for k in r} - set(SCREENER_COLUMNS)
+    if unknown:
+        raise ValueError(f"Unknown fields for out_screener_result: {', '.join(sorted(unknown))}")
+    rows = [{**key, **{c: r.get(c) for c in SCREENER_COLUMNS}} for r in results]
+    return [
+        (f"DELETE FROM out_screener_result WHERE run_id = {run_of}", [key]),
+        ("DELETE FROM out_screener_run WHERE run_date = :d AND universe = :u", [key]),
+        (
+            "INSERT INTO out_screener_run (run_date, universe, created_at, source) "
+            "VALUES (:d, :u, :t, :s)",
+            [{**key, "t": now_utc(), "s": source}],
+        ),
+        (
+            f"INSERT INTO out_screener_result (run_id, {', '.join(SCREENER_COLUMNS)}) "
+            f"VALUES ({run_of}, {', '.join(':' + c for c in SCREENER_COLUMNS)})",
+            rows,
+        ),
+    ]
+
 
 def clean(params: dict) -> dict:
     out = {**DEFAULTS, **{k: v for k, v in params.items() if v is not None}}
@@ -294,6 +336,14 @@ class DbData(Data):
         with self.writer.begin() as conn:
             return insert_rows(conn, "out_valuation", VALUATION_COLUMNS, rows)
 
+    def write_steps(self, steps: list[tuple[str, list[dict]]]) -> list[int]:
+        counts = []
+        with self.writer.begin() as conn:
+            for sql, rows in steps:
+                res = run(conn, sql, rows or None)
+                counts.append(res.rowcount if res.rowcount is not None else -1)
+        return counts
+
     def set_watchlist(self, stocks: list[dict]) -> int:
         """Replace the watch list: [{symbol, target_pe, target_note, stakes_per_share,
         peers: [...], eps_override: [{reported, eps, reason}]}]."""
@@ -341,6 +391,9 @@ class ApiData(Data):
 
     def read(self, name: str, **params) -> pd.DataFrame:
         return self.query(READS[name], clean(params))
+
+    def write_steps(self, steps: list[tuple[str, list[dict]]]) -> list[int]:
+        return self.execute(steps)
 
     def sql(self, query: str, limit: int = ROW_LIMIT) -> pd.DataFrame:
         return self.query(query, limit=max(1, min(int(limit), ROW_LIMIT)))

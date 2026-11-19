@@ -8,19 +8,27 @@ For each stock in config/watchlist.toml the PDF has three parts, in this order:
   3. Analysis: adjusted P/E against the stock's own 10-year history, the entry price at the
      target multiple, then business, risks, news and what to watch from notes.md.
 
-Adjusted EPS is Yahoo's reported quarterly EPS, which is on the same basis as analysts'
-estimates (excluding amortization and one-offs). It is split-adjusted and goes back
-decades, so the own-history P/E needs no hand-kept table. One-offs Yahoo still includes
-can be corrected with eps_override in the config.
+Every number comes from the database. The server computes them after each night's ingest
+(stock_analysis.nightly: the absolute values and ratios, the yearly history, the prices,
+Yahoo's earnings dates, the peers) and stores them; this script reads them, adds Claude's
+notes and renders the PDFs. A stock whose stored numbers are older than the last build, or
+whose watch-list settings changed since, is computed on the spot.
 
-Each run writes analyses/<SYMBOL>/<YYYY-MM-DD_HHMM>.pdf, adds a line to
-analyses/<SYMBOL>/runs.csv and rebuilds the dated lists analyses/<SYMBOL>/README.md and
-analyses/README.md. Earlier PDFs are never overwritten.
+Adjusted EPS is Yahoo's reported quarterly EPS, which is on the same basis as analysts'
+estimates (excluding amortization and one-offs), split-adjusted, so the own-history P/E
+needs no hand-kept table. One-offs Yahoo still includes can be corrected
+with eps_override in the config.
+
+The run first mirrors config/watchlist.toml into the database (the ingest reads the stocks
+and peers from there) and saves Claude's notes that changed (out_note). Each run writes
+analyses/<SYMBOL>/<YYYY-MM-DD_HHMM>.pdf, records the run in the database
+(out_watchlist_run) and rebuilds the dated lists analyses/<SYMBOL>/README.md and
+analyses/README.md from the recorded runs. Earlier PDFs are never overwritten.
 
 Usage:
-    uv run python analysis/watchlist.py              # screener, market report, every stock
-                                                     # and the summary
-    uv run python analysis/watchlist.py --no-screener  # same, reusing the last screener run
+    uv run python analysis/watchlist.py              # market report, every stock, summary
+    uv run python analysis/watchlist.py --screener   # same, rerunning the screener first
+    uv run python analysis/watchlist.py --recompute  # compute every stock now, not the stored
     uv run python analysis/watchlist.py BSX NFLX     # selected stocks
     uv run python analysis/watchlist.py --numbers    # print the key numbers, no PDF
 """
@@ -36,247 +44,46 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
-import tomllib
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import markdown
 import numpy as np
 import pandas as pd
-import yfinance as yf
+
+from stock_analysis import nightly, stocks
+from stock_analysis import watchlist as wl
+from stock_analysis.data import Data
+from stock_analysis.nightly import (  # noqa: F401 - the computations, under their old names
+    YEARS,
+    daily_pe,
+    gather,
+    has_price,
+    key_numbers,
+    load_inputs,
+    next_report,
+    plain,
+    quarterly_eps,
+    trailing_eps,
+    yearly_pe,
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import absolute  # noqa: E402
-import history  # noqa: E402
 import peer_screen  # noqa: E402
 import screen  # noqa: E402
-import sector  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config/watchlist.toml"
 OUT = ROOT / "analyses"
-YEARS = 10
 
 
 # --- configuration -------------------------------------------------------------------
 
 
 def load_watchlist(path: Path = CONFIG) -> dict:
-    with path.open("rb") as f:
-        cfg = tomllib.load(f)
-    cfg.setdefault("timezone", "Europe/Rome")
-    for s in cfg["stock"]:
-        s["symbol"] = s["symbol"].upper()
-        s.setdefault("peers", [])
-        s.setdefault("eps_override", [])
-        s.setdefault("stakes_per_share", 0.0)
-    return cfg
-
-
-# --- adjusted EPS and P/E history ----------------------------------------------------
-
-
-def quarterly_eps(dates: pd.DataFrame, overrides: list[dict] | None = None) -> pd.Series:
-    """Reported (adjusted) EPS by report date, one value per quarter, oldest first.
-
-    `dates` is yfinance's get_earnings_dates() frame. Duplicate rows for the same report are
-    dropped; overrides replace the EPS of the quarter reported on that date.
-    """
-    s = dates["Reported EPS"].dropna()
-    s.index = pd.to_datetime(s.index, utc=True).tz_convert(None).normalize()
-    s = s[~s.index.duplicated(keep="first")].sort_index()
-    # two reports within 30 days are the same quarter (a re-dated entry); keep the later one
-    keep = ~(pd.Series(s.index, index=s.index).diff(-1).abs() < pd.Timedelta(days=30))
-    s = s[keep.values]
-    for o in overrides or []:
-        day = pd.Timestamp(o["reported"]).normalize()
-        if day in s.index:
-            s[day] = float(o["eps"])
-    return s.astype(float)
-
-
-def trailing_eps(q: pd.Series) -> pd.Series:
-    """Sum of the last four quarters at each report date (only when the four are consecutive)."""
-    ttm = q.rolling(4).sum()
-    span = pd.Series(q.index, index=q.index).diff(3)
-    return ttm[span <= pd.Timedelta(days=400)].dropna()
-
-
-def daily_pe(prices: pd.Series, ttm: pd.Series) -> pd.Series:
-    """Price divided by the trailing adjusted EPS known on each day; blank when EPS <= 0."""
-    eps = ttm.reindex(prices.index.union(ttm.index)).ffill().reindex(prices.index)
-    return (prices / eps.where(eps > 0)).dropna()
-
-
-def yearly_pe(prices: pd.Series, ttm: pd.Series, years: int = YEARS) -> pd.DataFrame:
-    """Per calendar year: average price, full-year adjusted EPS, P/E on the average price.
-
-    Full-year EPS is the trailing EPS at the first report after the year ends (the Q4 report,
-    for calendar-year companies).
-    """
-    last = prices.index.max().year
-    rows = []
-    for y in range(last - years, last):
-        after = ttm[(ttm.index > f"{y}-12-31") & (ttm.index <= f"{y + 1}-04-30")]
-        p = prices[prices.index.year == y]
-        if after.empty or p.empty:
-            continue
-        eps = float(after.iloc[0])
-        rows.append(
-            {
-                "year": y,
-                "avg_price": float(p.mean()),
-                "eps": eps,
-                "pe": float(p.mean()) / eps if eps > 0 else np.nan,
-            }
-        )
-    return pd.DataFrame(rows).set_index("year") if rows else pd.DataFrame()
-
-
-def next_report(dates: pd.DataFrame, now: pd.Timestamp) -> tuple[pd.Timestamp | None, float]:
-    future = dates[dates["Reported EPS"].isna()].copy()
-    future.index = pd.to_datetime(future.index, utc=True).tz_convert(None)
-    future = future[future.index >= now].sort_index()
-    if future.empty:
-        return None, np.nan
-    return future.index[0], float(future["EPS Estimate"].iloc[0])
-
-
-# --- data ----------------------------------------------------------------------------
-
-
-def fetch_row(symbol: str) -> dict:
-    """sector.analyse() with retries: Yahoo sometimes answers without a price."""
-    for attempt in range(4):
-        row = sector.analyse({"symbol": symbol})
-        if has_price(row):
-            return row
-        time.sleep(5 * (attempt + 1))
-    return row
-
-
-def has_price(row: dict) -> bool:
-    """A usable price: present, a number and above zero (NaN is truthy, so test it)."""
-    try:
-        return float(row.get("price")) > 0
-    except (TypeError, ValueError):
-        return False
-
-
-def split_adjust(hist: pd.DataFrame, splits: pd.Series, shares_now: float) -> pd.DataFrame:
-    """Put EPS and share counts filed before a stock split on today's share basis.
-
-    Yahoo prices are split-adjusted, but SEC values keep the share basis of the filing
-    they come from. A year's share count is scaled by the splits since its year end when
-    that brings it closer to today's share count (share counts rarely move 2x otherwise).
-    """
-    if hist.empty or splits.empty or not np.isfinite(shares_now) or shares_now <= 0:
-        return hist
-    splits = splits.copy()
-    splits.index = pd.to_datetime(splits.index, utc=True).tz_convert(None)
-    h = hist.copy()
-    ends = pd.to_datetime(h["fiscal_year_end"])
-    for end in ends.unique():
-        factor = float(splits[splits.index > end].prod())
-        sh = h[(ends == end) & (h["column"] == "_shares")]["value"]
-        # forward or reverse split (a 1-for-20 reverse split is a factor of 0.05)
-        if abs(np.log(factor)) < np.log(1.5) or sh.empty:
-            continue
-        if abs(np.log(sh.iloc[0] * factor / shares_now)) < abs(np.log(sh.iloc[0] / shares_now)):
-            h.loc[(ends == end) & (h["column"] == "_shares"), "value"] *= factor
-            h.loc[(ends == end) & (h["column"] == "eps"), "value"] /= factor
-    return h
-
-
-def sec_years(
-    symbol: str, yahoo_rows: list[dict], currency: str | None, shares_now: float
-) -> pd.DataFrame:
-    """Yearly absolute values: SEC filings first, Yahoo for gaps, year-end prices."""
-    history.CACHE.mkdir(parents=True, exist_ok=True)
-    cik = history.ticker_ciks().get(symbol.replace("-", "."))
-    cached = history.CACHE / f"{symbol}.json"
-    stale = not cached.exists() or time.time() - cached.stat().st_mtime > 86400
-    facts = history.company_facts(symbol, cik, refresh=stale) if cik else None
-    hist = history.sec_history(symbol, facts) if facts else pd.DataFrame()
-    hist = history.fill_from_yahoo(hist, pd.DataFrame(yahoo_rows), symbol)
-    # history.add_prices puts SEC shares and EPS on today's share basis by filing date
-    # (history.split_adjust); adjusting here as well would apply each split twice
-    cur = history.reporting_currency(facts) if facts else (currency or "USD")
-    hist = history.add_prices(hist, symbol, cur)
-    return hist[hist["column"] != "_shares"] if not hist.empty else hist
-
-
-def gather(stock: dict, rows: dict[str, dict], now: pd.Timestamp) -> dict:
-    sym = stock["symbol"]
-    t = yf.Ticker(sym)
-    dates = t.get_earnings_dates(limit=100)
-    start = now - pd.DateOffset(years=YEARS + 1)
-    prices = t.history(start=start.strftime("%Y-%m-%d"), auto_adjust=False)["Close"]
-    prices.index = prices.index.tz_localize(None).normalize()
-    q = quarterly_eps(dates, stock["eps_override"])
-    ttm = trailing_eps(q)
-    row = rows[sym]
-    yahoo_rows = row.get("_history", [])
-    peers = pd.DataFrame([rows[s] for s in [sym, *stock["peers"]] if s in rows])
-    peers = peers.drop(columns="_history", errors="ignore").set_index("symbol")
-    peers["data_flag"] = ""
-    nxt, nxt_est = next_report(dates, now)
-    return {
-        "stock": stock,
-        "row": row,
-        "prices": prices,
-        "quarters": q,
-        "ttm": ttm,
-        "years": sec_years(
-            sym,
-            yahoo_rows,
-            row.get("currency"),
-            sector._div(row.get("market_cap") or np.nan, row["price"] if has_price(row) else np.nan)
-            * 1e9,
-        ),
-        "peers": peers,
-        "next_report": nxt,
-        "next_estimate": nxt_est,
-    }
-
-
-def key_numbers(d: dict) -> dict:
-    """The few numbers that go in the summary, the dated list and the evening message."""
-    stock, row, prices, ttm = d["stock"], d["row"], d["prices"], d["ttm"]
-    price = float(row["price"]) if has_price(row) else float(prices.iloc[-1])
-    eps = float(ttm.iloc[-1]) if not ttm.empty else np.nan
-    yearly = yearly_pe(prices, ttm)
-    median = float(yearly["pe"].median()) if not yearly.empty else np.nan
-    # Equity stakes (stakes_per_share) are kept out of the P/E: the price paid for the
-    # business is the price less the stakes, and the entry price adds them back.
-    stakes = float(stock.get("stakes_per_share", 0.0))
-    entry = stock["target_pe"] * eps + stakes if eps > 0 else np.nan
-    q = d["quarters"]
-    eps_next = (
-        eps - float(q.iloc[-4]) + d["next_estimate"]
-        if len(q) >= 4 and np.isfinite(d["next_estimate"])
-        else np.nan
-    )
-    return {
-        "price": price,
-        "price_date": prices.index[-1].date().isoformat(),
-        "eps_adj_ttm": eps,
-        "pe_adj": (price - stakes) / eps if eps > 0 else np.nan,
-        "pe_median_10y": median,
-        "pe_median_5y": float(yearly["pe"].tail(5).median()) if not yearly.empty else np.nan,
-        "pe_low_10y": float(yearly["pe"].min()) if not yearly.empty else np.nan,
-        "pe_high_10y": float(yearly["pe"].max()) if not yearly.empty else np.nan,
-        "target_pe": stock["target_pe"],
-        "entry_price": entry,
-        "to_entry": entry / price - 1 if np.isfinite(entry) else np.nan,
-        "next_report": d["next_report"].date().isoformat() if d["next_report"] is not None else "",
-        "next_estimate": d["next_estimate"],
-        "stakes_per_share": stakes,
-        "entry_after_next": stock["target_pe"] * eps_next + stakes if eps_next > 0 else np.nan,
-    }
+    return wl.load(path)
 
 
 # --- notes (Claude's own analysis, kept as Markdown) ---------------------------------
@@ -529,7 +336,7 @@ def dcf_html(row: dict) -> str:
     rows = [
         ["Cash flow before growth (OCF − D&A + after-tax interest)", money(fcff, "$bn")],
         ["WACC (CAPM)", pct(wacc, False)],
-        ["Growth forever", pct(sector.TERMINAL_GROWTH, False)],
+        ["Growth forever", pct(stocks.TERMINAL_GROWTH, False)],
         ["Fair value per share", money(row.get("dcf_fair_value"))],
         ["Price vs fair value", pct(row.get("price_vs_fair_value"))],
         ["Growth forever implied by today's price", pct(implied, False)],
@@ -609,7 +416,7 @@ Claude's notes updated {html.escape(updated or "never")}.</div>
 <h2 class="page">2. The numbers</h2>
 <h3>Absolute values, latest 12 months</h3>
 {latest}
-<h3>Absolute values by year (SEC filings; Yahoo where SEC has no figure)</h3>
+<h3>Absolute values by year (SEC filings; Yahoo where SEC has no figure; from the database)</h3>
 {yearly}
 {screens_html(d)}
 <h3>DCF</h3>
@@ -636,7 +443,9 @@ show very high P/Es). {nxt}</p>
 
 <h3>Caveats</h3>
 <ul class="note">
-<li>Yahoo data is unofficial; capex can include acquisitions or stakes, so check SEC capex.</li>
+<li>Prices are the database's latest close (the ingest runs after the US close), not
+live quotes. Yahoo data is unofficial; capex can include acquisitions or stakes, so check
+SEC capex.</li>
 <li>The peer group is hand-picked, so the weighted scores depend on it.</li>
 <li>Claude's notes are dated above and may be older than the numbers.</li>
 </ul>
@@ -747,8 +556,6 @@ def to_pdf(page: str, pdf: Path) -> None:
 
 
 RUN_COLUMNS = [
-    "run",
-    "file",
     "price",
     "eps_adj_ttm",
     "pe_adj",
@@ -756,9 +563,14 @@ RUN_COLUMNS = [
     "target_pe",
     "entry_price",
     "to_entry",
-    "verdict",
     "stakes_per_share",
 ]
+
+
+def local_label(run_at: str, tz: ZoneInfo) -> str:
+    """A run time stored in UTC as it reads in the watch list's time zone."""
+    t = pd.Timestamp(run_at).tz_localize("UTC").tz_convert(tz)
+    return t.strftime("%Y-%m-%d %H:%M ") + t.tzname()
 
 
 def first_sentence(text: str) -> str:
@@ -766,21 +578,16 @@ def first_sentence(text: str) -> str:
     return re.split(r"(?<=[.!?])\s", plain, maxsplit=1)[0] if plain else ""
 
 
-def record_run(sym: str, run: str, file: str, k: dict) -> pd.DataFrame:
-    path = OUT / sym / "runs.csv"
+def record_run(data, sym: str, run_at: str, file: str, k: dict) -> None:
+    """The run's numbers in out_watchlist_run (run_at in UTC)."""
     _, notes = read_notes(sym)
-    new = {c: k.get(c) for c in RUN_COLUMNS} | {
-        "run": run,
-        "file": file,
-        "verdict": first_sentence(notes.get("Verdict", "")),
-    }
-    runs = pd.read_csv(path) if path.exists() else pd.DataFrame(columns=RUN_COLUMNS)
-    runs = pd.concat([runs, pd.DataFrame([new])], ignore_index=True)
-    runs.to_csv(path, index=False, float_format="%.4f")
-    return runs
+    row = {c: plain(k.get(c)) for c in RUN_COLUMNS}
+    row |= {"symbol": sym, "run_at": run_at, "file": file,
+            "verdict": first_sentence(notes.get("Verdict", "")) or None}  # fmt: skip
+    data.save_watchlist_run(row)
 
 
-def stock_index(sym: str, name: str, runs: pd.DataFrame) -> str:
+def stock_index(sym: str, name: str, runs: pd.DataFrame, tz: ZoneInfo) -> str:
     lines = [
         f"# {name} ({sym}): dated analyses",
         "",
@@ -791,9 +598,9 @@ def stock_index(sym: str, name: str, runs: pd.DataFrame) -> str:
         "| Verdict | PDF |",
         "|---|---|---|---|---|---|---|---|",
     ]
-    for _, r in runs.iloc[::-1].iterrows():
+    for _, r in runs.sort_values("run_at", ascending=False).iterrows():
         lines.append(
-            f"| {r['run']} | {money(r['price'])} | {times(r['pe_adj'])} "
+            f"| {local_label(r['run_at'], tz)} | {money(r['price'])} | {times(r['pe_adj'])} "
             f"| {times(r['pe_median_10y'])} | {money(r['entry_price'])} "
             f"| {pct(r['to_entry'])} | {r['verdict'] if isinstance(r['verdict'], str) else ''} "
             f"| [{r['file']}]({r['file']}) |"
@@ -801,7 +608,8 @@ def stock_index(sym: str, name: str, runs: pd.DataFrame) -> str:
     return "\n".join(lines) + "\n"
 
 
-def overview(cfg: dict) -> str:
+def overview(cfg: dict, runs: pd.DataFrame) -> str:
+    """analyses/README.md: the latest run of each stock (from out_watchlist_run)."""
     lines = [
         "# Watch list analyses",
         "",
@@ -815,18 +623,20 @@ def overview(cfg: dict) -> str:
         "Entry price | vs price | All analyses |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
+    tz = ZoneInfo(cfg["timezone"])
     on_list = [s["symbol"] for s in cfg["stock"]]
-    skip = set(on_list) | {"market"}
-    others = sorted(p.parent.name for p in OUT.glob("*/runs.csv") if p.parent.name not in skip)
+    have = set(runs["symbol"]) if len(runs) else set()
+    others = sorted(have - set(on_list))
     for sym in on_list + others:
-        path = OUT / sym / "runs.csv"
-        if not path.exists():
+        mine = runs[runs["symbol"] == sym] if len(runs) else runs
+        if mine.empty:
             lines.append(f"| {sym} | none yet | | | | | | | |")
             continue
-        r = pd.read_csv(path).iloc[-1]
+        r = mine.sort_values("run_at").iloc[-1]
         tag = "" if sym in on_list else " (off the list)"
+        label = local_label(r["run_at"], tz)
         lines.append(
-            f"| {sym}{tag} | [{r['run']}]({sym}/{r['file']}) | {money(r['price'])} "
+            f"| {sym}{tag} | [{label}]({sym}/{r['file']}) | {money(r['price'])} "
             f"| {times(r['pe_adj'])} | {times(r['pe_median_10y'])} | {r['target_pe']:g}x "
             f"| {money(r['entry_price'])} | {pct(r['to_entry'])} | [list]({sym}/README.md) |"
         )
@@ -842,74 +652,120 @@ def overview(cfg: dict) -> str:
 # --- main ----------------------------------------------------------------------------
 
 
+def sync_notes(data, subjects: list[str]) -> int:
+    """Save each notes.md whose text differs from the database's latest version."""
+    latest = data.notes()
+    have = dict(zip(latest["subject"], latest["text"], strict=True)) if len(latest) else {}
+    saved = 0
+    for subject in subjects:
+        path = OUT / subject / "notes.md"
+        if path.exists() and path.read_text(encoding="utf-8") != have.get(subject):
+            saved += data.save_note(subject, path.read_text(encoding="utf-8"))
+    return saved
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("symbols", nargs="*", help="only these stocks (default: the whole list)")
     ap.add_argument("--numbers", action="store_true", help="print key numbers, write nothing")
     ap.add_argument("--no-market", action="store_true", help="skip the market report")
     ap.add_argument(
-        "--no-screener",
+        "--screener",
         action="store_true",
-        help="don't rerun the market screener; the market report uses its last results",
+        help="rerun the market screener first (the nightly analyses already ran it)",
+    )
+    ap.add_argument(
+        "--recompute",
+        action="store_true",
+        help="compute every stock's numbers now instead of reading the stored ones",
     )
     args = ap.parse_args()
 
     cfg = load_watchlist()
-    stocks = [s for s in cfg["stock"] if not args.symbols or s["symbol"] in args.symbols]
-    if not stocks:
+    stock_list = [s for s in cfg["stock"] if not args.symbols or s["symbol"] in args.symbols]
+    if not stock_list:
         raise SystemExit(f"Not on the watch list: {args.symbols}")
     tz = ZoneInfo(cfg["timezone"])
     local = datetime.now(tz)
     now = pd.Timestamp(local.astimezone(ZoneInfo("UTC")).replace(tzinfo=None))
+    run_at = local.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
-    symbols = sorted({x for s in stocks for x in [s["symbol"], *s["peers"]]})
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        rows = dict(zip(symbols, pool.map(fetch_row, symbols), strict=True))
+    data = Data.open()
+    if not args.numbers:
+        if wl.sync(data, cfg):
+            print("Watch list copied to the database (config/watchlist.toml changed)")
+        subjects = [s["symbol"] for s in cfg["stock"]] + ["market", "summaries"]
+        saved = sync_notes(data, subjects)
+        if saved:
+            print(f"Saved {saved} changed notes to the database")
+    # The numbers were computed on the server after the night's ingest (stock_analysis.nightly);
+    # a stock with none since the last build, or whose watch-list settings changed since
+    # (target, peers, EPS corrections), is computed here.
+    ready = {} if args.recompute else nightly.stored_stocks(data, stock_list)
+    todo = [s for s in stock_list if s["symbol"] not in ready]
+    computed, errors, missing = nightly.compute_stocks(data, todo, now) if todo else ({}, {}, [])
+    if ready:
+        print(f"Stored numbers (computed on the server): {', '.join(sorted(ready))}")
+    if todo:
+        print(f"Computed now: {', '.join(s['symbol'] for s in todo)}")
+    if missing:
+        print(f"Not in the database (left out of the peer screens): {', '.join(missing)}")
 
     stamp = local.strftime("%Y-%m-%d_%H%M")
     run_label = local.strftime("%Y-%m-%d %H:%M ") + local.tzname()
-    results, written = [], []
+    results, written, failed = [], [], []
     if not args.numbers and not args.no_market and not args.symbols:
         import market  # the whole-market report goes with the full evening run
 
-        if not args.no_screener:
-            # the market report lists the screener's top per sector, so refresh it first
-            import screener
+        if args.screener:
+            from stock_analysis.screener import run as run_screener
 
             try:
-                screener.run()
+                run_screener(data=data)
             except Exception as e:  # noqa: BLE001 - the report then uses the last results
                 print(f"Screener failed ({e}); the market report uses its last results")
-        written.append(market.build(local))
-    for stock in stocks:
+                failed.append(f"Market screener: {e}")
+        try:
+            written.append(market.build(local, data=data))
+        except Exception as e:  # noqa: BLE001 - the stocks' PDFs still get built
+            print(f"Market report failed: {e}")
+            failed.append(f"Market report: {e}")
+    for stock in stock_list:
         sym = stock["symbol"]
-        d = gather(stock, rows, now)
+        d = ready.get(sym) or computed.get(sym)
+        if d is None:
+            print(f"{sym}: failed ({errors.get(sym, 'no numbers')})")
+            failed.append(f"{sym}: {errors.get(sym, 'no numbers')}")
+            continue
+        d = {**d, "stock": stock}  # the config's entry (its target note, for the PDF)
         k = key_numbers(d)
         print(
-            f"{sym}: price {money(k['price'])}, adjusted EPS {money(k['eps_adj_ttm'])}, "
-            f"P/E {times(k['pe_adj'])} vs 10-yr median {times(k['pe_median_10y'])}, "
-            f"entry {money(k['entry_price'])} at {k['target_pe']:g}x ({pct(k['to_entry'])}), "
-            f"next report {k['next_report'] or '–'}"
+            f"{sym}: price {money(k['price'])} ({k['price_date']}), adjusted EPS "
+            f"{money(k['eps_adj_ttm'])}, P/E {times(k['pe_adj'])} vs 10-yr median "
+            f"{times(k['pe_median_10y'])}, entry {money(k['entry_price'])} at "
+            f"{k['target_pe']:g}x ({pct(k['to_entry'])}), next report {k['next_report'] or '–'}"
         )
         if args.numbers:
             continue
         results.append((d, k))
         pdf = new_pdf(OUT / sym, stamp)
         to_pdf(render(d, k, run_label), pdf)
-        runs = record_run(sym, run_label, pdf.name, k)
-        (OUT / sym / "README.md").write_text(stock_index(sym, d["row"].get("name") or sym, runs))
+        record_run(data, sym, run_at, pdf.name, k)
+        runs = data.watchlist_runs(sym)
+        name = d["row"].get("name") or sym
+        (OUT / sym / "README.md").write_text(stock_index(sym, name, runs, tz), encoding="utf-8")
         written.append(pdf)
     if args.numbers:
         return
     pdf = new_pdf(OUT / "summaries", stamp)
     to_pdf(render_summary(results, run_label), pdf)
     written.append(pdf)
-    (OUT / "README.md").write_text(overview(cfg))
+    (OUT / "README.md").write_text(overview(cfg, data.watchlist_runs()), encoding="utf-8")
     print("\nWrote:")
     for p in written:
         print(f"  {p.relative_to(ROOT)}")
     EMAIL.parent.mkdir(parents=True, exist_ok=True)
-    EMAIL.write_text(email_html(run_label, written, results))
+    EMAIL.write_text(email_html(run_label, written, results, data, failed), encoding="utf-8")
     print(f"\nEmail subject: Watch list analyses, {run_label}")
     print(f"Email body (HTML): {EMAIL.relative_to(ROOT)}")
     LAST_RUN.write_text(
@@ -918,6 +774,7 @@ def main() -> None:
                 "subject": f"Watch list analyses, {run_label}",
                 "html": str(EMAIL.relative_to(ROOT)),
                 "files": [str(p.relative_to(ROOT)) for p in written],
+                "failed": failed,
             },
             indent=2,
         )
@@ -943,12 +800,22 @@ def link(path: Path) -> str:
     return f"{REPO_URL}/{branch}/{path.relative_to(ROOT).as_posix()}"
 
 
-def email_html(run_label: str, written: list[Path], results: list[tuple[dict, dict]]) -> str:
-    """Email body: the high-level summary first, then the PDFs (attached, and linked)."""
+def email_html(
+    run_label: str,
+    written: list[Path],
+    results: list[tuple[dict, dict]],
+    data=None,
+    failed: list[str] | None = None,
+) -> str:
+    """Email body: what failed (if anything), the high-level summary, then the PDFs."""
     parts = [f"<h2>Watch list analyses, {html.escape(run_label)}</h2>"]
-    market_runs = OUT / "market/runs.csv"
-    if any(p.parent.name == "market" for p in written) and market_runs.exists():
-        r = pd.read_csv(market_runs).iloc[-1]
+    if failed:
+        parts.append("<p><b>Not built tonight:</b></p><ul>")
+        parts += [f"<li>{html.escape(f)}</li>" for f in failed]
+        parts.append("</ul>")
+    market_runs = data.market_runs() if data is not None else pd.DataFrame()
+    if any(p.parent.name == "market" for p in written) and len(market_runs):
+        r = market_runs.sort_values("run_at").iloc[-1]
         _, notes = read_notes("market")
         parts += [
             "<h3>Market</h3>",
