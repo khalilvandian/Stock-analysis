@@ -614,7 +614,9 @@ def main() -> None:
     ap.add_argument("--strict", action="store_true", help="exit non-zero on WARN too")
     ap.add_argument("--today", help="date the outputs should be from (default: today)")
     args = ap.parse_args()
-    today = date.fromisoformat(args.today) if args.today else date.today()
+    # the run's date in Italy, as the PDFs are stamped: a midnight run is already the next day
+    italy = datetime.now(ZoneInfo("Europe/Rome")).date()
+    today = date.fromisoformat(args.today) if args.today else italy
     checks = run_checks(ROOT, today)
     print(report(checks, args.verbose))
     result = overall(checks)
