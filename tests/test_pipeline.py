@@ -24,6 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CFG = p.load_config()
 T = dt.datetime
 STARTED = T(2026, 11, 18, 22, 30)
+# The audit tests use dates around go-live, so most of them leave live_from out.
+ANY_DAY = {**CFG, "audit": {k: v for k, v in CFG["audit"].items() if k != "live_from"}}
 
 
 @pytest.fixture()
@@ -80,9 +82,9 @@ def test_orchestration_files_parse() -> None:
 def test_audit_needs_an_ok_run_for_the_last_trading_day() -> None:
     now = T(2026, 11, 19, 7, 0)
     ok = {"run_date": "2026-11-18", "status": "ok"}
-    assert p.audit([ok], now, CFG).code == p.DONE
-    assert p.audit([{**ok, "run_date": "2026-11-17"}], now, CFG).code == p.FAILED
-    assert "ready" in p.audit([{**ok, "status": "ready"}], now, CFG).message
+    assert p.audit([ok], now, ANY_DAY).code == p.DONE
+    assert p.audit([{**ok, "run_date": "2026-11-17"}], now, ANY_DAY).code == p.FAILED
+    assert "ready" in p.audit([{**ok, "status": "ready"}], now, ANY_DAY).message
 
 
 def test_audit_waits_until_the_night_should_be_over() -> None:
@@ -93,11 +95,11 @@ def test_audit_waits_until_the_night_should_be_over() -> None:
     assert p.audit([running, friday_ok], T(2026, 11, 19, 7, 0), CFG).code == p.FAILED
 
 
-def test_audit_skips_the_days_before_the_first_run() -> None:
+def test_audit_skips_the_days_before_go_live() -> None:
     now = T(2026, 11, 20, 1, 0)  # Friday 01:00: Wednesday the 18th is the day checked
-    first = {"run_date": "2026-11-19", "status": "running"}  # go-live on Thursday
-    assert p.audit([first], now, CFG).code == p.DONE
-    assert p.audit([], now, CFG).code == p.FAILED  # no run at all: never silent
+    assert p.audit([], now, CFG).code == p.DONE  # live_from is Thursday the 19th
+    later = {**CFG, "audit": {**CFG["audit"], "live_from": dt.date(2026, 11, 18)}}
+    assert p.audit([], now, later).code == p.FAILED  # after go-live, no run is never silent
 
 
 def test_quotes_audit_on_weekdays_only() -> None:
