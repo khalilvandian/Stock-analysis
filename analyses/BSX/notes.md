@@ -1,6 +1,6 @@
 # Boston Scientific (BSX): Claude's notes
 
-Updated: 2026-11-13
+Updated: 2026-11-19
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
@@ -28,6 +28,7 @@ Boston Scientific makes devices for heart, vascular, digestive and urology proce
 
 ## News
 
+- 2026-11-18 (close): $43.8, down about 1% since Nov 13 in a falling market; no company news. About 5% above the $41.5 entry.
 - 2026-11-13: about $44.4 (intraday), little changed; no company news. About 7% above the $41.5 entry.
 - 2026-11-12: about $44.3 (intraday), little changed since last week; about 7% above the $41.5 entry. Presented at Stifel's healthcare conference on Nov 11; Blackstone Life Sciences is co-funding the VITALYST heart pump ($455m, Nov 2). Stifel cut its target to $55.
 - 2026-11-04: about $46 (intraday), up about 5% with the market's post-election rally; no company news.

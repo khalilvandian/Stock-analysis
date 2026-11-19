@@ -1,12 +1,12 @@
 # Booking Holdings (BKNG): Claude's notes
 
-Updated: 2026-11-13
+Updated: 2026-11-19
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
 ## Verdict
 
-**Q3 (Nov 3) beat on earnings (adjusted EPS $4.66, +17%; room nights +6.7%), but Q4 is guided much weaker (room nights +1-3%, revenue 0-2%). The stock jumped about 12% to $171 after the report, but that has faded to about $161. Cheap at about 15.6x adjusted earnings against a 10-year norm of about 21x. View: now only about 4% above the $154 entry (15x); hold any position started earlier, and add below about $154.**
+**Q3 (Nov 3) beat on earnings (adjusted EPS $4.66, +17%; room nights +6.7%), but Q4 is guided much weaker (room nights +1-3%, revenue 0-2%). The stock jumped about 12% to $171 after the report, but that has faded to about $161. Cheap at about 15.1x adjusted earnings against a 10-year norm of about 21x. View: the AI-led sell-off has brought it to the $154 entry (15x); this is the level to start or add to a position.**
 
 ## Summary
 
@@ -27,6 +27,7 @@ Booking runs Booking.com, Priceline, Agoda, KAYAK and OpenTable. Most of its pro
 
 ## News
 
+- 2026-11-18 (close): $154.9, down about 3% since Nov 13 with the market's AI-led sell-off; no company news. Now at the $154 entry (15x), less than 1% above it.
 - 2026-11-13: about $160 (intraday), little changed; no company news. About 3% above the $154 entry (15x).
 - 2026-11-12: about $161 (intraday): the post-results jump has faded, down about 6% from $171 on Nov 4. Now about 4% above the $154 entry (15x).
 - 2026-11-04: the stock jumped about 12% to about $171 (intraday) after the Q3 report, despite the weak Q4 guide; analysts trimmed targets but most kept Buy.

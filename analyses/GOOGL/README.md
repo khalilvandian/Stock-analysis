@@ -1,9 +1,10 @@
-# Alphabet Inc. (GOOGL): dated analyses
+# Alphabet Inc. Class A (GOOGL): dated analyses
 
 Every analysis of this stock, newest first. Each PDF has the summary, the numbers, and Claude's analysis. Claude's current notes are in [notes.md](notes.md).
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-19 11:18 CET | $283.84 | 24.6x | 23.6x | $255.83 | -9.9% | The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. | [2026-11-19_1118.pdf](2026-11-19_1118.pdf) |
 | 2026-11-13 20:53 CET | $294.86 | 25.6x | 23.7x | $255.83 | -13.2% | The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. | [2026-11-13_2053.pdf](2026-11-13_2053.pdf) |
 | 2026-11-12 21:32 CET | $299.43 | 26.0x | 23.7x | $255.83 | -14.6% | The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. | [2026-11-12_2132.pdf](2026-11-12_2132.pdf) |
 | 2026-11-04 20:57 CET | $291.38 | 25.2x | 23.7x | $255.83 | -12.2% | The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. | [2026-11-04_2057.pdf](2026-11-04_2057.pdf) |

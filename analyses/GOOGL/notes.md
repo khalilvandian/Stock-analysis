@@ -1,12 +1,12 @@
 # Alphabet (GOOGL): Claude's notes
 
-Updated: 2026-11-13
+Updated: 2026-11-19
 
 The evening run copies these sections into the PDF. Update them when the story changes.
 
 ## Verdict
 
-**The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. The GAAP P/E near 15x is an illusion: much of the last year's earnings are paper gains on the Anthropic and SpaceX stakes. On core earnings, with the stakes (about $15 a share after tax) taken out of the price, Alphabet trades at about 25.6x, above its 10-year median of about 24x. View (report 17): wait, and buy below about $256 (22x core EPS plus the stakes), about 13% below today.**
+**The business is the strongest it has been in years (revenue +25%, Google Cloud +103% in Q3), but the stock is not cheap. The GAAP P/E near 15x is an illusion: much of the last year's earnings are paper gains on the Anthropic and SpaceX stakes. On core earnings, with the stakes (about $15 a share after tax) taken out of the price, Alphabet trades at about 24.6x, a little above its 10-year median of about 24x. View (report 17): wait, and buy below about $256 (22x core EPS plus the stakes), about 10% below today.**
 
 ## Summary
 
@@ -28,6 +28,7 @@ Alphabet owns Google Search and advertising, YouTube, Google Cloud, Android and 
 
 ## News
 
+- 2026-11-18 (close): $283.8, down about 4% since Nov 13 as AI stocks sold off (Nvidia has lost over $2 trillion of value since October). About 24.6x core earnings, 11% above the $256 entry.
 - 2026-11-13: about $295 (intraday), down about 1.5% with the Nasdaq; no company news. About 25.6x core earnings, 15% above the $256 entry.
 - 2026-11-12: about $299 (intraday), up about 3% since Nov 4 and close to $300. Its filing showed the $83.7bn SpaceX stake held and a new $0.5bn Qualcomm stake; a $15bn Malaysia data-centre plan (Nov 7); a class action filed (Nov 9) and a possible EU antitrust probe into news rankings in search. About 26x core earnings, 17% above the $256 entry.
 - 2026-11-04: about $291.5 (intraday), up about 4.5% with the market; no company news.

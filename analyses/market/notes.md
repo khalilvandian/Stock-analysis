@@ -1,12 +1,12 @@
 # Market report: Claude's notes
 
-Updated: 2026-11-13
+Updated: 2026-11-19
 
 The evening run copies these sections into the market PDF. Keep it short.
 
 ## Verdict
 
-**Another soft day led by tech: the S&P 500 down about 0.6% to about 7,546 (3.5% below its high) and the Nasdaq down about 1% (9% below its high), as AI names keep sliding. The VIX is near 19 and the US 10-year yield about 5.15%. The sold-off software and data names (Adobe, Gartner, Intuit) are still the cheapest against their own history.**
+**A sharp AI-led sell-off: the S&P 500 fell about 3% in the three sessions to Nov 18, closing at about 7,324, 6% below its high, and the Nasdaq is 11% below its high, as Nvidia and other AI stocks slide. The VIX is near 22. The sold-off software and data names (Adobe, Gartner, Intuit) are still the cheapest against their own history, and Nvidia has now joined the screener's cheap list.**
 
 ## Summary
 
