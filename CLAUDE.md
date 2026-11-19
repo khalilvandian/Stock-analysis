@@ -38,13 +38,18 @@ Python 3.11+ project managed with `uv`. Source in `src/stock_analysis/`, tests i
   database directly; in cloud sessions it goes through the web API (`api/`,
   https://stock-api-bk.azurewebsites.net, used when `STOCK_API_URL` is set). Prices are the
   latest close the ingest stored, not live quotes.
-- Orchestration (issue #30, `docs/ORCHESTRATION.md`): the Airflow 3 DAG `stock_nightly`
-  (`orchestration/`, Docker on the PC, 22:35 UTC on weekdays) checks every scheduled piece
-  after the ingest: the ingest run, the nightly analyses, the prices, the hourly quotes job,
-  then the Claude session's commit and the site. It sets a ready marker
-  (`python -m stock_analysis.pipeline marker`), logs each step in `ops_pipeline_run` and
-  `ops_pipeline_step`, and emails failures; `pipeline-watch.yml` audits every morning that
-  the night ran.
+- Orchestration (issue #30, `docs/ORCHESTRATION.md`): Airflow 3 runs every timed piece as
+  a task. `stock_nightly` (22:30 UTC on weekdays) starts the `stock-ingest` job for the fetch,
+  build, quality check, coverage and nightly analyses, checks each one, sets the ready
+  marker (`python -m stock_analysis.pipeline marker`), rebuilds the site and waits for the
+  Claude session's commit; `stock_quotes` (hourly, weekdays) starts the quotes job. The jobs
+  have no schedule of their own and there is no fallback cron. Every step is logged in
+  `ops_pipeline_run` and `ops_pipeline_step`, and failures are emailed through Brevo.
+  Developed locally in Docker (`orchestration/compose.yaml`); production is Azure: a free VM
+  (`airflow-vm`, Spain Central) runs the always-on parts, the UI is the scale-to-zero
+  Container App `airflow-ui`. Merging to `main` deploys everything (`deploy.yml`, OIDC).
+  `pipeline-watch.yml` audits every 3 hours, from outside Airflow, that the night and the
+  quotes ran.
 - Tests must not hit the network; mock HTTP with `respx`. The database tests use the
   local Docker PostgreSQL (`stock_test` database, or `STOCK_TEST_PG_URL`) and skip when it
   isn't running; they seed it with `tests/seed_files.py`.
@@ -114,7 +119,7 @@ stock folder's `README.md`, rebuilt from `out_watchlist_run` (market reports and
 `analyses/README.md`). Call it a list of dated analyses, not an archive. The public page of all dated analyses is
 https://khalilvandian.github.io/Stock-analysis/, built by `analysis/site.py` and published by
 `.github/workflows/pages.yml` on every push to `main` that changes `analyses/` or the site
-script, and every morning after the ingest. Adjusted EPS for
+script, and by Airflow after each night's build. Adjusted EPS for
 the own-history P/E is Yahoo's reported quarterly EPS (split-adjusted).
 
 ## Reports
