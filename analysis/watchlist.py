@@ -96,7 +96,7 @@ def read_notes(symbol: str) -> tuple[str, dict[str, str]]:
     path = OUT / symbol / "notes.md"
     if not path.exists():
         return "", {}
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     m = re.search(r"^Updated:\s*(.+)$", text, re.M)
     parts = re.split(r"^## +(.+)$", text, flags=re.M)
     sections = {parts[i].strip(): parts[i + 1].strip() for i in range(1, len(parts) - 1, 2)}
@@ -536,7 +536,7 @@ def chrome() -> str:
 def to_pdf(page: str, pdf: Path) -> None:
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "page.html"
-        src.write_text(page)
+        src.write_text(page, encoding="utf-8")
         subprocess.run(
             [
                 chrome(),

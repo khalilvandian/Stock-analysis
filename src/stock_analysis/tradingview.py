@@ -17,7 +17,7 @@ PAGE = 2000
 
 # The fields the ingest keeps for every company of its snapshots (raw_tv_constituent: the
 # first few in columns of their own, the rest in extra_json). The market screener
-# (analysis/stage1.py) and the watch list read them from there. Statements and market values
+# (stock_analysis.screener) and the watch list read them from there. Statements and market values
 # are in the company's own currency (fundamental_currency_code), prices in the trading currency.
 SCREENER_FIELDS = [
     "name",

@@ -10,7 +10,8 @@ policy. The step-by-step processes are in [`PROCESSES.md`](PROCESSES.md).
 | Install or update the environment | `uv sync` |
 | Everything the evening run builds | `uv run python analysis/watchlist.py` |
 | Key numbers only, nothing written | `uv run python analysis/watchlist.py --numbers` |
-| Market screener | `uv run python analysis/screener.py` |
+| Market screener | `uv run python -m stock_analysis.screener` |
+| The nightly analyses (screener, watch list and market numbers) | `uv run python -m stock_analysis.db nightly` |
 | Market report alone | `uv run python analysis/market.py` |
 | Check the run's outputs | `uv run python analysis/validate.py [--verbose] [--strict]` |
 | Build the site locally | `python analysis/site.py _site` |
@@ -54,9 +55,10 @@ There are none to manage: every number is in the database, refreshed by the inge
 | SEC: market value 25x too low after a split | Share counts filed before a split | The build records each value's split factor (`core_fundamental.split_factor`); check the split is in the prices (`core_price_daily.split_ratio`) |
 | TradingView: HTTP 400, or a column of blanks | The unofficial endpoint renamed or dropped a field | Find the field on tradingview.com/screener, update `tradingview.SCREENER_FIELDS` (and `stage2.NEEDS`, `screen_common.USD_FIELDS`, `config/metrics.toml` sources if used there), run `uv run pytest tests/test_screener.py` |
 | TradingView: far fewer companies than expected | Index code or filters changed, or one market failed | Check `[universe]` in `config/screeners.toml`; rerun with `--refresh` |
-| Stage 2: "Stage 1 output lacks [...]" | Stage 1's pickle is from an older Stage 1 | `uv run python analysis/stage1.py` |
+| Stage 2: "Stage 1 output lacks [...]" | A column Stage 2 needs isn't in the TradingView snapshot | Add the field to `tradingview.SCREENER_FIELDS`; the next ingest stores it |
+| The evening run says "Computed now" for every stock | The nightly analyses didn't run after the last build (`nightly` in `config/ingest.toml`, or `nightly_error` in the run's summary in `ops_run`) | Check the job's log; `uv run python -m stock_analysis.db nightly --target server-writer` runs them by hand |
 | `validate.py` reports FAIL | An output is broken (a missing PDF, an inconsistent screener row, a broken identity) | Read the check's detail (`--verbose` for WARN rows), fix the cause, rebuild; if it can't be fixed tonight, say so in the email |
-| Market report says the screener's data is not from today | The screener failed in the evening run; the report used the last results | Read the run's output for the error; rerun `uv run python analysis/screener.py`, then `uv run python analysis/watchlist.py --no-screener` if the PDFs must be rebuilt |
+| Market report says the screener's data is older than the prices | The night's screener failed (`screener_error` in the nightly summary); the report used the last run | Fix the cause; `uv run python analysis/watchlist.py --screener` reruns it |
 | `RuntimeError: No Chrome or Chromium found` | No browser for the PDFs | Set `CHROME_PATH`, or install Chromium |
 | Brevo: 401 "Key not found" or "unauthorized" | Wrong or missing `BREVO_API_KEY` | Check the key in the cloud environment settings |
 | Brevo: 401 "unrecognised IP address" | Brevo's "authorized IPs" blocking; the cloud environment's IP changes | In Brevo, Security, Authorized IPs: turn the blocking off |

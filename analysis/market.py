@@ -4,7 +4,7 @@ Same template as every report: 1. Summary, 2. The numbers, 3. Analysis.
   - Market: main indices, rates, oil, gold, the dollar and bitcoin; the 11 S&P 500 sectors;
     breadth (share of S&P 500 stocks above their 200-day average, near 52-week highs/lows).
   - Stocks to look at: the market screener's top 3 cheap or close-to-cheap stocks per
-    sector (analysis/screener.py, report 13): Stage 1 keeps companies with good financial
+    sector (stock_analysis.screener, report 13): Stage 1 keeps companies with good financial
     statements for their Lynch category, Stage 2 ranks the survivors by price against
     their own cheap price. Read from the database's latest screener run; the evening run
     refreshes it first (analysis/watchlist.py).

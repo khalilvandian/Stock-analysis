@@ -61,7 +61,15 @@ Every command takes `--target`. On Azure the job runs as `server-writer`.
    days. A rate limit isn't a failure: the task stays due for the next run.
 5. **Build** the core layer, if anything new was stored ([`DATABASE.md`](DATABASE.md), "Build rules").
 6. **Coverage snapshot** of the day (`out_coverage_snapshot`).
-7. **Site.** It asks GitHub to rebuild the site (the Pages workflow, through `workflow_dispatch`),
+7. **Nightly analyses** (`nightly = true`; `stock_analysis.nightly`): everything the evening
+   run used to compute, done here so the scheduled Claude session only reads it and
+   interprets: the market screener (`out_screener_run`, `out_screener_result`), each
+   watch-list stock's numbers (`out_stock_numbers`) and the market report's numbers
+   (`out_market_numbers`). A failure here is recorded in the run's summary
+   (`nightly_error`, or `screener_error` / `market_error` inside `nightly`) and makes the run
+   `partial`; the evening run then computes what is missing on the spot.
+   `python -m stock_analysis.db nightly` runs this step alone.
+8. **Site.** It asks GitHub to rebuild the site (the Pages workflow, through `workflow_dispatch`),
    so the Data page shows the new coverage a few minutes later. This needs
    `GITHUB_DISPATCH_TOKEN`: a fine-grained personal access token for this repository only,
    with "Actions: Read and write". Without it, the workflow's daily schedule (05:15 UTC)

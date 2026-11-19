@@ -1,6 +1,6 @@
 # Database
 
-Status: **schema version 12** (migrations `001` to `012`; `011` is issue #30's), 2026-11-18. **PostgreSQL 16**,
+Status: **schema version 15** (migrations `001` to `015`; `011` and `012` are left to issue #30), 2026-11-19. **PostgreSQL 16**,
 locally in Docker (`compose.yaml`) and on the server: **Azure Database for PostgreSQL**
 (`stock-db-bk`, Italy North, Azure for Students). SQLite was dropped on 2026-11-16 (see
 `docs/DECISIONS.md`). It holds what the ingest job fetches from TradingView, SEC, Yahoo and
@@ -606,7 +606,7 @@ From the repository files, 2026-11-16 (28 MB):
 
 ## Tables
 
-### Added for the scripts (migration `012`, issue #33)
+### Added for the scripts (migrations `014` and `015`, issue #33)
 
 | Table or view | One row per | Notes |
 |---|---|---|
@@ -618,6 +618,11 @@ From the repository files, 2026-11-16 (28 MB):
 index's. The screener's runs are `out_screener_run` (one per day and universe; a second run
 the same day replaces it) and `out_screener_result` (stage 1: every company screened; stage 2:
 the top per sector; the columns without a field of their own in `detail_json`).
+
+| Table | One row per | Notes |
+|---|---|---|
+| `out_stock_numbers` | Watch-list stock and day (the newest price used) | What the nightly analyses (`stock_analysis.nightly`) computed for the evening run: the stock's row, yearly history, prices, adjusted EPS by quarter, peers' rows and next report (`payload_json`), and `stock_key`, the watch-list settings used. The evening run reads it while `computed_at` is after the last build and `stock_key` matches the config, else computes the stock on the spot |
+| `out_market_numbers` | Day (the newest price used) | The market report's numbers: the instruments' moves, the sector ETFs', breadth, the screener's top per sector |
 
 ### Raw
 

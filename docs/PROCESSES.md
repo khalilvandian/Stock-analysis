@@ -95,11 +95,11 @@ this order.
 Both stages in a row, from the database (a minute or two for the S&P 500):
 
 ```bash
-uv run python analysis/screener.py                 # Stage 1 then Stage 2, saved in the database
-uv run python analysis/screener.py --no-adjusted   # skip Yahoo adjusted EPS (diluted EPS only)
-uv run python analysis/screener.py --dry-run       # print only, save nothing
-uv run python analysis/stage1.py                   # Stage 1's counts only
-uv run python analysis/stage2.py [--no-adjusted]   # Stage 1 then Stage 2, printed
+uv run python -m stock_analysis.screener                 # Stage 1 then Stage 2, saved in the database
+uv run python -m stock_analysis.screener --no-adjusted   # skip Yahoo adjusted EPS (diluted EPS only)
+uv run python -m stock_analysis.screener --dry-run       # print only, save nothing
+uv run python -m stock_analysis.screener.stage1                   # Stage 1's counts only
+uv run python -m stock_analysis.screener.stage2 [--no-adjusted]   # Stage 1 then Stage 2, printed
 ```
 
 The run is saved as `out_screener_run` (one per day; a rerun the same day replaces it) and
@@ -108,7 +108,7 @@ every other column in `detail_json`); `stock_analysis.stocks.screener_run` reads
 Every threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the full
 reference.
 
-### Stage 1: good financial statements (`analysis/stage1.py`)
+### Stage 1: good financial statements (`stock_analysis/screener/stage1.py`)
 
 1. **Universe.** The index members (`[universe] index = "SP:SPX"`, the ingest's universe)
    of the newest TradingView snapshot the ingest stored (`v_tv_latest`: every screener field
@@ -143,7 +143,7 @@ reference.
    no data are skipped and listed in `flags`.
 9. **Hand over.** The table goes to Stage 2 in the same run (nothing is written).
 
-### Stage 2: cheapness (`analysis/stage2.py`)
+### Stage 2: cheapness (`stock_analysis/screener/stage2.py`)
 
 1. **Check.** Every column in `stage2.NEEDS` must be in Stage 1's table, or Stage 2 stops.
 2. **Own P/E history (diluted).** For each Stage 1 pass: monthly closes from the database,
@@ -198,24 +198,23 @@ percentiles (or z-scores) within the stocks given, with lower-is-better metrics 
 Europe/Rome. What happens, in order:
 
 1. **Set up.** `uv sync`, check out `main`, pull.
-2. **Numbers first.** `uv run python analysis/screener.py` refreshes the market screener,
-   then `uv run python analysis/watchlist.py --numbers` and
-   `uv run python analysis/market.py --numbers` print today's figures (the market numbers
-   include the screener's top names).
+2. **Read the numbers.** `uv run python analysis/watchlist.py --numbers` and
+   `uv run python analysis/market.py --numbers` print the figures the nightly analyses
+   stored after the ingest (the market numbers include the screener's top names).
 3. **Update Claude's notes** where the story changed (`Updated:` set to today): each stock's
    `notes.md` (search the news; after earnings update the verdict, the entry price and any
    `eps_override`), `analyses/market/notes.md` (the "Stocks to look at" section comments on
    the screener's names), `analyses/summaries/notes.md`.
 4. **Build.** `uv run python analysis/watchlist.py`. In order:
-   1. Copy `config/watchlist.toml` to the database if it changed (the ingest reads the
-      stocks and peers from there) and save the notes that changed (`out_note`). Read every
-      watch-list stock and its peers from the database.
-   2. Rerun the market screener (`screener.run()`: Stage 1 then Stage 2 on the S&P 500, from
-      the database). If it fails the run goes on and the market report uses the last
-      results, marked as not from today. `--no-screener` skips it on purpose.
-   3. Build the market report: indices, sectors, breadth, then the screener's Stage 1 pass
-      counts and its top 3 cheap or close-to-cheap stocks per sector. Records the run in
-      `out_market_run`.
+   1. Copy `config/watchlist.toml` to the database if it changed (the ingest and the
+      nightly analyses read the stocks and peers from there) and save the notes that changed
+      (`out_note`). Read each stock's stored numbers (`out_stock_numbers`); a stock with none
+      since the last build, or whose settings changed since, is computed now.
+   2. `--screener` only: rerun the market screener (the nightly analyses already ran it).
+   3. Build the market report from the stored market numbers (`out_market_numbers`, or
+      computed now if none since the last build): indices, sectors, breadth, then the
+      screener's Stage 1 pass counts and its top 3 cheap or close-to-cheap stocks per sector.
+      Records the run in `out_market_run`. If it fails, the stocks are still built.
    4. One PDF per stock, the run recorded in `out_watchlist_run`, its `README.md` rebuilt
       from the recorded runs.
    5. The watch-list summary PDF, `analyses/README.md` rebuilt.
@@ -236,7 +235,9 @@ Useful variants:
 ```bash
 uv run python analysis/watchlist.py BSX NFLX         # selected stocks only (no market report)
 uv run python analysis/watchlist.py --no-market      # skip the market report and the screener
-uv run python analysis/watchlist.py --no-screener    # market report on the last screener results
+uv run python analysis/watchlist.py --screener       # rerun the screener first
+uv run python analysis/watchlist.py --recompute      # compute every stock now, not the stored numbers
+uv run python -m stock_analysis.db nightly           # the nightly analyses by hand (after an ingest)
 uv run python analysis/market.py                     # the market PDF alone
 ```
 
@@ -320,7 +321,7 @@ Babak's own Gmail.
 2. A new kind of rule needs code: a branch in `stage1._rule()` and a label in
    `stage1.RULE_LABELS` (`tests/test_screener.py` fails on an unknown rule). If Stage 2 needs a
    new Stage 1 column, add it to `stage2.NEEDS`.
-3. Run `uv run python analysis/screener.py` and compare the pass counts and the top list with
+3. Run `uv run python -m stock_analysis.screener` and compare the pass counts and the top list with
    the last run.
 4. Update [`SCREENER.md`](SCREENER.md), report 13 (numbers and date), and the methods doc;
    record the change and who decided it in [`DECISIONS.md`](DECISIONS.md).

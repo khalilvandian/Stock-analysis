@@ -3,14 +3,14 @@
 The screener finds companies worth owning and then those whose price is cheap. It has two
 stages, run as separate programs:
 
-- **Stage 1, good financial statements** (`analysis/stage1.py`): puts each company in one of
+- **Stage 1, good financial statements** (`stock_analysis/screener/stage1.py`): puts each company in one of
   Peter Lynch's categories and keeps those that pass every rule for their category or kind
   of business. The price plays no part.
-- **Stage 2, cheapness** (`analysis/stage2.py`): reads only Stage 1's output, sets each
+- **Stage 2, cheapness** (`stock_analysis/screener/stage2.py`): reads only Stage 1's output, sets each
   survivor's own cheap price, and lists the top 3 cheap or close-to-cheap names per sector.
   Technicals are shown for timing and never change the ranking.
 
-`analysis/screener.py` runs both. Settings: `config/screeners.toml`. Results and their
+`stock_analysis.screener` runs both. Settings: `config/screeners.toml`. Results and their
 discussion: [report 13](../reports/13-market-screener.md). The methods doc with every rule's
 source, "Stage 1 screening methods and their sources", is at
 https://claude.ai/artifact/XXxnx8ZMtM8GwfnsfS4mza. Commands and the step-by-step run are in

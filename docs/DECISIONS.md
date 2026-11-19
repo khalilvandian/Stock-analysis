@@ -364,3 +364,23 @@ include it unchanged, and a push that edits it republishes the site.
 - **Rejected:** keeping the files as a fallback (two sources of truth, and the scripts
   drifted apart); porting the per-ticker scripts (they were ported first, then removed as
   unused by the scheduled run).
+
+### The server computes; the scheduled Claude session only interprets (issue #33)
+
+- **Who:** Babak, 2026-11-18: "we should minimalize the task that the Claude schedule does ...
+  on a schedule we already execute them ... the Claude schedule only checks those ready-made
+  data and does its interpretation and analysis on top of them, and creates its own analysis
+  and PDFs."
+- **Decision:** after each night's ingest the job runs the nightly analyses
+  (`stock_analysis.nightly`): the market screener, each watch-list stock's numbers and the
+  market report's numbers, stored in `out_screener_*`, `out_stock_numbers` and
+  `out_market_numbers` (migration `015`). The evening session reads them, writes the notes
+  and renders the PDFs. Its scripts compute on the spot only what is missing: a stock whose
+  numbers are older than the last build, or whose watch-list settings (target, peers, EPS
+  corrections) changed since, and the market numbers when none were stored. The screener
+  and the computations moved into the package (`stock_analysis.screener`,
+  `stock_analysis.nightly`) so the job's image has them.
+- **Why:** the session's time and tokens go to judgement, not to arithmetic a schedule can
+  do; the numbers are ready before the session starts and the same for every reader.
+- **Rejected:** rendering the PDFs on the server too: they carry Claude's notes of the same
+  evening, so they are built after the notes.

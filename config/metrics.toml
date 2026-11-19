@@ -19,7 +19,7 @@
 #   formula     how it is calculated from other metrics or statement lines
 #   sources     where it lives: `sector` = column of stock_analysis.stocks.rows() (the
 #               database's rows, as analysis/peer_screen.py and the watch list use them);
-#               `stage1` = column of the screener's Stage 1 (analysis/stage1.py, TradingView);
+#               `stage1` = column of the screener's Stage 1 (stock_analysis/screener/stage1.py, TradingView);
 #               `watchlist` = key from analysis/watchlist.py key_numbers(); `stage2` =
 #               column of the screener's Stage 2 top; `tradingview`, `yahoo` and `sec` name the
 #               raw field, statement line or XBRL tag. A source can be {column, scale} when

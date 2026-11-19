@@ -65,16 +65,16 @@ Ratios and scores hide important information, so they come after, never instead.
   company's reporting currency at the ECB's latest rate, and market value is only shown
   for US-dollar filers.
 - In answers, present the absolute-values table first, then ratios, scores and conclusions.
-- Market screener: `uv run python analysis/screener.py` screens the S&P 500 (the ingest's
-  universe; settings in `config/screeners.toml`, report 13) in two stages from the database
-  (the TradingView snapshot, prices, earnings dates, core values) and saves the run there
-  (report 13, settings in `config/screeners.toml`). Stage 1 (`analysis/stage1.py`) puts
+- Market screener: `uv run python -m stock_analysis.screener` screens the S&P 500 (the
+  ingest's universe; settings in `config/screeners.toml`, report 13) in two stages from the
+  database (the TradingView snapshot, prices, earnings dates, core values) and saves the run
+  there. Stage 1 (`stock_analysis/screener/stage1.py`) puts
   each company in one of Peter Lynch's six categories and keeps those with good financial
   statements by the rules for their category (banks, insurers, REITs by kind of business).
-  Stage 2 (`analysis/stage2.py`) takes Stage 1's output and lists the top 3 cheap or
-  close-to-cheap survivors per sector against each stock's own cheap P/E. The evening run
-  reruns it, and the market report, the site's Screener page and the email show its top 3
-  per sector.
+  Stage 2 (`stock_analysis/screener/stage2.py`) takes Stage 1's output and lists the top 3 cheap or
+  close-to-cheap survivors per sector against each stock's own cheap P/E. The nightly
+  analyses run it after the ingest, and the market report, the site's Screener page and the
+  email show its top 3 per sector.
 - Other tools after step 1: `analysis/screen.py TICKERS` (strict and weighted screens) and
   `analysis/peer_screen.py` (the same on a peer group). Only the scripts the evening run
   and the site use are kept (issue #33); a one-off analysis is written in its report with
@@ -92,12 +92,16 @@ builds a per-stock vector from any chosen set (report 14).
 
 The watch list is `config/watchlist.toml` (symbol, sector peers, target P/E, one-off EPS
 corrections). Every weekday evening (Monday to Friday) at 21:00 Italy time a scheduled session follows
-`docs/EVENING_RUN.md`: it updates Claude's notes (`analyses/<SYMBOL>/notes.md`,
-`analyses/market/notes.md`, `analyses/summaries/notes.md`), runs
-`uv run python analysis/watchlist.py` (which reruns the market screener first), checks the
-outputs with `analysis/validate.py`, commits the dated PDFs and notes to `main` and emails
-Babak. The run reads only the database and records its results there (the watch list's
-runs, the market run, the screener run, the notes).
+`docs/EVENING_RUN.md`. **The session only interprets**: every number is computed on the
+server after each night's ingest (`stock_analysis.nightly`, `db nightly`: the screener, each
+watch-list stock's numbers, the market report's numbers, stored in `out_screener_*`,
+`out_stock_numbers`, `out_market_numbers`). The session reads them, updates Claude's notes
+(`analyses/<SYMBOL>/notes.md`, `analyses/market/notes.md`, `analyses/summaries/notes.md`),
+runs `uv run python analysis/watchlist.py` (which renders the PDFs from the stored numbers
+and the notes, and computes on the spot only a stock whose numbers are missing or whose
+watch-list settings changed), checks the outputs with `analysis/validate.py`, commits the
+dated PDFs and notes to `main` and emails Babak. It records its runs and notes in the
+database. Work that needs no judgement belongs in the nightly analyses, not in the session.
 Every run is kept: `analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf` plus a dated list in each
 stock folder's `README.md`, rebuilt from `out_watchlist_run` (market reports and summaries are listed in
 `analyses/README.md`). Call it a list of dated analyses, not an archive. The public page of all dated analyses is

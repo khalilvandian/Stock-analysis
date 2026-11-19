@@ -9,6 +9,7 @@ user_eps_override), which the ingest job reads to fetch the watch list's stocks 
 
 from __future__ import annotations
 
+import math
 import tomllib
 from pathlib import Path
 
@@ -52,6 +53,19 @@ def symbols(cfg: dict) -> list[str]:
     return sorted({x for s in cfg["stock"] for x in [s["symbol"], *s["peers"]]})
 
 
+def number(v) -> float:
+    """A float, with a blank (None or NaN from the database) as 0."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if math.isnan(x) else x
+
+
+def text(v) -> str:
+    return v if isinstance(v, str) else ""
+
+
 def sync(data, cfg: dict | None = None) -> bool:
     """Mirror the config into the user tables when they differ; True if anything changed."""
     cfg = cfg or load()
@@ -62,8 +76,8 @@ def sync(data, cfg: dict | None = None) -> bool:
 
     def norm_stocks(rows):
         return sorted(
-            (r["symbol"], float(r["target_pe"] or 0), r.get("target_note") or "",
-             float(r.get("stakes_per_share") or 0))
+            (r["symbol"], number(r["target_pe"]), text(r.get("target_note")),
+             number(r.get("stakes_per_share")))
             for r in rows
         )  # fmt: skip
 
@@ -73,12 +87,12 @@ def sync(data, cfg: dict | None = None) -> bool:
         and sorted((s["symbol"], p, i) for s in want for i, p in enumerate(s["peers"], 1))
         == sorted(peers.itertuples(index=False, name=None))
         and sorted(
-            (s["symbol"], o["reported"], round(float(o["eps"]), 6), o.get("reason") or "")
+            (s["symbol"], o["reported"], round(float(o["eps"]), 6), text(o.get("reason")))
             for s in want
             for o in s["eps_override"]
         )
         == sorted(
-            (r.symbol, str(r.reported)[:10], round(float(r.eps), 6), r.reason or "")
+            (r.symbol, str(r.reported)[:10], round(float(r.eps), 6), text(r.reason))
             for r in overrides.itertuples()
         )
     )

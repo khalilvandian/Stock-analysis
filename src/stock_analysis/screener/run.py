@@ -1,7 +1,7 @@
 """Market screener: both stages in a row, saved in the database.
 
-Stage 1 (analysis/stage1.py) keeps the companies with good financial statements, judged by
-their kind of business and Peter Lynch's category. Stage 2 (analysis/stage2.py) ranks only
+Stage 1 (stage1.py) keeps the companies with good financial statements, judged by
+their kind of business and Peter Lynch's category. Stage 2 (stage2.py) ranks only
 those by how cheap they are and lists the top 3 per sector. Both read only the database
 (the ingest job's TradingView snapshot, prices, earnings dates and core values).
 

@@ -45,7 +45,7 @@ Screened first for every company, before any ratio or score (`config/absolute_va
 `column` must be a column of `stock_analysis.stocks.rows()` and `history` one of
 `stocks.history()`; `tests/test_absolute.py` checks both. The
 screener's own absolute-values table uses TradingView's fields in US dollars
-(`screen_common.ABSOLUTE`).
+(`stock_analysis.screener.common.ABSOLUTE`).
 
 ## Metrics dictionary
 

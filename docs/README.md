@@ -11,7 +11,7 @@ it is the way it is. The project rules every Claude session follows are in
 3. Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for the layers and where every file fits.
 4. Read [`ENTITIES.md`](ENTITIES.md) for the data sources, the watch list and the file formats.
 5. To analyse one stock, follow "Single-stock analysis" in [`PROCESSES.md`](PROCESSES.md).
-6. To screen the market, run `uv run python analysis/screener.py` and read [`SCREENER.md`](SCREENER.md).
+6. To screen the market, run `uv run python -m stock_analysis.screener` and read [`SCREENER.md`](SCREENER.md).
 7. The evening run is [`EVENING_RUN.md`](EVENING_RUN.md); its parts are explained in `PROCESSES.md`.
 8. Before changing a rule or a default, check [`DECISIONS.md`](DECISIONS.md) for why it is set that way.
 9. When something breaks, start with the troubleshooting table in [`OPERATIONS.md`](OPERATIONS.md).

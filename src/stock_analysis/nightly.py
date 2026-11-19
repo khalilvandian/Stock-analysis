@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 
 from . import stocks
+from . import watchlist as wl
 from .db import ROOT
 
 MARKET_CONFIG = ROOT / "config" / "market.toml"
@@ -185,7 +186,7 @@ def key_numbers(d: dict) -> dict:
     median = float(yearly["pe"].median()) if not yearly.empty else np.nan
     # Equity stakes (stakes_per_share) are kept out of the P/E: the price paid for the
     # business is the price less the stakes, and the entry price adds them back.
-    stakes = float(stock.get("stakes_per_share", 0.0))
+    stakes = wl.number(stock.get("stakes_per_share"))
     entry = stock["target_pe"] * eps + stakes if eps > 0 else np.nan
     q = d["quarters"]
     eps_next = (
@@ -335,14 +336,14 @@ def watch_list(data) -> list[dict]:
             {
                 "symbol": r.symbol,
                 "peers": peers.loc[peers["symbol"] == r.symbol, "peer"].tolist(),
-                "target_pe": float(r.target_pe),
-                "target_note": r.target_note or "",
-                "stakes_per_share": float(r.stakes_per_share or 0.0),
+                "target_pe": wl.number(r.target_pe),
+                "target_note": wl.text(r.target_note),
+                "stakes_per_share": wl.number(r.stakes_per_share),
                 "eps_override": [
                     {
                         "reported": str(o.reported)[:10],
                         "eps": float(o.eps),
-                        "reason": o.reason or "",
+                        "reason": wl.text(o.reason),
                     }
                     for o in over[over["symbol"] == r.symbol].itertuples()
                 ],
@@ -357,8 +358,8 @@ def stock_key(stock: dict) -> str:
     keep = {
         "symbol": stock["symbol"],
         "peers": list(stock.get("peers", [])),
-        "target_pe": float(stock.get("target_pe") or 0),
-        "stakes_per_share": float(stock.get("stakes_per_share") or 0),
+        "target_pe": wl.number(stock.get("target_pe")),
+        "stakes_per_share": wl.number(stock.get("stakes_per_share")),
         "eps_override": sorted(
             (str(o["reported"])[:10], round(float(o["eps"]), 6))
             for o in stock.get("eps_override", [])

@@ -10,7 +10,7 @@ API (api/app.py) where PostgreSQL can't be reached, as in Claude's cloud session
     data.daily("NEE", start="2025-01-01")
     data.sql("SELECT symbol, revenue FROM v_annual WHERE fiscal_year = 2025")
     data.save_note("NFLX", "## Thesis ...")
-    data.save_screener_run("2026-11-18", "SP:SPX", "analysis/screener.py", results)
+    data.save_screener_run("2026-11-18", "SP:SPX", "stock_analysis.screener", results)
 
 Backend: when STOCK_API_URL is set (the cloud environment sets it), the web API, with the key
 from STOCK_API_KEY if set (on a PC) or attached by the cloud's network secret. Otherwise the

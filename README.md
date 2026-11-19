@@ -42,7 +42,7 @@ ingest job (`docs/INGEST.md`). The scripts read it through `stock_analysis.data`
 | `uv run python analysis/peer_screen.py NAME TICKERS` | Metrics and the strict and weighted screens for a hand-picked peer group |
 | `uv run python analysis/screen.py TICKERS --balanced` | Weighted ranking (debt 50%, profitability and cash 25%, cheapness 25%) with a growth requirement |
 | `uv run python analysis/screen.py TICKERS --strict` | Strict debt rules, ranked by cheapness |
-| `uv run python analysis/screener.py` | Market screener: Stage 1 (Lynch category and financial-statement rules) then Stage 2 (top 3 cheap or close-to-cheap per sector); saved in the database |
+| `uv run python -m stock_analysis.screener` | Market screener: Stage 1 (Lynch category and financial-statement rules) then Stage 2 (top 3 cheap or close-to-cheap per sector); saved in the database |
 | `uv run python analysis/watchlist.py` | The evening run: screener, market report, one PDF per watch-list stock and the summary, in `analyses/` |
 | `uv run python analysis/market.py --numbers` | The market report's numbers (indices, sectors, breadth, the screener's top names) |
 | `uv run python analysis/validate.py` | Checks the run's outputs are complete and consistent |
@@ -50,6 +50,7 @@ ingest job (`docs/INGEST.md`). The scripts read it through `stock_analysis.data`
 | `uv run python analysis/send_email.py --to ADDRESS` | Emails the last run with every PDF through Brevo |
 | `uv run python -m stock_analysis.metrics list --set proposed` | The metrics dictionary and per-stock vectors |
 | `uv run python -m stock_analysis.db ingest` | One run of the ingest job (the Azure job runs it every night) |
+| `uv run python -m stock_analysis.db nightly` | The nightly analyses alone (the ingest job runs them after its build): the screener, the watch list's and the market report's numbers, stored for the evening run |
 
 ## Setup
 

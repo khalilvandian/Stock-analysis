@@ -341,7 +341,7 @@ def title(folder: Path) -> str:
     """Company name from the folder's README heading, e.g. 'Boston Scientific Corporation (BSX)'."""
     readme = folder / "README.md"
     if readme.exists():
-        m = re.match(r"#\s*(.+?):", readme.read_text().splitlines()[0])
+        m = re.match(r"#\s*(.+?):", readme.read_text(encoding="utf-8").splitlines()[0])
         if m:
             return m.group(1)
     return folder.name
@@ -358,7 +358,7 @@ def notes(folder: Path) -> dict[str, str]:
     if not path.exists():
         return {}
     out, name = {}, None
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith("## "):
             name = line[3:].strip()
             out[name] = []
@@ -381,7 +381,7 @@ def active() -> list[str]:
     """Symbols on the watch list now, in config order."""
     if not CONFIG.exists():
         return []
-    return [x["symbol"] for x in tomllib.loads(CONFIG.read_text()).get("stock", [])]
+    return [x["symbol"] for x in tomllib.loads(CONFIG.read_text(encoding="utf-8")).get("stock", [])]
 
 
 def watched() -> tuple[list[Path], list[Path]]:

@@ -196,7 +196,7 @@ def screener_checks(
         if frame.empty:
             out.append(_fail(f"{name} rows", "no rows"))
             return out
-    out.append(_pass("screener columns", f"Stage 2 top {len(top)} rows, stage1.csv {len(s1)} rows"))
+    out.append(_pass("screener columns", f"Stage 2 top {len(top)} rows, Stage 1 {len(s1)} rows"))
 
     # Stage 1: statuses and the reasons behind them
     bad = s1[~s1["status"].isin(STATUSES)]
@@ -530,7 +530,7 @@ def check_last_run(root: Path) -> list[Check]:
     if not path.exists():
         return [_warn(name, "not found (written by analysis/watchlist.py; not committed)")]
     try:
-        run = json.loads(path.read_text())
+        run = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         return [_fail(name, f"does not parse: {e}")]
     problems = []
