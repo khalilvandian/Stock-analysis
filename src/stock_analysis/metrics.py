@@ -193,7 +193,7 @@ def doc(d: dict) -> str:
         "# Metrics dictionary",
         "",
         "Generated from `config/metrics.toml` by `uv run python -m stock_analysis.metrics doc`;"
-        " edit the TOML, not this file. Report 14 explains the choices to make.",
+        " edit the TOML, not this file. docs/DECISIONS.md records the choices made.",
         "",
         d["meta"]["example_note"],
         "",

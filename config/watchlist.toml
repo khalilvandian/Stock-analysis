@@ -20,13 +20,13 @@ timezone = "Europe/Rome"
 symbol = "BSX"
 peers = ["ABT", "MDT", "SYK", "ISRG", "BDX", "EW", "ZBH", "DXCM", "STE", "PODD", "TFX", "GEHC", "RMD"]
 target_pe = 13
-target_note = "Proposed 2026-10-27 (report 11): about half the 10-year median, a discount for slower growth and the Penumbra debt."
+target_note = "Proposed 2026-10-27: about half the 10-year median, a discount for slower growth and the Penumbra debt."
 
 [[stock]]
 symbol = "BKNG"
 peers = ["EXPE", "ABNB", "TCOM", "TRIP", "MMYT", "TRVG"]
 target_pe = 15
-target_note = "Proposed 2026-10-25 (report 12), not yet confirmed by Babak: below the 18x decade low, a discount for the AI-agent risk."
+target_note = "Proposed 2026-10-25, not yet confirmed by Babak: below the 18x decade low, a discount for the AI-agent risk."
 
 [[stock]]
 symbol = "NFLX"

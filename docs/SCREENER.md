@@ -10,8 +10,8 @@ stages, run as separate programs:
   survivor's own cheap price, and lists the top 3 cheap or close-to-cheap names per sector.
   Technicals are shown for timing and never change the ranking.
 
-`stock_analysis.screener` runs both. Settings: `config/screeners.toml`. Results and their
-discussion: [report 13](../reports/13-market-screener.md). The methods doc with every rule's
+`stock_analysis.screener` runs both. Settings: `config/screeners.toml`. Each run's results
+are in the database (`out_screener_*`) and on the site's Screener page. The methods doc with every rule's
 source, "Stage 1 screening methods and their sources", is at
 https://claude.ai/artifact/XXxnx8ZMtM8GwfnsfS4mza. Commands and the step-by-step run are in
 [`PROCESSES.md`](PROCESSES.md#5-the-market-screener).
@@ -119,7 +119,7 @@ Piotroski, "Value Investing: The Use of Historical Financial Statement Informati
 Separate Winners from Losers", *Journal of Accounting Research*, 2000; **Altman 1968** =
 Edward Altman, "Financial Ratios, Discriminant Analysis and the Prediction of Corporate
 Bankruptcy", *Journal of Finance*, 1968; **Judgement** = a threshold chosen for this screener
-(report 13 and the methods doc list them for review).
+(the methods doc lists them for review).
 
 **Slow grower.** Babak's debt rules, and Lynch's dividend checks: slow growers are bought for
 the dividend, so check it has been paid regularly and that the payout leaves a cushion.
