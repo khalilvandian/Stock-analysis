@@ -40,6 +40,8 @@ max_age_hours = 4
 # close), and on weekdays an ok stock_quotes run within `quotes_max_age_hours`.
 grace_hours = 8
 quotes_max_age_hours = 2
+# Airflow's go-live: a trading day before it has no run by design, so it isn't a failure.
+live_from = 2026-11-19
 
 [alerts]
 # Failures are emailed through Brevo (the same account as the evening email). The
