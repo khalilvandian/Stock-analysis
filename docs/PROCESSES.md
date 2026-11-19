@@ -53,7 +53,7 @@ every answer, before any ratio or score.
 
 ## 4. Single-stock analysis
 
-The method of reports 11 (BSX) and 12 (BKNG). Each step's output goes into the report in
+The method of the single-stock analyses. Each step's output goes into the report in
 this order.
 
 1. **Absolute values, latest 12 months.** Run the peer group (it includes the stock itself):
@@ -76,8 +76,7 @@ this order.
 4. **Screens.** `peer_screen.py` prints the strict screen (every debt rule) and the weighted
    screen (debt 50%, profit and cash 25%, cheapness 25%, growth required) within the peers.
 5. **DCF.** The standard enterprise DCF is in the peer table (`dcf_fair_value`,
-   `price_vs_fair_value`, `wacc`, `fcff_before_growth`). A guided or scenario DCF (as in
-   reports 01-10) is worked out in the report from `stock_analysis.stocks`; the scripts that
+   `price_vs_fair_value`, `wacc`, `fcff_before_growth`). A guided or scenario DCF is worked out in the report from `stock_analysis.stocks`; the scripts that
    did it were retired with the files (issue #33).
 6. **Own-history P/E.** Adjusted EPS is Yahoo's reported quarterly EPS, split-adjusted; the
    trailing figure is the sum of four consecutive quarters. Each year's P/E is that year's
@@ -281,7 +280,7 @@ Babak's own Gmail.
 
 ## 10. Writing a report
 
-1. Number it after the last report in `reports/` (`15-<topic>.md`).
+1. Number it after the last report in `reports/` (`15-<topic>.md`; 01-14 were removed but keep their numbers).
 2. Title, then an italic line with the data date, when it was written and the tools used.
 3. **1. Summary:** the verdict in bold, then four one-line points (cheap, strong, weak,
    uncertain). Short, no detail.
@@ -326,7 +325,7 @@ Babak's own Gmail.
    new Stage 1 column, add it to `stage2.NEEDS`.
 3. Run `uv run python -m stock_analysis.screener` and compare the pass counts and the top list with
    the last run.
-4. Update [`SCREENER.md`](SCREENER.md), report 13 (numbers and date), and the methods doc;
+4. Update [`SCREENER.md`](SCREENER.md) and the methods doc;
    record the change and who decided it in [`DECISIONS.md`](DECISIONS.md).
 5. Run the pre-commit check and commit.
 

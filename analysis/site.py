@@ -851,7 +851,7 @@ def screener_page(menu) -> str:
         'years and its sector\'s median P/E. "Cheap" is at or below it, "close" within '
         "15% above. Trend is timing only. "
         'Hover a stock for the reason it is listed. "Not classified" = too little EPS history '
-        "for a Lynch category; those don't pass. Every rule and its source: report 13 and "
+        "for a Lynch category; those don't pass. Every rule and its source: "
         "docs/SCREENER.md in the repository.</p>"
     )
     return layout("Market screener", "screener", "\n".join(body), menu)

@@ -351,8 +351,10 @@ include it unchanged, and a push that edits it republishes the site.
     `db load-files` command, and the scripts the evening run and the site don't use:
     `sector.py`, `history.py`, `compare.py`, `valuation.py`, `debt.py`, `debt_to_ebitda.py`,
     `dcf.py`, `dcf_firm.py`, `dashboard/`, `stock_analysis.fetch`, `stock_analysis.fmp`,
-    `ecb.usd_per_unit`. Reports 01-12 keep their numbers; their reproduce commands name
-    scripts that no longer exist (`reports/README.md` says so).
+    `ecb.usd_per_unit`. Then (Babak, 2026-11-19: "they don't serve anything anymore ...
+    they were just initial experimentation") reports 01-14 too, which read those files and
+    scripts; `reports/README.md` lists them and the commit to read them from, and the docs
+    still cite them by number where a decision came from one.
   - The site reads the runs, the screener, the coverage and the explorer from the database
     through the web API at build time.
 - **Consequences:**

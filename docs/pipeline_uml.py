@@ -169,15 +169,15 @@ a = D(
     "UML activity diagram of the nightly ingest run in three partitions: the ingest job "
     "plans tasks, chooses its mode and fetches each due task into the raw layer; if new rows "
     "were stored the build rebuilds, in one transaction, only the companies with new raw "
-    "data; coverage takes the "
-    "snapshot that the next run reads to choose its mode.",
+    "data; coverage takes the snapshot that the next run reads to choose its mode, then the "
+    "nightly analyses compute what the evening run reads.",
 )
 a.frame(10, 10, 1280, 600)
 a.add('<rect class="u-part" x="24" y="46" width="1252" height="550"/>')
 a.add('<path class="u-partl" d="M24,256 H1276 M24,486 H1276 M50,46 V596"/>')
 a.lane_label(41, 151, "ingest job")
 a.lane_label(41, 371, "db build · one transaction")
-a.lane_label(41, 541, "coverage")
+a.lane_label(41, 541, "coverage · analyses")
 
 CY = 150
 a.initial(74, CY)
@@ -312,20 +312,23 @@ a.edge([(82, CC), (sn.l, CC)])
 a.edge([(168, core.b), (168, sn.t)])
 out = a.obj(270, CC - 20, 150, 40, ["out_coverage_snapshot"], store=True)
 a.edge([(sn.r, CC), (out.l, CC)])
-rr = a.action(460, CC - 20, 120, 40, ["Record the run"])
-a.edge([(out.r, CC), (rr.l, CC)])
-a.final(620, CC)
-a.edge([(rr.r, CC), (609, CC)])
+na = a.action(460, CC - 20, 150, 40, ["Nightly analyses", ("nightly.run", "u-objm")])
+a.edge([(out.r, CC), (na.l, CC)])
+rr = a.action(650, CC - 20, 120, 40, ["Record the run"])
+a.edge([(na.r, CC), (rr.l, CC)])
+a.final(810, CC)
+a.edge([(rr.r, CC), (799, CC)])
 a.note(
-    660,
-    500,
+    850,
+    496,
     380,
     [
-        "ops_run keeps the mode, requests, rows stored,",
-        "the build and the coverage summary of each run",
+        "nightly analyses: the screener, each watch-list",
+        "stock's and the market's numbers (out_*), read",
+        "by the evening run; ops_run keeps each run's summary",
     ],
     to=(rr.r, 525),
-    frm=(660, 525),
+    frm=(850, 525),
 )
 # object flow: the snapshot is read by the next run's Choose mode
 hy = BY + BH / 2
@@ -927,8 +930,8 @@ ROWS = [
     ("SEC company tickers", "JSON: every ticker with its CIK", "API · the nightly job"),
     (
         "Yahoo daily prices",
-        "table a company: open, high, low, close, volume, dividends, splits",
-        "yfinance · the nightly job",
+        "table a symbol: open, high, low, close, volume, dividends, splits",
+        "yfinance · the nightly job · companies and the market report's instruments",
     ),
     (
         "Yahoo statements",
@@ -942,14 +945,14 @@ ROWS = [
     ),
     (
         "TradingView screener",
-        "JSON: listings with index membership, sector, industry, market value",
-        "one scan request a night",
+        "JSON: listings with index membership, sector, industry and the screener's fields",
+        "two scans a night: the index, and the watch list's other symbols",
     ),
     ("ECB reference rates", "CSV: daily euro exchange rates", "API · the nightly job"),
     (
-        "project files",
-        "CSV in data/: history.csv and the files fetched before the database",
-        "on this PC · db load-files",
+        "history.csv (retired)",
+        "CSV: the project's own SEC-based yearly history, from before the database",
+        "loaded once; the file and its loader are gone, the rows stay",
     ),
 ]
 RY0, RS, RHT = 82, 54, 46
@@ -968,9 +971,9 @@ GROUPS = [
     (5, 5, ["Load prices", ("yahoo.load_prices", "u-objm")], "raw_yahoo_price"),
     (6, 6, ["Load statements", ("yahoo.load_statements", "u-objm")], "raw_yahoo_statement"),
     (7, 7, ["Load earnings", ("yahoo.load_earnings", "u-objm")], "raw_yahoo_earnings"),
-    (8, 8, ["Load members", ("market.load_constituents", "u-objm")], "raw_tv_constituent"),
+    (8, 8, ["Load snapshots", ("market.load_*", "u-objm")], "raw_tv_constituent"),
     (9, 9, ["Load rates", ("market.load_rates", "u-objm")], "raw_ecb_rate"),
-    (10, 10, ["Load files", ("load_files.load_all", "u-objm")], "raw_project_history"),
+    (10, 10, ["No loader now", ("kept as loaded", "u-st")], "raw_project_history"),
 ]
 tables = []
 for first, last, lines, table in GROUPS:
