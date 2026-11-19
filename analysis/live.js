@@ -93,14 +93,16 @@ window.Live = (() => {
     return true;
   }
 
-  const nyTime = (iso, withDay) => new Date(`${iso}Z`).toLocaleString("en-US", { timeZone: NY, hour: "numeric", minute: "2-digit", ...(withDay ? { month: "short", day: "numeric" } : {}) });
+  // Every hour the site shows is Italy time: CET, CEST in summer.
+  const CET = "Europe/Rome";
+  const cetTime = (iso, withDay) => new Date(`${iso}Z`).toLocaleString("en-GB", { timeZone: CET, hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZoneName: "short", ...(withDay ? { month: "short", day: "numeric" } : {}) });
 
   // When a quote's price was traded, in words: TradingView's own delay for the listing (15
   // minutes for US exchanges, 20 for Tokyo); outside the session it is the latest close.
   function when(q, fetchedAt, long = false) {
     const lag = ok(q.delay) && q.delay > 0 ? `${Math.round(q.delay / 60)} min delayed, ` : "real time, ";
-    if (q.session === "market" && q.at) return `${long ? lag : ""}${nyTime(q.at, true)} New York`;
-    return long && fetchedAt ? `latest close, checked ${nyTime(fetchedAt, true)} New York` : "latest close";
+    if (q.session === "market" && q.at) return `${long ? lag : ""}${cetTime(q.at, true)}`;
+    return long && fetchedAt ? `latest close, checked ${cetTime(fetchedAt, true)}` : "latest close";
   }
 
   // The same number formats as analysis/site.py (fmt_money and the fmt patterns).
