@@ -412,3 +412,21 @@ include it unchanged, and a push that edits it republishes the site.
 - **Rejected:** keeping separate clocks with no checks (the failure that started this);
   putting the run log only in Airflow's metadata database, which the cloud session and
   GitHub can't read.
+
+## 2026-11-19
+
+### Airflow owns every scheduled piece, and runs on Azure (issue #30)
+
+- **Who:** Babak: "the point of orchestration was to take everything under control ... define
+  them as tasks, make them repeatable"; "we are locally working on Airflow, but we will
+  implement Airflow on Azure."
+- **Decision:** Airflow starts each piece as a task instead of watching it: the ingest, the
+  nightly analyses (split out of the ingest run), the hourly quotes, the site rebuild and,
+  if its API allows, the Claude session. The Azure jobs lose their own cron. Only the
+  morning audit stays outside, because it must work when Airflow is down. Airflow is
+  developed and tested locally in Docker; production Airflow runs on Azure, never on the PC.
+- **Why:** a schedule nobody controls is what failed in November. Tasks can be retried and
+  rerun for any date. Hosting on the PC would stop every job when the PC is off.
+- **Supersedes:** the watcher design of 2026-11-18 (above), where the jobs kept their own
+  schedules and Airflow only checked them.
+
