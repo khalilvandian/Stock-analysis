@@ -71,7 +71,8 @@ prices as last time (the market is closed), and fails on an error.
 `pipeline-watch.yml` runs on GitHub Actions every 3 hours (at :20) and reads the run log
 through the web API: `python -m stock_analysis.pipeline audit`. It checks:
 - the last trading day's `stock_nightly` run finished `ok`, once it should be over (8 hours
-  after the close);
+  after the close). A trading day before Airflow's go-live (`live_from` in
+  `config/pipeline.toml`, 2026-11-19) has no run by design and passes;
 - on weekdays, an `ok` `stock_quotes` run in the last 2 hours.
 
 A failed check fails the workflow, and GitHub emails the repository owner.
