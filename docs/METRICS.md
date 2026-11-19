@@ -1,6 +1,6 @@
 # Metrics dictionary
 
-Generated from `config/metrics.toml` by `uv run python -m stock_analysis.metrics doc`; edit the TOML, not this file. Report 14 explains the choices to make.
+Generated from `config/metrics.toml` by `uv run python -m stock_analysis.metrics doc`; edit the TOML, not this file. docs/DECISIONS.md records the choices made.
 
 Worked examples are Boston Scientific (BSX) unless they say otherwise. Yahoo figures (sector.py, peer screen) are as of the 2026-10-26 close; TradingView figures (Stage 1) as of 2026-10-27; adjusted EPS and P/E history from the 2026-10-27 20:55 watch-list run. Booking (BKNG) is used where BSX can't show a case (net cash, negative equity).
 
@@ -151,7 +151,7 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 ## Left out
 
 - **technicals**: RSI, 50- and 200-day averages, 52-week range, one-year performance (Stage 2 timing only)
-- **analyst**: Analyst target upside and rating (sector.py analyst_upside, analyst_view; TradingView Recommend.All)
+- **analyst**: Analyst target upside and rating (the rows' analyst_upside, analyst_view from TradingView; Recommend.All)
 - **market**: Beta (used inside WACC), indices, sector breadth (market report)
 
 ## Detail
@@ -490,7 +490,7 @@ Years of operating earnings needed to repay the net debt. The standard leverage 
 - **Formula:** net_debt / ebitda (net cash always passes; EBITDA <= 0 fails)
 - **Unit:** x; **better:** lower; **period:** ttm
 - **Source:** sector: `net_debt_to_ebitda`; stage1: `net_debt_to_ebitda`
-- **Used in:** strict screen (<= 4.5x); weighted debt score; Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x); debt_to_ebitda.py history
+- **Used in:** strict screen (<= 4.5x); weighted debt score; Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x)
 - **Example (BSX, 2026-09-30):** 2.14x = 12.085 / 5.637. BKNG: 3.19 / 10.65 = 0.30
 - **Vector:** core
 - **Clipped in the vector:** lower 0.00x
@@ -624,7 +624,7 @@ Average yearly revenue growth over the fiscal years on record.
 - **Used in:** weighted screen growth gate (> 0)
 - **Example (BSX, FY2022-FY2025):** +16.6% = mean(+12.3%, +17.6%, +19.9%)
 - **Vector:** candidate
-- **Note:** sector.py uses Yahoo's 3-4 years; Stage 1 uses 5 years from TradingView. Open choice: which window.
+- **Note:** The rows (stock_analysis.stocks) use the last 4 fiscal years; Stage 1 uses 5 years from TradingView. Open choice: which window.
 
 <a id="revenue-growth-median"></a>
 #### Revenue growth, median year (`revenue_growth_median`)
@@ -924,7 +924,7 @@ Percentile (0-100) within the peer group, averaged over cash / short-term debt, 
 - **Unit:** score; **better:** higher; **period:** fq
 - **Source:** sector: `debt_score`
 - **Used in:** weighted screen (50% of the total)
-- **Example (BSX, 2026-10-27):** 29.5 = against 9 medical-device peers (report 11)
+- **Example (BSX, 2026-10-27):** 29.5 = against 9 medical-device peers
 - **Vector:** derived
 - **Note:** Relative to whichever peers it is run on, so not a property of the stock. Built from the ratios above; the vector can take the ratios instead.
 
@@ -937,7 +937,7 @@ Weighted percentile of net margin (2), margin change avg and median (1 each), OC
 - **Unit:** score; **better:** higher; **period:** history
 - **Source:** sector: `quality_score`
 - **Used in:** weighted screen (25%)
-- **Example (BSX, 2026-10-27):** 77 = against 9 medical-device peers (report 11)
+- **Example (BSX, 2026-10-27):** 77 = against 9 medical-device peers
 - **Vector:** derived
 
 <a id="cheap-score"></a>
@@ -949,7 +949,7 @@ Percentile of price vs DCF, P/E vs industry median, EV/EBITDA vs industry median
 - **Unit:** score; **better:** higher; **period:** now
 - **Source:** sector: `cheap_score`
 - **Used in:** weighted screen (25%)
-- **Example (BSX, 2026-10-27):** 80.6 = against 9 medical-device peers (report 11)
+- **Example (BSX, 2026-10-27):** 80.6 = against 9 medical-device peers
 - **Vector:** derived
 
 <a id="total-score"></a>
@@ -961,7 +961,7 @@ Babak's weighted score: debt 50%, profitability and cash 25%, cheapness 25%.
 - **Unit:** score; **better:** higher; **period:** now
 - **Source:** sector: `total_score`
 - **Used in:** weighted screen ranking
-- **Example (BSX, 2026-10-27):** 54.1 = 0.5 x 29.5 + 0.25 x 77.0 + 0.25 x 80.6; 5th of 9 (report 11)
+- **Example (BSX, 2026-10-27):** 54.1 = 0.5 x 29.5 + 0.25 x 77.0 + 0.25 x 80.6; 5th of 9
 - **Vector:** derived
 
 ### Valuation (needs the price)

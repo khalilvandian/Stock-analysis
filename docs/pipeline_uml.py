@@ -1,4 +1,4 @@
-"""Draws the "Inside the database, in UML" section of docs/pipeline.html (four UML 2.5
+"""Draws the "Inside the database, in UML" section of docs/pipeline.html (UML 2.5
 diagrams and their notes). Rerun after a change: python docs/pipeline_uml.py docs/pipeline.html"""
 
 # ruff: noqa: E501  (the SVG and the HTML notes are kept on one line each)
@@ -167,16 +167,17 @@ a = D(
     "act",
     "Nightly ingest run",
     "UML activity diagram of the nightly ingest run in three partitions: the ingest job "
-    "plans tasks, chooses its mode and fetches each due task into the raw layer; if rows "
-    "were stored the build rebuilds the core layer in one transaction; coverage takes the "
-    "snapshot that the next run reads to choose its mode.",
+    "plans tasks, chooses its mode and fetches each due task into the raw layer; if new rows "
+    "were stored the build rebuilds, in one transaction, only the companies with new raw "
+    "data; coverage takes the snapshot that the next run reads to choose its mode, then the "
+    "nightly analyses compute what the evening run reads.",
 )
 a.frame(10, 10, 1280, 600)
 a.add('<rect class="u-part" x="24" y="46" width="1252" height="550"/>')
 a.add('<path class="u-partl" d="M24,256 H1276 M24,486 H1276 M50,46 V596"/>')
 a.lane_label(41, 151, "ingest job")
 a.lane_label(41, 371, "db build · one transaction")
-a.lane_label(41, 541, "coverage")
+a.lane_label(41, 541, "coverage · analyses")
 
 CY = 150
 a.initial(74, CY)
@@ -250,13 +251,13 @@ a.note(
 
 a.diamond(1110, CY)
 a.edge([(RX + RW, CY), (1097, CY)])
-a.g(1130, CY - 7, "[nothing stored]")
+a.g(1130, CY - 7, "[nothing new]")
 
 # lane B, right to left
 BY, BH = 328, 44
 labels = [
-    ["Clear core and", "load items, tags"],
     ["Build companies", "and index spells"],
+    ["Pick companies", "with new raw data"],
     ["Build daily", "prices"],
     ["Build fundamentals"],
     ["Build trailing", "twelve months"],
@@ -269,7 +270,7 @@ bs = [
     for i, (c, lab) in enumerate(zip(centres, labels, strict=True))
 ]
 a.edge([(1110, CY + 13), (1110, BY)])
-a.g(1118, 200, "[rows stored]")
+a.g(1118, 200, "[new rows]")
 for i in range(6):
     a.edge([(bs[i].l, BY + BH / 2), (bs[i + 1].r, BY + BH / 2)])
 
@@ -311,20 +312,23 @@ a.edge([(82, CC), (sn.l, CC)])
 a.edge([(168, core.b), (168, sn.t)])
 out = a.obj(270, CC - 20, 150, 40, ["out_coverage_snapshot"], store=True)
 a.edge([(sn.r, CC), (out.l, CC)])
-rr = a.action(460, CC - 20, 120, 40, ["Record the run"])
-a.edge([(out.r, CC), (rr.l, CC)])
-a.final(620, CC)
-a.edge([(rr.r, CC), (609, CC)])
+na = a.action(460, CC - 20, 150, 40, ["Nightly analyses", ("nightly.run", "u-objm")])
+a.edge([(out.r, CC), (na.l, CC)])
+rr = a.action(650, CC - 20, 120, 40, ["Record the run"])
+a.edge([(na.r, CC), (rr.l, CC)])
+a.final(810, CC)
+a.edge([(rr.r, CC), (799, CC)])
 a.note(
-    660,
-    500,
+    850,
+    496,
     380,
     [
-        "ops_run keeps the mode, requests, rows stored,",
-        "the build and the coverage summary of each run",
+        "nightly analyses: the screener, each watch-list",
+        "stock's and the market's numbers (out_*), read",
+        "by the evening run; ops_run keeps each run's summary",
     ],
     to=(rr.r, 525),
-    frm=(660, 525),
+    frm=(850, 525),
 )
 # object flow: the snapshot is read by the next run's Choose mode
 hy = BY + BH / 2
@@ -882,8 +886,284 @@ m.note(
 )
 SVG6 = m.svg()
 
+# ======================================================================= 0. sources and their data
+src = D(
+    "u10",
+    1300,
+    760,
+    "class",
+    "Sources and the data they deliver",
+    "UML diagram of each source artifact with its format and contents, how it arrives, the "
+    "loader that reads it and the raw table it is stored in; every raw table feeds the build "
+    "of the core layer, and every payload is kept as received.",
+)
+src.frame(10, 10, 1280, 740)
+for x, s in (
+    (274, "what arrives · format · how"),
+    (690, "loader"),
+    (965, "raw table"),
+    (1190, "then"),
+):
+    src.t(x, 62, s, "u-lane", "middle")
+src.add('<path class="u-partl" d="M24,72 H1276"/>')
+ROWS = [
+    (
+        "SEC company facts",
+        "JSON per company: every reported fact, by tag, unit and period",
+        "API · the nightly job, one company a request",
+    ),
+    (
+        "SEC companyfacts.zip",
+        "ZIP of the same JSON files, every company at once",
+        "bulk file you download → inbox/sec_companyfacts/ · db import",
+    ),
+    (
+        "SEC Financial Statement Data Sets",
+        "ZIP a quarter of tab-separated text: filings, numbers, statement lines",
+        "bulk file you download → inbox/sec_fsds/ · db import",
+    ),
+    (
+        "SEC full filing (XBRL)",
+        "XML of one 10-K or 10-Q: instance, schema, linkbases",
+        "API through edgartools · values still missing per share class",
+    ),
+    ("SEC company tickers", "JSON: every ticker with its CIK", "API · the nightly job"),
+    (
+        "Yahoo daily prices",
+        "table a symbol: open, high, low, close, volume, dividends, splits",
+        "yfinance · the nightly job · companies and the market report's instruments",
+    ),
+    (
+        "Yahoo statements",
+        "tables a company: income, balance sheet, cash flow, annual and quarterly",
+        "yfinance · Yahoo keeps about four years",
+    ),
+    (
+        "Yahoo earnings dates",
+        "table: report dates with reported and expected EPS",
+        "yfinance · the nightly job",
+    ),
+    (
+        "TradingView screener",
+        "JSON: listings with index membership, sector, industry and the screener's fields",
+        "two scans a night: the index, and the watch list's other symbols",
+    ),
+    ("ECB reference rates", "CSV: daily euro exchange rates", "API · the nightly job"),
+    (
+        "history.csv (retired)",
+        "CSV: the project's own SEC-based yearly history, from before the database",
+        "loaded once; the file and its loader are gone, the rows stay",
+    ),
+]
+RY0, RS, RHT = 82, 54, 46
+arts = []
+for i, (name, what, how) in enumerate(ROWS):
+    y = RY0 + i * RS
+    arts.append(
+        src.obj(24, y, 500, RHT, [(f"«artifact» {name}", "u-act"), (what, "u-n"), (how, "u-nm")])
+    )
+# loaders and tables: (first row, last row, loader lines, table)
+GROUPS = [
+    (0, 1, ["Parse company facts", ("sec.load_companyfacts", "u-objm")], "raw_sec_fact"),
+    (2, 2, ["Read a quarter", ("files.import_fsds", "u-objm")], None),
+    (3, 3, ["Read a filing", ("xbrl.load_filing", "u-objm")], None),
+    (4, 4, ["Read tickers", ("sec.load_tickers", "u-objm")], "raw_sec_ticker"),
+    (5, 5, ["Load prices", ("yahoo.load_prices", "u-objm")], "raw_yahoo_price"),
+    (6, 6, ["Load statements", ("yahoo.load_statements", "u-objm")], "raw_yahoo_statement"),
+    (7, 7, ["Load earnings", ("yahoo.load_earnings", "u-objm")], "raw_yahoo_earnings"),
+    (8, 8, ["Load snapshots", ("market.load_*", "u-objm")], "raw_tv_constituent"),
+    (9, 9, ["Load rates", ("market.load_rates", "u-objm")], "raw_ecb_rate"),
+    (10, 10, ["No loader now", ("kept as loaded", "u-st")], "raw_project_history"),
+]
+tables = []
+for first, last, lines, table in GROUPS:
+    y0, y1 = RY0 + first * RS, RY0 + last * RS + RHT
+    ld = src.action(590, y0, 200, y1 - y0, lines)
+    for i in range(first, last + 1):
+        cy = arts[i].cy
+        src.edge([(arts[i].r, cy), (ld.l, cy)])
+    if table:
+        tb = src.obj(860, y0, 210, y1 - y0, [(table, "u-objm")], store=True)
+        tables.append(tb)
+        src.edge([(ld.r, (y0 + y1) / 2), (tb.l, (y0 + y1) / 2)])
+    else:  # the data sets and the full filings share raw_sec_xbrl_fact
+        if first == 2:
+            xb = src.obj(860, y0, 210, RS + RHT, [("raw_sec_xbrl_fact", "u-objm")], store=True)
+            tables.append(xb)
+        src.edge([(ld.r, (y0 + y1) / 2), (860, (y0 + y1) / 2)])
+BUS = 1100
+src.add(f'<path class="u-line" d="M{BUS},{tables[0].cy} V{tables[-1].cy}"/>')
+for tb in tables:
+    src.edge([(tb.r, tb.cy), (BUS, tb.cy)], arrow=False)
+src.add(f'<circle class="u-solid" cx="{BUS}" cy="{tables[4].cy}" r="4"/>')
+bd = src.action(
+    1130, tables[4].cy - 30, 140, 60, ["Build core", ("act Nightly run", "u-st")], call=True
+)
+src.edge([(BUS, tables[4].cy), (bd.l, tables[4].cy)])
+co = src.obj(1130, tables[4].cy + 70, 140, 44, [("core layer", "u-obj")], store=True)
+src.edge([(bd.cx, bd.b), (bd.cx, co.t)])
+src.note(
+    24,
+    RY0 + len(ROWS) * RS + 6,
+    1046,
+    [
+        "every payload is kept as received in raw_payload (gzip), with its raw_fetch row: source, request, time, fingerprint; a data-set quarter stays a file in inbox/",
+        "the raw tables keep only new or changed rows, so a payload fetched again stores nothing; db reparse reads the kept payloads again after a mapping change",
+    ],
+)
+SVG0 = src.svg()
+
+# ======================================================================= 6. check a change on a sample
+cs = D(
+    "u11",
+    1300,
+    250,
+    "act",
+    "Check a change on a sample",
+    "UML activity diagram of changing the extraction: re-read kept payloads if the parsing "
+    "changed, build a sample of companies in a transaction, compare with the stored values and "
+    "roll back; if the sample is right, write only those companies, otherwise change again.",
+)
+cs.frame(10, 10, 1280, 230)
+SY = 120
+cs.initial(40, SY)
+ch = cs.action(
+    64,
+    SY - 30,
+    200,
+    60,
+    ["Change the extraction", ("db_items.toml", "u-objm"), ("companies.toml · build.py", "u-objm")],
+)
+cs.edge([(48, SY), (ch.l, SY)])
+cs.diamond(300, SY)
+cs.edge([(ch.r, SY), (287, SY)])
+rp = cs.action(340, 34, 150, 44, ["Re-read kept payloads", ("db reparse", "u-objm")])
+cs.edge([(300, SY - 13), (300, rp.cy), (rp.l, rp.cy)])
+cs.g(308, 98, "[parsing changed]")
+cs.diamond(530, SY)
+cs.edge([(rp.r, rp.cy), (530, rp.cy), (530, SY - 13)])
+cs.edge([(313, SY), (517, SY)])
+cs.g(380, SY + 18, "[mapping only]")
+bsm = cs.action(
+    566,
+    SY - 26,
+    170,
+    52,
+    ["Build the sample", "in one transaction", ("check-sample --symbols A,B", "u-objm")],
+)
+cs.edge([(543, SY), (bsm.l, SY)])
+cmp_ = cs.action(764, SY - 22, 150, 44, ["Compare with the", "stored values"])
+cs.edge([(bsm.r, SY), (cmp_.l, SY)])
+rb = cs.action(942, SY - 22, 90, 44, ["Roll back"])
+cs.edge([(cmp_.r, SY), (rb.l, SY)])
+cs.diamond(1066, SY)
+cs.edge([(rb.r, SY), (1053, SY)])
+wr = cs.action(1100, SY - 26, 150, 52, ["Write the sample", ("build --symbols A,B", "u-objm")])
+cs.edge([(1079, SY), (wr.l, SY)])
+cs.g(1072, SY - 32, "[as expected]")
+cs.final(1270, SY)
+cs.edge([(wr.r, SY), (1259, SY)])
+cs.edge([(1066, SY + 13), (1066, 214), (164, 214), (164, ch.b)])
+cs.g(1074, 200, "[not as expected]")
+cs.note(
+    600,
+    170,
+    440,
+    [
+        "added · removed · changed per company; nothing is written",
+        "the other companies keep their rows and take the change when",
+        "their sources bring new data; build --full only when asked",
+    ],
+    to=(cmp_.cx, cmp_.b),
+    frm=(cmp_.cx, 170),
+)
+SVG7 = cs.svg()
+
+# ======================================================================= 7. PC to server
+ps_ = D(
+    "u12",
+    1300,
+    430,
+    "act",
+    "PC to server",
+    "UML activity diagram in three partitions: on this PC bulk files are downloaded and "
+    "imported, then db push sends every kept payload the server lacks through the same "
+    "loaders; the server database stores it and marks the tasks fetched; the server job then "
+    "fetches only its cheap daily sources and builds only the companies with new raw data.",
+)
+ps_.frame(10, 10, 1280, 410)
+ps_.add('<rect class="u-part" x="24" y="46" width="1252" height="360"/>')
+ps_.add('<path class="u-partl" d="M24,166 H1276 M24,286 H1276 M50,46 V406"/>')
+ps_.lane_label(41, 106, "this PC")
+ps_.lane_label(41, 226, "server database")
+ps_.lane_label(41, 346, "server job")
+PY1, PY2, PY3 = 106, 226, 346
+ps_.initial(74, PY1)
+dl = ps_.action(96, PY1 - 24, 150, 48, ["Download bulk files", ("inbox/<kind>/", "u-objm")])
+ps_.edge([(82, PY1), (dl.l, PY1)])
+im = ps_.action(276, PY1 - 24, 150, 48, ["Import and analyse", ("db import FILE", "u-objm")])
+ps_.edge([(dl.r, PY1), (im.l, PY1)])
+pu = ps_.action(
+    456, PY1 - 24, 170, 48, ["Find what the server lacks", ("db push --target server", "u-objm")]
+)
+ps_.edge([(im.r, PY1), (pu.l, PY1)])
+ps_.note(
+    660,
+    62,
+    420,
+    [
+        "same source, request and fingerprint already there: skipped",
+        "a data-set quarter is imported from its file in inbox/",
+        ("sec_companyfacts · sec_xbrl · sec_fsds", "mono"),
+    ],
+    to=(pu.r, PY1 - 10),
+    frm=(660, 84),
+)
+PX, PW = 140, 760
+ps_.add(f'<rect class="u-region" x="{PX}" y="182" width="{PW}" height="92" rx="14"/>')
+ps_.t(PX + 330, 198, "«iterative»", "u-kw")
+ps_.t(PX + 398, 198, "each payload the server lacks, parsed on this PC", "u-g")
+ps_.exp_node(235, 176, False)
+ps_.edge([(541, pu.b), (541, 150), (250, 150), (250, 176)])
+kp2 = ps_.action(
+    170, PY2 - 18, 160, 44, ["Store the payload", ("raw_payload · raw_fetch", "u-objm")]
+)
+pl2 = ps_.action(370, PY2 - 18, 180, 44, ["Store new or changed rows", "with the source's loader"])
+mk2 = ps_.action(590, PY2 - 18, 160, 44, ["Mark its tasks fetched", ("ops_task", "u-objm")])
+ps_.edge([(250, 188), (250, kp2.t)])
+ps_.edge([(kp2.r, kp2.cy), (pl2.l, pl2.cy)])
+ps_.edge([(pl2.r, pl2.cy), (mk2.l, mk2.cy)])
+ps_.flow_final(800, mk2.cy)
+ps_.edge([(mk2.r, mk2.cy), (791, mk2.cy)])
+rawsv = ps_.obj(960, PY2 - 22, 160, 44, [("raw layer", "u-obj")], store=True)
+ps_.edge([(pl2.cx, pl2.b), (pl2.cx, 262), (1000, 262), (1000, rawsv.b)])
+ps_.initial(74, PY3)
+pt2 = ps_.action(96, PY3 - 22, 130, 44, ["Plan tasks"])
+ps_.edge([(82, PY3), (pt2.l, PY3)])
+fe2 = ps_.action(
+    256,
+    PY3 - 26,
+    220,
+    52,
+    [
+        "Fetch only the due tasks",
+        ("TradingView · Yahoo · ECB daily;", "u-st"),
+        ("SEC: what was not pushed", "u-st"),
+    ],
+)
+ps_.edge([(pt2.r, PY3), (fe2.l, PY3)])
+bu2 = ps_.action(506, PY3 - 22, 220, 44, ["Build the companies", "with new raw data"], call=True)
+ps_.edge([(fe2.r, PY3), (bu2.l, PY3)])
+cv2 = ps_.action(756, PY3 - 22, 150, 44, ["Take coverage", "snapshot"])
+ps_.edge([(bu2.r, PY3), (cv2.l, PY3)])
+ps_.final(940, PY3)
+ps_.edge([(cv2.r, PY3), (929, PY3)])
+ps_.edge([(1080, rawsv.b), (1080, 300), (616, 300), (616, bu2.t)])
+ps_.g(1088, 296, "read by the build")
+SVG8 = ps_.svg()
+
 # ======================================================================= notation key
-k = D("u5", 1300, 112, "", "", "Key to the UML symbols used in the four diagrams.")
+k = D("u5", 1300, 112, "", "", "Key to the UML symbols used in the diagrams.")
 x = 24
 row = 30
 k.initial(x + 8, row)
@@ -948,11 +1228,14 @@ def fig(svg, cap):
 
 SECTION = f"""<section id="inside-the-database">
   <h2>Inside the database, in UML</h2>
+{fig(SVG0, "Class diagram: every source, what it delivers (format, contents, how it arrives), the loader that reads it and the raw table that stores it.")}
 {fig(SVG1, "Activity diagram: one run of the <code>stock-ingest</code> job, partitioned by who does the work.")}
 {fig(SVG2, "Activity diagram: the call behaviour <em>Build fundamentals</em> from the run above, partitioned by step; boxes between actions are the data in each state.")}
+{fig(SVG7, "Activity diagram: a change of the extraction is checked on a sample of companies (<code>db check-sample</code>), never by rebuilding the database.")}
 {fig(SVG3, "Class diagram: the tables of the data path, with their keys and links (migrations 001 to 010).")}
 {fig(SVG4, "State machine: the life of one ingest task, row by row in <code>ops_task</code>.")}
 {fig(SVG6, "Activity diagram: a file downloaded by hand loaded into the pipeline (<code>db import</code>).")}
+{fig(SVG8, "Activity diagram: what this PC loaded, sent to the server (<code>db push</code>), and the server job's own run.")}
 {fig(SVG5, "Key to the symbols (UML 2.5).")}
 </section>
 """
@@ -1055,138 +1338,155 @@ o = D(
     660,
     "act",
     "stock_nightly",
-    "UML activity diagram of one weekday night in four partitions. The Azure ingest job runs "
-    "at 22:30 UTC and records its run in ops_run. Airflow's stock_nightly starts at 22:35, "
-    "opens its run log, waits for the finished ingest run, checks that the prices reached "
-    "the last close and marks the run ready. The Claude evening session reads the ready "
-    "marker, writes the notes and reports and commits them; GitHub publishes the site; "
-    "Airflow waits for that commit and its published site, then closes the run. Any failed "
-    "check interrupts the Airflow region: the run is marked failed and an alert is emailed. "
-    "At 07:00 UTC a GitHub workflow audits that the last trading day has a finished run.",
+    "UML activity diagram of one weekday night in four partitions. Azure runs the ingest job "
+    "at 22:30 UTC (fetch, build, coverage, nightly analyses, a row in ops_run) and the quotes "
+    "job every hour. Airflow's stock_nightly starts at 22:35 and forks: it checks the quotes "
+    "job, waits for the finished ingest run, then forks again to check the nightly analyses "
+    "and the prices; the prices lead to the ready marker and to waiting for the Claude "
+    "session's commit and its published site. A join closes the run. Any failed check "
+    "interrupts the region: the run is marked failed and an alert is emailed. The Claude "
+    "session runs at 00:00 Italy time, waits for the newest price, writes the notes and "
+    "reports, commits and emails. At 07:00 UTC a GitHub workflow audits the last trading day.",
 )
 o.frame(10, 10, 1280, 640)
 o.add('<rect class="u-part" x="24" y="46" width="1252" height="590"/>')
-o.add('<path class="u-partl" d="M24,156 H1276 M24,396 H1276 M24,516 H1276 M50,46 V636"/>')
-o.lane_label(41, 101, "Azure job")
-o.lane_label(41, 276, "Airflow")
-o.lane_label(41, 456, "Claude")
+o.add('<path class="u-partl" d="M24,156 H1276 M24,406 H1276 M50,46 V636"/>')
+o.add('<path class="u-partl" d="M24,516 H1276"/>')
+o.lane_label(41, 101, "Azure jobs")
+o.lane_label(41, 281, "Airflow")
+o.lane_label(41, 461, "Claude")
 o.lane_label(41, 576, "GitHub")
 
-# lane 1: the ingest job
+# lane 1: the ingest job and the quotes job
 Y1 = 101
 hourglass(o, 82, Y1 - 8, ["22:30 UTC"])
-ing = o.action(116, Y1 - 22, 190, 44, ["Ingest: fetch, build,", "coverage snapshot"], call=True)
+ing = o.action(116, Y1 - 22, 200, 44, ["Ingest, build, coverage,", "nightly analyses"], call=True)
 o.edge([(91, Y1 - 8), (ing.l, Y1 - 8)])
-opsrun = o.obj(350, Y1 - 20, 110, 40, ["ops_run"], store=True)
+opsrun = o.obj(352, Y1 - 20, 110, 40, ["ops_run"], store=True)
 o.edge([(ing.r, Y1), (opsrun.l, Y1)])
 o.note(
-    500,
-    74,
-    340,
+    496,
+    62,
+    250,
     [
-        "act Nightly ingest run, above; one row per run with",
-        "its mode, status, requests and rows stored",
+        "its summary records any error of the",
+        "screener, the watch-list numbers or",
+        "the market numbers",
     ],
-    to=(opsrun.r, Y1),
-    frm=(500, Y1),
+    to=(opsrun.r, Y1 - 10),
+    frm=(496, Y1 - 10),
 )
+hourglass(o, 800, Y1 - 8, [":05 hourly", "Mon–Fri"])
+qa = o.action(832, Y1 - 20, 130, 40, ["Store the quotes"])
+o.edge([(809, Y1 - 8), (qa.l, Y1 - 8)])
+qo = o.obj(1000, Y1 - 20, 120, 40, ["raw_tv_quote"], store=True)
+o.edge([(qa.r, Y1), (qo.l, Y1)])
 
 # lane 2: Airflow
-Y2 = 226
+Y2 = 206
 hourglass(o, 82, Y2, ["22:35 UTC", "Mon–Fri"])
 st = o.action(108, Y2 - 20, 104, 40, ["Open the", "run log"])
 o.edge([(91, Y2), (st.l, Y2)])
-RX2, RY2, RW2, RH2 = 236, 168, 904, 218
+RX2, RY2, RW2, RH2 = 232, 166, 908, 230
 o.add(f'<rect class="u-region" x="{RX2}" y="{RY2}" width="{RW2}" height="{RH2}" rx="14"/>')
 o.t(RX2 + 12, RY2 + 16, "«interruptible»", "u-kw")
+
+
+def bar(d, x, y1, y2):
+    """Fork or join node: a thick bar."""
+    d.add(f'<rect class="u-solid" x="{x - 2.5}" y="{y1}" width="5" height="{y2 - y1}"/>')
+
+
+bar(o, 246, 192, 350)
+o.edge([(st.r, Y2), (243.5, Y2)])
 wi = o.action(262, Y2 - 20, 116, 40, ["Wait for the", "ingest run"])
-o.edge([(st.r, Y2), (wi.l, Y2)])
-o.edge([(405, opsrun.b), (405, 190), (340, 190), (340, wi.t)])
-o.g(412, 184, "finished row")
-o.diamond(420, Y2)
-o.edge([(wi.r, Y2), (407, Y2)])
-o.edge([(420, Y2 + 13), (420, 282), (300, 282), (300, wi.b)])
-o.g(310, 297, "[not yet] / again in 5 min")
-cp = o.action(470, Y2 - 20, 112, 40, ["Check the", "prices"])
-o.edge([(433, Y2), (cp.l, Y2)])
-o.g(451, Y2 - 8, "[done]", "middle")
-o.diamond(620, Y2)
-o.edge([(cp.r, Y2), (607, Y2)])
-mr = o.action(676, Y2 - 20, 100, 40, ["Mark ready"])
-o.edge([(633, Y2), (mr.l, Y2)])
-o.g(650, Y2 - 40, "[≥ 95% of members", "middle")
-o.g(650, Y2 - 27, "have the last close]", "middle")
-pr = o.obj(664, 316, 124, 40, ["ops_pipeline_run"], store=True)
-o.edge([(726, mr.b), (726, pr.t)])
-o.g(734, 296, "[ready]")
-we = o.action(826, Y2 - 20, 120, 40, ["Wait for commit", "and the site"])
+o.edge([(248.5, Y2), (wi.l, Y2)])
+YQ = 330
+cq = o.action(262, YQ - 20, 116, 40, ["Check the", "quotes job"])
+o.edge([(248.5, YQ), (cq.l, YQ)])
+o.edge([(407, opsrun.b), (407, 180), (350, 180), (350, wi.t)])
+o.g(414, 142, "finished row")
+o.diamond(412, Y2)
+o.edge([(wi.r, Y2), (399, Y2)])
+o.edge([(412, Y2 + 13), (412, 262), (290, 262), (290, wi.b)])
+o.g(300, 276, "[not yet] / again in 5 min")
+bar(o, 446, 192, 312)
+o.edge([(425, Y2), (443.5, Y2)])
+o.g(430, Y2 - 26, "[done]", "middle")
+cp = o.action(466, Y2 - 20, 112, 40, ["Check the", "prices"])
+o.edge([(448.5, Y2), (cp.l, Y2)])
+YN = 300
+cn = o.action(466, YN - 20, 112, 40, ["Check the nightly", "analyses"])
+o.edge([(448.5, YN), (cn.l, YN)])
+o.diamond(614, Y2)
+o.edge([(cp.r, Y2), (601, Y2)])
+mr = o.action(662, Y2 - 20, 100, 40, ["Mark ready"])
+o.edge([(627, Y2), (mr.l, Y2)])
+o.g(640, Y2 + 18, "[≥ 95%", "middle")
+o.g(640, Y2 + 31, "fresh]", "middle")
+pr = o.obj(650, 282, 124, 40, ["ops_pipeline_run"], store=True)
+o.edge([(712, mr.b), (712, pr.t)])
+o.g(720, 262, "[ready]")
+we = o.action(800, Y2 - 20, 120, 40, ["Wait for commit", "and the site"])
 o.edge([(mr.r, Y2), (we.l, Y2)])
-o.diamond(984, Y2)
-o.edge([(we.r, Y2), (971, Y2)])
-o.edge([(984, Y2 + 13), (984, 282), (926, 282), (926, we.b)])
-o.g(936, 297, "[not yet] / again in 10 min")
-fi = o.action(1030, Y2 - 20, 92, 40, ["Close the", "run (ok)"])
-o.edge([(997, Y2), (fi.l, Y2)])
-o.g(1013, Y2 - 27, "[published]", "middle")
-o.final(1076, 330)
-o.edge([(1076, fi.b), (1076, 319)])
+o.diamond(956, Y2)
+o.edge([(we.r, Y2), (943, Y2)])
+o.edge([(956, Y2 + 13), (956, 262), (890, 262), (890, we.b)])
+o.g(860, 276, "[not yet] / again in 10 min")
+bar(o, 994, 192, 372)
+o.edge([(969, Y2), (991.5, Y2)])
+o.g(975, Y2 - 26, "[published]", "middle")
+o.edge([(cn.r, YN), (620, YN), (620, 352), (991.5, 352)])
+o.edge([(cq.r, YQ), (390, YQ), (390, 368), (991.5, 368)])
+fi = o.action(1012, Y2 - 20, 86, 40, ["Close the", "run (ok)"])
+o.edge([(996.5, Y2), (fi.l, Y2)])
+o.final(1120, Y2)
+o.edge([(fi.r, Y2), (1109, Y2)])
+al = o.action(1166, 238, 98, 44, ["Mark failed,", "email alert"])
+interrupt(o, RX2 + RW2, 330, al.l, 260)
+o.flow_final(1215, 312)
+o.edge([(1215, al.b), (1215, 303)])
 o.note(
-    250,
-    316,
+    1150,
+    336,
+    120,
+    ["a failed check, a", "crash after retries", "or a wait past its", "limit interrupts"],
+)
+
+# lane 3: the Claude session
+Y3 = 456
+hourglass(o, 82, Y3 - 6, ["00:00 Italy", "Tue–Sat"])
+wp = o.action(108, Y3 - 26, 150, 40, ["Wait for the newest", "price (up to 1 h)"])
+o.edge([(91, Y3 - 6), (wp.l, Y3 - 6)])
+nt = o.action(290, Y3 - 28, 160, 44, ["Notes, reports,", "validate"], call=True)
+o.edge([(wp.r, Y3 - 6), (nt.l, Y3 - 6)])
+cm = o.action(482, Y3 - 26, 120, 40, ["Commit to main"])
+o.edge([(nt.r, Y3 - 6), (cm.l, Y3 - 6)])
+em = o.action(634, Y3 - 26, 110, 40, ["Email the run"])
+o.edge([(cm.r, Y3 - 6), (em.l, Y3 - 6)])
+o.final(778, Y3 - 6)
+o.edge([(em.r, Y3 - 6), (767, Y3 - 6)])
+o.note(
+    820,
+    426,
     360,
     [
-        "a failed check, a crash after two retries, or a wait",
-        "past its limit (ingest 3.5 h, evening 4 h) interrupts",
-        "the region",
+        "docs/EVENING_RUN.md: reads the stored numbers through the",
+        "web API, writes the notes, renders the PDFs",
     ],
-)
-al = o.action(1168, 250, 98, 44, ["Mark failed,", "email alert"])
-interrupt(o, RX2 + RW2, 352, al.l, 272)
-o.flow_final(1217, 346)
-o.edge([(1217, al.b), (1217, 337)])
-
-# lane 3: the Claude evening session
-Y3 = 446
-hourglass(o, 82, Y3 - 6, ["evening", "schedule"])
-rm = o.action(108, Y3 - 26, 122, 40, ["Read the ready", "marker (web API)"])
-o.edge([(91, Y3 - 6), (rm.l, Y3 - 6)])
-o.edge([(726, pr.b), (726, 406), (169, 406), (169, rm.t)])
-o.diamond(272, Y3 - 6)
-o.edge([(rm.r, Y3 - 6), (259, Y3 - 6)])
-nt = o.action(318, Y3 - 28, 160, 44, ["Notes, reports,", "validate"], call=True)
-o.edge([(285, Y3 - 6), (nt.l, Y3 - 6)])
-o.g(300, Y3 - 14, "[ready]", "middle")
-cm = o.action(510, Y3 - 26, 120, 40, ["Commit to main"])
-o.edge([(nt.r, Y3 - 6), (cm.l, Y3 - 6)])
-em = o.action(662, Y3 - 26, 110, 40, ["Email the run"])
-o.edge([(cm.r, Y3 - 6), (em.l, Y3 - 6)])
-o.final(806, Y3 - 6)
-o.edge([(em.r, Y3 - 6), (795, Y3 - 6)])
-sa = o.action(318, 478, 160, 28, ["Say so in the thread"])
-o.edge([(272, Y3 + 7), (272, 492), (sa.l, 492)])
-o.g(278, 476, "[not ready]")
-o.flow_final(506, 492)
-o.edge([(sa.r, 492), (497, 492)])
-o.note(
-    850,
-    410,
-    320,
-    ["docs/EVENING_RUN.md: the PDFs, the notes and", "the screener files are committed to main"],
-    to=(nt.r - 10, nt.t),
-    frm=(850, 425),
 )
 
 # lane 4: GitHub
 Y4 = 576
-pg = o.action(500, Y4 - 20, 140, 40, ["Pages publishes", "the site"])
-o.edge([(570, cm.b), (570, pg.t)])
-o.g(578, 532, "push")
-o.flow_final(676, Y4)
-o.edge([(pg.r, Y4), (667, Y4)])
+pg = o.action(472, Y4 - 20, 140, 40, ["Pages publishes", "the site"])
+o.edge([(542, cm.b), (542, pg.t)])
+o.g(550, 532, "push")
+o.flow_final(648, Y4)
+o.edge([(pg.r, Y4), (639, Y4)])
 o.add(
-    f'<path class="u-line dash" d="M{pg.r - 20},{pg.t} V530 H876 V{we.b}" marker-end="url(#u7-a)"/>'
+    f'<path class="u-line dash" d="M{pg.r - 20},{pg.t} V530 H860 V{we.b + 4}" marker-end="url(#u7-a)"/>'
 )
-o.g(880, 526, "read through the GitHub API")
+o.g(866, 526, "read through the GitHub API")
 hourglass(o, 82, Y4, ["07:00 UTC", "Tue–Sat"], below=False)
 au = o.action(108, Y4 - 20, 126, 40, ["Audit the last", "trading day"])
 o.edge([(91, Y4), (au.l, Y4)])
@@ -1195,11 +1495,11 @@ o.edge([(au.r, Y4), (263, Y4)])
 o.final(276, 620)
 o.edge([(276, Y4 + 13), (276, 609)])
 o.g(284, 606, "[ok run]")
-wf = o.action(318, 556, 150, 40, ["Fail: GitHub", "emails the owner"])
+wf = o.action(318, 556, 126, 40, ["Fail: GitHub", "emails the owner"])
 o.edge([(289, Y4), (wf.l, Y4)])
 o.g(303, Y4 - 8, "[none]", "middle")
-o.flow_final(490, 620)
-o.edge([(393, wf.b), (393, 620), (481, 620)])
+o.flow_final(430, 620)
+o.edge([(381, wf.b), (381, 620), (421, 620)])
 o.note(
     740,
     560,
@@ -1255,16 +1555,16 @@ SVG8 = r.svg()
 p = D(
     "u9",
     1300,
-    480,
+    520,
     "deployment",
     "Nightly pipeline",
     "UML deployment diagram: Airflow's API server, scheduler, DAG processor and metadata "
-    "database run in Docker on the PC with the DAG stock_nightly; Azure runs the ingest "
-    "Container Apps Job, the PostgreSQL server stock-db-bk and the web API stock-api-bk; "
-    "Anthropic's cloud runs the Claude evening routine; GitHub runs the Pages and "
-    "pipeline-watch workflows; Brevo sends the emails.",
+    "database run in Docker on the PC with the DAG stock_nightly; Azure runs the ingest and "
+    "quotes Container Apps Jobs, the PostgreSQL server stock-db-bk and the web API "
+    "stock-api-bk; Anthropic's cloud runs the scheduled Claude session; GitHub runs the "
+    "Pages and pipeline-watch workflows; Brevo sends the emails.",
 )
-p.frame(10, 10, 1280, 460)
+p.frame(10, 10, 1280, 500)
 pc = node3d(p, 30, 64, 400, 262, "«device»", "PC")
 node3d(p, 46, 110, 366, 200, "«executionEnvironment»", "Docker · orchestration/compose.yaml", 8)
 artifact(p, 62, 156, 160, "api-server", "«component»")
@@ -1272,33 +1572,35 @@ artifact(p, 236, 156, 160, "scheduler", "«component»")
 artifact(p, 62, 206, 160, "dag-processor", "«component»")
 artifact(p, 236, 206, 160, "airflow-db", "«database»")
 artifact(p, 62, 256, 334, "stock_nightly.py · stock_analysis.pipeline")
-az = node3d(p, 500, 64, 400, 222, "«cloud»", "Microsoft Azure")
-artifact(p, 516, 110, 368, "stock-ingest · Container Apps Job", "«executionEnvironment»")
-artifact(p, 516, 168, 368, "stock-db-bk · PostgreSQL 16", "«database»")
-artifact(p, 516, 226, 368, "stock-api-bk · App Service, api/app.py", "«executionEnvironment»")
+az = node3d(p, 500, 64, 400, 300, "«cloud»", "Microsoft Azure")
+artifact(p, 516, 106, 360, "stock-ingest · Container Apps Job", "«executionEnvironment»")
+artifact(p, 516, 156, 360, "stock-quotes · Container Apps Job", "«executionEnvironment»")
+artifact(p, 516, 206, 360, "stock-db-bk · PostgreSQL 16", "«database»")
+artifact(p, 516, 256, 360, "stock-api-bk · App Service, api/app.py", "«executionEnvironment»")
+p.edge([(876, 125), (888, 125), (888, 275), (876, 275)], arrow=False)  # each one to the database
+p.edge([(876, 175), (888, 175)], arrow=False)
+p.edge([(876, 225), (888, 225)], arrow=False)
 an = node3d(p, 970, 64, 300, 100, "«cloud»", "Anthropic")
-artifact(p, 986, 108, 268, "Evening watch list routine", "«executionEnvironment»")
+artifact(p, 986, 108, 268, "Scheduled Claude session", "«executionEnvironment»")
 gh = node3d(p, 970, 230, 300, 150, "«cloud»", "GitHub")
 artifact(p, 986, 276, 268, "pages.yml · pipeline-watch.yml", "«workflow»")
 artifact(p, 986, 326, 268, "Pages site", "«artifact»")
-bv = node3d(p, 500, 380, 220, 70, "«cloud»", "Brevo")
+bv = node3d(p, 500, 420, 220, 70, "«cloud»", "Brevo")
 # communication paths
-p.edge([(pc.r, 187), (516, 187)], arrow=False)
-p.g(473, 180, "SQL · TLS", "middle")
-p.edge([(700, 148), (700, 168)], arrow=False)
-p.edge([(700, 206), (700, 226)], arrow=False)
-p.edge([(986, 140), (930, 140), (930, 240), (884, 240)], arrow=False)
-p.g(936, 184, "HTTPS · marker")
+p.edge([(pc.r, 225), (516, 225)], arrow=False)
+p.g(473, 218, "SQL · TLS", "middle")
+p.edge([(986, 140), (930, 140), (930, 262), (900, 262)], arrow=False)
+p.g(936, 190, "HTTPS · data")
 p.edge([(1150, an.b), (1150, gh.t - 10)], arrow=False)
 p.g(1158, 200, "git push")
-p.edge([(380, pc.b), (380, 356), (gh.l, 356)], arrow=False)
-p.g(760, 350, "HTTPS · GitHub API: commit and Pages run", "middle")
-p.edge([(200, pc.b), (200, 415), (bv.l, 415)], arrow=False)
-p.g(350, 409, "HTTPS · alert email", "middle")
-p.edge([(986, 295), (910, 295), (910, 256), (884, 256)], arrow=False)
-p.g(916, 310, "HTTPS · audit")
-p.edge([(1254, 127), (1282, 127), (1282, 430), (bv.r, 430)], arrow=False)
-p.g(800, 424, "HTTPS · evening email")
+p.edge([(380, pc.b), (380, 396), (1100, 396), (1100, gh.b)], arrow=False)
+p.g(760, 390, "HTTPS · GitHub API: commit and Pages run", "middle")
+p.edge([(200, pc.b), (200, 455), (bv.l, 455)], arrow=False)
+p.g(350, 449, "HTTPS · alert email", "middle")
+p.edge([(986, 295), (944, 295), (944, 330), (900, 330)], arrow=False)
+p.g(950, 320, "HTTPS · audit")
+p.edge([(1254, 127), (1282, 127), (1282, 470), (bv.r, 470)], arrow=False)
+p.g(800, 464, "HTTPS · evening email")
 SVG9 = p.svg()
 
 ORCH = f"""<section id="orchestration">

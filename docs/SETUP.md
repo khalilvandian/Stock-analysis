@@ -17,14 +17,12 @@ Add these as environment variables (or under *Network secrets*, where that secti
 
 ```
 SEC_USER_AGENT=stock-analysis <your contact email>
-FMP_API_KEY=<a new FMP key>
 BREVO_API_KEY=<Brevo API key>
 WATCHLIST_EMAIL_FROM=<Name <verified sender address>>
 WATCHLIST_EMAIL_TO=<recipient address>
 ```
 
 - `SEC_USER_AGENT` is recommended. The SEC asks automated clients to identify themselves. Without it, the code sends a generic name.
-- `FMP_API_KEY` is optional; the analysis runs without it. **Generate a new key** in your FMP account: the key pasted into the original chat is exposed.
 - `BREVO_API_KEY` and `WATCHLIST_EMAIL_FROM` are needed for the evening email (see `docs/EVENING_RUN.md`); `WATCHLIST_EMAIL_TO` is optional when the scheduled task passes `--to`. In Brevo, turn off "authorized IPs" blocking, since the cloud IP changes.
 - Never paste keys into the chat or commit them.
 
@@ -62,7 +60,7 @@ No setup script is needed. The repository's SessionStart hook (`.claude/hooks/se
 
 A good first message:
 
-> Read README.md, CLAUDE.md and reports/README.md. Refresh the data (sector.py, then history.py), rebuild the three dashboards, and tell me what changed since the last reports.
+> Read README.md, CLAUDE.md and reports/README.md. Check how fresh the database is, run the absolute-values screen for the watch list, and tell me what changed since the last reports.
 
 Refreshing the data takes about 2 minutes. The first SEC download is about 250 MB, cached in `.cache/sec/`.
 
@@ -90,7 +88,7 @@ A Project in the Claude chat app is useful for discussion, and for keeping the r
 
 ## 6. Security notes
 
-- The FMP key pasted into the original chat should be replaced (see section 2).
+- The FMP key pasted into the original chat should be revoked in the FMP account (FMP is no longer used).
 - An early commit of `analysis/history.py` included the owner's email address as the SEC contact. The current code reads it from `SEC_USER_AGENT` instead, but the old value remains in git history. Rewriting history can remove it if needed.
 
 ## Database access from cloud sessions

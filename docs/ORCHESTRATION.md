@@ -1,8 +1,9 @@
 # The nightly pipeline (orchestration)
 
-Issue #30. One Apache Airflow 3 DAG, `stock_nightly`, ties the nightly pieces together. It
-waits for each piece, checks what it produced, logs every step in the database and emails
-an alert when a step fails or never happens. Before it existed, each piece ran on its own
+Issue #30. One Apache Airflow 3 DAG, `stock_nightly`, ties the scheduled pieces together:
+the Azure ingest job (with its nightly analyses), the hourly quotes job, the scheduled
+Claude session and the site. It waits for each piece, checks what it produced, logs every
+step in the database and emails an alert when a step fails or never happens. Before it existed, each piece ran on its own
 clock and nothing noticed when one stopped. In November 2026 the evening routine was switched
 off for three weekdays without anyone noticing.
 
@@ -10,16 +11,36 @@ The diagrams are in [`pipeline.html`](pipeline.html), section "The nightly pipel
 UML": an activity diagram of one night, the state machine of a run and the deployment
 diagram.
 
-## What runs, in order
+## The night, in UTC (winter; Italy is UTC+1, UTC+2 in summer)
+
+| When | What | Where |
+|---|---|---|
+| :05 every hour, Mon–Fri | Quotes job: the latest price of every company | Azure Container Apps Job `stock-quotes` |
+| 22:30 | Ingest job: fetch, build, coverage, then the nightly analyses (screener, watch-list and market numbers) | Azure Container Apps Job `stock-ingest` |
+| 22:35 | **`stock_nightly` starts** | Airflow on the PC |
+| 23:00 (00:00 Italy), Tue–Sat | The scheduled Claude session: waits for the newest price, writes the notes and PDFs, commits "Watch list analyses …", emails | Anthropic's cloud |
+| after that commit | The site is rebuilt | GitHub Pages |
+| 05:15 | The site is rebuilt from the database | GitHub Pages |
+| 07:00, Tue–Sat | Morning audit: the last trading day has an `ok` run | GitHub Actions, `pipeline-watch.yml` |
+
+## What the DAG runs
+
+```
+start ─┬─► wait_for_ingest ─┬─► check_prices ─► mark_ready ─► wait_for_evening ─┐
+       │                    └─► check_nightly ─────────────────────────────────┤
+       └─► check_quotes ───────────────────────────────────────────────────────┴─► finish
+```
 
 | Step (Airflow task) | What it does | Passes when | Fails when |
 |---|---|---|---|
 | `start` | Opens the run log: a row in `ops_pipeline_run` (status `running`) | The row exists | The database can't be reached (retried twice) |
-| `wait_for_ingest` | Sensor, every 5 minutes: the Azure job `stock-ingest` (22:30 UTC) has a finished row in `ops_run` that started at most 20 minutes before the DAG | The row is `ok` or `partial` | The row is `failed`, or there is none after 3.5 hours |
+| `check_quotes` | The newest stored fetch of the quotes job (`raw_fetch`, source `tradingview_quotes`) | It is at most 4 hours old, or today isn't a trading day | Older: the job stopped (the last error, if any, is in the message) |
+| `wait_for_ingest` | Sensor, every 5 minutes: the Azure job `stock-ingest` has a finished row in `ops_run` that started at most 20 minutes before the DAG | The row is `ok` or `partial` | The row is `failed`, or there is none after 3.5 hours |
+| `check_nightly` | The nightly analyses in that run's summary | No `nightly_error`, `screener_error` or `market_error`, and no watch-list stock failed | Any of those: the evening session computes the missing numbers on the spot, so this one alerts without holding back the marker |
 | `check_prices` | Each current S&P 500 member's newest price in `core_price_daily` | At least 95% have the last US close | Fewer do: the prices are stale |
-| `mark_ready` | Sets the run to `ready`. This is the marker the Claude evening session reads | Always | The database can't be reached |
-| `wait_for_evening` | Sensor, every 10 minutes: GitHub has an `Evening watch list analyses …` commit on `main` after the marker, and a successful Pages run for it | Both are found | No commit after 4 hours, or the Pages run failed |
-| `finish` | Sets the run to `ok` | Always | The database can't be reached |
+| `mark_ready` | Sets the run to `ready`: the marker | Always | The database can't be reached |
+| `wait_for_evening` | Sensor, every 10 minutes: GitHub has a `Watch list analyses …` commit on `main` since the run started, and a successful Pages run for it | Both are found | No commit 5 hours after the start, or the Pages run failed |
+| `finish` | Sets the run to `ok` (a run already `failed` by a side check stays `failed`) | Every branch passed | The database can't be reached |
 
 The "last US close" is the newest weekday that isn't an NYSE holiday and is at least 21:30
 UTC old (`config/pipeline.toml`, `[nyse]`; `tests/test_pipeline.py` fails in December until
@@ -52,22 +73,24 @@ FROM ops_pipeline_run r JOIN ops_pipeline_step s USING (run_id)
 ORDER BY r.run_id DESC, s.at;
 ```
 
-## The Claude evening session
+## The scheduled Claude session
 
 The notes need Claude, which runs in Anthropic's cloud with its own clone of the repository.
-Airflow doesn't start it. The session keeps its own schedule and starts by reading the
-marker (decided 2026-11-18, [`DECISIONS.md`](DECISIONS.md)):
+Airflow doesn't start it (decided 2026-11-18, [`DECISIONS.md`](DECISIONS.md)). The session
+keeps its own schedule, 00:00 Italy time Tuesday to Saturday, and its own wait: it checks the
+newest price and waits up to an hour for the ingest. The marker tells it more:
 
 ```bash
 uv run python -m stock_analysis.pipeline marker   # exit 0 = ready; 3 = not yet; 4 = the run failed
 ```
 
-It reads `ops_pipeline_run` through the web API. If the data isn't ready, the session waits
-and checks again (up to an hour). If it's still not ready, it says so in its thread and
-stops, without building on stale data ([`EVENING_RUN.md`](EVENING_RUN.md), step 0). Its
-schedule must come after the marker: the ingest job starts at 22:30 UTC and a maintenance
-run takes minutes, so 01:00 Italy time (00:00 UTC in winter, 23:00 UTC in summer), Tuesday
-to Saturday, leaves room. Airflow then waits up to 4 hours for its commit.
+It reads `ops_pipeline_run` through the web API. A failed run goes at the top of the email
+([`EVENING_RUN.md`](EVENING_RUN.md), step 1). Airflow then waits up to 5 hours from its own
+start for the session's commit and the site.
+
+In summer 00:00 Italy time is 22:00 UTC, before the ingest starts at 22:30 UTC. The session
+still waits for the newest price (up to an hour), so it usually lands after the ingest, but
+with less room than in winter.
 
 ## Running it
 

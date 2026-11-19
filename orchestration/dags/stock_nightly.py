@@ -1,14 +1,20 @@
 """stock_nightly: the weekday pipeline after the US close (issue #30, docs/ORCHESTRATION.md).
 
-    start ─► wait_for_ingest ─► check_prices ─► mark_ready ─► wait_for_evening ─► finish
+    start ─┬─► wait_for_ingest ─┬─► check_prices ─► mark_ready ─► wait_for_evening ─┐
+           │                    └─► check_nightly ─────────────────────────────────┤
+           └─► check_quotes ───────────────────────────────────────────────────────┴─► finish
 
-- wait_for_ingest: the Azure Container Apps Job `stock-ingest` (22:30 UTC) fetched, built and
-  took the coverage snapshot (a finished row in ops_run).
+- check_quotes: the hourly quotes job (`stock-quotes`) stored a quote in the last 4 hours.
+- wait_for_ingest: the Azure Container Apps Job `stock-ingest` (22:30 UTC) fetched, built,
+  took the coverage snapshot and ran the nightly analyses (a finished row in ops_run).
+- check_nightly: the nightly analyses (screener, watch-list numbers, market numbers) ran
+  without errors. A side branch: it alerts but doesn't hold back the ready marker, because
+  the evening session computes what is missing on the spot.
 - check_prices: the current S&P 500 members have the last close in core_price_daily.
-- mark_ready: ops_pipeline_run.status = 'ready'. The Claude evening session reads this
-  marker through the web API before it starts (docs/EVENING_RUN.md).
-- wait_for_evening: the session's "Evening watch list analyses" commit is on main and the
-  Pages workflow published it.
+- mark_ready: ops_pipeline_run.status = 'ready', the marker the evening session can read
+  (python -m stock_analysis.pipeline marker).
+- wait_for_evening: the scheduled Claude session's "Watch list analyses" commit is on main
+  and the Pages workflow published it.
 
 Every step is a row in ops_pipeline_step. A failure (or a sensor that runs out of time)
 marks the run failed and emails the alert address through Brevo. The logic lives in
@@ -117,6 +123,14 @@ def stock_nightly():
         step("check-prices", key)
 
     @task
+    def check_nightly(key: str) -> None:
+        step("check-nightly", key)
+
+    @task
+    def check_quotes(key: str) -> None:
+        step("check-quotes", key)
+
+    @task
     def mark_ready(key: str) -> None:
         step("ready", key)
 
@@ -129,14 +143,12 @@ def stock_nightly():
         step("finish", key)
 
     key = "{{ run_id }}"  # the dag_run_id: the run log's run_key
-    (
-        start(key)
-        >> wait_for_ingest(key)
-        >> check_prices(key)
-        >> mark_ready(key)
-        >> wait_for_evening(key)
-        >> finish(key)
-    )
+    begin, ingest, done = start(key), wait_for_ingest(key), finish(key)
+    prices, nightly, quotes = check_prices(key), check_nightly(key), check_quotes(key)
+    begin >> ingest >> [prices, nightly]
+    prices >> mark_ready(key) >> wait_for_evening(key) >> done
+    nightly >> done
+    begin >> quotes >> done
 
 
 stock_nightly()

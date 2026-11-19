@@ -19,12 +19,20 @@ close_utc = "21:30"
 min_share_fresh = 0.95
 
 [evening]
-# After the ready marker, the Claude evening session must commit "Evening watch list
-# analyses ..." to main within `wait_hours`, and the Pages workflow must then publish it.
+# The scheduled Claude session (00:00 Italy time, Tuesday to Saturday, after the ingest)
+# must commit "Watch list analyses ..." to main within `wait_hours` of the run's start, and
+# the Pages workflow must then publish it.
 repo = "khalilvandian/Stock-analysis"
-commit_prefix = "Evening watch list analyses"
+commit_prefix = "Watch list analyses"
 pages_workflow = "pages.yml"
-wait_hours = 4.0
+wait_hours = 5.0
+
+[quotes]
+# The hourly quotes job (stock-quotes, 5 minutes past each hour on weekdays). A run with
+# unchanged prices stores nothing, so the newest stored fetch is when a price last moved:
+# at the DAG's start (after the US close) it should be at most a couple of hours old.
+source = "tradingview_quotes"
+max_age_hours = 4
 
 [alerts]
 # Failures are emailed through Brevo (the same account as the evening email). The

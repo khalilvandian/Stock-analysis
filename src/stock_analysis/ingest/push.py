@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..db import Database, frame
-from ..db.load_files import finish_fetch, store_changed
+from ..db.raw import finish_fetch, store_changed
 from . import xbrl
 from .common import read_payload, start_fetch
 from .files import followed_ciks, import_file, mark_fetched

@@ -15,12 +15,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from dotenv import load_dotenv
+from seed_files import load_all
 from sqlalchemy import text
 
 from stock_analysis.db import ROOT, Database, iso, migrations, statements, target_settings
 from stock_analysis.db.build import adjusted_close, build, build_ttm
 from stock_analysis.db.check import Reader, run_checks
-from stock_analysis.db.load_files import load_all
 
 load_dotenv(ROOT / ".env")
 TEST_URL = os.environ.get("STOCK_TEST_PG_URL", "postgresql://stock@127.0.0.1:5432/stock_test")
@@ -414,6 +414,77 @@ def test_quality_issues_and_rebuild(con) -> None:
     assert dict(q(con, "SELECT symbol, company_id FROM core_company").fetchall()) == ids
 
 
+CORE_SNAPSHOT = {
+    "core_fundamental": "SELECT company_id, item, period_type, period_end, filed, value, "
+    "split_factor, method, source FROM core_fundamental",
+    "core_fundamental_ttm": "SELECT company_id, item, period_end, filed, basis, value, "
+    "value_adj FROM core_fundamental_ttm",
+    "core_price_daily": "SELECT company_id, date, close, adj_close FROM core_price_daily",
+}
+
+
+def core_rows(con) -> dict:
+    return {t: sorted(map(tuple, q(con, sql).fetchall())) for t, sql in CORE_SNAPSHOT.items()}
+
+
+def issue_rows(con, build_id) -> list:
+    sql = (
+        "SELECT company_id, item, at_date, check_name, detail FROM core_quality_issue "
+        "WHERE build_id = ?"
+    )
+    return sorted(map(tuple, q(con, sql, build_id).fetchall()))
+
+
+def test_incremental_build_rebuilds_only_what_changed_and_matches_a_full_one(con) -> None:
+    first = build(con)
+    assert first["mode"] == "full" and first["why"] == "core is empty: first build"
+    again = build(con)  # nothing changed since
+    assert again["mode"] == "incremental" and again["rebuilt"] == 0
+    assert again["quality_issues"] == first["quality_issues"]
+    # A new Yahoo price for AAA: only AAA is rebuilt.
+    with con.begin() as conn:
+        fetch = conn.execute(text(
+            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status) "
+            "VALUES ('yahoo_prices', 'AAA', '2026-11-18', '2026-11-18', 'ok') RETURNING fetch_id"
+        )).scalar()  # fmt: skip
+        conn.execute(text(
+            "INSERT INTO raw_yahoo_price (fetch_id, symbol, date, close, volume, dividends, "
+            "stock_splits) SELECT :f, symbol, date, close * 1.01, volume, dividends, stock_splits "
+            "FROM raw_yahoo_price WHERE symbol = 'AAA' ORDER BY date DESC LIMIT 1"
+        ), {"f": fetch})  # fmt: skip
+    step = build(con)
+    assert step["mode"] == "incremental" and step["rebuilt_symbols"] == ["AAA"]
+    incremental, step_issues = core_rows(con), issue_rows(con, step["build_id"])
+    full = build(con, full=True)
+    assert full["mode"] == "full"
+    assert core_rows(con) == incremental  # the same core as a full build
+    assert issue_rows(con, full["build_id"]) == step_issues
+    # Asked for one company.
+    only = build(con, symbols=["BBB"])
+    assert only["rebuilt_symbols"] == ["BBB"] and core_rows(con) == incremental
+
+
+def test_check_sample_reports_changes_and_writes_nothing(con) -> None:
+    """A dry run on a sample: what a rebuild of AAA would change, then rolled back."""
+    build(con)
+    builds = one(con, "SELECT COUNT(*) FROM core_build")
+    with con.begin() as conn:  # a stored value that the sources don't give (a stale row)
+        conn.execute(text(
+            "UPDATE core_fundamental SET value = value + 1 WHERE company_id = (SELECT company_id "
+            "FROM core_company WHERE symbol = 'AAA') AND item = 'revenue' AND period_type = 'FY'"
+        ))  # fmt: skip
+    before = core_rows(con)
+    report = build(con, symbols=["AAA"], dry_run=True)
+    assert report["companies"] == ["AAA"] and "rolled back" in report["mode"]
+    changed = [c for c in report["changes"] if c["change"] == "changed"]
+    assert changed and {c["item"] for c in changed} == {"revenue"}
+    assert all(c["value_old"] == c["value_new"] + 1 for c in changed)
+    assert core_rows(con) == before  # nothing written
+    assert one(con, "SELECT COUNT(*) FROM core_build") == builds
+    with pytest.raises(ValueError):
+        build(con, dry_run=True)  # a dry run needs a sample
+
+
 def test_out_tables(con) -> None:
     top = q(
         con,
@@ -578,6 +649,83 @@ def test_custom_tags_are_summed_and_signed(con, monkeypatch) -> None:
         x = b.custom_facts(conn, tags)
     assert len(x) == 1 and x["item"].iloc[0] == "capex" and x["value"].iloc[0] == 4467e6
     assert x["scale"].iloc[0] == -1.0  # stored negative, like the other capex
+
+
+def test_share_class_reads_the_listed_class_and_its_own_tag(con, monkeypatch) -> None:
+    """AAA's diluted EPS per class A (the item's sec_class tag); BBB files basic only
+    (Berkshire), named for it in [[share_class]] tags. Other classes and tags are ignored."""
+    from stock_analysis.db import build as b
+
+    rules = {"share_class": [
+        {"symbol": "AAA", "member": "us-gaap:CommonClassAMember"},
+        {"symbol": "BBB", "member": "us-gaap:EquivalentClassBMember",
+         "tags": {"eps_diluted": ["us-gaap:EarningsPerShareBasic"]}},
+    ]}  # fmt: skip
+    monkeypatch.setattr(b, "load_companies", lambda: rules)
+    facts = [
+        (1001, "us-gaap:EarningsPerShareDiluted", "us-gaap:CommonClassAMember", 2.5),
+        (1001, "us-gaap:EarningsPerShareDiluted", "us-gaap:CommonClassBMember", 9.0),
+        (1001, "us-gaap:EarningsPerShareBasic", "us-gaap:CommonClassAMember", 2.6),
+        (1002, "us-gaap:EarningsPerShareBasic", "us-gaap:EquivalentClassBMember", 41.27),
+        (1002, "us-gaap:EarningsPerShareBasic", "us-gaap:EquivalentClassAMember", 61900.0),
+    ]
+    with con.begin() as conn:
+        for sym, cik in (("AAA", 1001), ("BBB", 1002)):
+            conn.execute(text(
+                "INSERT INTO core_company (symbol, cik) VALUES (:s, :c) "
+                "ON CONFLICT (symbol) DO UPDATE SET cik = :c"
+            ), {"s": sym, "c": cik})  # fmt: skip
+        fetch = conn.execute(text(
+            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status) "
+            "VALUES ('sec_fsds', 'q', '2026-01-01', '2026-01-01', 'ok') RETURNING fetch_id"
+        )).scalar()  # fmt: skip
+        for cik, concept, member, v in facts:
+            conn.execute(text(
+                "INSERT INTO raw_sec_xbrl_fact (fetch_id, cik, accn, form, filed, concept, axis, "
+                "member, unit, period_start, period_end, value) VALUES (:f, :cik, 'a1', '10-K', "
+                "'2025-02-20', :c, :axis, :m, 'USD/shares', '2024-01-01', '2024-12-31', :v)"
+            ), {"f": fetch, "cik": cik, "c": concept, "axis": b.CLASS_AXIS, "m": member,
+                "v": v})  # fmt: skip
+        _, tags = b.load_items()
+        x = b.class_facts(conn, tags)
+    got = dict(zip(x["symbol"], x["value"], strict=True))
+    assert got == {"AAA": 2.5, "BBB": 41.27}
+    assert set(x["item"]) == {"eps_diluted"}
+
+
+def test_share_class_converts_units_and_drops_yahoo(con, monkeypatch) -> None:
+    """Berkshire states its shares in equivalent Class A shares (data-set member without a
+    prefix, edgartools with brka:); BRK.B's count is 1,500 times that, and Yahoo's A-unit
+    count is not used."""
+    from stock_analysis.db import build as b
+
+    rule = {"symbol": "BBB", "member": "us-gaap:EquivalentClassBMember",
+            "convert": [{"item": "shares_outstanding",
+                         "concept": "us-gaap:CommonStockSharesOutstanding",
+                         "member": "brka:EquivalentClassAMember", "factor": 1500}],
+            "not_from_yahoo": ["shares_outstanding"]}  # fmt: skip
+    monkeypatch.setattr(b, "load_companies", lambda: {"share_class": [rule]})
+    with con.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO core_company (symbol, cik) VALUES ('BBB', 1002) "
+            "ON CONFLICT (symbol) DO UPDATE SET cik = 1002"
+        ))  # fmt: skip
+        fetch = conn.execute(text(
+            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status) "
+            "VALUES ('sec_xbrl', 'k', '2026-01-01', '2026-01-01', 'ok') RETURNING fetch_id"
+        )).scalar()  # fmt: skip
+        for member, v in (("brka:EquivalentClassAMember", 1438223.0),
+                          ("us-gaap:CommonClassAMember", 547562.0)):  # fmt: skip
+            conn.execute(text(
+                "INSERT INTO raw_sec_xbrl_fact (fetch_id, cik, accn, form, filed, concept, axis, "
+                "member, unit, period_end, value) VALUES (:f, 1002, 'a1', '10-K', '2025-02-20', "
+                "'us-gaap:CommonStockSharesOutstanding', :axis, :m, 'shares', '2024-12-31', :v)"
+            ), {"f": fetch, "axis": b.CLASS_AXIS, "m": member, "v": v})  # fmt: skip
+        _, tags = b.load_items()
+        x = b.class_facts(conn, tags)
+    assert list(x["item"]) == ["shares_outstanding"]
+    assert list(x["value"]) == [1438223.0 * 1500]
+    assert b.yahoo_excluded([rule]) == {("BBB", "shares_outstanding")}
 
 
 def test_watchlist(con, tmp_path: Path, data_dir: Path) -> None:
@@ -834,3 +982,19 @@ def test_data_open_picks_the_api_when_configured(monkeypatch) -> None:
     assert isinstance(data, ApiData)
     assert data.client.headers["X-API-Key"] == "k"
     assert str(data.client.base_url) == "https://example.test"
+
+
+def test_companies_config_is_well_formed() -> None:
+    """config/companies.toml parses and every entry has the keys the build reads."""
+    from stock_analysis.db.build import load_companies
+
+    cfg = load_companies()
+    for c in cfg.get("share_class", []):
+        assert c["symbol"] and c["member"]
+        for r in c.get("convert", []):
+            assert {"item", "concept", "member", "factor"} <= set(r) and float(r["factor"]) > 0
+        assert all(isinstance(v, list) for v in c.get("tags", {}).values())
+    for c in cfg.get("custom_tag", []):
+        assert c["symbol"] and c["item"] and c["tags"]
+    for c in cfg.get("predecessor", []):
+        assert c["symbol"] and int(c["cik"]) and c["until"]

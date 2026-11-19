@@ -123,7 +123,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <p class="lede">How data gets from the free sources into the database, and from there to the
   analyses, the public site and the evening email. One repository and one Python package, run in
   four places that meet in one PostgreSQL database.</p>
-  <div class="meta">Updated 2026-11-18 · issues #18, #20, #30 · source: docs/pipeline.html</div>
+  <div class="meta">Updated 2026-11-19 · issues #18, #20, #29, #30, #35 · source: docs/pipeline.html</div>
 </header>
 
 <section>
@@ -131,12 +131,12 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <div class="legend" aria-hidden="true">
     <span><i class="hot"></i>the scheduled data path (ingest → database → site)</span>
     <span><i></i>code, deploy and analysis flows</span>
-    <span><i class="dash"></i>still separate: moves to the database next</span>
+    <span><i class="dash"></i>opens the firewall for the run</span>
     <span><i class="fw"></i>database firewall (listed addresses only)</span>
   </div>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; the web API reads the newest coverage snapshot and every ticker's data for the GitHub Pages build; GitHub Actions builds the job's image, which the job pulls at each run; the evening run and your analyses use the database and the repository.">
+<svg viewBox="0 0 1330 670" role="img" aria-label="The ingest job in Azure fetches Yahoo, SEC, TradingView and ECB data and writes it through the database firewall into PostgreSQL; every hour on weekdays the quotes job stores TradingView's latest price of every company; the web API reads the newest coverage snapshot and every ticker's data for the GitHub Pages build, and serves the latest prices to the site's pages; GitHub Actions builds the job's image, which the job pulls at each run; only the ingest job calls the sources, and after each run it computes what the evening run reads (the screener, the watch list's and the market's numbers); the evening run reads those and records its runs through the web API and commits its PDFs and notes, and your analyses read the database directly.">
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
     <marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahh" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -155,11 +155,11 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 
   <!-- sources -->
   <rect class="box" x="26" y="100" width="164" height="52" rx="6"/>
-  <text class="t" x="38" y="122">Yahoo Finance</text><text class="s" x="38" y="139">prices, statements, EPS</text>
+  <text class="t" x="38" y="122">Yahoo Finance</text><text class="s" x="38" y="139">prices, statements, EPS, indices</text>
   <rect class="box" x="26" y="170" width="164" height="52" rx="6"/>
   <text class="t" x="38" y="192">SEC EDGAR</text><text class="s" x="38" y="209">XBRL company facts</text>
   <rect class="box" x="26" y="240" width="164" height="52" rx="6"/>
-  <text class="t" x="38" y="262">TradingView</text><text class="s" x="38" y="279">S&amp;P 500 members, sectors</text>
+  <text class="t" x="38" y="262">TradingView</text><text class="s" x="38" y="279">members, screener fields</text>
   <rect class="box" x="26" y="310" width="164" height="52" rx="6"/>
   <text class="t" x="38" y="332">ECB</text><text class="s" x="38" y="349">exchange rates</text>
 
@@ -179,8 +179,17 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="k" x="254" y="218">3  fetch to budget → <tspan class="m">raw_*</tspan></text>
   <text class="k" x="254" y="244">4  build <tspan class="m">raw_*</tspan> → <tspan class="m">core_*</tspan></text>
   <text class="k" x="254" y="270">5  coverage → <tspan class="m">out_*</tspan></text>
-  <text class="k" x="254" y="296">6  close firewall rule</text>
-  <text class="s" x="254" y="330">backfill until 90% present, then maintain</text>
+  <text class="k" x="254" y="296">6  nightly analyses → <tspan class="m">out_*</tspan></text>
+  <text class="k" x="254" y="322">7  close firewall rule</text>
+  <text class="s" x="254" y="342">backfill until 90% present, then maintain</text>
+
+  <!-- quotes job (issue #35) -->
+  <polyline class="e hot" points="190,284 214,284 214,408 238,408" marker-end="url(#h)"/>
+  <rect class="box hot" x="240" y="380" width="222" height="56" rx="6"/>
+  <text class="t" x="254" y="403">Quotes job</text>
+  <text class="s" x="254" y="420">every hour on weekdays · every company</text>
+  <polyline class="e hot" points="462,400 580,400 580,330 588,330" marker-end="url(#h)"/>
+  <text class="el hot" x="470" y="394">own firewall rule · writes raw_tv_quote</text>
 
   <!-- firewall -->
   <text class="fwl" x="525" y="84" text-anchor="middle">firewall</text>
@@ -200,7 +209,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <rect class="band" x="602" y="182" width="196" height="30" rx="4"/>
   <text class="m" x="612" y="201">core_*</text><text class="s" x="668" y="201">prices, fundamentals</text>
   <rect class="band" x="602" y="218" width="196" height="30" rx="4"/>
-  <text class="m" x="612" y="237">out_*</text><text class="s" x="668" y="237">screener, coverage</text>
+  <text class="m" x="612" y="237">out_*</text><text class="s" x="668" y="237">runs, screener, coverage</text>
   <rect class="band" x="602" y="254" width="196" height="30" rx="4"/>
   <text class="m" x="612" y="273">user_*</text><text class="s" x="668" y="273">watch list</text>
   <rect class="band" x="602" y="290" width="196" height="30" rx="4"/>
@@ -221,7 +230,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="mm" x="904" y="176">src/</text>
   <text class="mm" x="904" y="194">config/</text>
   <text class="mm" x="904" y="212">analyses/</text>
-  <text class="mm" x="904" y="230">data/screener/</text>
+  <text class="mm" x="904" y="230">docs/</text>
   <text class="mm" x="904" y="248">reports/</text>
 
   <rect class="box" x="1030" y="120" width="130" height="56" rx="6"/>
@@ -249,16 +258,18 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <!-- API to the site build -->
   <polyline class="e hot" points="810,408 1095,408 1095,348" marker-end="url(#h)"/>
   <text class="el hot" x="960" y="401" text-anchor="middle">coverage snapshot, ticker data</text>
+  <polyline class="e hot" points="810,428 1245,428 1245,348" marker-end="url(#h)"/>
+  <text class="el hot" x="1030" y="444" text-anchor="middle">GET /quotes: live prices, read by each visitor's browser</text>
 
   <!-- PC and Claude sessions -->
   <rect class="box" x="240" y="540" width="222" height="66" rx="6"/>
   <text class="t" x="254" y="563">Evening run</text>
   <text class="s" x="254" y="580">Claude session · watchlist.py</text>
-  <text class="s" x="254" y="596">weekdays 21:00 Italy</text>
+  <text class="s" x="254" y="596">00:00 Italy, Tue–Sat</text>
 
   <rect class="box" x="590" y="540" width="220" height="66" rx="6"/>
   <text class="t" x="604" y="563">Your analyses</text>
-  <text class="s" x="604" y="580">analysis/*.py · Data.open()</text>
+  <text class="s" x="604" y="580">absolute.py · stocks · Data</text>
   <text class="s" x="604" y="596">on your PC or in a session</text>
 
   <rect class="box" x="890" y="540" width="134" height="66" rx="6"/>
@@ -267,27 +278,38 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="s" x="904" y="596">PDFs attached</text>
 
   <line class="e" x1="630" y1="538" x2="630" y2="353" marker-start="url(#a)" marker-end="url(#a)"/>
-  <text class="el" x="622" y="470" text-anchor="end">direct SQL (PC)</text>
+  <text class="el" x="622" y="452" text-anchor="end">direct SQL (PC)</text>
   <line class="e" x1="740" y1="538" x2="740" y2="439" marker-start="url(#a)" marker-end="url(#a)"/>
   <text class="el" x="748" y="492">HTTPS (cloud)</text>
 
   <polyline class="e" points="350,540 350,520 852,520 852,250 888,250" marker-end="url(#a)"/>
-  <text class="el" x="470" y="513" text-anchor="middle">commits PDFs + screener</text>
+  <text class="el" x="470" y="513" text-anchor="middle">commits PDFs + notes</text>
 
   <polyline class="e" points="350,606 350,630 957,630 957,608" marker-end="url(#a)"/>
   <text class="el" x="700" y="624" text-anchor="middle">PDFs + summary</text>
 
-  <polyline class="e dash" points="108,452 108,573 238,573" marker-end="url(#a)"/>
-  <text class="el" x="116" y="500">still fetches</text>
-  <text class="el" x="116" y="514">its own data</text>
+  <polyline class="e" points="450,538 450,488 700,488 700,439" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="el" x="458" y="483">HTTPS: numbers, runs</text>
 </svg>
     </div>
     <figcaption>The highlighted path runs by itself every night: the ingest job opens the
     firewall for its own address, fills the raw layer, rebuilds the core layer and writes a
-    coverage snapshot; the site build reads that snapshot, and exports every ticker for the explorer pages, through the web API. GitHub Actions
-    turns code into the image the job runs and turns the repository into the site.</figcaption>
+    coverage snapshot; the site build reads that snapshot, and exports every ticker for the explorer pages, through the web API.
+    Every hour on weekdays the quotes job stores the latest price of every company, and each page that shows a price asks
+    the web API for them and recomputes every value that depends on the price. GitHub Actions
+    turns code into the image the job runs and turns the repository into the site. Nothing
+    else calls the sources: after its build the ingest job runs the nightly analyses (the
+    screener, the watch list's and the market report's numbers), the evening run reads
+    them and records its runs through the web API, and your analyses read the database
+    directly.</figcaption>
   </figure>
 </section>
+
+
+
+
+
+
 
 
 
@@ -311,7 +333,169 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <h2>Inside the database, in UML</h2>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1300 620" role="img" aria-label="UML activity diagram of the nightly ingest run in three partitions: the ingest job plans tasks, chooses its mode and fetches each due task into the raw layer; if rows were stored the build rebuilds the core layer in one transaction; coverage takes the snapshot that the next run reads to choose its mode.">
+<svg viewBox="0 0 1300 760" role="img" aria-label="UML diagram of each source artifact with its format and contents, how it arrives, the loader that reads it and the raw table it is stored in; every raw table feeds the build of the core layer, and every payload is kept as received.">
+<defs><marker id="u10-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="10" y="10" width="1280" height="740"/>
+<path class="u-frame-tag" d="M10,10 h298 v14 l-9,10 H10 z"/>
+<text class="u-tagk" x="18" y="26">class</text>
+<text class="u-tag" x="70.5" y="26">Sources and the data they deliver</text>
+<text class="u-lane" x="274" y="62" text-anchor="middle">what arrives · format · how</text>
+<text class="u-lane" x="690" y="62" text-anchor="middle">loader</text>
+<text class="u-lane" x="965" y="62" text-anchor="middle">raw table</text>
+<text class="u-lane" x="1190" y="62" text-anchor="middle">then</text>
+<path class="u-partl" d="M24,72 H1276"/>
+<rect class="u-node" x="24" y="82" width="500" height="46"/>
+<text class="u-act" x="274" y="94" text-anchor="middle">«artifact» SEC company facts</text>
+<text class="u-n" x="274" y="109" text-anchor="middle">JSON per company: every reported fact, by tag, unit and period</text>
+<text class="u-nm" x="274" y="124" text-anchor="middle">API · the nightly job, one company a request</text>
+<rect class="u-node" x="24" y="136" width="500" height="46"/>
+<text class="u-act" x="274" y="148" text-anchor="middle">«artifact» SEC companyfacts.zip</text>
+<text class="u-n" x="274" y="163" text-anchor="middle">ZIP of the same JSON files, every company at once</text>
+<text class="u-nm" x="274" y="178" text-anchor="middle">bulk file you download → inbox/sec_companyfacts/ · db import</text>
+<rect class="u-node" x="24" y="190" width="500" height="46"/>
+<text class="u-act" x="274" y="202" text-anchor="middle">«artifact» SEC Financial Statement Data Sets</text>
+<text class="u-n" x="274" y="217" text-anchor="middle">ZIP a quarter of tab-separated text: filings, numbers, statement lines</text>
+<text class="u-nm" x="274" y="232" text-anchor="middle">bulk file you download → inbox/sec_fsds/ · db import</text>
+<rect class="u-node" x="24" y="244" width="500" height="46"/>
+<text class="u-act" x="274" y="256" text-anchor="middle">«artifact» SEC full filing (XBRL)</text>
+<text class="u-n" x="274" y="271" text-anchor="middle">XML of one 10-K or 10-Q: instance, schema, linkbases</text>
+<text class="u-nm" x="274" y="286" text-anchor="middle">API through edgartools · values still missing per share class</text>
+<rect class="u-node" x="24" y="298" width="500" height="46"/>
+<text class="u-act" x="274" y="310" text-anchor="middle">«artifact» SEC company tickers</text>
+<text class="u-n" x="274" y="325" text-anchor="middle">JSON: every ticker with its CIK</text>
+<text class="u-nm" x="274" y="340" text-anchor="middle">API · the nightly job</text>
+<rect class="u-node" x="24" y="352" width="500" height="46"/>
+<text class="u-act" x="274" y="364" text-anchor="middle">«artifact» Yahoo daily prices</text>
+<text class="u-n" x="274" y="379" text-anchor="middle">table a symbol: open, high, low, close, volume, dividends, splits</text>
+<text class="u-nm" x="274" y="394" text-anchor="middle">yfinance · the nightly job · companies and the market report&#x27;s instruments</text>
+<rect class="u-node" x="24" y="406" width="500" height="46"/>
+<text class="u-act" x="274" y="418" text-anchor="middle">«artifact» Yahoo statements</text>
+<text class="u-n" x="274" y="433" text-anchor="middle">tables a company: income, balance sheet, cash flow, annual and quarterly</text>
+<text class="u-nm" x="274" y="448" text-anchor="middle">yfinance · Yahoo keeps about four years</text>
+<rect class="u-node" x="24" y="460" width="500" height="46"/>
+<text class="u-act" x="274" y="472" text-anchor="middle">«artifact» Yahoo earnings dates</text>
+<text class="u-n" x="274" y="487" text-anchor="middle">table: report dates with reported and expected EPS</text>
+<text class="u-nm" x="274" y="502" text-anchor="middle">yfinance · the nightly job</text>
+<rect class="u-node" x="24" y="514" width="500" height="46"/>
+<text class="u-act" x="274" y="526" text-anchor="middle">«artifact» TradingView screener</text>
+<text class="u-n" x="274" y="541" text-anchor="middle">JSON: listings with index membership, sector, industry and the screener&#x27;s fields</text>
+<text class="u-nm" x="274" y="556" text-anchor="middle">two scans a night: the index, and the watch list&#x27;s other symbols</text>
+<rect class="u-node" x="24" y="568" width="500" height="46"/>
+<text class="u-act" x="274" y="580" text-anchor="middle">«artifact» ECB reference rates</text>
+<text class="u-n" x="274" y="595" text-anchor="middle">CSV: daily euro exchange rates</text>
+<text class="u-nm" x="274" y="610" text-anchor="middle">API · the nightly job</text>
+<rect class="u-node" x="24" y="622" width="500" height="46"/>
+<text class="u-act" x="274" y="634" text-anchor="middle">«artifact» history.csv (retired)</text>
+<text class="u-n" x="274" y="649" text-anchor="middle">CSV: the project&#x27;s own SEC-based yearly history, from before the database</text>
+<text class="u-nm" x="274" y="664" text-anchor="middle">loaded once; the file and its loader are gone, the rows stay</text>
+<rect class="u-node" x="590" y="82" width="200" height="100" rx="12"/>
+<text class="u-act" x="690" y="128.5" text-anchor="middle">Parse company facts</text>
+<text class="u-objm" x="690" y="143.5" text-anchor="middle">sec.load_companyfacts</text>
+<path class="u-line" d="M524,105 L590,105" marker-end="url(#u10-a)"/>
+<path class="u-line" d="M524,159 L590,159" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="82" width="210" height="100"/>
+<text class="u-kw" x="965" y="128.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="143.5" text-anchor="middle">raw_sec_fact</text>
+<path class="u-line" d="M790,132 L860,132" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="190" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="209.5" text-anchor="middle">Read a quarter</text>
+<text class="u-objm" x="690" y="224.5" text-anchor="middle">files.import_fsds</text>
+<path class="u-line" d="M524,213 L590,213" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="190" width="210" height="100"/>
+<text class="u-kw" x="965" y="236.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="251.5" text-anchor="middle">raw_sec_xbrl_fact</text>
+<path class="u-line" d="M790,213 L860,213" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="244" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="263.5" text-anchor="middle">Read a filing</text>
+<text class="u-objm" x="690" y="278.5" text-anchor="middle">xbrl.load_filing</text>
+<path class="u-line" d="M524,267 L590,267" marker-end="url(#u10-a)"/>
+<path class="u-line" d="M790,267 L860,267" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="298" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="317.5" text-anchor="middle">Read tickers</text>
+<text class="u-objm" x="690" y="332.5" text-anchor="middle">sec.load_tickers</text>
+<path class="u-line" d="M524,321 L590,321" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="298" width="210" height="46"/>
+<text class="u-kw" x="965" y="317.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="332.5" text-anchor="middle">raw_sec_ticker</text>
+<path class="u-line" d="M790,321 L860,321" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="352" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="371.5" text-anchor="middle">Load prices</text>
+<text class="u-objm" x="690" y="386.5" text-anchor="middle">yahoo.load_prices</text>
+<path class="u-line" d="M524,375 L590,375" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="352" width="210" height="46"/>
+<text class="u-kw" x="965" y="371.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="386.5" text-anchor="middle">raw_yahoo_price</text>
+<path class="u-line" d="M790,375 L860,375" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="406" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="425.5" text-anchor="middle">Load statements</text>
+<text class="u-objm" x="690" y="440.5" text-anchor="middle">yahoo.load_statements</text>
+<path class="u-line" d="M524,429 L590,429" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="406" width="210" height="46"/>
+<text class="u-kw" x="965" y="425.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="440.5" text-anchor="middle">raw_yahoo_statement</text>
+<path class="u-line" d="M790,429 L860,429" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="460" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="479.5" text-anchor="middle">Load earnings</text>
+<text class="u-objm" x="690" y="494.5" text-anchor="middle">yahoo.load_earnings</text>
+<path class="u-line" d="M524,483 L590,483" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="460" width="210" height="46"/>
+<text class="u-kw" x="965" y="479.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="494.5" text-anchor="middle">raw_yahoo_earnings</text>
+<path class="u-line" d="M790,483 L860,483" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="514" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="533.5" text-anchor="middle">Load snapshots</text>
+<text class="u-objm" x="690" y="548.5" text-anchor="middle">market.load_*</text>
+<path class="u-line" d="M524,537 L590,537" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="514" width="210" height="46"/>
+<text class="u-kw" x="965" y="533.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="548.5" text-anchor="middle">raw_tv_constituent</text>
+<path class="u-line" d="M790,537 L860,537" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="568" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="587.5" text-anchor="middle">Load rates</text>
+<text class="u-objm" x="690" y="602.5" text-anchor="middle">market.load_rates</text>
+<path class="u-line" d="M524,591 L590,591" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="568" width="210" height="46"/>
+<text class="u-kw" x="965" y="587.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="602.5" text-anchor="middle">raw_ecb_rate</text>
+<path class="u-line" d="M790,591 L860,591" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="590" y="622" width="200" height="46" rx="12"/>
+<text class="u-act" x="690" y="641.5" text-anchor="middle">No loader now</text>
+<text class="u-st" x="690" y="656.5" text-anchor="middle">kept as loaded</text>
+<path class="u-line" d="M524,645 L590,645" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="860" y="622" width="210" height="46"/>
+<text class="u-kw" x="965" y="641.5" text-anchor="middle">«datastore»</text>
+<text class="u-objm" x="965" y="656.5" text-anchor="middle">raw_project_history</text>
+<path class="u-line" d="M790,645 L860,645" marker-end="url(#u10-a)"/>
+<path class="u-line" d="M1100,132.0 V645.0"/>
+<path class="u-line" d="M1070,132 L1100,132"/>
+<path class="u-line" d="M1070,240 L1100,240"/>
+<path class="u-line" d="M1070,321 L1100,321"/>
+<path class="u-line" d="M1070,375 L1100,375"/>
+<path class="u-line" d="M1070,429 L1100,429"/>
+<path class="u-line" d="M1070,483 L1100,483"/>
+<path class="u-line" d="M1070,537 L1100,537"/>
+<path class="u-line" d="M1070,591 L1100,591"/>
+<path class="u-line" d="M1070,645 L1100,645"/>
+<circle class="u-solid" cx="1100" cy="429.0" r="4"/>
+<rect class="u-node" x="1130" y="399.0" width="140" height="60" rx="12"/>
+<text class="u-act" x="1200" y="425.5" text-anchor="middle">Build core</text>
+<text class="u-st" x="1200" y="440.5" text-anchor="middle">act Nightly run</text>
+<path class="u-rake" d="M1256,445.0 v10 M1251,455.0 v-5 h10 v5"/>
+<path class="u-line" d="M1100,429 L1130,429" marker-end="url(#u10-a)"/>
+<rect class="u-node" x="1130" y="499.0" width="140" height="44"/>
+<text class="u-kw" x="1200" y="517.5" text-anchor="middle">«datastore»</text>
+<text class="u-obj" x="1200" y="532.5" text-anchor="middle">core layer</text>
+<path class="u-line" d="M1200,459 L1200,499" marker-end="url(#u10-a)"/>
+<path class="u-note" d="M24,682 H1061 L1070,691 V724 H24 z M1061,682 V691 H1070"/>
+<text class="u-n" x="32" y="700">every payload is kept as received in raw_payload (gzip), with its raw_fetch row: source, request, time, fingerprint; a data-set quarter stays a file in inbox/</text>
+<text class="u-n" x="32" y="715">the raw tables keep only new or changed rows, so a payload fetched again stores nothing; db reparse reads the kept payloads again after a mapping change</text>
+</svg>
+    </div>
+    <figcaption>Class diagram: every source, what it delivers (format, contents, how it arrives), the loader that reads it and the raw table that stores it.</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 620" role="img" aria-label="UML activity diagram of the nightly ingest run in three partitions: the ingest job plans tasks, chooses its mode and fetches each due task into the raw layer; if new rows were stored the build rebuilds, in one transaction, only the companies with new raw data; coverage takes the snapshot that the next run reads to choose its mode, then the nightly analyses compute what the evening run reads.">
 <defs><marker id="u1-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
 <rect class="u-frame" x="10" y="10" width="1280" height="600"/>
 <path class="u-frame-tag" d="M10,10 h179 v14 l-9,10 H10 z"/>
@@ -321,7 +505,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <path class="u-partl" d="M24,256 H1276 M24,486 H1276 M50,46 V596"/>
 <text class="u-lane" x="41" y="151" text-anchor="middle" transform="rotate(-90 41 151)">ingest job</text>
 <text class="u-lane" x="41" y="371" text-anchor="middle" transform="rotate(-90 41 371)">db build · one transaction</text>
-<text class="u-lane" x="41" y="541" text-anchor="middle" transform="rotate(-90 41 541)">coverage</text>
+<text class="u-lane" x="41" y="541" text-anchor="middle" transform="rotate(-90 41 541)">coverage · analyses</text>
 <circle class="u-solid" cx="74" cy="150" r="8"/>
 <rect class="u-node" x="96" y="130" width="100" height="40" rx="12"/>
 <text class="u-act" x="146" y="154" text-anchor="middle">Plan tasks</text>
@@ -379,13 +563,13 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <path class="u-line dash" d="M860,182 L860,170"/>
 <path class="u-node" d="M1110,137 L1123,150 L1110,163 L1097,150 z"/>
 <path class="u-line" d="M1060,150 L1097,150" marker-end="url(#u1-a)"/>
-<text class="u-g" x="1130" y="143" text-anchor="start">[nothing stored]</text>
+<text class="u-g" x="1130" y="143" text-anchor="start">[nothing new]</text>
 <rect class="u-node" x="1045" y="328" width="130" height="44" rx="12"/>
-<text class="u-act" x="1110" y="346.5" text-anchor="middle">Clear core and</text>
-<text class="u-act" x="1110" y="361.5" text-anchor="middle">load items, tags</text>
+<text class="u-act" x="1110" y="346.5" text-anchor="middle">Build companies</text>
+<text class="u-act" x="1110" y="361.5" text-anchor="middle">and index spells</text>
 <rect class="u-node" x="888" y="328" width="130" height="44" rx="12"/>
-<text class="u-act" x="953" y="346.5" text-anchor="middle">Build companies</text>
-<text class="u-act" x="953" y="361.5" text-anchor="middle">and index spells</text>
+<text class="u-act" x="953" y="346.5" text-anchor="middle">Pick companies</text>
+<text class="u-act" x="953" y="361.5" text-anchor="middle">with new raw data</text>
 <rect class="u-node" x="731" y="328" width="130" height="44" rx="12"/>
 <text class="u-act" x="796" y="346.5" text-anchor="middle">Build daily</text>
 <text class="u-act" x="796" y="361.5" text-anchor="middle">prices</text>
@@ -401,7 +585,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <rect class="u-node" x="103" y="328" width="130" height="44" rx="12"/>
 <text class="u-act" x="168" y="354" text-anchor="middle">Commit build</text>
 <path class="u-line" d="M1110,163 L1110,328" marker-end="url(#u1-a)"/>
-<text class="u-g" x="1118" y="200" text-anchor="start">[rows stored]</text>
+<text class="u-g" x="1118" y="200" text-anchor="start">[new rows]</text>
 <path class="u-line" d="M1045,350 L1018,350" marker-end="url(#u1-a)"/>
 <path class="u-line" d="M888,350 L861,350" marker-end="url(#u1-a)"/>
 <path class="u-line" d="M731,350 L704,350" marker-end="url(#u1-a)"/>
@@ -440,16 +624,21 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <text class="u-kw" x="345" y="537.5" text-anchor="middle">«datastore»</text>
 <text class="u-obj" x="345" y="552.5" text-anchor="middle">out_coverage_snapshot</text>
 <path class="u-line" d="M232,541 L270,541" marker-end="url(#u1-a)"/>
-<rect class="u-node" x="460" y="521" width="120" height="40" rx="12"/>
-<text class="u-act" x="520" y="545" text-anchor="middle">Record the run</text>
+<rect class="u-node" x="460" y="521" width="150" height="40" rx="12"/>
+<text class="u-act" x="535" y="537.5" text-anchor="middle">Nightly analyses</text>
+<text class="u-objm" x="535" y="552.5" text-anchor="middle">nightly.run</text>
 <path class="u-line" d="M420,541 L460,541" marker-end="url(#u1-a)"/>
-<circle class="u-node" cx="620" cy="541" r="11"/>
-<circle class="u-solid" cx="620" cy="541" r="6.5"/>
-<path class="u-line" d="M580,541 L609,541" marker-end="url(#u1-a)"/>
-<path class="u-note" d="M660,500 H1031 L1040,509 V542 H660 z M1031,500 V509 H1040"/>
-<text class="u-n" x="668" y="518">ops_run keeps the mode, requests, rows stored,</text>
-<text class="u-n" x="668" y="533">the build and the coverage summary of each run</text>
-<path class="u-line dash" d="M660,525 L580,525"/>
+<rect class="u-node" x="650" y="521" width="120" height="40" rx="12"/>
+<text class="u-act" x="710" y="545" text-anchor="middle">Record the run</text>
+<path class="u-line" d="M610,541 L650,541" marker-end="url(#u1-a)"/>
+<circle class="u-node" cx="810" cy="541" r="11"/>
+<circle class="u-solid" cx="810" cy="541" r="6.5"/>
+<path class="u-line" d="M770,541 L799,541" marker-end="url(#u1-a)"/>
+<path class="u-note" d="M850,496 H1221 L1230,505 V553 H850 z M1221,496 V505 H1230"/>
+<text class="u-n" x="858" y="514">nightly analyses: the screener, each watch-list</text>
+<text class="u-n" x="858" y="529">stock&#x27;s and the market&#x27;s numbers (out_*), read</text>
+<text class="u-n" x="858" y="544">by the evening run; ops_run keeps each run&#x27;s summary</text>
+<path class="u-line dash" d="M850,525 L770,525"/>
 <path class="u-line" d="M345,521 V494 H403 V357.0 A7,7 0 0 1 403,343.0 V262 H281 V170" marker-end="url(#u1-a)"/>
 <text class="u-g" x="290" y="276" text-anchor="start">read by the next run</text>
 </svg>
@@ -555,6 +744,64 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 </svg>
     </div>
     <figcaption>Activity diagram: the call behaviour <em>Build fundamentals</em> from the run above, partitioned by step; boxes between actions are the data in each state.</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 250" role="img" aria-label="UML activity diagram of changing the extraction: re-read kept payloads if the parsing changed, build a sample of companies in a transaction, compare with the stored values and roll back; if the sample is right, write only those companies, otherwise change again.">
+<defs><marker id="u11-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="10" y="10" width="1280" height="230"/>
+<path class="u-frame-tag" d="M10,10 h235 v14 l-9,10 H10 z"/>
+<text class="u-tagk" x="18" y="26">act</text>
+<text class="u-tag" x="55.5" y="26">Check a change on a sample</text>
+<circle class="u-solid" cx="40" cy="120" r="8"/>
+<rect class="u-node" x="64" y="90" width="200" height="60" rx="12"/>
+<text class="u-act" x="164" y="109" text-anchor="middle">Change the extraction</text>
+<text class="u-objm" x="164" y="124" text-anchor="middle">db_items.toml</text>
+<text class="u-objm" x="164" y="139" text-anchor="middle">companies.toml · build.py</text>
+<path class="u-line" d="M48,120 L64,120" marker-end="url(#u11-a)"/>
+<path class="u-node" d="M300,107 L313,120 L300,133 L287,120 z"/>
+<path class="u-line" d="M264,120 L287,120" marker-end="url(#u11-a)"/>
+<rect class="u-node" x="340" y="34" width="150" height="44" rx="12"/>
+<text class="u-act" x="415" y="52.5" text-anchor="middle">Re-read kept payloads</text>
+<text class="u-objm" x="415" y="67.5" text-anchor="middle">db reparse</text>
+<path class="u-line" d="M300,107 L300,56 L340,56" marker-end="url(#u11-a)"/>
+<text class="u-g" x="308" y="98" text-anchor="start">[parsing changed]</text>
+<path class="u-node" d="M530,107 L543,120 L530,133 L517,120 z"/>
+<path class="u-line" d="M490,56 L530,56 L530,107" marker-end="url(#u11-a)"/>
+<path class="u-line" d="M313,120 L517,120" marker-end="url(#u11-a)"/>
+<text class="u-g" x="380" y="138" text-anchor="start">[mapping only]</text>
+<rect class="u-node" x="566" y="94" width="170" height="52" rx="12"/>
+<text class="u-act" x="651" y="109" text-anchor="middle">Build the sample</text>
+<text class="u-act" x="651" y="124" text-anchor="middle">in one transaction</text>
+<text class="u-objm" x="651" y="139" text-anchor="middle">check-sample --symbols A,B</text>
+<path class="u-line" d="M543,120 L566,120" marker-end="url(#u11-a)"/>
+<rect class="u-node" x="764" y="98" width="150" height="44" rx="12"/>
+<text class="u-act" x="839" y="116.5" text-anchor="middle">Compare with the</text>
+<text class="u-act" x="839" y="131.5" text-anchor="middle">stored values</text>
+<path class="u-line" d="M736,120 L764,120" marker-end="url(#u11-a)"/>
+<rect class="u-node" x="942" y="98" width="90" height="44" rx="12"/>
+<text class="u-act" x="987" y="124" text-anchor="middle">Roll back</text>
+<path class="u-line" d="M914,120 L942,120" marker-end="url(#u11-a)"/>
+<path class="u-node" d="M1066,107 L1079,120 L1066,133 L1053,120 z"/>
+<path class="u-line" d="M1032,120 L1053,120" marker-end="url(#u11-a)"/>
+<rect class="u-node" x="1100" y="94" width="150" height="52" rx="12"/>
+<text class="u-act" x="1175" y="116.5" text-anchor="middle">Write the sample</text>
+<text class="u-objm" x="1175" y="131.5" text-anchor="middle">build --symbols A,B</text>
+<path class="u-line" d="M1079,120 L1100,120" marker-end="url(#u11-a)"/>
+<text class="u-g" x="1072" y="88" text-anchor="start">[as expected]</text>
+<circle class="u-node" cx="1270" cy="120" r="11"/>
+<circle class="u-solid" cx="1270" cy="120" r="6.5"/>
+<path class="u-line" d="M1250,120 L1259,120" marker-end="url(#u11-a)"/>
+<path class="u-line" d="M1066,133 L1066,214 L164,214 L164,150" marker-end="url(#u11-a)"/>
+<text class="u-g" x="1074" y="200" text-anchor="start">[not as expected]</text>
+<path class="u-note" d="M600,170 H1031 L1040,179 V227 H600 z M1031,170 V179 H1040"/>
+<text class="u-n" x="608" y="188">added · removed · changed per company; nothing is written</text>
+<text class="u-n" x="608" y="203">the other companies keep their rows and take the change when</text>
+<text class="u-n" x="608" y="218">their sources bring new data; build --full only when asked</text>
+<path class="u-line dash" d="M839,170 L839,142"/>
+</svg>
+    </div>
+    <figcaption>Activity diagram: a change of the extraction is checked on a sample of companies (<code>db check-sample</code>), never by rebuilding the database.</figcaption>
   </figure>
   <figure>
     <div class="scroll">
@@ -947,7 +1194,90 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   </figure>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1300 112" role="img" aria-label="Key to the UML symbols used in the four diagrams.">
+<svg viewBox="0 0 1300 430" role="img" aria-label="UML activity diagram in three partitions: on this PC bulk files are downloaded and imported, then db push sends every kept payload the server lacks through the same loaders; the server database stores it and marks the tasks fetched; the server job then fetches only its cheap daily sources and builds only the companies with new raw data.">
+<defs><marker id="u12-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
+<rect class="u-frame" x="10" y="10" width="1280" height="410"/>
+<path class="u-frame-tag" d="M10,10 h137 v14 l-9,10 H10 z"/>
+<text class="u-tagk" x="18" y="26">act</text>
+<text class="u-tag" x="55.5" y="26">PC to server</text>
+<rect class="u-part" x="24" y="46" width="1252" height="360"/>
+<path class="u-partl" d="M24,166 H1276 M24,286 H1276 M50,46 V406"/>
+<text class="u-lane" x="41" y="106" text-anchor="middle" transform="rotate(-90 41 106)">this PC</text>
+<text class="u-lane" x="41" y="226" text-anchor="middle" transform="rotate(-90 41 226)">server database</text>
+<text class="u-lane" x="41" y="346" text-anchor="middle" transform="rotate(-90 41 346)">server job</text>
+<circle class="u-solid" cx="74" cy="106" r="8"/>
+<rect class="u-node" x="96" y="82" width="150" height="48" rx="12"/>
+<text class="u-act" x="171" y="102.5" text-anchor="middle">Download bulk files</text>
+<text class="u-objm" x="171" y="117.5" text-anchor="middle">inbox/&lt;kind&gt;/</text>
+<path class="u-line" d="M82,106 L96,106" marker-end="url(#u12-a)"/>
+<rect class="u-node" x="276" y="82" width="150" height="48" rx="12"/>
+<text class="u-act" x="351" y="102.5" text-anchor="middle">Import and analyse</text>
+<text class="u-objm" x="351" y="117.5" text-anchor="middle">db import FILE</text>
+<path class="u-line" d="M246,106 L276,106" marker-end="url(#u12-a)"/>
+<rect class="u-node" x="456" y="82" width="170" height="48" rx="12"/>
+<text class="u-act" x="541" y="102.5" text-anchor="middle">Find what the server lacks</text>
+<text class="u-objm" x="541" y="117.5" text-anchor="middle">db push --target server</text>
+<path class="u-line" d="M426,106 L456,106" marker-end="url(#u12-a)"/>
+<path class="u-note" d="M660,62 H1071 L1080,71 V119 H660 z M1071,62 V71 H1080"/>
+<text class="u-n" x="668" y="80">same source, request and fingerprint already there: skipped</text>
+<text class="u-n" x="668" y="95">a data-set quarter is imported from its file in inbox/</text>
+<text class="u-nm" x="668" y="110">sec_companyfacts · sec_xbrl · sec_fsds</text>
+<path class="u-line dash" d="M660,84 L626,96"/>
+<rect class="u-region" x="140" y="182" width="760" height="92" rx="14"/>
+<text class="u-kw" x="470" y="198">«iterative»</text>
+<text class="u-g" x="538" y="198">each payload the server lacks, parsed on this PC</text>
+<rect class="u-node" x="235" y="176" width="30" height="12"/>
+<path class="u-line" d="M245,176 v12 M255,176 v12"/>
+<path class="u-line" d="M541,130 L541,150 L250,150 L250,176" marker-end="url(#u12-a)"/>
+<rect class="u-node" x="170" y="208" width="160" height="44" rx="12"/>
+<text class="u-act" x="250" y="226.5" text-anchor="middle">Store the payload</text>
+<text class="u-objm" x="250" y="241.5" text-anchor="middle">raw_payload · raw_fetch</text>
+<rect class="u-node" x="370" y="208" width="180" height="44" rx="12"/>
+<text class="u-act" x="460" y="226.5" text-anchor="middle">Store new or changed rows</text>
+<text class="u-act" x="460" y="241.5" text-anchor="middle">with the source&#x27;s loader</text>
+<rect class="u-node" x="590" y="208" width="160" height="44" rx="12"/>
+<text class="u-act" x="670" y="226.5" text-anchor="middle">Mark its tasks fetched</text>
+<text class="u-objm" x="670" y="241.5" text-anchor="middle">ops_task</text>
+<path class="u-line" d="M250,188 L250,208" marker-end="url(#u12-a)"/>
+<path class="u-line" d="M330,230 L370,230" marker-end="url(#u12-a)"/>
+<path class="u-line" d="M550,230 L590,230" marker-end="url(#u12-a)"/>
+<circle class="u-node" cx="800" cy="230.0" r="9"/>
+<path class="u-line" d="M793.6,223.6 L806.4,236.4 M793.6,236.4 L806.4,223.6"/>
+<path class="u-line" d="M750,230 L791,230" marker-end="url(#u12-a)"/>
+<rect class="u-node" x="960" y="204" width="160" height="44"/>
+<text class="u-kw" x="1040" y="222.5" text-anchor="middle">«datastore»</text>
+<text class="u-obj" x="1040" y="237.5" text-anchor="middle">raw layer</text>
+<path class="u-line" d="M460,252 L460,262 L1000,262 L1000,248" marker-end="url(#u12-a)"/>
+<circle class="u-solid" cx="74" cy="346" r="8"/>
+<rect class="u-node" x="96" y="324" width="130" height="44" rx="12"/>
+<text class="u-act" x="161" y="350" text-anchor="middle">Plan tasks</text>
+<path class="u-line" d="M82,346 L96,346" marker-end="url(#u12-a)"/>
+<rect class="u-node" x="256" y="320" width="220" height="52" rx="12"/>
+<text class="u-act" x="366" y="335" text-anchor="middle">Fetch only the due tasks</text>
+<text class="u-st" x="366" y="350" text-anchor="middle">TradingView · Yahoo · ECB daily;</text>
+<text class="u-st" x="366" y="365" text-anchor="middle">SEC: what was not pushed</text>
+<path class="u-line" d="M226,346 L256,346" marker-end="url(#u12-a)"/>
+<rect class="u-node" x="506" y="324" width="220" height="44" rx="12"/>
+<text class="u-act" x="616" y="342.5" text-anchor="middle">Build the companies</text>
+<text class="u-act" x="616" y="357.5" text-anchor="middle">with new raw data</text>
+<path class="u-rake" d="M712,354 v10 M707,364 v-5 h10 v5"/>
+<path class="u-line" d="M476,346 L506,346" marker-end="url(#u12-a)"/>
+<rect class="u-node" x="756" y="324" width="150" height="44" rx="12"/>
+<text class="u-act" x="831" y="342.5" text-anchor="middle">Take coverage</text>
+<text class="u-act" x="831" y="357.5" text-anchor="middle">snapshot</text>
+<path class="u-line" d="M726,346 L756,346" marker-end="url(#u12-a)"/>
+<circle class="u-node" cx="940" cy="346" r="11"/>
+<circle class="u-solid" cx="940" cy="346" r="6.5"/>
+<path class="u-line" d="M906,346 L929,346" marker-end="url(#u12-a)"/>
+<path class="u-line" d="M1080,248 L1080,300 L616,300 L616,324" marker-end="url(#u12-a)"/>
+<text class="u-g" x="1088" y="296" text-anchor="start">read by the build</text>
+</svg>
+    </div>
+    <figcaption>Activity diagram: what this PC loaded, sent to the server (<code>db push</code>), and the server job's own run.</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+<svg viewBox="0 0 1300 112" role="img" aria-label="Key to the UML symbols used in the diagrams.">
 <defs><marker id="u5-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
 <circle class="u-solid" cx="32" cy="30" r="8"/>
 <text class="u-n" x="46" y="34">start</text>
@@ -992,142 +1322,159 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <h2>The nightly pipeline, in UML</h2>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1300 660" role="img" aria-label="UML activity diagram of one weekday night in four partitions. The Azure ingest job runs at 22:30 UTC and records its run in ops_run. Airflow&#x27;s stock_nightly starts at 22:35, opens its run log, waits for the finished ingest run, checks that the prices reached the last close and marks the run ready. The Claude evening session reads the ready marker, writes the notes and reports and commits them; GitHub publishes the site; Airflow waits for that commit and its published site, then closes the run. Any failed check interrupts the Airflow region: the run is marked failed and an alert is emailed. At 07:00 UTC a GitHub workflow audits that the last trading day has a finished run.">
+<svg viewBox="0 0 1300 660" role="img" aria-label="UML activity diagram of one weekday night in four partitions. Azure runs the ingest job at 22:30 UTC (fetch, build, coverage, nightly analyses, a row in ops_run) and the quotes job every hour. Airflow&#x27;s stock_nightly starts at 22:35 and forks: it checks the quotes job, waits for the finished ingest run, then forks again to check the nightly analyses and the prices; the prices lead to the ready marker and to waiting for the Claude session&#x27;s commit and its published site. A join closes the run. Any failed check interrupts the region: the run is marked failed and an alert is emailed. The Claude session runs at 00:00 Italy time, waits for the newest price, writes the notes and reports, commits and emails. At 07:00 UTC a GitHub workflow audits the last trading day.">
 <defs><marker id="u7-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
 <rect class="u-frame" x="10" y="10" width="1280" height="640"/>
 <path class="u-frame-tag" d="M10,10 h144 v14 l-9,10 H10 z"/>
 <text class="u-tagk" x="18" y="26">act</text>
 <text class="u-tag" x="55.5" y="26">stock_nightly</text>
 <rect class="u-part" x="24" y="46" width="1252" height="590"/>
-<path class="u-partl" d="M24,156 H1276 M24,396 H1276 M24,516 H1276 M50,46 V636"/>
-<text class="u-lane" x="41" y="101" text-anchor="middle" transform="rotate(-90 41 101)">Azure job</text>
-<text class="u-lane" x="41" y="276" text-anchor="middle" transform="rotate(-90 41 276)">Airflow</text>
-<text class="u-lane" x="41" y="456" text-anchor="middle" transform="rotate(-90 41 456)">Claude</text>
+<path class="u-partl" d="M24,156 H1276 M24,406 H1276 M50,46 V636"/>
+<path class="u-partl" d="M24,516 H1276"/>
+<text class="u-lane" x="41" y="101" text-anchor="middle" transform="rotate(-90 41 101)">Azure jobs</text>
+<text class="u-lane" x="41" y="281" text-anchor="middle" transform="rotate(-90 41 281)">Airflow</text>
+<text class="u-lane" x="41" y="461" text-anchor="middle" transform="rotate(-90 41 461)">Claude</text>
 <text class="u-lane" x="41" y="576" text-anchor="middle" transform="rotate(-90 41 576)">GitHub</text>
 <path class="u-node" d="M73,81 H91 L73,105 H91 z"/>
 <text class="u-g" x="82" y="121" text-anchor="middle">22:30 UTC</text>
-<rect class="u-node" x="116" y="79" width="190" height="44" rx="12"/>
-<text class="u-act" x="211" y="97.5" text-anchor="middle">Ingest: fetch, build,</text>
-<text class="u-act" x="211" y="112.5" text-anchor="middle">coverage snapshot</text>
-<path class="u-rake" d="M292,109 v10 M287,119 v-5 h10 v5"/>
+<rect class="u-node" x="116" y="79" width="200" height="44" rx="12"/>
+<text class="u-act" x="216" y="97.5" text-anchor="middle">Ingest, build, coverage,</text>
+<text class="u-act" x="216" y="112.5" text-anchor="middle">nightly analyses</text>
+<path class="u-rake" d="M302,109 v10 M297,119 v-5 h10 v5"/>
 <path class="u-line" d="M91,93 L116,93" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="350" y="81" width="110" height="40"/>
-<text class="u-kw" x="405" y="97.5" text-anchor="middle">«datastore»</text>
-<text class="u-obj" x="405" y="112.5" text-anchor="middle">ops_run</text>
-<path class="u-line" d="M306,101 L350,101" marker-end="url(#u7-a)"/>
-<path class="u-note" d="M500,74 H831 L840,83 V116 H500 z M831,74 V83 H840"/>
-<text class="u-n" x="508" y="92">act Nightly ingest run, above; one row per run with</text>
-<text class="u-n" x="508" y="107">its mode, status, requests and rows stored</text>
-<path class="u-line dash" d="M500,101 L460,101"/>
-<path class="u-node" d="M73,214 H91 L73,238 H91 z"/>
-<text class="u-g" x="82" y="254" text-anchor="middle">22:35 UTC</text>
-<text class="u-g" x="82" y="267" text-anchor="middle">Mon–Fri</text>
-<rect class="u-node" x="108" y="206" width="104" height="40" rx="12"/>
-<text class="u-act" x="160" y="222.5" text-anchor="middle">Open the</text>
-<text class="u-act" x="160" y="237.5" text-anchor="middle">run log</text>
-<path class="u-line" d="M91,226 L108,226" marker-end="url(#u7-a)"/>
-<rect class="u-region" x="236" y="168" width="904" height="218" rx="14"/>
-<text class="u-kw" x="248" y="184">«interruptible»</text>
-<rect class="u-node" x="262" y="206" width="116" height="40" rx="12"/>
-<text class="u-act" x="320" y="222.5" text-anchor="middle">Wait for the</text>
-<text class="u-act" x="320" y="237.5" text-anchor="middle">ingest run</text>
-<path class="u-line" d="M212,226 L262,226" marker-end="url(#u7-a)"/>
-<path class="u-line" d="M405,121 L405,190 L340,190 L340,206" marker-end="url(#u7-a)"/>
-<text class="u-g" x="412" y="184" text-anchor="start">finished row</text>
-<path class="u-node" d="M420,213 L433,226 L420,239 L407,226 z"/>
-<path class="u-line" d="M378,226 L407,226" marker-end="url(#u7-a)"/>
-<path class="u-line" d="M420,239 L420,282 L300,282 L300,246" marker-end="url(#u7-a)"/>
-<text class="u-g" x="310" y="297" text-anchor="start">[not yet] / again in 5 min</text>
-<rect class="u-node" x="470" y="206" width="112" height="40" rx="12"/>
-<text class="u-act" x="526" y="222.5" text-anchor="middle">Check the</text>
-<text class="u-act" x="526" y="237.5" text-anchor="middle">prices</text>
-<path class="u-line" d="M433,226 L470,226" marker-end="url(#u7-a)"/>
-<text class="u-g" x="451" y="218" text-anchor="middle">[done]</text>
-<path class="u-node" d="M620,213 L633,226 L620,239 L607,226 z"/>
-<path class="u-line" d="M582,226 L607,226" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="676" y="206" width="100" height="40" rx="12"/>
-<text class="u-act" x="726" y="230" text-anchor="middle">Mark ready</text>
-<path class="u-line" d="M633,226 L676,226" marker-end="url(#u7-a)"/>
-<text class="u-g" x="650" y="186" text-anchor="middle">[≥ 95% of members</text>
-<text class="u-g" x="650" y="199" text-anchor="middle">have the last close]</text>
-<rect class="u-node" x="664" y="316" width="124" height="40"/>
-<text class="u-kw" x="726" y="332.5" text-anchor="middle">«datastore»</text>
-<text class="u-obj" x="726" y="347.5" text-anchor="middle">ops_pipeline_run</text>
-<path class="u-line" d="M726,246 L726,316" marker-end="url(#u7-a)"/>
-<text class="u-g" x="734" y="296" text-anchor="start">[ready]</text>
-<rect class="u-node" x="826" y="206" width="120" height="40" rx="12"/>
-<text class="u-act" x="886" y="222.5" text-anchor="middle">Wait for commit</text>
-<text class="u-act" x="886" y="237.5" text-anchor="middle">and the site</text>
-<path class="u-line" d="M776,226 L826,226" marker-end="url(#u7-a)"/>
-<path class="u-node" d="M984,213 L997,226 L984,239 L971,226 z"/>
-<path class="u-line" d="M946,226 L971,226" marker-end="url(#u7-a)"/>
-<path class="u-line" d="M984,239 L984,282 L926,282 L926,246" marker-end="url(#u7-a)"/>
-<text class="u-g" x="936" y="297" text-anchor="start">[not yet] / again in 10 min</text>
-<rect class="u-node" x="1030" y="206" width="92" height="40" rx="12"/>
-<text class="u-act" x="1076" y="222.5" text-anchor="middle">Close the</text>
-<text class="u-act" x="1076" y="237.5" text-anchor="middle">run (ok)</text>
-<path class="u-line" d="M997,226 L1030,226" marker-end="url(#u7-a)"/>
-<text class="u-g" x="1013" y="199" text-anchor="middle">[published]</text>
-<circle class="u-node" cx="1076" cy="330" r="11"/>
-<circle class="u-solid" cx="1076" cy="330" r="6.5"/>
-<path class="u-line" d="M1076,246 L1076,319" marker-end="url(#u7-a)"/>
-<path class="u-note" d="M250,316 H601 L610,325 V373 H250 z M601,316 V325 H610"/>
-<text class="u-n" x="258" y="334">a failed check, a crash after two retries, or a wait</text>
-<text class="u-n" x="258" y="349">past its limit (ingest 3.5 h, evening 4 h) interrupts</text>
-<text class="u-n" x="258" y="364">the region</text>
-<rect class="u-node" x="1168" y="250" width="98" height="44" rx="12"/>
-<text class="u-act" x="1217" y="268.5" text-anchor="middle">Mark failed,</text>
-<text class="u-act" x="1217" y="283.5" text-anchor="middle">email alert</text>
-<path class="u-line" d="M1140,352 L1159.0,352 L1149.0,272 L1168,272" marker-end="url(#u7-a)"/>
-<circle class="u-node" cx="1217" cy="346" r="9"/>
-<path class="u-line" d="M1210.6,339.6 L1223.4,352.4 M1210.6,352.4 L1223.4,339.6"/>
-<path class="u-line" d="M1217,294 L1217,337" marker-end="url(#u7-a)"/>
-<path class="u-node" d="M73,428 H91 L73,452 H91 z"/>
-<text class="u-g" x="82" y="468" text-anchor="middle">evening</text>
-<text class="u-g" x="82" y="481" text-anchor="middle">schedule</text>
-<rect class="u-node" x="108" y="420" width="122" height="40" rx="12"/>
-<text class="u-act" x="169" y="436.5" text-anchor="middle">Read the ready</text>
-<text class="u-act" x="169" y="451.5" text-anchor="middle">marker (web API)</text>
-<path class="u-line" d="M91,440 L108,440" marker-end="url(#u7-a)"/>
-<path class="u-line" d="M726,356 L726,406 L169,406 L169,420" marker-end="url(#u7-a)"/>
-<path class="u-node" d="M272,427 L285,440 L272,453 L259,440 z"/>
-<path class="u-line" d="M230,440 L259,440" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="318" y="418" width="160" height="44" rx="12"/>
-<text class="u-act" x="398" y="436.5" text-anchor="middle">Notes, reports,</text>
-<text class="u-act" x="398" y="451.5" text-anchor="middle">validate</text>
-<path class="u-rake" d="M464,448 v10 M459,458 v-5 h10 v5"/>
-<path class="u-line" d="M285,440 L318,440" marker-end="url(#u7-a)"/>
-<text class="u-g" x="300" y="432" text-anchor="middle">[ready]</text>
-<rect class="u-node" x="510" y="420" width="120" height="40" rx="12"/>
-<text class="u-act" x="570" y="444" text-anchor="middle">Commit to main</text>
-<path class="u-line" d="M478,440 L510,440" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="662" y="420" width="110" height="40" rx="12"/>
-<text class="u-act" x="717" y="444" text-anchor="middle">Email the run</text>
-<path class="u-line" d="M630,440 L662,440" marker-end="url(#u7-a)"/>
-<circle class="u-node" cx="806" cy="440" r="11"/>
-<circle class="u-solid" cx="806" cy="440" r="6.5"/>
-<path class="u-line" d="M772,440 L795,440" marker-end="url(#u7-a)"/>
-<rect class="u-node" x="318" y="478" width="160" height="28" rx="12"/>
-<text class="u-act" x="398" y="496" text-anchor="middle">Say so in the thread</text>
-<path class="u-line" d="M272,453 L272,492 L318,492" marker-end="url(#u7-a)"/>
-<text class="u-g" x="278" y="476" text-anchor="start">[not ready]</text>
-<circle class="u-node" cx="506" cy="492" r="9"/>
-<path class="u-line" d="M499.6,485.6 L512.4,498.4 M499.6,498.4 L512.4,485.6"/>
-<path class="u-line" d="M478,492 L497,492" marker-end="url(#u7-a)"/>
-<path class="u-note" d="M850,410 H1161 L1170,419 V452 H850 z M1161,410 V419 H1170"/>
-<text class="u-n" x="858" y="428">docs/EVENING_RUN.md: the PDFs, the notes and</text>
-<text class="u-n" x="858" y="443">the screener files are committed to main</text>
-<path class="u-line dash" d="M850,425 L468,418"/>
-<rect class="u-node" x="500" y="556" width="140" height="40" rx="12"/>
-<text class="u-act" x="570" y="572.5" text-anchor="middle">Pages publishes</text>
-<text class="u-act" x="570" y="587.5" text-anchor="middle">the site</text>
-<path class="u-line" d="M570,460 L570,556" marker-end="url(#u7-a)"/>
-<text class="u-g" x="578" y="532" text-anchor="start">push</text>
-<circle class="u-node" cx="676" cy="576" r="9"/>
-<path class="u-line" d="M669.6,569.6 L682.4,582.4 M669.6,582.4 L682.4,569.6"/>
-<path class="u-line" d="M640,576 L667,576" marker-end="url(#u7-a)"/>
-<path class="u-line dash" d="M620,556 V530 H876 V246" marker-end="url(#u7-a)"/>
-<text class="u-g" x="880" y="526" text-anchor="start">read through the GitHub API</text>
+<rect class="u-node" x="352" y="81" width="110" height="40"/>
+<text class="u-kw" x="407" y="97.5" text-anchor="middle">«datastore»</text>
+<text class="u-obj" x="407" y="112.5" text-anchor="middle">ops_run</text>
+<path class="u-line" d="M316,101 L352,101" marker-end="url(#u7-a)"/>
+<path class="u-note" d="M496,62 H737 L746,71 V119 H496 z M737,62 V71 H746"/>
+<text class="u-n" x="504" y="80">its summary records any error of the</text>
+<text class="u-n" x="504" y="95">screener, the watch-list numbers or</text>
+<text class="u-n" x="504" y="110">the market numbers</text>
+<path class="u-line dash" d="M496,91 L462,91"/>
+<path class="u-node" d="M791,81 H809 L791,105 H809 z"/>
+<text class="u-g" x="800" y="121" text-anchor="middle">:05 hourly</text>
+<text class="u-g" x="800" y="134" text-anchor="middle">Mon–Fri</text>
+<rect class="u-node" x="832" y="81" width="130" height="40" rx="12"/>
+<text class="u-act" x="897" y="105" text-anchor="middle">Store the quotes</text>
+<path class="u-line" d="M809,93 L832,93" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="1000" y="81" width="120" height="40"/>
+<text class="u-kw" x="1060" y="97.5" text-anchor="middle">«datastore»</text>
+<text class="u-obj" x="1060" y="112.5" text-anchor="middle">raw_tv_quote</text>
+<path class="u-line" d="M962,101 L1000,101" marker-end="url(#u7-a)"/>
+<path class="u-node" d="M73,194 H91 L73,218 H91 z"/>
+<text class="u-g" x="82" y="234" text-anchor="middle">22:35 UTC</text>
+<text class="u-g" x="82" y="247" text-anchor="middle">Mon–Fri</text>
+<rect class="u-node" x="108" y="186" width="104" height="40" rx="12"/>
+<text class="u-act" x="160" y="202.5" text-anchor="middle">Open the</text>
+<text class="u-act" x="160" y="217.5" text-anchor="middle">run log</text>
+<path class="u-line" d="M91,206 L108,206" marker-end="url(#u7-a)"/>
+<rect class="u-region" x="232" y="166" width="908" height="230" rx="14"/>
+<text class="u-kw" x="244" y="182">«interruptible»</text>
+<rect class="u-solid" x="243.5" y="192" width="5" height="158"/>
+<path class="u-line" d="M212,206 L243.5,206" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="262" y="186" width="116" height="40" rx="12"/>
+<text class="u-act" x="320" y="202.5" text-anchor="middle">Wait for the</text>
+<text class="u-act" x="320" y="217.5" text-anchor="middle">ingest run</text>
+<path class="u-line" d="M248.5,206 L262,206" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="262" y="310" width="116" height="40" rx="12"/>
+<text class="u-act" x="320" y="326.5" text-anchor="middle">Check the</text>
+<text class="u-act" x="320" y="341.5" text-anchor="middle">quotes job</text>
+<path class="u-line" d="M248.5,330 L262,330" marker-end="url(#u7-a)"/>
+<path class="u-line" d="M407,121 L407,180 L350,180 L350,186" marker-end="url(#u7-a)"/>
+<text class="u-g" x="414" y="142" text-anchor="start">finished row</text>
+<path class="u-node" d="M412,193 L425,206 L412,219 L399,206 z"/>
+<path class="u-line" d="M378,206 L399,206" marker-end="url(#u7-a)"/>
+<path class="u-line" d="M412,219 L412,262 L290,262 L290,226" marker-end="url(#u7-a)"/>
+<text class="u-g" x="300" y="276" text-anchor="start">[not yet] / again in 5 min</text>
+<rect class="u-solid" x="443.5" y="192" width="5" height="120"/>
+<path class="u-line" d="M425,206 L443.5,206" marker-end="url(#u7-a)"/>
+<text class="u-g" x="430" y="180" text-anchor="middle">[done]</text>
+<rect class="u-node" x="466" y="186" width="112" height="40" rx="12"/>
+<text class="u-act" x="522" y="202.5" text-anchor="middle">Check the</text>
+<text class="u-act" x="522" y="217.5" text-anchor="middle">prices</text>
+<path class="u-line" d="M448.5,206 L466,206" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="466" y="280" width="112" height="40" rx="12"/>
+<text class="u-act" x="522" y="296.5" text-anchor="middle">Check the nightly</text>
+<text class="u-act" x="522" y="311.5" text-anchor="middle">analyses</text>
+<path class="u-line" d="M448.5,300 L466,300" marker-end="url(#u7-a)"/>
+<path class="u-node" d="M614,193 L627,206 L614,219 L601,206 z"/>
+<path class="u-line" d="M578,206 L601,206" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="662" y="186" width="100" height="40" rx="12"/>
+<text class="u-act" x="712" y="210" text-anchor="middle">Mark ready</text>
+<path class="u-line" d="M627,206 L662,206" marker-end="url(#u7-a)"/>
+<text class="u-g" x="640" y="224" text-anchor="middle">[≥ 95%</text>
+<text class="u-g" x="640" y="237" text-anchor="middle">fresh]</text>
+<rect class="u-node" x="650" y="282" width="124" height="40"/>
+<text class="u-kw" x="712" y="298.5" text-anchor="middle">«datastore»</text>
+<text class="u-obj" x="712" y="313.5" text-anchor="middle">ops_pipeline_run</text>
+<path class="u-line" d="M712,226 L712,282" marker-end="url(#u7-a)"/>
+<text class="u-g" x="720" y="262" text-anchor="start">[ready]</text>
+<rect class="u-node" x="800" y="186" width="120" height="40" rx="12"/>
+<text class="u-act" x="860" y="202.5" text-anchor="middle">Wait for commit</text>
+<text class="u-act" x="860" y="217.5" text-anchor="middle">and the site</text>
+<path class="u-line" d="M762,206 L800,206" marker-end="url(#u7-a)"/>
+<path class="u-node" d="M956,193 L969,206 L956,219 L943,206 z"/>
+<path class="u-line" d="M920,206 L943,206" marker-end="url(#u7-a)"/>
+<path class="u-line" d="M956,219 L956,262 L890,262 L890,226" marker-end="url(#u7-a)"/>
+<text class="u-g" x="860" y="276" text-anchor="start">[not yet] / again in 10 min</text>
+<rect class="u-solid" x="991.5" y="192" width="5" height="180"/>
+<path class="u-line" d="M969,206 L991.5,206" marker-end="url(#u7-a)"/>
+<text class="u-g" x="975" y="180" text-anchor="middle">[published]</text>
+<path class="u-line" d="M578,300 L620,300 L620,352 L991.5,352" marker-end="url(#u7-a)"/>
+<path class="u-line" d="M378,330 L390,330 L390,368 L991.5,368" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="1012" y="186" width="86" height="40" rx="12"/>
+<text class="u-act" x="1055" y="202.5" text-anchor="middle">Close the</text>
+<text class="u-act" x="1055" y="217.5" text-anchor="middle">run (ok)</text>
+<path class="u-line" d="M996.5,206 L1012,206" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="1120" cy="206" r="11"/>
+<circle class="u-solid" cx="1120" cy="206" r="6.5"/>
+<path class="u-line" d="M1098,206 L1109,206" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="1166" y="238" width="98" height="44" rx="12"/>
+<text class="u-act" x="1215" y="256.5" text-anchor="middle">Mark failed,</text>
+<text class="u-act" x="1215" y="271.5" text-anchor="middle">email alert</text>
+<path class="u-line" d="M1140,330 L1158.0,330 L1148.0,260 L1166,260" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="1215" cy="312" r="9"/>
+<path class="u-line" d="M1208.6,305.6 L1221.4,318.4 M1208.6,318.4 L1221.4,305.6"/>
+<path class="u-line" d="M1215,282 L1215,303" marker-end="url(#u7-a)"/>
+<path class="u-note" d="M1150,336 H1261 L1270,345 V408 H1150 z M1261,336 V345 H1270"/>
+<text class="u-n" x="1158" y="354">a failed check, a</text>
+<text class="u-n" x="1158" y="369">crash after retries</text>
+<text class="u-n" x="1158" y="384">or a wait past its</text>
+<text class="u-n" x="1158" y="399">limit interrupts</text>
+<path class="u-node" d="M73,438 H91 L73,462 H91 z"/>
+<text class="u-g" x="82" y="478" text-anchor="middle">00:00 Italy</text>
+<text class="u-g" x="82" y="491" text-anchor="middle">Tue–Sat</text>
+<rect class="u-node" x="108" y="430" width="150" height="40" rx="12"/>
+<text class="u-act" x="183" y="446.5" text-anchor="middle">Wait for the newest</text>
+<text class="u-act" x="183" y="461.5" text-anchor="middle">price (up to 1 h)</text>
+<path class="u-line" d="M91,450 L108,450" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="290" y="428" width="160" height="44" rx="12"/>
+<text class="u-act" x="370" y="446.5" text-anchor="middle">Notes, reports,</text>
+<text class="u-act" x="370" y="461.5" text-anchor="middle">validate</text>
+<path class="u-rake" d="M436,458 v10 M431,468 v-5 h10 v5"/>
+<path class="u-line" d="M258,450 L290,450" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="482" y="430" width="120" height="40" rx="12"/>
+<text class="u-act" x="542" y="454" text-anchor="middle">Commit to main</text>
+<path class="u-line" d="M450,450 L482,450" marker-end="url(#u7-a)"/>
+<rect class="u-node" x="634" y="430" width="110" height="40" rx="12"/>
+<text class="u-act" x="689" y="454" text-anchor="middle">Email the run</text>
+<path class="u-line" d="M602,450 L634,450" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="778" cy="450" r="11"/>
+<circle class="u-solid" cx="778" cy="450" r="6.5"/>
+<path class="u-line" d="M744,450 L767,450" marker-end="url(#u7-a)"/>
+<path class="u-note" d="M820,426 H1171 L1180,435 V468 H820 z M1171,426 V435 H1180"/>
+<text class="u-n" x="828" y="444">docs/EVENING_RUN.md: reads the stored numbers through the</text>
+<text class="u-n" x="828" y="459">web API, writes the notes, renders the PDFs</text>
+<rect class="u-node" x="472" y="556" width="140" height="40" rx="12"/>
+<text class="u-act" x="542" y="572.5" text-anchor="middle">Pages publishes</text>
+<text class="u-act" x="542" y="587.5" text-anchor="middle">the site</text>
+<path class="u-line" d="M542,470 L542,556" marker-end="url(#u7-a)"/>
+<text class="u-g" x="550" y="532" text-anchor="start">push</text>
+<circle class="u-node" cx="648" cy="576" r="9"/>
+<path class="u-line" d="M641.6,569.6 L654.4,582.4 M641.6,582.4 L654.4,569.6"/>
+<path class="u-line" d="M612,576 L639,576" marker-end="url(#u7-a)"/>
+<path class="u-line dash" d="M592,556 V530 H860 V230" marker-end="url(#u7-a)"/>
+<text class="u-g" x="866" y="526" text-anchor="start">read through the GitHub API</text>
 <path class="u-node" d="M73,564 H91 L73,588 H91 z"/>
 <text class="u-g" x="82" y="545" text-anchor="middle">07:00 UTC</text>
 <text class="u-g" x="82" y="558" text-anchor="middle">Tue–Sat</text>
@@ -1141,14 +1488,14 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <circle class="u-solid" cx="276" cy="620" r="6.5"/>
 <path class="u-line" d="M276,589 L276,609" marker-end="url(#u7-a)"/>
 <text class="u-g" x="284" y="606" text-anchor="start">[ok run]</text>
-<rect class="u-node" x="318" y="556" width="150" height="40" rx="12"/>
-<text class="u-act" x="393" y="572.5" text-anchor="middle">Fail: GitHub</text>
-<text class="u-act" x="393" y="587.5" text-anchor="middle">emails the owner</text>
+<rect class="u-node" x="318" y="556" width="126" height="40" rx="12"/>
+<text class="u-act" x="381" y="572.5" text-anchor="middle">Fail: GitHub</text>
+<text class="u-act" x="381" y="587.5" text-anchor="middle">emails the owner</text>
 <path class="u-line" d="M289,576 L318,576" marker-end="url(#u7-a)"/>
 <text class="u-g" x="303" y="568" text-anchor="middle">[none]</text>
-<circle class="u-node" cx="490" cy="620" r="9"/>
-<path class="u-line" d="M483.6,613.6 L496.4,626.4 M483.6,626.4 L496.4,613.6"/>
-<path class="u-line" d="M393,596 L393,620 L481,620" marker-end="url(#u7-a)"/>
+<circle class="u-node" cx="430" cy="620" r="9"/>
+<path class="u-line" d="M423.6,613.6 L436.4,626.4 M423.6,626.4 L436.4,613.6"/>
+<path class="u-line" d="M381,596 L381,620 L421,620" marker-end="url(#u7-a)"/>
 <path class="u-note" d="M740,560 H1051 L1060,569 V617 H740 z M1051,560 V569 H1060"/>
 <text class="u-n" x="748" y="578">pipeline-watch.yml reads ops_pipeline_run through</text>
 <text class="u-n" x="748" y="593">the web API: it catches a night Airflow never ran</text>
@@ -1199,9 +1546,9 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   </figure>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1300 480" role="img" aria-label="UML deployment diagram: Airflow&#x27;s API server, scheduler, DAG processor and metadata database run in Docker on the PC with the DAG stock_nightly; Azure runs the ingest Container Apps Job, the PostgreSQL server stock-db-bk and the web API stock-api-bk; Anthropic&#x27;s cloud runs the Claude evening routine; GitHub runs the Pages and pipeline-watch workflows; Brevo sends the emails.">
+<svg viewBox="0 0 1300 520" role="img" aria-label="UML deployment diagram: Airflow&#x27;s API server, scheduler, DAG processor and metadata database run in Docker on the PC with the DAG stock_nightly; Azure runs the ingest and quotes Container Apps Jobs, the PostgreSQL server stock-db-bk and the web API stock-api-bk; Anthropic&#x27;s cloud runs the scheduled Claude session; GitHub runs the Pages and pipeline-watch workflows; Brevo sends the emails.">
 <defs><marker id="u9-a" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="u-ah" d="M0,0 L10,5 L0,10"/></marker></defs>
-<rect class="u-frame" x="10" y="10" width="1280" height="460"/>
+<rect class="u-frame" x="10" y="10" width="1280" height="500"/>
 <path class="u-frame-tag" d="M10,10 h214 v14 l-9,10 H10 z"/>
 <text class="u-tagk" x="18" y="26">deployment</text>
 <text class="u-tag" x="108" y="26">Nightly pipeline</text>
@@ -1235,23 +1582,30 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <path class="u-line" d="M379,262 h7 l4,4 v10 h-11 z M386,262 v4 h4"/>
 <text class="u-kw" x="70" y="271">«artifact»</text>
 <text class="u-attr" x="70" y="286">stock_nightly.py · stock_analysis.pipeline</text>
-<path class="u-node" d="M500,64 l10,-10 h400 v222 l-10,10 z"/>
-<rect class="u-node" x="500" y="64" width="400" height="222"/>
+<path class="u-node" d="M500,64 l10,-10 h400 v300 l-10,10 z"/>
+<rect class="u-node" x="500" y="64" width="400" height="300"/>
 <path class="u-line" d="M900,64 l10,-10"/>
 <text class="u-kw" x="510" y="80">«cloud»</text>
 <text class="u-cname" x="510" y="95">Microsoft Azure</text>
-<rect class="u-node" x="516" y="110" width="368" height="38"/>
-<path class="u-line" d="M867,116 h7 l4,4 v10 h-11 z M874,116 v4 h4"/>
-<text class="u-kw" x="524" y="125">«executionEnvironment»</text>
-<text class="u-attr" x="524" y="140">stock-ingest · Container Apps Job</text>
-<rect class="u-node" x="516" y="168" width="368" height="38"/>
-<path class="u-line" d="M867,174 h7 l4,4 v10 h-11 z M874,174 v4 h4"/>
-<text class="u-kw" x="524" y="183">«database»</text>
-<text class="u-attr" x="524" y="198">stock-db-bk · PostgreSQL 16</text>
-<rect class="u-node" x="516" y="226" width="368" height="38"/>
-<path class="u-line" d="M867,232 h7 l4,4 v10 h-11 z M874,232 v4 h4"/>
-<text class="u-kw" x="524" y="241">«executionEnvironment»</text>
-<text class="u-attr" x="524" y="256">stock-api-bk · App Service, api/app.py</text>
+<rect class="u-node" x="516" y="106" width="360" height="38"/>
+<path class="u-line" d="M859,112 h7 l4,4 v10 h-11 z M866,112 v4 h4"/>
+<text class="u-kw" x="524" y="121">«executionEnvironment»</text>
+<text class="u-attr" x="524" y="136">stock-ingest · Container Apps Job</text>
+<rect class="u-node" x="516" y="156" width="360" height="38"/>
+<path class="u-line" d="M859,162 h7 l4,4 v10 h-11 z M866,162 v4 h4"/>
+<text class="u-kw" x="524" y="171">«executionEnvironment»</text>
+<text class="u-attr" x="524" y="186">stock-quotes · Container Apps Job</text>
+<rect class="u-node" x="516" y="206" width="360" height="38"/>
+<path class="u-line" d="M859,212 h7 l4,4 v10 h-11 z M866,212 v4 h4"/>
+<text class="u-kw" x="524" y="221">«database»</text>
+<text class="u-attr" x="524" y="236">stock-db-bk · PostgreSQL 16</text>
+<rect class="u-node" x="516" y="256" width="360" height="38"/>
+<path class="u-line" d="M859,262 h7 l4,4 v10 h-11 z M866,262 v4 h4"/>
+<text class="u-kw" x="524" y="271">«executionEnvironment»</text>
+<text class="u-attr" x="524" y="286">stock-api-bk · App Service, api/app.py</text>
+<path class="u-line" d="M876,125 L888,125 L888,275 L876,275"/>
+<path class="u-line" d="M876,175 L888,175"/>
+<path class="u-line" d="M876,225 L888,225"/>
 <path class="u-node" d="M970,64 l10,-10 h300 v100 l-10,10 z"/>
 <rect class="u-node" x="970" y="64" width="300" height="100"/>
 <path class="u-line" d="M1270,64 l10,-10"/>
@@ -1260,7 +1614,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <rect class="u-node" x="986" y="108" width="268" height="38"/>
 <path class="u-line" d="M1237,114 h7 l4,4 v10 h-11 z M1244,114 v4 h4"/>
 <text class="u-kw" x="994" y="123">«executionEnvironment»</text>
-<text class="u-attr" x="994" y="138">Evening watch list routine</text>
+<text class="u-attr" x="994" y="138">Scheduled Claude session</text>
 <path class="u-node" d="M970,230 l10,-10 h300 v150 l-10,10 z"/>
 <rect class="u-node" x="970" y="230" width="300" height="150"/>
 <path class="u-line" d="M1270,230 l10,-10"/>
@@ -1274,27 +1628,25 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
 <path class="u-line" d="M1237,332 h7 l4,4 v10 h-11 z M1244,332 v4 h4"/>
 <text class="u-kw" x="994" y="341">«artifact»</text>
 <text class="u-attr" x="994" y="356">Pages site</text>
-<path class="u-node" d="M500,380 l10,-10 h220 v70 l-10,10 z"/>
-<rect class="u-node" x="500" y="380" width="220" height="70"/>
-<path class="u-line" d="M720,380 l10,-10"/>
-<text class="u-kw" x="510" y="396">«cloud»</text>
-<text class="u-cname" x="510" y="411">Brevo</text>
-<path class="u-line" d="M430,187 L516,187"/>
-<text class="u-g" x="473" y="180" text-anchor="middle">SQL · TLS</text>
-<path class="u-line" d="M700,148 L700,168"/>
-<path class="u-line" d="M700,206 L700,226"/>
-<path class="u-line" d="M986,140 L930,140 L930,240 L884,240"/>
-<text class="u-g" x="936" y="184" text-anchor="start">HTTPS · marker</text>
+<path class="u-node" d="M500,420 l10,-10 h220 v70 l-10,10 z"/>
+<rect class="u-node" x="500" y="420" width="220" height="70"/>
+<path class="u-line" d="M720,420 l10,-10"/>
+<text class="u-kw" x="510" y="436">«cloud»</text>
+<text class="u-cname" x="510" y="451">Brevo</text>
+<path class="u-line" d="M430,225 L516,225"/>
+<text class="u-g" x="473" y="218" text-anchor="middle">SQL · TLS</text>
+<path class="u-line" d="M986,140 L930,140 L930,262 L900,262"/>
+<text class="u-g" x="936" y="190" text-anchor="start">HTTPS · data</text>
 <path class="u-line" d="M1150,164 L1150,220"/>
 <text class="u-g" x="1158" y="200" text-anchor="start">git push</text>
-<path class="u-line" d="M380,326 L380,356 L970,356"/>
-<text class="u-g" x="760" y="350" text-anchor="middle">HTTPS · GitHub API: commit and Pages run</text>
-<path class="u-line" d="M200,326 L200,415 L500,415"/>
-<text class="u-g" x="350" y="409" text-anchor="middle">HTTPS · alert email</text>
-<path class="u-line" d="M986,295 L910,295 L910,256 L884,256"/>
-<text class="u-g" x="916" y="310" text-anchor="start">HTTPS · audit</text>
-<path class="u-line" d="M1254,127 L1282,127 L1282,430 L720,430"/>
-<text class="u-g" x="800" y="424" text-anchor="start">HTTPS · evening email</text>
+<path class="u-line" d="M380,326 L380,396 L1100,396 L1100,380"/>
+<text class="u-g" x="760" y="390" text-anchor="middle">HTTPS · GitHub API: commit and Pages run</text>
+<path class="u-line" d="M200,326 L200,455 L500,455"/>
+<text class="u-g" x="350" y="449" text-anchor="middle">HTTPS · alert email</text>
+<path class="u-line" d="M986,295 L944,295 L944,330 L900,330"/>
+<text class="u-g" x="950" y="320" text-anchor="start">HTTPS · audit</text>
+<path class="u-line" d="M1254,127 L1282,127 L1282,470 L720,470"/>
+<text class="u-g" x="800" y="464" text-anchor="start">HTTPS · evening email</text>
 </svg>
     </div>
     <figcaption>Deployment diagram: the nodes the pipeline runs on and how they talk.</figcaption>
@@ -1305,7 +1657,7 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <h2>One day, in UTC</h2>
   <figure>
     <div class="scroll">
-<svg viewBox="0 0 1330 210" role="img" aria-label="Daily timeline in UTC: the evening run at 20:00, which republishes the site when it commits; the Airflow DAG stock_nightly from 22:35, which waits for the ingest job and the evening commit, at most until morning; the ingest job from 22:30, usually about 25 minutes and at most until 01:30; the scheduled site build at 05:15; the pipeline audit at 07:00.">
+<svg viewBox="0 0 1330 216" role="img" aria-label="Daily timeline in UTC: the quotes job every hour on weekdays, around the clock; the Airflow DAG stock_nightly from 22:35, which checks each piece and waits for the Claude session; the Claude session at 00:00 Italy time (23:00 UTC in winter), which republishes the site when it commits; the ingest job from 22:30, usually about 25 minutes and at most until 01:30; the scheduled site build at 05:15; the pipeline audit at 07:00.">
   <defs>
     <marker id="ta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
   </defs>
@@ -1322,14 +1674,30 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   </g>
   <text class="tick" x="70" y="18">UTC · Italy is UTC+1 in winter, UTC+2 in summer</text>
 
-  <!-- evening run -->
-  <rect class="mute" x="254" y="34" width="69" height="14" rx="3"/>
-  <text class="k" x="334" y="45">Evening run (21:00 Italy, weekdays): notes, PDFs, screener, email</text>
+  <!-- the scheduled Claude session: 00:00 Italy time, Tuesday to Saturday (23:00 UTC in winter) -->
+  <rect class="mute" x="530" y="34" width="69" height="14" rx="3"/>
+  <text class="k" x="610" y="45">Claude session (00:00 Italy, Tue–Sat): notes, PDFs from the nightly numbers, email</text>
 
   <!-- nightly pipeline (Airflow) -->
-  <rect class="cap" x="492" y="56" width="774" height="14" rx="3"/>
+  <rect class="cap" x="492" y="56" width="460" height="14" rx="3"/>
   <rect class="run" x="492" y="56" width="176" height="14" rx="3"/>
-  <text class="k" x="482" y="67" text-anchor="end">Airflow stock_nightly (22:35): waits, checks, ready marker</text>
+  <text class="k" x="482" y="67" text-anchor="end">Airflow stock_nightly (22:35): checks, ready marker, waits for the session</text>
+
+  <!-- quotes job: every hour on weekdays, around the clock -->
+  <rect class="run" x="75" y="143" width="6" height="6" rx="1" transform="rotate(45 78 146)"/>
+  <rect class="run" x="167" y="143" width="6" height="6" rx="1" transform="rotate(45 170 146)"/>
+  <rect class="run" x="259" y="143" width="6" height="6" rx="1" transform="rotate(45 262 146)"/>
+  <rect class="run" x="351" y="143" width="6" height="6" rx="1" transform="rotate(45 354 146)"/>
+  <rect class="run" x="443" y="143" width="6" height="6" rx="1" transform="rotate(45 446 146)"/>
+  <rect class="run" x="535" y="143" width="6" height="6" rx="1" transform="rotate(45 538 146)"/>
+  <rect class="run" x="627" y="143" width="6" height="6" rx="1" transform="rotate(45 630 146)"/>
+  <rect class="run" x="719" y="143" width="6" height="6" rx="1" transform="rotate(45 722 146)"/>
+  <rect class="run" x="811" y="143" width="6" height="6" rx="1" transform="rotate(45 814 146)"/>
+  <rect class="run" x="903" y="143" width="6" height="6" rx="1" transform="rotate(45 906 146)"/>
+  <rect class="run" x="995" y="143" width="6" height="6" rx="1" transform="rotate(45 998 146)"/>
+  <rect class="run" x="1087" y="143" width="6" height="6" rx="1" transform="rotate(45 1090 146)"/>
+  <rect class="run" x="1179" y="143" width="6" height="6" rx="1" transform="rotate(45 1182 146)"/>
+  <text class="k" x="70" y="206">Small diamonds above the axis: the quotes job, every hour on weekdays around the clock (also before 18:00), a few seconds each</text>
 
   <!-- ingest -->
   <rect class="cap" x="484" y="80" width="276" height="14" rx="3"/>
@@ -1338,8 +1706,8 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <text class="s" x="484" y="112">22:30 start</text>
 
   <!-- site -->
-  <rect class="mute" x="326" y="126" width="10" height="10" rx="2" transform="rotate(45 331 131)"/>
-  <text class="s" x="346" y="135">site rebuilt on the evening commit</text>
+  <rect class="mute" x="594" y="126" width="10" height="10" rx="2" transform="rotate(45 599 131)"/>
+  <text class="s" x="584" y="135" text-anchor="end">site rebuilt on the session's commit</text>
   <rect class="run" x="1256" y="100" width="10" height="10" rx="2" transform="rotate(45 1261 105)"/>
   <text class="k" x="1246" y="109" text-anchor="end">Pipeline audit (07:00)</text>
   <rect class="run" x="1100" y="126" width="10" height="10" rx="2" transform="rotate(45 1105 131)"/>
@@ -1359,13 +1727,14 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
     <thead><tr><th>Piece</th><th>Runs on</th><th>Started by</th><th>Code</th></tr></thead>
     <tbody>
       <tr><td>Ingest job</td><td>Azure Container Apps Job <code>stock-ingest</code> (1.5 vCPU, 3 GiB, Consumption)</td><td>Daily at 22:30 UTC</td><td><code>python -m stock_analysis.db ingest</code></td></tr>
+      <tr><td>Quotes job</td><td>Azure Container Apps Job <code>stock-quotes</code> (0.25 vCPU, 0.5 GiB, Consumption)</td><td>Every hour on weekdays, around the clock</td><td><code>python -m stock_analysis.db quotes</code>; every page with a price reads them through <code>GET /quotes</code> (<code>analysis/live.js</code>)</td></tr>
       <tr><td>Database</td><td>Azure Database for PostgreSQL <code>stock-db-bk</code>; Docker locally</td><td>Always on</td><td><code>src/stock_analysis/db/</code></td></tr>
       <tr><td>Web API</td><td>Azure App Service <code>stock-api-bk</code> (F1, wakes on request)</td><td>An HTTPS request</td><td><code>api/app.py</code></td></tr>
       <tr><td>Image build</td><td>GitHub Actions → GHCR</td><td>A push to <code>main</code> touching code or settings</td><td><code>.github/workflows/ingest-image.yml</code>, <code>Dockerfile</code></td></tr>
       <tr><td>Site</td><td>GitHub Actions → GitHub Pages</td><td>A push to <code>main</code>, daily at 05:15 UTC, by hand</td><td><code>.github/workflows/pages.yml</code>, <code>analysis/site.py</code>, <code>analysis/explore.py</code></td></tr>
       <tr><td>Nightly pipeline</td><td>Airflow 3 in Docker on the PC (<code>orchestration/compose.yaml</code>)</td><td>Weekdays at 22:35 UTC</td><td><code>orchestration/dags/stock_nightly.py</code>, <code>python -m stock_analysis.pipeline</code></td></tr>
       <tr><td>Pipeline audit</td><td>GitHub Actions</td><td>Tuesday to Saturday at 07:00 UTC</td><td><code>.github/workflows/pipeline-watch.yml</code></td></tr>
-      <tr><td>Evening run</td><td>A scheduled Claude Code session</td><td>Its own schedule, after the pipeline's ready marker</td><td><code>analysis/watchlist.py</code>, <code>docs/EVENING_RUN.md</code></td></tr>
+      <tr><td>Evening run</td><td>A scheduled Claude Code session</td><td>00:00 Italy time, Tuesday to Saturday</td><td><code>analysis/watchlist.py</code>, <code>docs/EVENING_RUN.md</code></td></tr>
       <tr><td>Analyses by hand</td><td>Your PC or a Claude session</td><td>You</td><td><code>analysis/*.py</code>, <code>Data.open()</code></td></tr>
     </tbody>
   </table>
@@ -1376,7 +1745,6 @@ body { background: var(--p-bg); color: var(--p-fg); font: 15px/1.55 var(--p-sans
   <h2>Keeping this drawing current</h2>
   <ol>
     <li>Edit <code>docs/pipeline.html</code> in the same change that adds, moves or reschedules a piece.</li>
-    <li>Change the dashed line when the evening run reads from the database instead of the sources.</li>
     <li>"Inside the database, in UML" follows <code>src/stock_analysis/db/build.py</code>, <code>db/coverage.py</code>, <code>ingest/job.py</code> and the migrations: redraw an action, table or state when the code changes it, in <code>docs/pipeline_uml.py</code> (run it with this file as its argument); keep the notes to the structure: no counts, dates or plans.</li>
     <li>"The nightly pipeline, in UML" follows <code>orchestration/dags/stock_nightly.py</code>, <code>src/stock_analysis/pipeline/</code> and <code>.github/workflows/pipeline-watch.yml</code>; it is drawn by the same script.</li>
     <li>Update the date under the title and republish the artifact; the link is in <code>docs/ARCHITECTURE.md</code>.</li>

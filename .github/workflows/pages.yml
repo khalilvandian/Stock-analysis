@@ -1,10 +1,11 @@
-# Publishes the watch list analyses (analyses/*), the market screener's latest results
-# (data/screener/*) and the data coverage page as a web page on GitHub Pages:
+# Publishes the watch list analyses (analyses/*), the market screener's latest results, the
+# ticker explorer and the data coverage page as a web page on GitHub Pages:
 # https://khalilvandian.github.io/Stock-analysis/
 # One-time setup: Settings > Pages > Build and deployment > Source: GitHub Actions.
-# The coverage page reads the newest snapshot through the web API: add the repository secret
-# STOCK_API_KEY (Settings > Secrets and variables > Actions). Without it the page uses a local
-# data/coverage/latest.json (not committed), or says there is no snapshot yet.
+# Everything but the PDFs and notes comes from the database through the web API (the
+# recorded runs, the screener run, the coverage snapshot, the explorer's data): add the
+# repository secret STOCK_API_KEY (Settings > Secrets and variables > Actions). Without it
+# those pages say there is no data yet.
 # The daily schedule refreshes the page after the
 # ingest job (docs/INGEST.md).
 name: Publish analyses page
@@ -14,8 +15,10 @@ on:
     branches: [main]
     paths:
       - "analyses/**"
-      - "data/screener/**"
       - "analysis/site.py"
+      - "analysis/explore.py"
+      - "analysis/explorer.js"
+      - "analysis/live.js"
       - "docs/pipeline.html"
       - ".github/workflows/pages.yml"
   schedule:

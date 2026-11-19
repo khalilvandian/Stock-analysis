@@ -3,9 +3,9 @@
 # core_item and core_item_tag on every run.
 #
 # For each item, the fields are tried in the order listed and the first one present wins.
-# Sources are ranked: SEC company facts first (`sec`, loader still to come), then the
-# project's own SEC-based history file (`history`, data/sector/history.csv), then the Yahoo
-# statements (`yahoo`, data/<SYMBOL>/*.csv).
+# Sources are ranked: SEC company facts first (`sec`), then the project's former SEC-based
+# history file (`history`: raw_project_history, loaded once from data/sector/history.csv
+# before the files were retired in issue #33), then the Yahoo statements (`yahoo`).
 #
 # kind: "flow" (measured over a period) or "instant" (measured at a date).
 # derive: "a + b" or "a - b - c?" computes the item from other items wherever every part
@@ -104,7 +104,7 @@ yahoo = ["Reconciled Depreciation", "Depreciation And Amortization",
 
 [[items]]
 item = "ebitda"
-label = "EBITDA (operating income + D&A, as in analysis/history.py)"
+label = "EBITDA (operating income + D&A)"
 kind = "flow"
 unit = "USD"
 derive = "operating_income + d_and_a"

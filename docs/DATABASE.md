@@ -1,13 +1,16 @@
 # Database
 
-Status: **schema version 5** (migrations `001` to `005`), 2026-11-17. **PostgreSQL 16**,
+Status: **schema version 15** (migrations `001` to `015`; `011` and `012` are left to issue #30), 2026-11-19. **PostgreSQL 16**,
 locally in Docker (`compose.yaml`) and on the server: **Azure Database for PostgreSQL**
 (`stock-db-bk`, Italy North, Azure for Students). SQLite was dropped on 2026-11-16 (see
-`docs/DECISIONS.md`). It holds the data already in `data/`, the watch list,
-and what the ingest job fetches from TradingView, SEC, Yahoo and the ECB
-([`INGEST.md`](INGEST.md), [issue #18](https://github.com/khalilvandian/Stock-analysis/issues/18)).
-How complete it is: [`COVERAGE.md`](COVERAGE.md) and the site's Data page. No analysis reads
-it yet. The first roadmap was [issue #16](https://github.com/khalilvandian/Stock-analysis/issues/16).
+`docs/DECISIONS.md`). It holds what the ingest job fetches from TradingView, SEC, Yahoo and
+the ECB ([`INGEST.md`](INGEST.md), [issue #18](https://github.com/khalilvandian/Stock-analysis/issues/18)),
+the watch list, and every result of the analyses. How complete it is:
+[`COVERAGE.md`](COVERAGE.md) and the site's Data page. Since
+[issue #33](https://github.com/khalilvandian/Stock-analysis/issues/33) it is the only store of
+market data: every analysis script reads it (`stock_analysis.data`, `stock_analysis.stocks`)
+and the files under `data/` are gone. The first roadmap was
+[issue #16](https://github.com/khalilvandian/Stock-analysis/issues/16).
 
 The design follows how the project analyses a company:
 - the absolute values first, for every fiscal year and as of any day
@@ -23,8 +26,8 @@ Only what those need is stored.
 # once: put STOCK_DB_PASSWORD=<a long random value> in .env (see .env.example)
 docker compose up -d --wait                     # PostgreSQL 16 on 127.0.0.1:5432, healthy
 uv run python -m stock_analysis.db init         # create the tables (apply the migrations)
-uv run python -m stock_analysis.db load-files   # import data/ and the watch list (no network)
-uv run python -m stock_analysis.db build        # rebuild the core layer from raw
+uv run python -m stock_analysis.db build        # build core for what is new (--symbols A,B)
+uv run python -m stock_analysis.db check-sample --symbols A,B  # what a rebuild would change; writes nothing
 uv run python -m stock_analysis.db status       # rows per table
 uv run python -m stock_analysis.db check        # connection, schema and data (see below)
 uv run python -m stock_analysis.db ingest       # fetch from the sources (docs/INGEST.md)
@@ -58,18 +61,38 @@ SELECT * FROM v_watchlist ORDER BY position;                              -- wat
   container. `docker compose down` stops it and keeps the data; `down -v` deletes the data.
 - **Not committed:** the database is never committed. The data lives in the Docker volume,
   and the repository holds only the code and the migrations that build it.
-- **Rerunning:** `load-files` can be run again safely, and only stores what is new or
-  changed. `build` rewrites core each time, in one transaction.
+- **Rerunning:** the ingest stores only what is new or changed. `build` builds core in one transaction, only for the companies with something
+  new since the last build: raw rows stored after its `max_fetch_id`, a changed entry in
+  `config/companies.toml`, a new company or a changed CIK. The other companies' core rows
+  and quality issues stay as they are: the job adds what is new and never rebuilds the
+  whole database. A change of the extraction (`config/db_items.toml`, `build.py`) is checked
+  on a sample, not by rebuilding everything: `check-sample --symbols A,B` builds those
+  companies with today's code, lists every value that would be added, removed or changed
+  against the database, and rolls back (nothing is written); if the sample is right,
+  `build --symbols A,B` writes it. Items newly added to `config/db_items.toml` are added to
+  `core_item` without touching existing rows. `build --full` (every company) only when asked,
+  or by itself on an empty core. Each step works company by company, so a company's rows
+  are the same whichever way it was built
+  (`test_incremental_build_rebuilds_only_what_changed_and_matches_a_full_one`). The summary
+  records the mode, the reason, the companies built and the seconds per step. Rows are
+  written with `COPY`.
+- **Migrations:** `migrate` applies every number not yet in `schema_version`, in order, so
+  a migration from another branch with a lower number than one already applied still runs.
+  On the server, apply a new migration as the owner before the job's next run:
+  `db init --target server`, then `db create-roles --target server` so the readers and the
+  writer get the new tables. The job connects as `stock_writer`, which can't change the
+  schema, so a migration left to the job fails its run ("permission denied for schema public").
 - **Code:** `src/stock_analysis/db/`, through SQLAlchemy and psycopg:
   - `__init__.py`: targets, the `Database` class, migrations, helpers
   - `migrations/`: numbered SQL files
-  - `load_files.py`
+  - `raw.py`: the raw-layer helpers the loaders share
   - `build.py`
   - `check.py`
 - **Items:** `config/db_items.toml` lists the items and their source fields.
 - **Tests:** `tests/test_db.py` runs on the `stock_test` database in the same container, or
   on `STOCK_TEST_PG_URL`. Every test empties that database first, so never point it at
-  `stock`. Without a reachable PostgreSQL the database tests are skipped, and the rest of
+  `stock`; two sessions testing at once need a database each. The tests seed it with
+  `tests/seed_files.py` (small files in the old `data/` layout). Without a reachable PostgreSQL the database tests are skipped, and the rest of
   the suite still runs. To create the test database once:
   `docker compose exec db psql -U stock -c "CREATE DATABASE stock_test"`.
 
@@ -81,7 +104,7 @@ There is **no API for now**: scripts and Claude connect **straight to the databa
 | User | Rights | Used by | Password |
 |---|---|---|---|
 | `stock_admin` (Azure) / `stock` (local) | Owner: migrations, `create-roles` | Your PC only | `STOCK_SERVER_DB_PASSWORD` / `STOCK_DB_PASSWORD` |
-| `stock_writer` | Read, add and change data, rebuild core. Can't change the schema or `schema_version`, can't delete or change raw data (append only, except `raw_fetch` row counts) | `load-files`, `build`, scripts that save results, Claude when it writes | `STOCK_WRITER_DB_PASSWORD` |
+| `stock_writer` | Read, add and change data, rebuild core. Can't change the schema or `schema_version`, can't delete or change raw data (append only, except `raw_fetch` row counts) | The ingest, `build`, the evening run's results, Claude when it writes | `STOCK_WRITER_DB_PASSWORD` |
 | `stock_reader` | Read only | Analyses, viewers, Claude when it reads | `STOCK_READER_DB_PASSWORD` |
 
 `python -m stock_analysis.db create-roles --target server` (as the owner) creates both users or
@@ -144,10 +167,11 @@ question: it runs SQL, and the database users' rights decide what is allowed.
 | Route | Runs as | Does |
 |---|---|---|
 | `GET /health` | | `{"ok": true}`, no key needed |
+| `GET /quotes` | `stock_reader` | No key: the newest quote of every company from `v_quote_latest` (issue #35), for the explorer pages. One fixed query (no input reaches SQL), quotes of the last 10 days only, cached 5 minutes in the app and in browsers, gzip, CORS open to `QUOTES_ORIGINS` (default `https://khalilvandian.github.io`). Answer `{"fetched_at", "columns": ["price", "change_pct", "session", "price_at", "delay_s", "currency"], "quotes": {SYMBOL: [...]}}`; `analysis/live.js` reads the columns by name, shows the delay ("15 min delayed") from `delay_s` and applies a quote only in the page's currency |
 | `POST /query` `{"sql", "params", "limit"}` | `stock_reader` | One SELECT or WITH statement in a read-only transaction, 30 s limit, at most 50,000 rows. Answer `{"columns", "rows", "truncated"}` |
 | `POST /execute` `{"steps": [{"sql", "rows"}]}` | `stock_writer` | INSERT, UPDATE, DELETE (or WITH, MERGE) steps in one transaction, all or nothing; each step runs once per row. Answer `{"rowcounts"}` |
 
-Parameters are `:name` placeholders. Every route but `/health` needs `X-API-Key:
+Parameters are `:name` placeholders. Every route but `/health` and `/quotes` needs `X-API-Key:
 <STOCK_API_KEY>`. App settings: `DATABASE_URL` (stock_reader), `DATABASE_WRITER_URL`
 (stock_writer), `STOCK_API_KEY`. The database firewall allows the app's outbound addresses
 (rules `stock-api`, `stock-api-2`). Protection, in layers: the key; HTTPS; one statement per
@@ -245,10 +269,10 @@ Today, on `local` and `server`: 28 pass, 6 warn, 0 fail. The warnings are:
 
 | Layer | Holds | Written by | Rule |
 |---|---|---|---|
-| `raw_*` | What each source returned: the payload itself as it came (`raw_payload`), and its parsed rows, one table per source | The loaders (`load_files.py` and the ingest job) | Append only. A row is stored when it is **new or its values changed** since the last version of the same key, and nothing is ever edited. Each row points to its `raw_fetch`. Parsing can be redone from the kept payloads, so a parsing rule is never a reason to ask a source again |
+| `raw_*` | What each source returned: the payload itself as it came (`raw_payload`), and its parsed rows, one table per source | The ingest job (`ingest/*.py`; `raw_project_history` was loaded once from the retired `history.csv`) | Append only. A row is stored when it is **new or its values changed** since the last version of the same key, and nothing is ever edited. Each row points to its `raw_fetch`. Parsing can be redone from the kept payloads, so a parsing rule is never a reason to ask a source again |
 | `core_*` | One cleaned, standard version: companies, index membership, daily prices, fundamentals with every filed version, trailing twelve months, quality issues | `build.py`, from raw, `config/db_items.toml` and `config/companies.toml` (predecessor CIKs) only | Rewritten on every build. `core_company` is updated in place so `company_id` stays the same |
-| `user_*` | What people decide: the watch list (stocks, peers, target P/E, equity stakes, EPS corrections) | For now `load-files` mirrors `config/watchlist.toml`, the master copy. Later the interface edits these tables | Keyed by symbol. A changed TOML replaces the mirror, and an unchanged one changes nothing |
-| `out_*` | Results of the analyses: screener runs, valuations, the watch list's evening runs | The analyses (for now `load_files.py`, from their output files) | Keyed by **symbol and date**, so an analysis can write without a build |
+| `user_*` | What people decide: the watch list (stocks, peers, target P/E, equity stakes, EPS corrections) | The evening run mirrors `config/watchlist.toml`, the master copy (`stock_analysis.watchlist.sync`); the ingest reads the stocks and peers from here | Keyed by symbol. A changed TOML replaces the mirror, and an unchanged one changes nothing |
+| `out_*` | Results of the analyses: screener runs, valuations, the watch list's and the market report's evening runs, Claude's notes | The analyses (`screener.py`, `watchlist.py`, `market.py`) through `Data` | Keyed by **symbol and date**, so an analysis can write without a build |
 | `v_*` | Views for analysis | none | `v_annual`, `v_daily`, `v_watchlist`, `v_fundamental_latest` |
 
 ## UML class diagram
@@ -586,6 +610,24 @@ From the repository files, 2026-11-16 (28 MB):
 
 ## Tables
 
+### Added for the scripts (migrations `014` and `015`, issue #33)
+
+| Table or view | One row per | Notes |
+|---|---|---|
+| `core_market_daily` | Market instrument and day | The closes of `config/market.toml`'s indices, rates, commodities, currencies and sector ETFs (Yahoo symbols such as `^GSPC`, `XLU`, `EURUSD=X`), from `raw_yahoo_price` (source `yahoo_market`); rebuilt by every build |
+| `v_earnings` | Symbol and report date | Yahoo's estimated and reported EPS as last fetched (`fetch_id` of that version) |
+| `v_tv_latest` | Company in the newest TradingView snapshot of each request | `request_key` `SP:SPX` (the index) or `watchlist` (the watch list's symbols outside it); `extra_json` holds every screener field (`tradingview.SCREENER_FIELDS`) |
+
+`core_company` holds the companies of both kinds of snapshot; `core_index_member`, only the
+index's. The screener's runs are `out_screener_run` (one per day and universe; a second run
+the same day replaces it) and `out_screener_result` (stage 1: every company screened; stage 2:
+the top per sector; the columns without a field of their own in `detail_json`).
+
+| Table | One row per | Notes |
+|---|---|---|
+| `out_stock_numbers` | Watch-list stock and day (the newest price used) | What the nightly analyses (`stock_analysis.nightly`) computed for the evening run: the stock's row, yearly history, prices, adjusted EPS by quarter, peers' rows and next report (`payload_json`), and `stock_key`, the watch-list settings used. The evening run reads it while `computed_at` is after the last build and `stock_key` matches the config, else computes the stock on the spot |
+| `out_market_numbers` | Day (the newest price used) | The market report's numbers: the instruments' moves, the sector ETFs', breadth, the screener's top per sector |
+
 ### Raw
 
 | Table | One row per | Notes |
@@ -594,6 +636,7 @@ From the repository files, 2026-11-16 (28 MB):
 | `raw_payload` | Distinct payload fetched | The payload as the source returned it, gzip-compressed (`content`, `size_bytes` before compression, `media_type`): the SEC files, TradingView's scan, the ECB's CSV, the tables yfinance returns. The other raw tables hold what is parsed from it, so a changed parsing rule (a newly mapped SEC tag) reads the kept copy (`db reparse`) instead of the source. About 0.25 MB per SEC company file |
 | `raw_sec_xbrl_fact` | Fact of a full 10-K or 10-Q, per dimension | Read from the filing's XBRL (edgartools, source `sec_xbrl`) for the values company facts leaves out: `axis` and `member` give the share class (Visa's Class A diluted EPS). Only the concepts in `sec_class` in `config/db_items.toml`. Also filled from SEC's Financial Statement Data Sets (`db import`, kind `sec_fsds`): the companies' own tags (`custom`, read through `[[custom_tag]]` in `config/companies.toml`) and the values per share class. `statement` is BS, IS, CF, EQ or CI |
 | `raw_tv_constituent` | Company in one S&P 500 snapshot | The whole snapshot is stored, since its prices change daily. `extra_json` holds the columns that have no field of their own |
+| `raw_tv_quote` | Listing in one hourly quote fetch | TradingView's last price of the regular session (15 minutes delayed), the day's change (% and $), volume, currency, `session` and `delay_s`. Source `tradingview_quotes`; a fetch with the same prices as the last one is skipped. Migration `013` (issue #35; `011` and `012` are kept for the orchestrator branch, #30) |
 | `raw_yahoo_price` | Symbol, day and version | Open, high, low and close (split-adjusted), volume, dividends and splits. The dividend-adjusted close is **computed in core**, so a dividend does not rewrite the history here, and Yahoo's own adjusted close isn't stored. Open, high and low were added by migration `002` for technical analysis |
 | `raw_yahoo_statement` | Line item, period and version | Yahoo's own names (`Total Revenue`) |
 | `raw_project_history` | Value in `history.csv` and version | As in the file: money in $bn |
@@ -620,7 +663,7 @@ From the repository files, 2026-11-16 (28 MB):
 |---|---|---|
 | `out_screener_run` | Screener run (date and universe) | Today only the latest run exists as files. Every evening run will add one |
 | `out_screener_result` | Symbol in Stage 1 or Stage 2 of a run | The fields the site and email show (sector, category, status, rank, close, cheap price). Every other column goes in `detail_json` |
-| `out_watchlist_run` | Watch list stock and evening run | Price, adjusted EPS (12 months), P/E, 10-year median P/E, target P/E, entry price, distance to entry, the verdict. `run_at` is UTC, converted from the Rome time in `runs.csv` |
+| `out_watchlist_run` | Watch list stock and evening run | Price, adjusted EPS (12 months), P/E, 10-year median P/E, target P/E, entry price, distance to entry, the verdict. `run_at` is UTC; the dated lists show it in Rome time |
 | `out_valuation` | Symbol, date and method | Fair value per share, the price, and the inputs (WACC, cash flow) in `detail_json` |
 
 ### Ops (the ingest job's own state, migration `005`)
@@ -660,6 +703,7 @@ reason (docs/COVERAGE.md).
 | `v_daily` | Company and trading day | The close, the adjusted close and the absolute values as known that day. Flows are trailing twelve months (`_ttm`). Also `market_cap`, `net_debt` and `free_cf_ttm` |
 | `v_watchlist` | Watch list stock | Its settings and its latest evening run (price, P/E, entry price, distance to entry, verdict) |
 | `v_fundamental_latest` | Company, item and period | The latest filed version |
+| `v_quote_latest` | Company (symbol) | Its newest intraday quote: price, change, volume, session, `fetched_at` and `price_at` (fetch time less the delay while the market is open; empty outside the session, when the price is the latest close). Reads `raw_tv_quote` directly, on purpose: a quote is shown as it came, and rebuilding core every hour would cost far more than it adds |
 
 ## The 17 items
 
@@ -670,7 +714,7 @@ The full field lists are in `config/db_items.toml`.
 | `revenue` | flow | none | Total Revenue | revenue |
 | `operating_income` | flow | none | Operating Income | none |
 | `d_and_a` | flow | none | Reconciled Depreciation | none |
-| `ebitda` | flow | operating_income + d_and_a (as `analysis/history.py`) | EBITDA (fallback) | ebitda |
+| `ebitda` | flow | operating_income + d_and_a | EBITDA (fallback) | ebitda |
 | `net_income` | flow | none | Net Income | net_income |
 | `eps_diluted` | flow | none | Diluted EPS | eps |
 | `interest_expense` | flow | none | Interest Expense | none |
@@ -693,7 +737,11 @@ Free cash flow, net debt and market value are calculated in the views, not store
    everything else too, such as TLN and the non-S&P 500 utilities. Each company gets its
    CIK from the SEC ticker file; two share classes (GOOG and GOOGL) share one. SEC values
    come from company facts (`raw_sec_fact`) and, for the filings it lacks, the companies'
-   own tags (`[[custom_tag]]`) and the values per share class (`[[share_class]]`), from the
+   own tags (`[[custom_tag]]`) and the values per share class (`[[share_class]]`, with `tags`
+   when the company files the item under another concept: Berkshire's basic EPS; `convert`
+   for an item stated only in another class's units, times the charter's fixed ratio:
+   Berkshire's shares, in Class A units, x 1,500 for BRK.B; `not_from_yahoo` for Yahoo values
+   in the wrong class's units), from the
    data sets and full filings (`raw_sec_xbrl_fact`). A company whose earlier filings are under a predecessor's CIK (`[[predecessor]]` in
    `config/companies.toml`) reads that CIK too, for periods ending before the new CIK's
    first 10-K or 10-Q.
@@ -760,16 +808,13 @@ current ones.)
 
 **Caveat found by these checks:** `history.csv` has EPS and market value that were never
 split-adjusted. NEE's EPS for 2016–2017 is in pre-2020-split shares (6.24 and 11.39 against
-3.47 in 2018), and so is its 2016–2017 market value. ETR and SRE look the same. The cause is
-in `analysis/history.py`'s `split_adjust`, not in the database. The database stores the file
-as it is and flags it.
+3.47 in 2018), and so is its 2016–2017 market value. ETR and SRE look the same. The cause was
+in the retired `analysis/history.py`'s `split_adjust`, not in the database. The database keeps
+those values as they were and flags them; SEC's own values rank above them.
 
 ## Not done yet
 
 - **API loaders:** done in issue #18 (`ingest`, [`INGEST.md`](INGEST.md)).
-- **Analyses writing to `out_*`:** the evening run and the screener writing their results
-  to the database.
-- **Readers:** no analysis, dashboard or the site reads the database yet.
-- **Server:** PostgreSQL, run with the same migration.
+- **Analyses writing to `out_*`** and **readers:** done in issue #33.
 - **Older index membership:** S&P 500 membership before 2026-10-27, needed before any
   backtest.

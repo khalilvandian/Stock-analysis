@@ -2,12 +2,14 @@
 
 Pages: an overview (market strip and one card per stock), one page per stock (verdict,
 key numbers, Claude's notes, every dated PDF), the market reports, the market screener's
-latest top 3 per sector (data/screener/), the watch list summaries, the data coverage and
-the pipeline diagram (docs/pipeline.html), with grouped menus on every page. The PDFs
-are copied next to the pages, so a link opens the report in the browser. The evening run
-commits to `main`; the Pages workflow
-(.github/workflows/pages.yml) then runs this and publishes `_site/` at
-https://khalilvandian.github.io/Stock-analysis/.
+latest top 3 per sector, the watch list summaries, the data coverage and the pipeline
+diagram (docs/pipeline.html), with grouped menus on every page. The PDFs and notes are
+files in analyses/; the recorded runs (out_watchlist_run, out_market_run), the screener
+run, the coverage and the explorer's data come from the database: through the web API
+when STOCK_API_URL and STOCK_API_KEY are set (the Pages workflow), else stock_analysis.data
+on a PC. The PDFs are copied next to the pages, so a link opens the report in the browser.
+The evening run commits to `main`; the Pages workflow (.github/workflows/pages.yml) then
+runs this and publishes `_site/` at https://khalilvandian.github.io/Stock-analysis/.
 
 Standard library only, so the workflow needs no install step.
 
@@ -17,7 +19,7 @@ Usage:
 
 from __future__ import annotations
 
-import csv
+import datetime as dt
 import html
 import json
 import os
@@ -25,15 +27,15 @@ import re
 import shutil
 import sys
 import tomllib
-import urllib.request
+from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 ANALYSES = ROOT / "analyses"
 CONFIG = ROOT / "config/watchlist.toml"
-SCREENER = ROOT / "data/screener"  # written by analysis/screener.py
 SITE = ROOT / "_site"
-COVERAGE = ROOT / "data/coverage/latest.json"  # db coverage --json
 PIPELINE = ROOT / "docs/pipeline.html"  # the hand-drawn pipeline diagram
 # The menus: (group, [(page, label)]). A page is <page>.html; "index" is the home page.
 MENU = [
@@ -51,7 +53,7 @@ MENU = [
     ("Project", [("pipeline", "Pipeline"), ("coverage", "Data coverage")]),
 ]
 EXPLORER_JS = ROOT / "analysis/explorer.js"  # the ticker page's script
-EXPLORE_DATA = ROOT / "data/explore"  # a local export (python analysis/explore.py data/explore)
+LIVE_JS = ROOT / "analysis/live.js"  # live prices for every page (issue #35)
 URL = "https://khalilvandian.github.io/Stock-analysis/"
 
 CSS = """
@@ -282,13 +284,52 @@ tr.hide { display: none; }
 # --- reading the analyses folder ----------------------------------------------------
 
 
-def read_runs(folder: Path) -> list[dict]:
-    """The folder's runs.csv, newest first (empty if there is none)."""
-    path = folder / "runs.csv"
-    if not path.exists():
+@cache
+def db():
+    """The database query function (analysis/explore.py's backends); None if unreachable."""
+    sys.path.insert(0, str(ROOT / "analysis"))
+    import explore
+
+    try:
+        return explore.backend()
+    except Exception as exc:  # the site still builds, with what the files give
+        print(f"database: not reachable ({exc}); pages that need it say so")
+        return None
+
+
+def query(sql: str) -> list[dict]:
+    q = db()
+    if q is None:
         return []
-    with path.open(newline="") as f:
-        return list(reversed(list(csv.DictReader(f))))
+    try:
+        return q(sql)
+    except Exception as exc:  # one failed query leaves its page empty
+        print(f"database: query failed ({exc})")
+        return []
+
+
+def run_label(run_at: str) -> str:
+    """A run time stored in UTC, as it reads in Italy (cet())."""
+    return cet(str(run_at)[:19])
+
+
+@cache
+def all_runs() -> dict[str, list[dict]]:
+    """Every recorded run by folder (the stock's symbol, or "market"), newest first; each
+    with `run`, its time as a label in the watch list's time zone."""
+    out: dict[str, list[dict]] = {}
+    rows = [(r["symbol"], r) for r in query("SELECT * FROM out_watchlist_run")]
+    rows += [("market", r) for r in query("SELECT * FROM out_market_run")]
+    for folder, r in rows:
+        out.setdefault(folder, []).append({**r, "run": run_label(r["run_at"])})
+    for runs in out.values():
+        runs.sort(key=lambda r: str(r["run_at"]), reverse=True)
+    return out
+
+
+def read_runs(folder: Path) -> list[dict]:
+    """The folder's recorded runs, newest first (empty if there are none)."""
+    return all_runs().get(folder.name, [])
 
 
 def pdfs(folder: Path) -> list[str]:
@@ -300,7 +341,7 @@ def title(folder: Path) -> str:
     """Company name from the folder's README heading, e.g. 'Boston Scientific Corporation (BSX)'."""
     readme = folder / "README.md"
     if readme.exists():
-        m = re.match(r"#\s*(.+?):", readme.read_text().splitlines()[0])
+        m = re.match(r"#\s*(.+?):", readme.read_text(encoding="utf-8").splitlines()[0])
         if m:
             return m.group(1)
     return folder.name
@@ -317,7 +358,7 @@ def notes(folder: Path) -> dict[str, str]:
     if not path.exists():
         return {}
     out, name = {}, None
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith("## "):
             name = line[3:].strip()
             out[name] = []
@@ -327,20 +368,20 @@ def notes(folder: Path) -> dict[str, str]:
 
 
 def stocks() -> list[Path]:
-    """Stock folders (they have runs.csv with a price), most recently analysed first."""
+    """Stock folders with recorded runs, most recently analysed first."""
     found = [
         f
         for f in ANALYSES.iterdir()
         if f.is_dir() and f.name not in ("market", "summaries") and read_runs(f)
     ]
-    return sorted(found, key=lambda f: read_runs(f)[0]["run"], reverse=True)
+    return sorted(found, key=lambda f: str(read_runs(f)[0]["run_at"]), reverse=True)
 
 
 def active() -> list[str]:
     """Symbols on the watch list now, in config order."""
     if not CONFIG.exists():
         return []
-    return [x["symbol"] for x in tomllib.loads(CONFIG.read_text()).get("stock", [])]
+    return [x["symbol"] for x in tomllib.loads(CONFIG.read_text(encoding="utf-8")).get("stock", [])]
 
 
 def watched() -> tuple[list[Path], list[Path]]:
@@ -364,6 +405,20 @@ def stamp(name: str) -> str:
     """'2026-10-27_1657.pdf' -> '2026-10-27 16:57'."""
     m = re.match(r"(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})", name)
     return f"{m.group(1)} {m.group(2)}:{m.group(3)}" if m else name
+
+
+CET = ZoneInfo("Europe/Rome")
+
+
+def cet(when) -> str:
+    """A UTC time from the database (naive or ISO text) as Italy time: '2026-11-19 16:30 CET'
+    (CEST in summer). Every hour the site shows is in this zone."""
+    try:
+        t = when if isinstance(when, datetime) else datetime.fromisoformat(str(when))
+    except ValueError:
+        return str(when)[:16].replace("T", " ")
+    t = (t if t.tzinfo else t.replace(tzinfo=UTC)).astimezone(CET)
+    return t.strftime("%Y-%m-%d %H:%M ") + t.tzname()
 
 
 def esc(s) -> str:
@@ -583,7 +638,7 @@ def overview(menu) -> str:
     market = ANALYSES / "market"
     summaries = ANALYSES / "summaries"
     now, _ = watched()
-    latest = max((read_runs(f)[0]["run"] for f in now), default="")
+    latest = max((read_runs(f)[0]["run"] for f in now), default="")  # labels sort by time
     main = [
         "<h1>Watch list</h1>",
         f'<p class="sub">{len(now)} stocks, last analysed {esc(latest)}. Each summary below is '
@@ -709,21 +764,39 @@ def market_page(menu) -> str:
     return layout("Market reports", "market", "\n".join(body), menu)
 
 
-def read_csv(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    with path.open(newline="") as f:
-        return list(csv.DictReader(f))
+SCREENER_RUN = """
+SELECT u.run_date, r.stage, r.symbol, r.sector, r.category, r.status, r.rank_in_sector,
+       r.close, r.cheap_price, r.detail_json
+FROM out_screener_result r JOIN out_screener_run u ON u.run_id = r.run_id
+WHERE u.run_id = (SELECT run_id FROM out_screener_run ORDER BY run_date DESC, run_id DESC
+                  LIMIT 1)"""
+
+
+def screener_rows() -> tuple[str, list[dict], list[dict]]:
+    """The newest screener run: (date, Stage 1 rows, Stage 2 top), detail_json merged in."""
+    rows = []
+    for r in query(SCREENER_RUN):
+        detail = json.loads(r.pop("detail_json") or "{}")
+        rows.append({**detail, **r})
+    run_date = str(rows[0]["run_date"])[:10] if rows else "never"
+    return (
+        run_date,
+        [r for r in rows if int(r["stage"]) == 1],
+        [r for r in rows if int(r["stage"]) == 2],
+    )
+
+
+def text(v) -> str:
+    return "" if v is None else str(v)
 
 
 def screener_page(menu) -> str:
     """The market screener's latest top 3 cheap or close-to-cheap stocks per sector."""
-    top, stage1 = read_csv(SCREENER / "top.csv"), read_csv(SCREENER / "stage1.csv")
-    dated = sorted(p.stem for p in SCREENER.glob("????-??-??.csv"))
+    run_date, stage1, top = screener_rows()
     passed = [r for r in stage1 if r.get("status") == "pass"]
     body = [
         "<h1>Market screener</h1>",
-        f'<p class="sub">Run {esc(dated[-1] if dated else "never")} on the S&amp;P 500. '
+        f'<p class="sub">Run {esc(run_date)} on the S&amp;P 500. '
         f"Stage 1: {len(passed)} of {len(stage1)} companies have good financial statements "
         "for their Peter Lynch category. Stage 2: of those, the top 3 per sector that are "
         f"cheap or close to cheap against their own history ({len(top)} stocks). Refreshed "
@@ -745,7 +818,7 @@ def screener_page(menu) -> str:
     )
     sectors: dict[str, list[dict]] = {}
     for r in top:
-        sectors.setdefault(r["sector"], []).append(r)
+        sectors.setdefault(text(r["sector"]), []).append(r)
     body.append(
         "<h2>Top 3 per sector</h2><div class='card wrap'><table><tr><th>Sector</th>"
         "<th>Stock</th><th>Lynch category</th><th>Price</th><th>P/E now</th>"
@@ -753,20 +826,21 @@ def screener_page(menu) -> str:
         "<th>Trend</th></tr>"
     )
     for sector in sorted(sectors):
-        rows = sorted(sectors[sector], key=lambda r: int(float(r["rank_in_sector"])))
+        rows = sorted(sectors[sector], key=lambda r: int(float(r["rank_in_sector"] or 0)))
         for i, r in enumerate(rows):
             cell = f"<td rowspan={len(rows)}><b>{esc(sector)}</b></td>" if i == 0 else ""
             body.append(
-                f'<tr>{cell}<td title="{esc(r["why"])}"><b>{esc(r["name"])}</b> '
-                f"{esc(r['description'])}</td>"
-                f"<td>{esc(r['category'].replace('_', ' '))}</td>"
-                f"<td class='n'>{num(r['close'], '{:,.2f}')}</td>"
-                f"<td class='n'>{num(r['pe_now'], '{:.1f}x')}</td>"
-                f"<td class='n'>{num(r['cheap_multiple'], '{:.1f}x')} "
-                f"<small>{esc(r['cheap_basis'])}</small></td>"
-                f"<td class='n'>{num(r['cheap_price'], '{:,.2f}')}</td>"
-                f"<td class='n'>{num(r['vs_cheap'], '{:+.1%}')}</td>"
-                f"<td>{esc(r['cheapness'])}</td><td>{esc(r['trend'])}</td></tr>"
+                f'<tr>{cell}<td title="{esc(text(r.get("why")))}">'
+                f"<b>{esc(text(r.get('name') or r['symbol']))}</b> "
+                f"{esc(text(r.get('description')))}</td>"
+                f"<td>{esc(text(r.get('category')).replace('_', ' '))}</td>"
+                f"<td class='n'>{num(r.get('close'), '{:,.2f}')}</td>"
+                f"<td class='n'>{num(r.get('pe_now'), '{:.1f}x')}</td>"
+                f"<td class='n'>{num(r.get('cheap_multiple'), '{:.1f}x')} "
+                f"<small>{esc(text(r.get('cheap_basis')))}</small></td>"
+                f"<td class='n'>{num(r.get('cheap_price'), '{:,.2f}')}</td>"
+                f"<td class='n'>{num(r.get('vs_cheap'), '{:+.1%}')}</td>"
+                f"<td>{esc(text(r.get('cheapness')))}</td><td>{esc(text(r.get('trend')))}</td></tr>"
             )
     body.append(
         "</table></div><p class='sub'>Cheap price = EPS (Yahoo's adjusted EPS for the closest "
@@ -774,7 +848,7 @@ def screener_page(menu) -> str:
         'years and its sector\'s median P/E. "Cheap" is at or below it, "close" within '
         "15% above. Trend is timing only. "
         'Hover a stock for the reason it is listed. "Not classified" = too little EPS history '
-        "for a Lynch category; those don't pass. Every rule and its source: report 13 and "
+        "for a Lynch category; those don't pass. Every rule and its source: "
         "docs/SCREENER.md in the repository.</p>"
     )
     return layout("Market screener", "screener", "\n".join(body), menu)
@@ -804,27 +878,11 @@ def summaries_page(menu) -> str:
 
 
 def coverage_detail() -> dict | None:
-    """The newest coverage snapshot: from the web API when STOCK_API_URL and STOCK_API_KEY
-    are set (the Pages workflow), else data/coverage/latest.json, else nothing."""
-    url, key = os.environ.get("STOCK_API_URL"), os.environ.get("STOCK_API_KEY")
-    if url and key:
-        sql = "SELECT detail_json FROM out_coverage_snapshot ORDER BY snapshot_date DESC LIMIT 1"
-        req = urllib.request.Request(
-            url.rstrip("/") + "/query",
-            data=json.dumps({"sql": sql, "limit": 1}).encode(),
-            method="POST",
-            headers={"Content-Type": "application/json", "X-API-Key": key},
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=60) as r:
-                rows = json.loads(r.read())["rows"]
-            if rows:
-                return json.loads(rows[0][0])
-        except Exception as exc:  # the page still builds, from the file if there is one
-            print(f"coverage: web API failed ({exc}); using {COVERAGE.name} if present")
-    if COVERAGE.exists():
-        return json.loads(COVERAGE.read_text(encoding="utf-8"))
-    return None
+    """The newest coverage snapshot (out_coverage_snapshot), or nothing."""
+    rows = query(
+        "SELECT detail_json FROM out_coverage_snapshot ORDER BY snapshot_date DESC LIMIT 1"
+    )
+    return json.loads(rows[0]["detail_json"]) if rows else None
 
 
 def share(a_, b_) -> float:
@@ -1008,7 +1066,7 @@ def coverage_page(menu, d: dict | None = None) -> str:
         for k, v in sorted(p["sources"].items())
     )
     runs = "".join(
-        f"<tr><td class='d'>{esc(str(r['started_at'])[:16].replace('T', ' '))}</td>"
+        f"<tr><td class='d'>{esc(cet(r['started_at']))}</td>"
         f"<td>{esc(r['mode'])}</td><td>{esc(r['status'])}</td>"
         f"<td class='n'>{r['requests']:,}</td><td class='n'>{r['tasks_ok']:,}</td>"
         f"<td class='n'>{r['tasks_failed']:,}</td><td class='n'>{r['rows_stored']:,}</td>"
@@ -1019,7 +1077,7 @@ def coverage_page(menu, d: dict | None = None) -> str:
         "<h2>The ingest job</h2><div class='cols'>"
         + table(["Source", "Tasks", "Fetched", "Waiting", "Failed"], src)
         + table(
-            ["Run (UTC)", "Mode", "Result", "Requests", "Done", "Failed", "Rows", "Stopped by"],
+            ["Run (CET)", "Mode", "Result", "Requests", "Done", "Failed", "Rows", "Stopped by"],
             runs,
         )
         + "</div>"
@@ -1077,27 +1135,15 @@ def coverage_page(menu, d: dict | None = None) -> str:
 
 def explore_index(out: Path) -> dict | None:
     """Export the explorer's data into out/tickers (analysis/explore.py) and return its
-    index. STOCK_EXPLORE picks the source: "api" (the default when STOCK_API_URL and
-    STOCK_API_KEY are set, as in the Pages workflow), "local" (stock_analysis.data on a PC),
-    "files" (a copy of data/explore/tickers), "off". Without a source the explorer pages
-    say there is no data yet."""
-    mode = os.environ.get("STOCK_EXPLORE")
-    if not mode:
-        api = os.environ.get("STOCK_API_URL") and os.environ.get("STOCK_API_KEY")
-        mode = "api" if api else ("files" if (EXPLORE_DATA / "tickers").exists() else "off")
-    if mode == "off":
+    index, from the database (the web API in the Pages workflow, stock_analysis.data on a
+    PC). STOCK_EXPLORE=off skips it (the explorer pages then say there is no data)."""
+    if os.environ.get("STOCK_EXPLORE") == "off" or db() is None:
         return None
-    if mode == "files":
-        if not (EXPLORE_DATA / "tickers/index.json").exists():
-            return None
-        shutil.copytree(EXPLORE_DATA / "tickers", out / "tickers", dirs_exist_ok=True)
-        return json.loads((out / "tickers/index.json").read_text(encoding="utf-8"))
     sys.path.insert(0, str(ROOT / "analysis"))
     import explore
 
     try:
-        query = explore.local_backend() if mode == "local" else explore.backend()
-        return explore.export(out, query=query)
+        return explore.export(out, query=db())
     except Exception as exc:  # the rest of the site still builds
         print(f"explorer: export failed ({exc}); the explorer pages say there is no data")
         return None
@@ -1135,10 +1181,32 @@ def no_explore_data(title_: str, active: str, menu) -> str:
         title_,
         active,
         f"<h1>{esc(title_)}</h1><p class='sub'>No explorer data in this build. The Pages "
-        "workflow exports it from the database every day; locally run "
-        "<code>python analysis/explore.py data/explore</code> first.</p>",
+        "workflow exports it from the database every day; locally, build with the database "
+        "reachable (stock_analysis.data) or <code>STOCK_API_URL</code> and "
+        "<code>STOCK_API_KEY</code> set.</p>",
         menu,
     )
+
+
+# Values that move with the price, and the live.js format of each site.py pattern (issue #35).
+LIVE_KEYS = {"price", "market_cap", "pe", "ps", "pb", "ev_ebitda", "fcf_yield", "div_yield"}
+LIVE_FMT = {"${:,.2f}": "price", None: "money", "{:.1f}x": "mult", "{:.1%}": "pct"}
+LIVE_SCRIPT = '<script src="live.js" defer></script>'
+LIVE_NOTE = "<span data-live-asof></span>"
+
+
+def live(sym: str, key: str, pattern: str | None) -> str:
+    """The data-live attribute of a cell live.js keeps current, or nothing."""
+    if key not in LIVE_KEYS or pattern not in LIVE_FMT:
+        return ""
+    return f' data-live="{esc(sym)} {key} {LIVE_FMT[pattern]}"'
+
+
+def live_med(group: str, key: str, pattern: str | None) -> str:
+    """The data-live-med attribute of a sector median ("*" = every company), or nothing."""
+    if key not in LIVE_KEYS or pattern not in LIVE_FMT:
+        return ""
+    return f' data-live-med="{esc(group)} {key} {LIVE_FMT[pattern]}"'
 
 
 def ticker_link(sym: str) -> str:
@@ -1180,7 +1248,7 @@ def ticker_page(menu) -> str:
     body = (
         '<div id="explorer"><p class="sub">Loading…</p></div>'
         "<noscript><p>The ticker explorer needs JavaScript.</p></noscript>"
-        '<script src="explorer.js" defer></script>'
+        '<script src="live.js" defer></script><script src="explorer.js" defer></script>'
     )
     return layout("Ticker explorer", "ticker", body, menu)
 
@@ -1215,7 +1283,8 @@ def tickers_page(menu, idx: dict | None) -> str:
     for r in rows:
         key = f"{r['symbol']} {r.get('name') or ''} {r.get('industry') or ''}".lower()
         cells = "".join(
-            f"<td class='n' data-v=\"{'' if r.get(k) is None else r[k]}\">"
+            f"<td class='n' data-v=\"{'' if r.get(k) is None else r[k]}\""
+            f"{live(r['symbol'], k, p)}>"
             f"{fmt_money(r.get(k)) if p is None else fmt(r.get(k), p)}</td>"
             for _, k, p in cols
         )
@@ -1230,7 +1299,7 @@ def tickers_page(menu, idx: dict | None) -> str:
         "<h1>All tickers</h1>"
         f"<p class='sub'><span id='count'>{len(rows)}</span> companies in the database, data "
         f"as of {esc(idx.get('asof') or '—')}. Absolute values over the last twelve months; "
-        "click a column to sort, a ticker to explore it.</p>"
+        f"click a column to sort, a ticker to explore it. {LIVE_NOTE}</p>"
         "<div class='tools'><input type='search' id='q' placeholder='Ticker, name or industry'"
         " aria-label='Search'><select id='sector' aria-label='Sector'><option value=''>"
         "Every sector</option>"
@@ -1240,6 +1309,7 @@ def tickers_page(menu, idx: dict | None) -> str:
         + "".join(trs)
         + "</tbody></table></div>"
         + SORT_JS
+        + LIVE_SCRIPT
     )
     return layout("All tickers", "tickers", body, menu)
 
@@ -1273,14 +1343,19 @@ def sectors_page(menu, idx: dict | None) -> str:
 
     def line(name: str, rows: list[dict], link: bool) -> str:
         cap = sum(r.get("market_cap") or 0 for r in rows)
+        group = name if link else "*"
         cells = ""
         for _, k, p in SECTOR_COLS:
             m = median_of(r.get(k) for r in rows)
-            cells += f"<td class='n' data-v=\"{'' if m is None else m}\">{fmt(m, p)}</td>"
+            cells += (
+                f"<td class='n' data-v=\"{'' if m is None else m}\"{live_med(group, k, p)}>"
+                f"{fmt(m, p)}</td>"
+            )
         label = f'<a href="#{esc(slug(name))}">{esc(name)}</a>' if link else f"<b>{esc(name)}</b>"
         return (
             f"<tr><td>{label}</td><td class='n'>{len(rows)}</td>"
-            f"<td class='n' data-v='{cap}'>{fmt_money(cap)}</td>{cells}</tr>"
+            f"<td class='n' data-v='{cap}' data-live-sum=\"{esc(group)} market_cap\">"
+            f"{fmt_money(cap)}</td>{cells}</tr>"
         )
 
     body = [
@@ -1288,7 +1363,7 @@ def sectors_page(menu, idx: dict | None) -> str:
         f"<p class='sub'>Medians per TradingView sector, data as of "
         f"{esc(idx.get('asof') or '—')}. P/E, P/B and EV/EBITDA only count positive "
         "earnings, equity and EBITDA. Each sector lists its companies below, cheapest P/E "
-        "first.</p>",
+        f"first. {LIVE_NOTE}</p>",
         f"<div class='card wrap'><table class='sort'><thead><tr>{head}</tr></thead><tbody>",
         *[line(s, by[s], True) for s in sorted(by)],
         "</tbody><tfoot>" + line("All companies", every, False) + "</tfoot></table></div>",
@@ -1302,14 +1377,18 @@ def sectors_page(menu, idx: dict | None) -> str:
             + "</tr>"
             + "".join(
                 f"<tr><td>{ticker_link(r['symbol'])}</td><td>{esc(r.get('name') or '')}</td>"
-                f"<td class='n'>{fmt_money(r.get('market_cap'))}</td>"
-                + "".join(f"<td class='n'>{fmt(r.get(k), p)}</td>" for _, k, p in SECTOR_COLS[:8])
+                f"<td class='n'{live(r['symbol'], 'market_cap', None)}>"
+                f"{fmt_money(r.get('market_cap'))}</td>"
+                + "".join(
+                    f"<td class='n'{live(r['symbol'], k, p)}>{fmt(r.get(k), p)}</td>"
+                    for _, k, p in SECTOR_COLS[:8]
+                )
                 + "</tr>"
                 for r in rows
             )
             + "</table></div>"
         )
-    return layout("Sector valuations", "sectors", "\n".join(body) + SORT_JS, menu)
+    return layout("Sector valuations", "sectors", "\n".join(body) + SORT_JS + LIVE_SCRIPT, menu)
 
 
 def slug(s: str) -> str:
@@ -1319,7 +1398,6 @@ def slug(s: str) -> str:
 def calendar_page(menu, idx: dict | None, weeks: int = 8) -> str:
     if not idx:
         return no_explore_data("Earnings calendar", "calendar", menu)
-    import datetime as dt
 
     start = dt.date.fromisoformat(idx.get("built") or dt.date.today().isoformat())
     end = (start + dt.timedelta(weeks=weeks)).isoformat()
@@ -1332,7 +1410,7 @@ def calendar_page(menu, idx: dict | None, weeks: int = 8) -> str:
         f"<p class='sub'>The next {weeks} weeks of quarterly reports: {len(rows)} companies. "
         "EPS estimate = the analysts' consensus for that quarter; last surprise = reported "
         "EPS against the estimate a quarter earlier. Source: Yahoo, rebuilt "
-        f"{esc(idx.get('built') or '—')}.</p>",
+        f"{esc(idx.get('built') or '—')}. {LIVE_NOTE}</p>",
     ]
     day = None
     for r in rows:
@@ -1351,16 +1429,18 @@ def calendar_page(menu, idx: dict | None, weeks: int = 8) -> str:
         body.append(
             f"<tr><td>{ticker_link(r['symbol'])}</td><td>{esc(r.get('name') or '')}</td>"
             f"<td>{esc(r.get('sector') or '')}</td>"
-            f"<td class='n'>{fmt_money(r.get('market_cap'))}</td>"
+            f"<td class='n'{live(r['symbol'], 'market_cap', None)}>"
+            f"{fmt_money(r.get('market_cap'))}</td>"
             f"<td class='n'>{fmt(r.get('next_eps_estimate'), '${:,.2f}')}</td>"
             f"<td class='n'>{fmt(surprise, '{:+.1%}')}</td>"
-            f"<td class='n'>{fmt(r.get('pe'), '{:.1f}x')}</td></tr>"
+            f"<td class='n'{live(r['symbol'], 'pe', '{:.1f}x')}>"
+            f"{fmt(r.get('pe'), '{:.1f}x')}</td></tr>"
         )
     if day:
         body.append("</table></div>")
     else:
         body.append("<p class='empty'>No reports in the coming weeks.</p>")
-    return layout("Earnings calendar", "calendar", "\n".join(body), menu)
+    return layout("Earnings calendar", "calendar", "\n".join(body) + LIVE_SCRIPT, menu)
 
 
 def build(out: Path = SITE) -> Path:
@@ -1369,6 +1449,7 @@ def build(out: Path = SITE) -> Path:
     out.mkdir(parents=True)
     idx = explore_index(out)
     shutil.copy2(EXPLORER_JS, out / "explorer.js")
+    shutil.copy2(LIVE_JS, out / "live.js")
     for pdf in ANALYSES.glob("*/*.pdf"):
         dst = out / pdf.parent.name / pdf.name
         dst.parent.mkdir(exist_ok=True)

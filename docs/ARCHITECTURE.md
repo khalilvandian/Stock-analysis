@@ -1,13 +1,16 @@
 # Architecture
 
-The project is a set of Python scripts that pull free market data, screen and value
-companies, and turn the results into reports, dated PDFs, a public web page and an evening
-email. Claude runs the scripts in Claude Code sessions and writes the judgement (notes,
-verdicts, reports); the scripts produce the numbers.
+The project is a scheduled job that fills a database with free market data, and a few
+Python scripts that read that database to screen and value companies and turn the results
+into dated PDFs, a public web page and an evening email. Claude runs the scripts in Claude
+Code sessions and writes the judgement (notes, verdicts, reports); the scripts produce the
+numbers.
 
 It is one repository and one Python package (`src/stock_analysis`), with its settings in
 `config/`, run in five places. They meet in one PostgreSQL database
-([`DATABASE.md`](DATABASE.md)):
+([`DATABASE.md`](DATABASE.md)). Since issue #33 the database is the only store of market
+data: only the ingest job calls the sources, and the scripts read through
+`stock_analysis.data` and `stock_analysis.stocks`.
 
 The drawn version of this map, with the daily timeline, is [`pipeline.html`](pipeline.html)
 (published at https://claude.ai/artifact/A54Gn496CWVif9xdr5fgCi). Keep it matching this page.
@@ -19,11 +22,12 @@ state machine of an ingest task.
 | Piece | Runs on | Started by | Code |
 |---|---|---|---|
 | Ingest job | Azure Container Apps Job `stock-ingest` | A schedule (22:30 UTC daily) | `python -m stock_analysis.db ingest` ([`INGEST.md`](INGEST.md)) |
+| Quotes job | Azure Container Apps Job `stock-quotes` | Every hour on weekdays, around the clock | `python -m stock_analysis.db quotes`: every company in the database ([`INGEST.md`](INGEST.md), "Hourly quotes"); the site's pages read them through `GET /quotes` (`analysis/live.js`) |
 | Database | Azure Database for PostgreSQL `stock-db-bk` (and Docker locally) | Always on | `src/stock_analysis/db/` |
 | Web API | Azure App Service `stock-api-bk` (F1) | An HTTPS request | `api/app.py` |
 | Evening run | A scheduled Claude Code session | Weekdays 21:00 Italy time | `analysis/watchlist.py` ([`EVENING_RUN.md`](EVENING_RUN.md)) |
 | Site | GitHub Actions + GitHub Pages | A push to `main`, the end of an ingest run, a daily schedule | `analysis/site.py` |
-| Analyses by hand | Your PC or a Claude session | You | `analysis/*.py`, `Data.open()` |
+| Analyses by hand | Your PC or a Claude session | You | `analysis/absolute.py`, `peer_screen.py`, `screen.py`, `stock_analysis.stocks` |
 
 ```mermaid
 flowchart TD
@@ -35,16 +39,14 @@ flowchart TD
   API[Web API<br/>App Service F1]
   EV[Evening run<br/>Claude scheduled session]
   PC[Your PC and Claude sessions]
-  F[Repository files<br/>config, data, analyses, reports]
+  F[Repository files<br/>config, analyses PDFs and notes, reports]
   GH[GitHub Actions]
   P[GitHub Pages site<br/>incl. the Data page]
   M[Evening email]
   Y & S & T & E --> J --> DB
-  Y & S & T -.still fetched directly.-> EV
   PC <--> DB
-  API <--> DB
+  EV <--> API <--> DB
   EV --> F
-  F -.load-files.-> DB
   F --> GH
   J -.starts.-> GH
   API --> GH
@@ -52,111 +54,38 @@ flowchart TD
   EV --> M
 ```
 
-The dashed lines are what is still separate: the evening run and most analysis scripts still
-download their own data and read the files in `data/`. Moving them to the database
-(`Data.open()`) is the next step after issue #18; then only the ingest job calls the sources.
-The layers below describe the file-based analysis pipeline as it works today.
-
 ## Layers
 
-Data moves through five layers, top to bottom.
-
 ```
- 1. DATA SOURCES (all free; FMP exists but is not used)
-    Yahoo Finance       SEC EDGAR             TradingView        ECB          Wikipedia
-    (yfinance)          companyfacts, frames  screener (scan)    FX rates     S&P 500 list
-        |                   |                     |                 |            | (by hand)
-        v                   v                     v                 v            v
- 2. FETCH AND CACHE
-    src/stock_analysis/fetch.py      -> data/<SYMBOL>/            (one company, Yahoo)
-    analysis/sector.py               -> data/sector/utilities.csv, history_yahoo.csv
-    analysis/history.py              -> data/sector/history.csv   (.cache/sec/ raw files)
-    src/stock_analysis/tradingview.py, ecb.py
-                                     -> .cache/screener/*.pkl     (cached for the day)
-    config/market_universe.csv       (S&P 500 members for market breadth)
+ 1. DATA SOURCES (all free)
+    Yahoo Finance       SEC EDGAR                TradingView             ECB
+    prices, statements, company facts, full      screener fields, index  FX rates
+    earnings dates      filings, bulk data sets  members, watch list
+        |                   |                        |                     |
+        v                   v                        v                     v
+ 2. INGEST (src/stock_analysis/ingest, nightly on Azure)
+    raw_* tables, one row per fetch in raw_fetch, every payload kept (raw_payload)
+    for the S&P 500, the watch list's stocks and peers, extra_symbols and the market
+    report's instruments (config/market.toml)
         |
         v
- 3. ANALYSIS MODULES
-    absolute.py (step 1)  screen.py  peer_screen.py  dcf.py  dcf_firm.py  compare.py
-    valuation.py  debt.py  debt_to_ebitda.py
+ 3. BUILD (src/stock_analysis/db/build.py, after each ingest)
+    core_company, core_price_daily, core_market_daily, core_fundamental(_ttm),
+    core_quality_issue; views v_annual, v_daily, v_earnings, v_tv_latest
+        |
+        v
+ 4. ANALYSES (read the database: stock_analysis.data, stock_analysis.stocks)
+    absolute.py (step 1)  screen.py  peer_screen.py
     stage1.py -> stage2.py (run together by screener.py)
-    watchlist.py (own-history P/E, entry price)   market.py   stock_analysis.metrics
+    watchlist.py (own-history P/E, entry price)   market.py   validate.py
         |
         v
- 4. OUTPUTS
-    reports/NN-*.md                 numbered reports (written by Claude)
-    dashboard/*.html                sector dashboards (published as Claude artifacts)
-    data/screener/stage1.csv, top.csv, YYYY-MM-DD.csv
-    analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf, runs.csv, README.md, notes.md
-    analyses/market/, analyses/summaries/, analyses/README.md
-    docs/METRICS.md                 generated from config/metrics.toml
-        |
-        v
- 5. DELIVERY
-    git push to main  ->  GitHub Actions (pages.yml) -> analysis/site.py -> GitHub Pages
+ 5. OUTPUTS AND DELIVERY
+    database: out_screener_*, out_watchlist_run, out_market_run, out_note, user_watchlist
+    analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf, notes.md, README.md (dated list from the runs)
+    reports/NN-*.md (written by Claude), docs/METRICS.md (generated)
+    git push to main -> GitHub Actions (pages.yml) -> analysis/site.py -> GitHub Pages
     analysis/send_email.py -> Brevo API -> email to Babak (body + every PDF attached)
-    Claude artifacts (dashboards), published by hand from a session
-```
-
-The same picture as a Mermaid diagram (GitHub renders it):
-
-```mermaid
-flowchart TD
-  subgraph Sources
-    Y[Yahoo Finance]
-    S[SEC EDGAR]
-    T[TradingView scanner]
-    E[ECB rates]
-    W[Wikipedia S&P 500 list]
-  end
-  subgraph Fetch
-    SEC[sector.py]
-    HIS[history.py]
-    TV[tradingview.py / ecb.py]
-  end
-  subgraph Analysis
-    ABS[absolute.py]
-    SCR[screen.py / peer_screen.py]
-    DCF[dcf.py / dcf_firm.py]
-    S1[stage1.py]
-    S2[stage2.py]
-    WL[watchlist.py]
-    MK[market.py]
-  end
-  subgraph Outputs
-    R[reports/]
-    D[dashboard/]
-    SD[data/screener/]
-    AN[analyses/]
-  end
-  subgraph Delivery
-    P[GitHub Pages via site.py]
-    M[Email via Brevo]
-  end
-  Y --> SEC --> ABS
-  S --> HIS --> ABS
-  Y --> HIS
-  T --> TV --> S1
-  E --> TV
-  Y --> S1
-  S1 --> S2
-  Y --> S2
-  S --> S2
-  S2 --> SD
-  SEC --> SCR --> R
-  ABS --> R
-  DCF --> R
-  ABS --> D
-  Y --> WL
-  S --> WL
-  SD --> MK
-  W --> MK
-  Y --> MK
-  WL --> AN
-  MK --> AN
-  AN --> P
-  SD --> P
-  AN --> M
 ```
 
 ## Module map
@@ -165,97 +94,75 @@ flowchart TD
 
 | File | Purpose |
 |---|---|
-| `__init__.py` | Exposes `FMPClient`. |
-| `fetch.py` | Saves one company's Yahoo prices, dividends, statements and info to `data/<SYMBOL>/` (`uv run python -m stock_analysis.fetch CEG`). |
-| `fmp.py` | Thin client for Financial Modeling Prep's `stable` endpoints; key from `FMP_API_KEY`. Kept but unused by the analyses. |
-| `tradingview.py` | Pages through TradingView's public screener endpoint (`scanner.tradingview.com/<market>/scan`), 2,000 rows a request. |
-| `ecb.py` | Latest ECB reference rates as US dollars per unit of each currency, plus GBX (pence). |
-| `data.py` | One way for scripts and Claude to read and write the database (`Data.open()`): named reads, read-only SQL, saving notes, runs and valuations. |
+| `stocks.py` | The analyses' view of a stock, from the database: `rows()` (absolute values in $bn, ratios, growth, standard DCF, analysts' target and rating; one row per stock), `history()` (every fiscal year, long format, with each value's source), `statements()`, `closes()`, `monthly_closes()`, `market_closes()`, `earnings()`, `splits()`, `fx_rates()`, `screener_run()`. Values a source other than SEC reports are converted to dollars at the ECB's newest rate. |
+| `nightly.py` | The nightly analyses, run by the ingest job after its build (`nightly = true` in `config/ingest.toml`; `db nightly` by hand): the market screener, each watch-list stock's numbers (`out_stock_numbers`: row, yearly history, prices, adjusted EPS, peers, next report) and the market report's numbers (`out_market_numbers`), so the evening session only reads them. Also the computations themselves (adjusted EPS, own-history P/E, key numbers, market moves and breadth), which the evening scripts reuse when a stock's stored numbers are stale. |
+| `screener/` | The market screener ([SCREENER.md](SCREENER.md)): `stage1.py` (the index members of the newest TradingView snapshot in the database, gaps filled from the core values, Lynch category, rules per category or business type), `stage2.py` (each survivor's cheap price from monthly closes and Yahoo's reported EPS, ranking, technicals, the SEC cross-check), `common.py` (settings, US-dollar columns), `run.py` (both stages, saved in `out_screener_*`; `python -m stock_analysis.screener`). |
+| `data.py` | One way for scripts and Claude to read and write the database (`Data.open()`): named reads, read-only SQL, saving notes, runs, valuations, screener runs and the watch list; directly on a PC, through the web API in cloud sessions. |
+| `watchlist.py` | Loads `config/watchlist.toml` and mirrors it into the user tables (`sync`). |
+| `tradingview.py` | Pages through TradingView's public screener endpoint, 2,000 rows a request; `SCREENER_FIELDS`, the fields the ingest keeps for the screener. |
+| `ecb.py` | The address of the ECB's reference rates (the ingest fetches them). |
 | `metrics.py` | The metrics dictionary: loads `config/metrics.toml`, selects sets, builds per-stock vectors, standardizes them, and writes `docs/METRICS.md`. |
-| `db/` | The project database (`docs/DATABASE.md`), on PostgreSQL through SQLAlchemy and psycopg: `__init__.py` (targets from `config/database.toml`, `Database`, migrations), `migrations/` (numbered SQL files), `load_files.py` (imports the files in `data/`, no network; raw stores only new or changed rows), `build.py` (rebuilds core from raw), `check.py` (read-only PASS/WARN/FAIL report), `azure.py` (`allow-my-ip`: the Azure firewall rule for this computer's IP), `roles.py` (`create-roles`: `stock_reader`, `stock_writer`), `ping.py` (connection diagnosis), `tunnel.py` (PostgreSQL through an HTTP proxy, for Claude's cloud sessions), `coverage.py` (`coverage`: completeness and quality against `config/coverage.toml`, the daily snapshot), `python -m stock_analysis.db {init,load-files,build,status,check,ingest,coverage,tasks} [--target]`. `azure.py` also has `JobFirewall`, which lets an ingest run on Azure through the firewall. |
-| `ingest/` | The scheduled ingest job (`docs/INGEST.md`): `job.py` (the task queue, budgets, stops, the run log and lock), `sec.py` (ticker file and company facts), `yahoo.py` (prices, statements, earnings dates, through one client the tests replace), `market.py` (TradingView index members, ECB rates), `common.py` (raw-layer helpers), `notify.py` (starts the Pages workflow when a run ends). |
+| `db/` | The project database (`docs/DATABASE.md`), on PostgreSQL through SQLAlchemy and psycopg: `__init__.py` (targets from `config/database.toml`, `Database`, migrations: every number not applied yet runs, in order), `migrations/` (numbered SQL files), `raw.py` (raw-layer helpers: store only new or changed rows), `build.py` (rebuilds core from raw), `check.py` (read-only PASS/WARN/FAIL report), `azure.py` (`allow-my-ip`, and `JobFirewall` for an ingest run on Azure), `roles.py` (`create-roles`: `stock_reader`, `stock_writer`), `ping.py` (connection diagnosis), `tunnel.py` (PostgreSQL through an HTTP proxy), `coverage.py` (completeness and quality against `config/coverage.toml`, the daily snapshot); `python -m stock_analysis.db {init,build,check-sample,status,check,ingest,import,reparse,push,coverage,tasks,quotes,nightly} [--target]`. |
+| `ingest/` | The scheduled ingest job (`docs/INGEST.md`): `job.py` (the task queue, budgets, stops, the run log and lock; the watch list's symbols and the market instruments; earnings due again after a report), `sec.py`, `xbrl.py`, `files.py` (bulk files from `inbox/`), `push.py`, `yahoo.py` (prices, statements, earnings dates, through one client the tests replace), `market.py` (TradingView snapshots of the index and of the watch list, ECB rates), `common.py`, `notify.py` (starts the Pages workflow when a run ends). |
 
 ### `analysis/` (scripts, run with `uv run python analysis/<name>.py`)
 
+Only the scripts the evening run and the site use are kept (issue #33).
+
 | File | Purpose |
 |---|---|
-| `absolute.py` | Step 1 of every analysis: the absolute values from `config/absolute_values.toml`, latest or by fiscal year (`--history`), for the utilities in `data/sector/`. |
-| `sector.py` | Screens every US-listed utility on Yahoo and computes the standard metrics and a standard enterprise DCF per company (`analyse()` is reused for any symbol). |
-| `history.py` | Yearly absolute values back to 2016: SEC EDGAR company facts first, Yahoo for gaps, year-end prices; each value records its source. |
-| `screen.py` | The utilities screens from report 09: strict debt rules (`--strict`) and the weighted score (`--balanced`, debt 50%, profit and cash 25%, cheapness 25%). |
-| `peer_screen.py` | Runs `sector.analyse()` and the strict and weighted screens on a hand-picked peer group; writes `data/peers/<name>.csv`. |
-| `dcf.py` | Equity DCF for power producers, dividend model for regulated utilities, reverse DCF. |
-| `dcf_firm.py` | Enterprise DCF: free cash flow to the firm discounted at WACC. |
-| `compare.py` | Debt and growth comparison across companies saved in `data/<SYMBOL>/`. |
-| `valuation.py` | Valuation multiples across saved companies, with past year-end P/Es. |
-| `debt.py` | One company's leverage over time from its saved statements. |
-| `debt_to_ebitda.py` | Debt / EBITDA history across saved companies. |
-| `screen_common.py` | Paths, settings loader and US-dollar columns shared by Stage 1 and Stage 2. |
-| `stage1.py` | Screener Stage 1: universe, gap filling, Lynch category, rules per category or business type. Writes `data/screener/stage1.csv` and `.cache/screener/stage1_full.pkl`. |
-| `stage2.py` | Screener Stage 2: reads only Stage 1's output, sets each survivor's cheap price, ranks, adds technicals and the SEC cross-check. Writes `data/screener/top.csv`. |
-| `screener.py` | Runs Stage 1 then Stage 2 and writes the dated `data/screener/YYYY-MM-DD.csv`. `run()` is called by the evening run. |
-| `watchlist.py` | The evening run's driver: runs the screener and the market report, then one PDF per watch-list stock and a summary PDF; records `runs.csv`, rebuilds the dated lists, writes the email body. |
-| `market.py` | The whole-market PDF: indices, sectors, breadth, and the screener's top 3 per sector from `data/screener/top.csv`. |
-| `site.py` | Builds the public GitHub Pages site from `analyses/` and `data/screener/` (standard library only), and the ticker explorer pages. |
+| `absolute.py` | Step 1 of every analysis: the absolute values from `config/absolute_values.toml` for the companies named, latest or by fiscal year (`--history`). The watch list's PDFs use its config helpers. |
+| `screen.py` | The strict debt rules (`--strict`) and the weighted score (`--balanced`, debt 50%, profit and cash 25%, cheapness 25%) on a table of stocks. |
+| `peer_screen.py` | The strict and weighted screens on a hand-picked peer group; the watch list's PDFs run it on each stock's peers. |
+| `watchlist.py` | The evening run's driver: mirrors the watch list and the notes into the database, reads each stock's stored numbers (computing on the spot only a stale one), renders the market report, one PDF per watch-list stock and a summary PDF; records the runs (`out_watchlist_run`), rebuilds the dated lists, writes the email body. |
+| `market.py` | The whole-market PDF from the stored market numbers (the instruments of `config/market.toml`, breadth of the index members, the screener's top 3 per sector); records the run (`out_market_run`). |
+| `site.py` | Builds the public GitHub Pages site from the PDFs and notes in `analyses/` and the database (runs, screener, coverage, explorer; standard library only). |
 | `explore.py` | Exports the ticker explorer's data (issue #20) from the database: `tickers/<SYMBOL>.json` and `tickers/index.json` (standard library only; web API or `stock_analysis.data`). |
 | `explorer.js` | The ticker page's script: draws the tabs and the SVG charts in the browser from that JSON. |
 | `send_email.py` | Sends the last run's email through Brevo with every PDF attached. |
-| `validate.py` | Checks the latest outputs on disk (screener tables, absolute-value identities, SEC history, dated analyses, `last_run.json`) and prints PASS / WARN / FAIL; no network. |
-
-### `dashboard/`
-
-`build_absolute.py`, `build_sector.py` and `build.py` fill the HTML templates
-(`*_template.html`, `template.html`) with saved data and write `absolute.html`,
-`sector.html` and `index.html`. The pages are published as Claude artifacts (links in the
-top-level `README.md`).
+| `validate.py` | Checks the run's outputs (the screener run, the watch list's rows and history, the recorded runs, the PDFs, `last_run.json`) and prints PASS / WARN / FAIL. |
 
 ### `tests/`
 
-`test_absolute.py` (config columns exist in the saved data), `test_fmp.py` (FMP client with
-`respx`), `test_metrics.py` (dictionary complete, `docs/METRICS.md` up to date),
-`test_screener.py` (TradingView paging and ECB rates with `respx`, categories, rules, cheap
-price, ranking, the Stage 1 to Stage 2 contract), `test_watchlist.py` (adjusted EPS, P/E
-history, split adjustment, notes, PDFs never overwritten), `test_pipeline_units.py`
-(missing values, splits, currencies, outliers and cross-checks between sources, on the saved
-responses in `tests/fixtures/`; tests marked `xfail(strict=True)` document known bugs)), `test_db.py` (the database: file import, rerun safety, the
-core build rules, trailing twelve months, the daily as-of view, quality checks).
+`test_absolute.py` (configured columns exist in the rows), `test_metrics.py` (dictionary
+complete, `docs/METRICS.md` up to date), `test_screener.py` (TradingView paging,
+categories, rules, cheap price, ranking, the Stage 1 to Stage 2 contract),
+`test_watchlist.py` (adjusted EPS, P/E history, notes, PDFs never overwritten, the site),
+`test_pipeline_units.py` (missing values, splits, currencies, outliers and the SEC
+cross-check, with a fake database), `test_data_validation.py` (`validate.py` on hand-built
+outputs), `test_db.py` (the database: the build rules, trailing twelve months, the daily
+as-of view, quality checks, the data interface and the API; seeded by `seed_files.py`),
+`test_ingest.py` (the job, the sources, the watch list's symbols and the market
+instruments), `test_explore.py`.
 
 ## Data flow, source by source
 
-| Source | Read by | Lands in | Ends up in |
+| Source | Fetched by (ingest) | Lands in | Read by |
 |---|---|---|---|
-| Yahoo screener (utilities) | `sector.py` | `data/sector/utilities.csv`, `history_yahoo.csv` | `absolute.py`, `screen.py`, dashboards, reports 02-10 |
-| Yahoo statements, info, prices (one symbol) | `sector.analyse()` via `peer_screen.py`, `watchlist.py` | `data/peers/<name>.csv`, watch-list PDFs | Reports 11-12, watch-list PDFs |
-| Yahoo statements (one symbol, full) | `stock_analysis.fetch` | `data/<SYMBOL>/` | `compare.py`, `valuation.py`, `debt*.py`, `dashboard/build.py` |
-| Yahoo earnings dates (reported EPS) | `watchlist.py`, `stage2.py` | memory | Own-history P/E, entry prices, Stage 2 adjusted cheap price |
-| Yahoo price history | `history.py`, `watchlist.py`, `stage2.py`, `market.py` | `.cache/screener/prices_<date>.pkl` (Stage 2) | Year-end market values, P/E history, breadth |
-| Yahoo statements (gaps) | `stage1.fill_gaps`, `stage2.fill_cash_flows` | `.cache/screener/yahoo_fill_<date>.pkl` | `filled` column of `stage1.csv` and `top.csv` |
-| SEC company facts | `history.py`, `watchlist.sec_years` | `.cache/sec/<SYMBOL>.json` | `data/sector/history.csv`, the yearly table in each watch-list PDF |
-| SEC frames API | `stage2.sec_check` | memory | `sec_eps` column and `flags` in `top.csv` |
-| TradingView scanner | `stage1.fetch_universe` | `.cache/screener/tradingview_<index>_<date>.pkl` | Every Stage 1 and Stage 2 figure |
-| ECB reference rates | `stage1.run` | memory | `fx_fund`, `fx_price` and every `*_usd_bn` column |
-| Wikipedia S&P 500 list | by hand | `config/market_universe.csv` | Market breadth in `market.py` |
-| Claude's notes | `watchlist.py`, `market.py`, `site.py` | `analyses/*/notes.md` | PDFs, the site, the email |
+| TradingView, index members and screener fields | `tradingview` | `raw_tv_constituent` (`v_tv_latest`), `core_company`, `core_index_member` | `stage1.py`; the rows' forward EPS, beta, analysts' target and rating |
+| TradingView, the watch list's symbols outside the index | `tradingview_watchlist` | the same | the same |
+| SEC company facts, full filings, data sets | `sec_companyfacts`, `sec_xbrl`, `db import` | `raw_sec_*` | `core_fundamental`, the rows, the history, Stage 2's SEC check |
+| Yahoo statements | `yahoo_statements` | `raw_yahoo_statement` | `core_fundamental` (gaps SEC leaves) |
+| Yahoo daily prices | `yahoo_prices` | `raw_yahoo_price` | `core_price_daily`: every price, P/E history, breadth |
+| Yahoo prices of indices, ETFs, rates, commodities | `yahoo_market` | `raw_yahoo_price` | `core_market_daily`: the market report |
+| Yahoo earnings dates | `yahoo_earnings` | `raw_yahoo_earnings` (`v_earnings`) | Adjusted EPS, own-history P/E, entry prices, Stage 2's adjusted cheap price |
+| ECB reference rates | `ecb_rates` | `raw_ecb_rate` | Dollar conversions (`stocks.fx_rates`) |
+| Claude's notes | (the evening run) | `analyses/*/notes.md`, `out_note` | PDFs, the site, the email |
 
 ## Where state lives
 
 | Place | Committed | What it holds | Written by |
 |---|---|---|---|
-| `config/` | Yes | Settings: absolute values, watch list, screener rules, metrics dictionary, S&P 500 list | People and Claude, by hand |
-| `data/<SYMBOL>/` | Yes | One company's saved Yahoo data | `stock_analysis.fetch` |
-| `data/sector/` | Yes | Utilities screen, yearly history, absolute-values tables | `sector.py`, `history.py`, `absolute.py` |
-| `data/peers/` | Yes | Peer-group tables | `peer_screen.py` |
-| `data/screener/` | Yes, every evening (`stage1.csv`, `top.csv`, the dated CSV) | Stage 1 results, Stage 2 top per sector, the dated full table | `stage1.py`, `stage2.py`, `screener.py` |
-| Azure Database for PostgreSQL `stock-db-bk` | No | The server database (target `server`): everything the ingest job fetches, the cleaned core, the job's queue and run log, the daily coverage snapshots | The ingest job (`db ingest`), `load-files`, `build` |
-| Docker volume `stock-db` | No | The local PostgreSQL database (`compose.yaml`, target `local`): raw copies of the files in `data/`, the cleaned core layer, the watch list, screener results, valuations and watch list runs, quality issues | `python -m stock_analysis.db load-files` and `build` |
-| `.cache/sec/` | No | Raw SEC company facts, about 250 MB for the utilities | `history.py`, `watchlist.py` |
-| `.cache/screener/` | No | Day caches of TradingView, Yahoo fills and prices; `stage1_full.pkl` for Stage 2 | `stage1.py`, `stage2.py` |
+| `config/` | Yes | Settings: absolute values, watch list, screener rules, metrics dictionary, market instruments, ingest, coverage | People and Claude, by hand |
+| Azure Database for PostgreSQL `stock-db-bk` | No | Everything: raw data, the cleaned core, the screener runs, the watch list's and market runs, notes, the job's queue and run log, the daily coverage snapshots | The ingest job, `build`, the evening run |
+| Docker volume `stock-db` | No | The local PostgreSQL database (`compose.yaml`, target `local`) for development and tests | `db ingest`, `db import`, `build`, the tests |
+| `inbox/` | No | Files downloaded by hand, waiting for `db import` | You |
 | `.cache/watchlist/` | No | `email.html` and `last_run.json` of the last run | `watchlist.py` |
-| `analyses/` | Yes | Dated PDFs, `runs.csv`, `notes.md`, dated lists | `watchlist.py`, `market.py`, Claude (notes) |
+| `analyses/` | Yes | Dated PDFs, `notes.md`, the dated lists | `watchlist.py`, `market.py`, Claude (notes) |
 | `reports/` | Yes | Numbered reports | Claude |
 | `docs/` | Yes | This documentation; `METRICS.md` is generated | Claude; `stock_analysis.metrics doc` |
 | `_site/` | No | The built web site | `site.py` (locally or in the Pages workflow) |
-| Cloud environment settings | No (never in the repository) | `FMP_API_KEY`, `SEC_USER_AGENT`, `BREVO_API_KEY`, `WATCHLIST_EMAIL_FROM`, `WATCHLIST_EMAIL_TO` | Babak, in the environment's settings |
+| Cloud environment settings | No (never in the repository) | `STOCK_API_URL`, `SEC_USER_AGENT`, `BREVO_API_KEY`, `WATCHLIST_EMAIL_FROM`, `WATCHLIST_EMAIL_TO` | Babak, in the environment's settings |
 | Azure job secrets, GitHub repository secrets | No | The ingest job's database password, `SEC_USER_AGENT`, `GITHUB_DISPATCH_TOKEN`; `STOCK_API_KEY` for the Pages workflow | `deploy/ingest-job.ps1` from `.env`; Babak in GitHub's settings |
 
 ## Design principles
@@ -265,20 +172,21 @@ core build rules, trailing twelve months, the daily as-of view, quality checks).
    operating cash flow, capex and free cash flow, and their yearly history. Ratios, scores and
    rankings come after, never instead, because they hide information. The list is
    `config/absolute_values.toml`; the screener's tables also lead with absolute values.
-2. **Two separate screener stages.** Stage 1 judges the financial statements and ignores the
-   price. Stage 2 judges only the price, and only for Stage 1's survivors. They are separate
-   programs that share nothing but Stage 1's output file, and Stage 2 refuses to run if a
-   column it needs is missing (`stage2.NEEDS`). Either can change without touching the other.
-3. **Every run is kept.** Dated PDFs are never overwritten (`watchlist.new_pdf` adds `-2`,
-   `-3` for a second run in the same minute), every run adds a line to `runs.csv`, and
-   stocks dropped from the watch list keep their folder. It is a list of dated analyses.
-4. **Free data sources.** Yahoo Finance, SEC EDGAR, TradingView's public screener and the
-   ECB. No paid plan is needed. FMP is kept as a client only.
-5. **No secrets in the repository.** It is public. Keys and email addresses live in the cloud
+2. **One way in for data.** Only the ingest job calls the sources; everything else reads the
+   database. A value an analysis needs and the database lacks is added to the ingest.
+3. **Two separate screener stages.** Stage 1 judges the financial statements and ignores the
+   price. Stage 2 judges only the price, and only for Stage 1's survivors, and refuses to run
+   if a column it needs is missing (`stage2.NEEDS`). Either can change without the other.
+4. **Every run is kept.** Dated PDFs are never overwritten (`watchlist.new_pdf` adds `-2`,
+   `-3` for a second run in the same minute), every run is a row of `out_watchlist_run`,
+   and stocks dropped from the watch list keep their folder. It is a list of dated analyses.
+5. **Free data sources.** Yahoo Finance, SEC EDGAR, TradingView's public screener and the
+   ECB. No paid plan is needed.
+6. **No secrets in the repository.** It is public. Keys and email addresses live in the cloud
    environment's settings and are read from environment variables; docs and code name only
    the variables.
-6. **Tests never hit the network.** HTTP is mocked with `respx`; everything else is tested on
-   small hand-made frames.
-7. **The code is the source of truth for numbers; Claude's notes are the source of truth
+7. **Tests never hit the network.** HTTP is mocked with `respx`; the database tests use a
+   local PostgreSQL; everything else is tested on small hand-made frames.
+8. **The code is the source of truth for numbers; Claude's notes are the source of truth
    for judgement.** PDFs combine both, and each states the dates of its numbers and of the
    notes.

@@ -16,7 +16,9 @@ from . import (
     audit,
     check_evening,
     check_ingest,
+    check_nightly,
     check_prices,
+    check_quotes,
     load_config,
     log_step,
     marker,
@@ -46,8 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "command",
         choices=[
-            "start", "wait-ingest", "check-prices", "ready", "wait-evening", "finish", "fail",
-            "marker", "audit",
+            "start", "wait-ingest", "check-prices", "check-nightly", "check-quotes", "ready",
+            "wait-evening", "finish", "fail", "marker", "audit",
         ],
     )  # fmt: skip
     ap.add_argument("run_key", nargs="?", help="the Airflow dag_run_id")
@@ -83,13 +85,18 @@ def main(argv: list[str] | None = None) -> int:
             return report(db, key, "wait_for_ingest", check_ingest(db, started, now, cfg))
         if args.command == "check-prices":
             return report(db, key, "check_prices", check_prices(db, now, cfg))
+        if args.command == "check-nightly":
+            started = run_row(db, key)["started_at"]
+            return report(db, key, "check_nightly", check_nightly(db, started, cfg))
+        if args.command == "check-quotes":
+            return report(db, key, "check_quotes", check_quotes(db, now, cfg))
         if args.command == "ready":
             set_status(db, key, "ready", now)
             return report(db, key, "mark_ready", Result(DONE, "Data ready for the evening session"))
         if args.command == "wait-evening":
-            ready_at = run_row(db, key)["ready_at"] or now
+            started = run_row(db, key)["started_at"]
             with httpx.Client() as client:
-                result = check_evening(ready_at, now, cfg, client)
+                result = check_evening(started, now, cfg, client)
             return report(db, key, "wait_for_evening", result)
         if args.command == "finish":
             set_status(db, key, "ok", now)

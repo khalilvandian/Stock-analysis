@@ -1,9 +1,9 @@
 # Absolute values screened first for every company, before any ratio, score or summary.
-# To add a value: add an entry to the right group. `column` must exist in
-# data/sector/utilities.csv (produced by analysis/sector.py). `unit` controls formatting:
-# "$" = dollars per share, "$bn" = billions of US dollars.
-# `history` names the column in data/sector/history.csv (analysis/history.py) that holds
-# the yearly values; it defaults to `column`. Use history = "" for values that exist only
+# To add a value: add an entry to the right group. `column` must be a column of the rows
+# stock_analysis.stocks.rows() builds from the database (add it there if it isn't).
+# `unit` controls formatting: "$" = dollars per share, "$bn" = billions of US dollars.
+# `history` names the column of stock_analysis.stocks.history() that holds the yearly
+# values; it defaults to `column`. Use history = "" for values that exist only
 # for the current date.
 
 [[group]]

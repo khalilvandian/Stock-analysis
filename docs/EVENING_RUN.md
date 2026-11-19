@@ -3,16 +3,27 @@
 Every weekday evening (Monday to Friday) at 21:00 Italy time a scheduled Claude session runs these steps on `main`.
 Babak approved committing the results straight to `main` (no pull request each night).
 
-0. **Is the data ready?** `uv run python -m stock_analysis.pipeline marker` reads the nightly
-   pipeline's marker through the web API ([`ORCHESTRATION.md`](ORCHESTRATION.md)). Exit 0:
-   go on. Exit 3 (not ready yet): check again every 10 minutes, for up to an hour. Exit 4
-   (the run failed), or still not ready after an hour: say so in the thread and stop. Don't
-   build reports on stale data. Airflow has already emailed the failure.
-1. **Set up:** `uv sync`. Check out `main` and pull.
-2. **Numbers first:** `uv run python analysis/screener.py` refreshes the market screener,
-   then `uv run python analysis/watchlist.py --numbers` and
-   `uv run python analysis/market.py --numbers` print today's figures (the market one
-   includes the screener's top names).
+The session does only what needs judgement: reading the numbers, writing Claude's notes and
+the email. Every number is already computed on the server (`docs/INGEST.md`): after each
+night's ingest the job runs the nightly analyses (`stock_analysis.nightly`) and stores the
+market screener's run, each watch-list stock's numbers (its row, yearly history, prices,
+adjusted EPS, peers, next report) and the market report's numbers. No step downloads market
+data or recomputes what the server stored. In the cloud session the scripts reach the
+database through the web API (`STOCK_API_URL`, with the key the environment attaches). Prices
+are the last close the ingest stored (the previous trading day), and the PDFs say so.
+
+1. **Set up:** `uv sync`. Check out `main` and pull. `uv run python -c "from stock_analysis.data
+   import Data; print(Data.open().status())"` shows the newest price and screener run; if the
+   newest price is more than three days old, the ingest has stopped: say so in the email.
+   `uv run python -m stock_analysis.pipeline marker` reads the orchestrator's marker
+   ([`ORCHESTRATION.md`](ORCHESTRATION.md)): exit 0 when the night's checks passed, 3 while
+   they are still running, 4 when one failed (Airflow has emailed which). A failed run goes
+   at the top of the email; the session still builds from what is stored.
+2. **Read the numbers:** `uv run python analysis/watchlist.py --numbers` and
+   `uv run python analysis/market.py --numbers` print the stored figures (the market one
+   includes the screener's top names). "Stored numbers (computed on the server)" lists the
+   stocks read as stored; a stock computed now had none since the last build, or its
+   watch-list settings changed since (a new target, peer or EPS correction).
 3. **Update Claude's notes** where the story changed, and set `Updated:` to today:
    - `analyses/<SYMBOL>/notes.md` for each stock in `config/watchlist.toml`: Verdict,
      Summary (4 one-line bullets: cheap, strong, weak, uncertain), Business, Risks, News
@@ -20,26 +31,29 @@ Babak approved committing the results straight to `main` (no pull request each n
      earnings report, update the verdict, entry price and, if a quarter's adjusted EPS
      includes a one-off, add an `eps_override` in the config.
    - `analyses/market/notes.md`: Verdict, Summary, What is driving the market, Stocks to
-     look at (comment on the screener's top names; `uv run python analysis/market.py
-     --numbers` lists them after the screener has run), What to watch.
+     look at (comment on the screener's top names from step 2), What to watch. Rewrite
+     every section each run, not only the Verdict: drop events that have passed (an
+     election, a meeting, a report already out) so nothing is described as still to come.
    - `analyses/summaries/notes.md`: Verdict across the watch list, and Analysis.
    - A new stock on the watch list with no `notes.md` gets a short first analysis.
    Every report keeps the same template: a high-level summary first, then the numbers,
    then the detail. Keep the summaries short and free of detail.
-4. **Build:** `uv run python analysis/watchlist.py`. It first reruns the market screener
-   (`analysis/screener.py`: Stage 1 then Stage 2 on the S&P 500; same-day downloads are
-   cached, so this is quick after step 2; `--no-screener` skips it) and writes
-   `data/screener/stage1.csv`, `top.csv` and the dated `YYYY-MM-DD.csv`. The market report
-   lists the screener's top 3 cheap or close-to-cheap stocks per sector (if the screener
-   fails, it uses the last results and says so). Then it writes one PDF per stock and the
-   watch list summary, each dated `YYYY-MM-DD_HHMM.pdf`, adds a line to
-   each `runs.csv`, rebuilds the dated lists (`analyses/README.md`, `analyses/<SYMBOL>/README.md`)
-   and writes the email body to `.cache/watchlist/email.html` (not committed).
+4. **Build:** `uv run python analysis/watchlist.py`. It copies `config/watchlist.toml` to the
+   database if it changed (the ingest and the nightly analyses read the stocks and peers
+   from there) and saves the notes that changed (`out_note`). Then it renders the market
+   report and one PDF per stock and the watch list summary, each dated `YYYY-MM-DD_HHMM.pdf`,
+   from the stored numbers and the notes; records each run in the database
+   (`out_watchlist_run`, `out_market_run`); rebuilds the dated lists from them
+   (`analyses/README.md`, `analyses/<SYMBOL>/README.md`); and writes the email body to
+   `.cache/watchlist/email.html` (not committed). A stock or the market report that fails is
+   left out and named at the top of the email; the rest is still built. `--screener` reruns
+   the market screener first (only if the night's run failed), `--recompute` computes every
+   stock now instead of reading the stored numbers.
 5. **Check:** `uv run python analysis/validate.py` (the run's outputs are complete and
    consistent; a FAIL goes in the email) and
    `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
-6. **Save:** commit `analyses/` and `data/screener/` (and any config or notes changes) to
-   `main` and push. The push publishes the site, including its Screener page.
+6. **Save:** commit `analyses/` (and any config or notes changes) to `main` and push. The
+   push publishes the site; its Screener page and run lists read the database.
 7. **Email:** `uv run python analysis/send_email.py --to <addresses>` sends one email
    through Brevo (brevo.com, free, 300 a day) with the run's HTML body and every PDF of the
    run attached. It needs `BREVO_API_KEY` and the verified sender in `WATCHLIST_EMAIL_FROM`

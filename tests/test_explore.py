@@ -259,13 +259,20 @@ def test_in_list_rejects_anything_but_tickers():
 
 
 def test_site_builds_the_explorer_pages(tmp_path, monkeypatch):
+    import sys
+
     site = load("site_explore_under_test", "analysis/site.py")
-    explore.export(tmp_path / "export", query=fake_query, today="2026-01-06")
-    monkeypatch.setenv("STOCK_EXPLORE", "files")
-    monkeypatch.setattr(site, "EXPLORE_DATA", tmp_path / "export")
+    sys.path.insert(0, str(ROOT / "analysis"))
+    import explore as site_explore  # the module site.py imports
+
+    monkeypatch.delenv("STOCK_EXPLORE", raising=False)
+    monkeypatch.setattr(site, "db", lambda: fake_query)  # the database, faked
+    real = site_explore.export
+    monkeypatch.setattr(
+        site_explore, "export", lambda out, query: real(out, query=query, today="2026-01-06")
+    )
     monkeypatch.setattr(site, "ANALYSES", tmp_path / "analyses")
     monkeypatch.setattr(site, "CONFIG", tmp_path / "watchlist.toml")
-    monkeypatch.setattr(site, "COVERAGE", tmp_path / "none.json")
     (tmp_path / "analyses").mkdir()
     (tmp_path / "watchlist.toml").write_text("")
     out = site.build(tmp_path / "_site")
@@ -281,9 +288,9 @@ def test_site_builds_the_explorer_pages(tmp_path, monkeypatch):
 def test_site_without_explorer_data_says_so(tmp_path, monkeypatch):
     site = load("site_explore_off", "analysis/site.py")
     monkeypatch.setenv("STOCK_EXPLORE", "off")
+    monkeypatch.setattr(site, "db", lambda: None)
     monkeypatch.setattr(site, "ANALYSES", tmp_path / "analyses")
     monkeypatch.setattr(site, "CONFIG", tmp_path / "watchlist.toml")
-    monkeypatch.setattr(site, "COVERAGE", tmp_path / "none.json")
     (tmp_path / "analyses").mkdir()
     (tmp_path / "watchlist.toml").write_text("")
     out = site.build(tmp_path / "_site")

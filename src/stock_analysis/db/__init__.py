@@ -8,7 +8,6 @@ DATABASE_URL environment variable overrides it. Passwords come only from the env
 `schema_version` records which have been applied, and opening a database applies new ones.
 
     python -m stock_analysis.db init         create the tables (apply the migrations)
-    python -m stock_analysis.db load-files   import the data already in data/ (no network)
     python -m stock_analysis.db build        rebuild the core layer from raw
     python -m stock_analysis.db status       rows per table
     python -m stock_analysis.db check        connection, schema and data present
@@ -127,16 +126,25 @@ class Database:
             if "raw_fetch" in tables:
                 raise RuntimeError(
                     "This database predates the migrations. Empty it and run init, "
-                    "load-files and build again (everything in it comes from data/)."
+                    "then ingest again (python -m stock_analysis.db ingest)."
                 )
             return 0
         with self.connect() as conn:
             return scalar(conn, "SELECT COALESCE(MAX(version), 0) FROM schema_version")
 
+    def applied_versions(self) -> set[int]:
+        if self.schema_version() == 0:
+            return set()
+        with self.connect() as conn:
+            return {r[0] for r in run(conn, "SELECT version FROM schema_version")}
+
     def migrate(self) -> int:
+        """Apply every migration not applied yet, in order. A migration merged from another
+        branch with a lower number than one already applied still runs."""
         current = self.schema_version()
+        applied = self.applied_versions()
         for version, path in migrations():
-            if version > current:
+            if version not in applied:
                 with self.begin() as conn:
                     for statement in statements(path.read_text(encoding="utf-8")):
                         conn.exec_driver_sql(statement)
@@ -145,7 +153,7 @@ class Database:
                         "INSERT INTO schema_version (version, applied_at) VALUES (:v, :t)",
                         {"v": version, "t": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")},
                     )
-                current = version
+                current = max(current, version)
         return current
 
     def table_counts(self) -> dict[str, int]:
@@ -216,6 +224,15 @@ def insert_df(conn: Connection, table: str, df: pd.DataFrame, chunk: int = 20_00
     if df.empty:
         return 0
     cols = list(df.columns)
+    raw = getattr(conn.connection, "driver_connection", None)
+    if raw is not None and hasattr(raw, "cursor") and type(raw).__module__.startswith("psycopg"):
+        # COPY: several times faster than INSERT for the build's millions of rows.
+        with raw.cursor() as cur, cur.copy(f"COPY {table} ({', '.join(cols)}) FROM STDIN") as cp:
+            for start in range(0, len(df), chunk):
+                obj = df.iloc[start : start + chunk].astype(object)
+                for row in obj.where(pd.notna(obj), None).itertuples(index=False, name=None):
+                    cp.write_row(row)
+        return len(df)
     sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"
     for start in range(0, len(df), chunk):
         run(conn, sql, records(df.iloc[start : start + chunk]))

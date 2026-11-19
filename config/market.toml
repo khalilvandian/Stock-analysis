@@ -1,0 +1,31 @@
+# The market instruments of the market report (analysis/market.py): indices, rates,
+# commodities, currencies and the S&P 500 sector ETFs. The ingest job fetches their daily
+# prices from Yahoo (source yahoo_market, config/ingest.toml) and the build keeps them in
+# core_market_daily. The symbols are Yahoo's; the labels are shown in the report.
+
+[markets]
+"^GSPC" = "S&P 500"
+"^IXIC" = "Nasdaq Composite"
+"^DJI" = "Dow Jones"
+"^RUT" = "Russell 2000"
+"^STOXX50E" = "Euro Stoxx 50"
+"FTSEMIB.MI" = "FTSE MIB (Italy)"
+"^VIX" = "VIX (fear index)"
+"^TNX" = "US 10-year yield"
+"CL=F" = "Oil (WTI)"
+"GC=F" = "Gold"
+"EURUSD=X" = "Euro in dollars"
+"BTC-USD" = "Bitcoin"
+
+[sectors]
+XLK = "Technology"
+XLC = "Communication"
+XLY = "Consumer discretionary"
+XLP = "Consumer staples"
+XLF = "Financials"
+XLV = "Health care"
+XLI = "Industrials"
+XLE = "Energy"
+XLB = "Materials"
+XLRE = "Real estate"
+XLU = "Utilities"

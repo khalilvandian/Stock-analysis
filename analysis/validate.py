@@ -1,26 +1,27 @@
-"""Check the latest pipeline outputs on disk and print a short PASS / WARN / FAIL report.
+"""Check the latest pipeline outputs and print a short PASS / WARN / FAIL report.
 
-No network: reads only files in the repository (and .cache/ when present). Run it in the
-evening run right after the build (docs/EVENING_RUN.md, step 4).
+Reads the run's outputs in the database (the newest screener run, the watch list's runs,
+the watch list's rows and history) and the files of the repository (the PDFs, notes.md and
+.cache/watchlist/last_run.json). Run it in the evening run right after the build
+(docs/EVENING_RUN.md, step 5).
 
 What it checks:
-  - Market screener (data/screener/top.csv, stage1.csv): required columns, at most
+  - Market screener (the newest run in out_screener_result): required columns, at most
     `top_per_sector` rows per region and sector, only Stage 1 passes listed, vs_cheap equal
     to close / cheap_price - 1, the cheap / close labels against `close_to_cheap`, ranks in
     order, P/E and cheap price consistent with EPS and the exchange rates, market value in
     dollars consistent with the statement currency, and whether the screener ran today.
-  - Identities on the absolute values (screener, data/sector/utilities.csv and the SEC
-    yearly history data/sector/history.csv), with tolerances: net debt = total debt - cash,
-    total debt = short-term + long-term debt, free cash flow = operating cash flow - |capex|.
-    In history.csv the implied share count (market value / price) must not jump between
+  - Identities on the absolute values (the screener's, and the watch list's rows from the
+    database), with tolerances: net debt = total debt - cash, total debt = short-term +
+    long-term debt, free cash flow = operating cash flow - |capex|. In the watch list's
+    yearly history the implied share count (market value / price) must not jump between
     years, which catches splits not applied and share counts in the wrong unit.
   - Suspicious outliers in the screener's list: P/E under 5 or over 100, EPS far from SEC,
     adjusted EPS far from diluted, extreme EPS growth, infinite ratios.
-  - Dated analyses (analyses/*/runs.csv): they parse, run times are in order and match
-    the file names, every listed PDF exists and is a non-empty PDF, the newest PDF of
-    every folder is non-empty, entry price = target P/E x adjusted EPS (+ equity stakes
-    per share where set), every watch list
-    stock has notes.md; .cache/watchlist/last_run.json lists files that exist.
+  - Dated analyses (out_watchlist_run): run times match the file names, every recorded
+    PDF exists and is a non-empty PDF, the newest PDF of every folder is non-empty, entry
+    price = target P/E x adjusted EPS (+ equity stakes per share where set), every watch
+    list stock has notes.md; .cache/watchlist/last_run.json lists files that exist.
 
 WARN = worth a look (known data differences between sources); FAIL = the outputs are broken.
 Exits 1 on any FAIL (with --strict, also on WARN).
@@ -46,8 +47,10 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
+from stock_analysis import stocks
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from screen_common import ABSOLUTE  # noqa: E402
+from stock_analysis.screener.common import ABSOLUTE  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -87,7 +90,6 @@ STAGE1_REQUIRED = [
     *ABSOLUTE,
 ]
 STATUSES = {"pass", "fail", "incomplete"}
-HISTORY_SOURCES = {"SEC", "Yahoo", "Yahoo price x SEC shares"}
 RUN_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})")
 FILE_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(-\d+)?\.pdf$")
 
@@ -169,19 +171,21 @@ def identities(
 # --- market screener -----------------------------------------------------------------
 
 
-def check_screener(root: Path, today: date) -> list[Check]:
-    folder = root / "data/screener"
-    top_path, s1_path = folder / "top.csv", folder / "stage1.csv"
-    missing = [p.name for p in (top_path, s1_path) if not p.exists()]
-    if missing:
-        return [_fail("screener files", f"missing: {', '.join(missing)}")]
+def check_screener(root: Path, today: date, data) -> list[Check]:
+    run_date, s1, top = stocks.screener_run(data)
+    if run_date is None:
+        return [_fail("screener run", "no screener run in the database")]
+    return screener_checks(root, today, run_date, s1, top)
+
+
+def screener_checks(
+    root: Path, today: date, run_date: str, s1: pd.DataFrame, top: pd.DataFrame
+) -> list[Check]:
     with (root / "config/screeners.toml").open("rb") as f:
         cfg = tomllib.load(f)
-    top = pd.read_csv(top_path, index_col=0)
-    s1 = pd.read_csv(s1_path, index_col=0)
     out: list[Check] = []
 
-    for frame, name, need in ((top, "top.csv", TOP_REQUIRED), (s1, "stage1.csv", STAGE1_REQUIRED)):
+    for frame, name, need in ((top, "Stage 2 top", TOP_REQUIRED), (s1, "Stage 1", STAGE1_REQUIRED)):
         lacking = [c for c in need if c not in frame.columns]
         if lacking:
             out.append(_fail(f"{name} columns", f"missing: {', '.join(lacking)}"))
@@ -192,7 +196,7 @@ def check_screener(root: Path, today: date) -> list[Check]:
         if frame.empty:
             out.append(_fail(f"{name} rows", "no rows"))
             return out
-    out.append(_pass("screener columns", f"top.csv {len(top)} rows, stage1.csv {len(s1)} rows"))
+    out.append(_pass("screener columns", f"Stage 2 top {len(top)} rows, Stage 1 {len(s1)} rows"))
 
     # Stage 1: statuses and the reasons behind them
     bad = s1[~s1["status"].isin(STATUSES)]
@@ -203,18 +207,18 @@ def check_screener(root: Path, today: date) -> list[Check]:
     passed = s1[s1["status"] == "pass"]
     bad = pd.concat([bad, passed[passed["failed"].fillna("").ne("")]])
     if len(bad):
-        out.append(_fail("stage1.csv statuses", f"unknown or unexplained: {_names(bad.index)}"))
+        out.append(_fail("Stage 1 statuses", f"unknown or unexplained: {_names(bad.index)}"))
     else:
         counts = s1["status"].value_counts().to_dict()
-        out.append(_pass("stage1.csv statuses", ", ".join(f"{k} {v}" for k, v in counts.items())))
+        out.append(_pass("Stage 1 statuses", ", ".join(f"{k} {v}" for k, v in counts.items())))
 
     # Stage 2's list
     n = cfg["top_per_sector"]
     per = top.groupby(["region", "sector"]).size()
     if (per > n).any():
-        out.append(_fail("top.csv per sector", f"more than {n}: {_names(per[per > n].index)}"))
+        out.append(_fail("Stage 2 top per sector", f"more than {n}: {_names(per[per > n].index)}"))
     else:
-        out.append(_pass("top.csv per sector", f"at most {n} per region and sector"))
+        out.append(_pass("Stage 2 top per sector", f"at most {n} per region and sector"))
 
     not_pass = top[top["status"] != "pass"].index.tolist()
     not_in_s1 = [i for i in top.index if i not in s1.index]
@@ -222,13 +226,13 @@ def check_screener(root: Path, today: date) -> list[Check]:
     if not_pass or not_in_s1 or s1_not_pass:
         out.append(
             _fail(
-                "top.csv lists only Stage 1 passes",
-                f"status not pass: {not_pass}; not in stage1.csv: {not_in_s1}; "
-                f"not passed in stage1.csv: {s1_not_pass}",
+                "Stage 2 top lists only Stage 1 passes",
+                f"status not pass: {not_pass}; not in Stage 1: {not_in_s1}; "
+                f"not passed in Stage 1: {s1_not_pass}",
             )
         )
     else:
-        out.append(_pass("top.csv lists only Stage 1 passes"))
+        out.append(_pass("Stage 2 top lists only Stage 1 passes"))
 
     vs = top["close"] / top["cheap_price"] - 1
     wrong = top.index[off(vs, top["vs_cheap"], abs_tol=1e-3) | top["vs_cheap"].isna()]
@@ -282,13 +286,10 @@ def check_screener(root: Path, today: date) -> list[Check]:
         else:
             out.append(_pass("market value in dollars = market value x exchange rate"))
 
-    dated = sorted(p.stem for p in folder.glob("????-??-??.csv"))
-    if not dated:
-        out.append(_warn("screener date", "no dated screener CSV"))
-    elif dated[-1] != today.isoformat():
-        out.append(_warn("screener date", f"last run {dated[-1]}, not today ({today})"))
+    if run_date != today.isoformat():
+        out.append(_warn("screener date", f"last run {run_date}, not today ({today})"))
     else:
-        out.append(_pass("screener date", dated[-1]))
+        out.append(_pass("screener date", run_date))
 
     cols = dict(
         total="total_debt_usd_bn",
@@ -300,8 +301,8 @@ def check_screener(root: Path, today: date) -> list[Check]:
         capex="capex_usd_bn",
         fcf="fcf_usd_bn",
     )
-    out += identities(top, "top.csv", **cols)
-    out += identities(s1, "stage1.csv", **cols)
+    out += identities(top, "Stage 2 top", **cols)
+    out += identities(s1, "Stage 1", **cols)
     out += outliers(top)
     return out
 
@@ -337,49 +338,32 @@ def outliers(top: pd.DataFrame) -> list[Check]:
         for i in vals.index[np.isinf(vals)]:
             found.append(f"{i}: {c} is infinite")
     if found:
-        return [_warn("outliers in top.csv", f"{len(found)} to look at", found)]
-    return [_pass("outliers in top.csv", "none")]
+        return [_warn("outliers in the Stage 2 top", f"{len(found)} to look at", found)]
+    return [_pass("outliers in the Stage 2 top", "none")]
 
 
-# --- sector data and SEC history -----------------------------------------------------
+# --- the watch list's rows and yearly history ------------------------------------------
 
 
-def check_sector(root: Path) -> list[Check]:
-    path = root / "data/sector/utilities.csv"
-    if not path.exists():
-        return [_warn("utilities.csv", "not found")]
-    u = pd.read_csv(path, index_col=0)
+def check_rows(root: Path, data, symbols: list[str]) -> list[Check]:
+    """The configured absolute values exist in the database's rows, and the identities hold
+    for the watch list's stocks."""
+    u = stocks.rows(data, symbols)
+    if "error" in u and u["error"].notna().any():
+        lost = u.index[u["error"].notna()]
+        return [_fail("watch list in the database", f"missing: {_names(lost)}")]
     with (root / "config/absolute_values.toml").open("rb") as f:
         groups = tomllib.load(f)["group"]
     wanted = [v["column"] for g in groups for v in g["values"]]
     lacking = [c for c in wanted if c not in u.columns]
     if lacking:
-        return [_fail("absolute values configured", f"missing from utilities.csv: {lacking}")]
-    out = [_pass("absolute values configured", f"{len(wanted)} columns in utilities.csv")]
-    # net debt uses cash and equivalents; the cash column adds short-term investments, so
-    # net debt can only be at or above total debt - cash
-    low = (u["net_debt"] < u["total_debt"] - u["cash"] - ABS_TOL_BN) & u["net_debt"].notna()
-    if low.any():
-        out.append(_warn("utilities.csv: net debt >= total debt - cash", _names(u.index[low])))
-    else:
-        out.append(_pass("utilities.csv: net debt >= total debt - cash"))
-    for label, lhs, rhs in (
-        (
-            "total debt = short + long term",
-            u["total_debt"],
-            u["short_term_debt"] + u["long_term_debt"],
-        ),
-        (
-            "free cash flow = operating cash flow - |capex|",
-            u["free_cf"],
-            u["operating_cf"] - u["capex"].abs(),
-        ),
-    ):
-        bad = off(lhs, rhs)
-        if bad.any():
-            out.append(_warn(f"utilities.csv: {label}", _names(u.index[bad])))
-        else:
-            out.append(_pass(f"utilities.csv: {label}"))
+        return [_fail("absolute values configured", f"missing from the rows: {lacking}")]
+    out = [_pass("absolute values configured", f"{len(wanted)} columns")]
+    out += identities(
+        u, "watch list rows", total="total_debt", cash="cash", net="net_debt",
+        short="short_term_debt", long="long_term_debt", ocf="operating_cf", capex="capex",
+        fcf="free_cf",
+    )  # fmt: skip
     return out
 
 
@@ -397,38 +381,20 @@ def implied_share_jumps(hist: pd.DataFrame) -> pd.DataFrame:
     return sh[jump]
 
 
-def check_history(root: Path) -> list[Check]:
-    path = root / "data/sector/history.csv"
-    if not path.exists():
-        return [_warn("history.csv", "not found")]
-    h = pd.read_csv(path)
+def check_history(data, symbols: list[str]) -> list[Check]:
+    h = stocks.history(data, symbols)
+    if h.empty:
+        return [_warn("yearly history", "none for the watch list")]
+    return history_checks(h)
+
+
+def history_checks(h: pd.DataFrame) -> list[Check]:
     out = []
-    unknown = sorted(set(h["source"].dropna()) - HISTORY_SOURCES)
-    blank = int(h["source"].isna().sum())
-    if unknown or blank:
-        out.append(_fail("history.csv sources", f"unknown {unknown}, blank {blank}"))
-    else:
-        out.append(_pass("history.csv sources", ", ".join(sorted(HISTORY_SOURCES))))
     dup = h.duplicated(["symbol", "fiscal_year_end", "column"])
     if dup.any():
-        out.append(_fail("history.csv one value per year", f"{dup.sum()} duplicates"))
-    sec = h[h["source"] == "SEC"].pivot_table(
-        index=["symbol", "fiscal_year_end"], columns="column", values="value", aggfunc="last"
-    )
-    if {"total_debt", "cash", "net_debt"} <= set(sec.columns):
-        sec.index = [f"{s} {y}" for s, y in sec.index]
-        out += identities(
-            sec,
-            "history.csv (SEC)",
-            total="total_debt",
-            cash="cash",
-            net="net_debt",
-            short="short_term_debt",
-            long="long_term_debt",
-            ocf="operating_cf",
-            capex="capex",
-            fcf="free_cf",
-        )
+        out.append(_fail("yearly history: one value per year", f"{dup.sum()} duplicates"))
+    else:
+        out.append(_pass("yearly history: one value per year", f"{h['symbol'].nunique()} stocks"))
     jumps = implied_share_jumps(h)
     if len(jumps):
         rows = [
@@ -437,14 +403,14 @@ def check_history(root: Path) -> list[Check]:
         ]
         out.append(
             _warn(
-                "history.csv: market value / price steady between years",
+                "yearly history: market value / price steady between years",
                 f"{jumps['symbol'].nunique()} companies with a jump (split not applied or "
                 f"shares in the wrong unit): {_names(jumps['symbol'].unique())}",
                 rows,
             )
         )
     else:
-        out.append(_pass("history.csv: market value / price steady between years"))
+        out.append(_pass("yearly history: market value / price steady between years"))
     return out
 
 
@@ -458,60 +424,54 @@ def is_pdf(path: Path) -> bool:
         return f.read(5) == b"%PDF-"
 
 
-def check_runs(folder: Path) -> list[Check]:
-    """One folder's runs.csv: parses, in order, matches its file names, files exist."""
-    name = f"{folder.name}/runs.csv"
-    try:
-        runs = pd.read_csv(folder / "runs.csv")
-    except Exception as e:  # noqa: BLE001 - any parse error is the finding
-        return [_fail(name, f"does not parse: {e}")]
-    if not {"run", "file"} <= set(runs.columns):
-        return [_fail(name, "needs run and file columns")]
+def check_runs(folder: Path, runs: pd.DataFrame, tz: ZoneInfo) -> list[Check]:
+    """One stock's recorded runs (out_watchlist_run): run times match the file names, the
+    files exist, the entry price follows from the numbers."""
+    name = f"{folder.name} runs"
     if runs.empty:
         return [_warn(name, "no runs yet")]
     out = []
-    times, problems = [], []
+    problems = []
+    runs = runs.sort_values("run_at").reset_index(drop=True)
     for r in runs.itertuples():
-        m, f = RUN_TIME.match(str(r.run)), FILE_TIME.match(str(r.file))
-        if not m or not f:
-            problems.append(f"unreadable run or file: {r.run!r}, {r.file!r}")
+        f = FILE_TIME.match(str(r.file))
+        local = pd.Timestamp(r.run_at).tz_localize("UTC").tz_convert(tz)
+        if not f:
+            problems.append(f"unreadable file name: {r.file!r}")
             continue
-        times.append(datetime.strptime(f"{m[1]} {m[2]}:{m[3]}", "%Y-%m-%d %H:%M"))
-        if (m[1], m[2], m[3]) != (f[1], f[2], f[3]):
-            problems.append(f"{r.file} listed for run {r.run}")
-    if any(b < a for a, b in zip(times, times[1:], strict=False)):
-        problems.append("runs not in date order")
+        if (local.strftime("%Y-%m-%d"), local.strftime("%H"), local.strftime("%M")) != (
+            f[1], f[2], f[3]
+        ):  # fmt: skip
+            problems.append(f"{r.file} recorded for the run at {local:%Y-%m-%d %H:%M}")
     lost = [f for f in runs["file"] if not is_pdf(folder / str(f))]
     if lost:
         problems.append(f"missing or empty PDFs: {', '.join(map(str, lost))}")
     if problems:
         out.append(_fail(name, "; ".join(problems)))
     else:
-        out.append(_pass(name, f"{len(runs)} runs, latest {runs['run'].iloc[-1]}"))
-    if {"price", "eps_adj_ttm", "pe_adj", "target_pe", "entry_price", "to_entry"} <= set(runs):
-        r = runs.astype({c: float for c in ("price", "eps_adj_ttm", "target_pe")})
-        # stakes_per_share (equity stakes kept out of the P/E) is blank in older rows
-        stakes = pd.to_numeric(
-            r.get("stakes_per_share", pd.Series(0.0, index=r.index)), errors="coerce"
-        ).fillna(0.0)
-        entry = (r["target_pe"] * r["eps_adj_ttm"] + stakes).where(r["eps_adj_ttm"] > 0)
-        pe = ((r["price"] - stakes) / r["eps_adj_ttm"]).where(r["eps_adj_ttm"] > 0)
-        to_entry = entry / r["price"] - 1
-        wrong = (
-            off(entry, r["entry_price"], 1e-3)
-            | off(pe, r["pe_adj"], 1e-3)
-            | off(to_entry, r["to_entry"], 1e-3)
-        )
-        if wrong.any():
-            out.append(
-                _fail(
-                    f"{folder.name}: entry price = target P/E x adjusted EPS",
-                    f"rows {list(runs.index[wrong])}",
-                )
+        out.append(_pass(name, f"{len(runs)} runs, latest {runs['run_at'].iloc[-1]} UTC"))
+    r = runs.copy()
+    for c in ("price", "eps_adj_ttm", "target_pe", "entry_price", "pe_adj", "to_entry"):
+        r[c] = pd.to_numeric(r[c], errors="coerce")
+    stakes = pd.to_numeric(r.get("stakes_per_share"), errors="coerce").fillna(0.0)
+    entry = (r["target_pe"] * r["eps_adj_ttm"] + stakes).where(r["eps_adj_ttm"] > 0)
+    pe = ((r["price"] - stakes) / r["eps_adj_ttm"]).where(r["eps_adj_ttm"] > 0)
+    to_entry = entry / r["price"] - 1
+    wrong = (
+        off(entry, r["entry_price"], 1e-3)
+        | off(pe, r["pe_adj"], 1e-3)
+        | off(to_entry, r["to_entry"], 1e-3)
+    )
+    if wrong.any():
+        out.append(
+            _fail(
+                f"{folder.name}: entry price = target P/E x adjusted EPS",
+                f"runs {list(r.loc[wrong, 'run_at'])}",
             )
+        )
     unlisted = sorted({p.name for p in folder.glob("*.pdf")} - set(runs["file"].astype(str)))
     if unlisted:
-        out.append(_warn(f"{folder.name}: PDFs not in runs.csv", ", ".join(unlisted)))
+        out.append(_warn(f"{folder.name}: PDFs not recorded", ", ".join(unlisted)))
     return out
 
 
@@ -520,23 +480,26 @@ def newest_pdf(folder: Path) -> Path | None:
     return pdfs[-1] if pdfs else None
 
 
-def check_analyses(root: Path, today: date) -> list[Check]:
+def check_analyses(root: Path, today: date, runs: pd.DataFrame) -> list[Check]:
     analyses = root / "analyses"
     if not analyses.exists():
         return [_fail("analyses", "folder not found")]
     out = []
     with (root / "config/watchlist.toml").open("rb") as f:
-        symbols = [s["symbol"].upper() for s in tomllib.load(f).get("stock", [])]
+        cfg = tomllib.load(f)
+    symbols = [s["symbol"].upper() for s in cfg.get("stock", [])]
+    tz = ZoneInfo(cfg.get("timezone", "Europe/Rome"))
     no_notes = [s for s in symbols if not (analyses / s / "notes.md").exists()]
-    no_runs = [s for s in symbols if not (analyses / s / "runs.csv").exists()]
+    have = set(runs["symbol"]) if len(runs) else set()
+    no_runs = [s for s in symbols if s not in have]
     if no_notes:
         out.append(_fail("watch list notes.md", f"missing for {', '.join(no_notes)}"))
     else:
         out.append(_pass("watch list notes.md", ", ".join(symbols)))
     if no_runs:
-        out.append(_warn("watch list runs.csv", f"no runs yet for {', '.join(no_runs)}"))
-    for runs in sorted(analyses.glob("*/runs.csv")):
-        out += check_runs(runs.parent)
+        out.append(_warn("watch list runs", f"no runs yet for {', '.join(no_runs)}"))
+    for sym in sorted(have):
+        out += check_runs(analyses / sym, runs[runs["symbol"] == sym], tz)
     stamps = {}
     for folder in [analyses / s for s in symbols] + [analyses / "market", analyses / "summaries"]:
         pdf = newest_pdf(folder) if folder.exists() else None
@@ -567,7 +530,7 @@ def check_last_run(root: Path) -> list[Check]:
     if not path.exists():
         return [_warn(name, "not found (written by analysis/watchlist.py; not committed)")]
     try:
-        run = json.loads(path.read_text())
+        run = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         return [_fail(name, f"does not parse: {e}")]
     problems = []
@@ -589,14 +552,17 @@ def check_last_run(root: Path) -> list[Check]:
 # --- report --------------------------------------------------------------------------
 
 
-def run_checks(root: Path = ROOT, today: date | None = None) -> list[Check]:
+def run_checks(root: Path = ROOT, today: date | None = None, data=None) -> list[Check]:
     today = today or date.today()
+    data = data or stocks.default_data()
+    with (root / "config/watchlist.toml").open("rb") as f:
+        symbols = [s["symbol"].upper() for s in tomllib.load(f).get("stock", [])]
     checks: list[Check] = []
     for part in (
-        lambda: check_screener(root, today),
-        lambda: check_sector(root),
-        lambda: check_history(root),
-        lambda: check_analyses(root, today),
+        lambda: check_screener(root, today, data),
+        lambda: check_rows(root, data, symbols),
+        lambda: check_history(data, symbols),
+        lambda: check_analyses(root, today, data.watchlist_runs()),
         lambda: check_last_run(root),
     ):
         try:
@@ -612,7 +578,7 @@ def overall(checks: list[Check]) -> str:
 
 
 def report(checks: list[Check], verbose: bool = False) -> str:
-    lines = ["Pipeline check: outputs on disk, no network", ""]
+    lines = ["Pipeline check: the run's outputs in the database and on disk", ""]
     for c in checks:
         lines.append(f"{c.level:<5} {c.name}" + (f": {c.detail}" if c.detail else ""))
         if verbose and c.rows:

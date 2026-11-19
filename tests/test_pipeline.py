@@ -80,7 +80,7 @@ def test_marker_tells_the_evening_session_whether_to_start() -> None:
 REPO = CFG["evening"]["repo"]
 COMMITS = f"https://api.github.com/repos/{REPO}/commits"
 RUNS = f"https://api.github.com/repos/{REPO}/actions/workflows/pages.yml/runs"
-READY = T(2026, 11, 18, 23, 40)
+STARTED = T(2026, 11, 18, 22, 35)
 
 
 def commit(message: str, sha: str = "abc1234def") -> dict:
@@ -90,31 +90,31 @@ def commit(message: str, sha: str = "abc1234def") -> dict:
 def test_evening_waits_then_fails_without_the_commit(respx_mock) -> None:
     respx_mock.get(COMMITS).mock(return_value=httpx.Response(200, json=[commit("Other work")]))
     with httpx.Client() as c:
-        assert p.check_evening(READY, READY + dt.timedelta(hours=1), CFG, c).code == p.NOT_YET
-        late = p.check_evening(READY, READY + dt.timedelta(hours=5), CFG, c)
+        assert p.check_evening(STARTED, STARTED + dt.timedelta(hours=1), CFG, c).code == p.NOT_YET
+        late = p.check_evening(STARTED, STARTED + dt.timedelta(hours=6), CFG, c)
     assert late.code == p.FAILED and "routine" in late.message
 
 
 def test_evening_passes_when_pages_published_the_commit(respx_mock) -> None:
-    msg = "Evening watch list analyses, 2026-11-18 23:50 CET"
+    msg = "Watch list analyses, 2026-11-19 00:20 CET"
     respx_mock.get(COMMITS).mock(return_value=httpx.Response(200, json=[commit(msg)]))
     route = respx_mock.get(RUNS)
     route.mock(return_value=httpx.Response(200, json={"workflow_runs": []}))
-    later = READY + dt.timedelta(hours=1)
+    later = STARTED + dt.timedelta(hours=1)
     with httpx.Client() as c:
-        assert p.check_evening(READY, later, CFG, c).code == p.NOT_YET
+        assert p.check_evening(STARTED, later, CFG, c).code == p.NOT_YET
         route.mock(
             return_value=httpx.Response(
                 200, json={"workflow_runs": [{"status": "completed", "conclusion": "success"}]}
             )
         )
-        assert p.check_evening(READY, later, CFG, c).code == p.DONE
+        assert p.check_evening(STARTED, later, CFG, c).code == p.DONE
         route.mock(
             return_value=httpx.Response(
                 200, json={"workflow_runs": [{"status": "completed", "conclusion": "failure"}]}
             )
         )
-        assert p.check_evening(READY, later, CFG, c).code == p.FAILED
+        assert p.check_evening(STARTED, later, CFG, c).code == p.FAILED
     assert route.calls.last.request.url.params["head_sha"] == "abc1234def"
 
 
@@ -157,6 +157,10 @@ def test_run_log_start_is_idempotent_and_steps_upsert(fresh) -> None:
     assert json.loads(steps[0][2])["message"] == "found"
     p.set_status(fresh, "scheduled__1", "ready", now)
     assert p.run_row(fresh, "scheduled__1")["ready_at"] == now
+    # a side check failed: the main chain's ready and ok don't hide it
+    p.set_status(fresh, "scheduled__1", "failed", now)
+    p.set_status(fresh, "scheduled__1", "ok", now)
+    assert p.run_row(fresh, "scheduled__1")["status"] == "failed"
 
 
 def test_ingest_waits_passes_and_fails(fresh) -> None:
@@ -176,6 +180,55 @@ def test_ingest_waits_passes_and_fails(fresh) -> None:
     with fresh.begin() as conn:
         run(conn, "UPDATE ops_run SET status = 'failed'")
     assert p.check_ingest(fresh, dag_start, soon, CFG).code == p.FAILED
+
+
+def summary_row(db, started: str, summary: dict) -> None:
+    with db.begin() as conn:
+        run(
+            conn,
+            "INSERT INTO ops_run (started_at, finished_at, mode, status, summary) "
+            "VALUES (:s, :s, 'maintain', 'ok', :j)",
+            {"s": started, "j": json.dumps(summary)},
+        )
+
+
+def test_nightly_analyses_must_run_clean(fresh) -> None:
+    clean = {
+        "screener": {"screened": 480, "listed": 33},
+        "stocks": {"computed": ["NEE", "NFLX"], "failed": {}, "peers_missing": []},
+        "market": {"price_date": "2026-11-18"},
+    }
+    assert p.check_nightly(fresh, STARTED, CFG).code == p.FAILED  # no run at all
+    summary_row(fresh, "2026-11-18T22:30:05", {"nightly": clean})
+    ok = p.check_nightly(fresh, STARTED, CFG)
+    assert ok.code == p.DONE and "480" in ok.message
+    bad = {**clean, "screener_error": "boom", "stocks": {**clean["stocks"], "failed": {"X": "e"}}}
+    summary_row(fresh, "2026-11-18T22:31:00", {"nightly": bad})
+    failed = p.check_nightly(fresh, STARTED, CFG)
+    assert failed.code == p.FAILED and "screener: boom" in failed.message and "X" in failed.message
+    summary_row(fresh, "2026-11-18T22:32:00", {"nightly_error": "crash"})
+    assert "crash" in p.check_nightly(fresh, STARTED, CFG).message
+
+
+def quote_fetch(db, at: str, status: str, sha: str, error: str | None = None) -> None:
+    with db.begin() as conn:
+        run(
+            conn,
+            "INSERT INTO raw_fetch (source, request_key, fetched_at, loaded_at, status, "
+            "payload_sha256, error) VALUES ('tradingview_quotes', 'all', :t, :t, :st, :h, :e)",
+            {"t": at, "st": status, "h": sha, "e": error},
+        )
+
+
+def test_quotes_job_must_have_stored_recently(fresh) -> None:
+    now = T(2026, 11, 18, 22, 40)
+    assert p.check_quotes(fresh, now, CFG).code == p.FAILED  # never stored
+    quote_fetch(fresh, "2026-11-18T21:05:00", "ok", "a")
+    assert p.check_quotes(fresh, now, CFG).code == p.DONE
+    quote_fetch(fresh, "2026-11-18T22:05:00", "error", None, "HTTP 503")
+    later = p.check_quotes(fresh, T(2026, 11, 19, 2, 0), CFG)
+    assert later.code == p.FAILED and "HTTP 503" in later.message
+    assert p.check_quotes(fresh, T(2026, 11, 26, 23, 0), CFG).code == p.DONE  # Thanksgiving
 
 
 def test_prices_must_reach_the_last_close(fresh) -> None:

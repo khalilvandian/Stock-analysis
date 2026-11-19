@@ -12,9 +12,6 @@ _site/
 
 .env.cloud
 
-# Coverage snapshot written for local site builds (db coverage --json); the site reads the API
-data/coverage/
-data/explore/
 
 # Files downloaded or found by hand, waiting to be imported (db import); never committed
 inbox/
