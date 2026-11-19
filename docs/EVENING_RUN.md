@@ -15,6 +15,10 @@ are the last close the ingest stored (the previous trading day), and the PDFs sa
 1. **Set up:** `uv sync`. Check out `main` and pull. `uv run python -c "from stock_analysis.data
    import Data; print(Data.open().status())"` shows the newest price and screener run; if the
    newest price is more than three days old, the ingest has stopped: say so in the email.
+   `uv run python -m stock_analysis.pipeline marker` reads the orchestrator's marker
+   ([`ORCHESTRATION.md`](ORCHESTRATION.md)): exit 0 when the night's checks passed, 3 while
+   they are still running, 4 when one failed (Airflow has emailed which). A failed run goes
+   at the top of the email; the session still builds from what is stored.
 2. **Read the numbers:** `uv run python analysis/watchlist.py --numbers` and
    `uv run python analysis/market.py --numbers` print the stored figures (the market one
    includes the screener's top names). "Stored numbers (computed on the server)" lists the

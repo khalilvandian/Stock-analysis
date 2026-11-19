@@ -16,7 +16,8 @@ it is the way it is. The project rules every Claude session follows are in
 8. Before changing a rule or a default, check [`DECISIONS.md`](DECISIONS.md) for why it is set that way.
 9. When something breaks, start with the troubleshooting table in [`OPERATIONS.md`](OPERATIONS.md).
 10. How the database is filled and how complete it is: [`INGEST.md`](INGEST.md) and [`COVERAGE.md`](COVERAGE.md).
-11. Before every commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
+11. How the nightly pieces are tied together, logged and watched: [`ORCHESTRATION.md`](ORCHESTRATION.md).
+12. Before every commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
 
 ## Index
 
@@ -32,6 +33,7 @@ it is the way it is. The project rules every Claude session follows are in
 | [`SETUP.md`](SETUP.md) | Setting up a Claude Code on the web workspace for this repository |
 | [`EVENING_RUN.md`](EVENING_RUN.md) | The steps the scheduled 21:00 session follows every evening |
 | [`INGEST.md`](INGEST.md) | The scheduled ingest job (issue #18): sources, budgets, backfill and maintenance, the Azure Container Apps Job |
+| [`ORCHESTRATION.md`](ORCHESTRATION.md) | The nightly pipeline (issue #30): the Airflow DAG `stock_nightly`, its checks, run log, alerts and morning audit |
 | [`COVERAGE.md`](COVERAGE.md) | What complete data means, the quality metrics, and the site's Data page |
 | [`DATABASE.md`](DATABASE.md) | The PostgreSQL database (issue #16): commands, targets, the check, raw, core, user and out layers, UML diagram, items, build rules |
 | [`METRICS.md`](METRICS.md) | The metrics dictionary, generated from `config/metrics.toml` (do not edit by hand) |

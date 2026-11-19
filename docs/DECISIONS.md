@@ -389,3 +389,49 @@ include it unchanged, and a push that edits it republishes the site.
   do; the numbers are ready before the session starts and the same for every reader.
 - **Rejected:** rendering the PDFs on the server too: they carry Claude's notes of the same
   evening, so they are built after the notes.
+
+### One orchestrated, logged and watched nightly pipeline (issue #30)
+
+- **Who:** Babak, after the evening routine had been switched off for three weekdays without
+  any warning.
+- **Decision:** Apache Airflow 3 (3.4.0) on the PC first: Docker Compose with the
+  LocalExecutor and its own metadata PostgreSQL (`orchestration/`). One DAG, `stock_nightly`,
+  at 22:35 UTC on weekdays, checks every scheduled piece: the Azure ingest run, the nightly
+  analyses in its summary, the prices (the last close for at least 95% of the members), the
+  hourly quotes job, and then the scheduled Claude session's commit and its published site.
+  It sets a **ready marker** and logs every step in `ops_pipeline_run` and
+  `ops_pipeline_step`. A failure emails an alert. A GitHub workflow audits each morning that
+  the last trading day has a finished run, so a night when Airflow didn't run is caught too.
+- **The Claude step:** a ready marker, chosen over Airflow starting the routine or running
+  `claude -p` headless. The session keeps its own schedule (00:00 Italy time, Tuesday to
+  Saturday, since 2026-11-19) and its own wait for the newest price. The marker tells it
+  whether the night's checks passed, and Airflow checks that it committed.
+- **Side checks:** the nightly analyses and the quotes job alert without holding back the
+  marker, because the evening session computes missing numbers on the spot.
+- **Why:** Airflow is the community standard (career value, issue #30). The checks live in
+  `stock_analysis.pipeline`, so they're tested without Airflow and run by hand, and the DAG
+  only orders them. Airflow and the project pin different SQLAlchemy versions, so the
+  project runs in its own environment inside the image.
+- **Rejected:** keeping separate clocks with no checks (the failure that started this);
+  putting the run log only in Airflow's metadata database, which the cloud session and
+  GitHub can't read.
+
+## 2026-11-19
+
+### Airflow owns every scheduled piece, and runs on Azure (issue #30)
+
+- **Who:** Babak: "the point of orchestration was to take everything under control ... define
+  them as tasks, make them repeatable"; "we are locally working on Airflow, but we will
+  implement Airflow on Azure."
+- **Decision:** Airflow starts each piece as a task instead of watching it: the ingest, the
+  nightly analyses (split out of the ingest run), the hourly quotes and the site rebuild.
+  The Azure jobs lose their own cron, with no fallback schedule: a failure should show, not
+  be covered. Two things stay outside: the Claude session that reads the data keeps its own
+  schedule for now (Airflow checks its commit), and the morning audit, which must work when
+  Airflow is down. Airflow is
+  developed and tested locally in Docker; production Airflow runs on Azure, never on the PC.
+- **Why:** a schedule nobody controls is what failed in November. Tasks can be retried and
+  rerun for any date. Hosting on the PC would stop every job when the PC is off.
+- **Supersedes:** the watcher design of 2026-11-18 (above), where the jobs kept their own
+  schedules and Airflow only checked them.
+
