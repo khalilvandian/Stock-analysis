@@ -4,6 +4,7 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-20 00:10 CET | $42.99 | 13.5x | 25.2x | $41.47 | -3.5% | Cheap but stalled. | [2026-11-20_0010.pdf](2026-11-20_0010.pdf) |
 | 2026-11-19 11:59 CET | $43.82 | 13.7x | 25.2x | $41.47 | -5.4% | Cheap but stalled. | [2026-11-19_1159.pdf](2026-11-19_1159.pdf) |
 | 2026-11-19 11:30 CET | $43.82 | 13.7x | 25.2x | $41.47 | -5.4% | Q3 (Oct 28) missed on earnings and the year's outlook was cut a fourth time: sales grew only 1.5% and are guided to fall in Q4. | [2026-11-19_1130.pdf](2026-11-19_1130.pdf) |
 | 2026-11-19 11:18 CET | $43.82 | 13.7x | 25.2x | $41.47 | -5.4% | Q3 (Oct 28) missed on earnings and the year's outlook was cut a fourth time: sales grew only 1.5% and are guided to fall in Q4. | [2026-11-19_1118.pdf](2026-11-19_1118.pdf) |
