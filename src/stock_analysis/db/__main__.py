@@ -1,6 +1,10 @@
 """Command line: python -m stock_analysis.db
 {init,load-files,build,status,check,ping,allow-my-ip,create-roles,ingest,import,reparse,push,
-coverage,tasks} [--target].
+coverage,tasks,quotes} [--target].
+
+quotes fetches the last price of every company in the index (TradingView, one request, 15
+minutes delayed) into raw_tv_quote; the hourly job stock-quotes runs it (ingest/quotes.py).
+--symbols A,B fetches only those (a sample).
 
 push sends what this PC ingested (kept SEC payloads, imported data-set files) to --target
 (the server) without asking SEC again (ingest/push.py); --from picks the source database.
@@ -53,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
             "push",
             "coverage",
             "tasks",
+            "quotes",
         ],
     )
     parser.add_argument("--target", help="a target in config/database.toml (default: selected)")
@@ -93,6 +98,13 @@ def main(argv: list[str] | None = None) -> int:
             if ip:
                 print(f"Firewall rule ingest-job allows this run's address {ip}")
             return run_ingest(args)
+    if args.command == "quotes":  # its own rule, so it never removes the ingest job's
+        from .azure import JobFirewall
+
+        with JobFirewall(args.target, rule="quotes-job") as ip:
+            if ip:
+                print(f"Firewall rule quotes-job allows this run's address {ip}")
+            return run_quotes(args)
     db = Database.open(args.target)  # applies any new migrations
     print(f"Database: {db.target} ({db.where})")
     if args.command == "create-roles":
@@ -154,6 +166,17 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{name:28} {n:>10,}")
     db.close()
     return 0
+
+
+def run_quotes(args) -> int:
+    from ..ingest.quotes import fetch_quotes
+
+    db = Database.open(args.target)
+    print(f"Database: {db.target} ({db.where})")
+    result = fetch_quotes(db, args.symbols.split(",") if args.symbols else None)
+    print("Quotes:", json.dumps(result, default=str))
+    db.close()
+    return 0 if result["status"] in ("ok", "unchanged") else 1
 
 
 def run_ingest(args) -> int:

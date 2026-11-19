@@ -168,6 +168,26 @@ docker run --rm -e DATABASE_URL=postgresql://stock_writer@host.docker.internal:5
   -e PGPASSWORD=<the writer password> stock-ingest ingest --limit 3
 ```
 
+## Hourly quotes (`db quotes`, issue #35)
+
+Every company in the database has a price at most about an hour old on the site, and every
+value that depends on it moves with it: the explorer's summary (the face of each ticker) and
+the list pages. A second, small job does this, separate from the nightly ingest:
+
+| | |
+|---|---|
+| **What** | `python -m stock_analysis.db quotes` (`src/stock_analysis/ingest/quotes.py`): **one** request to TradingView's `global` screener, so any exchange works (New York, Europe, Tokyo), for **every company in the database**: each one in `core_company` (index members, past members such as KVUE, other share classes such as GOOG) by its listing in the latest snapshot that names it, else its exchange and symbol, plus the newest index snapshot (`raw_tv_constituent`, before the first build). A listing TradingView no longer knows (a delisted company) comes back empty and is skipped. It stores the last price of the regular session, the day's change, the volume, the currency, TradingView's session (`market`, `pre_market`, `post_market`, `out_of_session`) and its delay (`delayed_streaming_900` = 15 minutes; Tokyo is 20) in `raw_tv_quote`, under our symbol, with the payload in `raw_payload` (source `tradingview_quotes`, request key `all`). `--symbols A,B` fetches a sample |
+| **Nothing new, nothing stored** | The digest covers the listings, prices and session, not the volume (which still ticks after the close), so a run with the same prices as the last one stores nothing (`status: unchanged`) |
+| **Service** | Azure Container Apps Job `stock-quotes`: the same image and environment as `stock-ingest`, 0.25 vCPU, 0.5 GiB, at most 15 minutes. Each run takes a few seconds: about 520 runs a month, well inside the free grant |
+| **Schedule** | `5 * * * 1-5` UTC: every hour, around the clock, Monday to Friday, so every market's session is covered whatever exchanges the universe holds (the US session is 13:30–20:00 UTC in summer, 14:30–21:00 in winter; Tokyo 00:00–06:30) |
+| **Database access** | Its own firewall rule `quotes-job` (not `ingest-job`, so neither job removes the other's rule mid-run) |
+| **Deploy or update** | One command, after the merge to `main` (the image is built from `main`): `powershell -ExecutionPolicy Bypass -File deploy\quotes-job.ps1` (`-RunNow` starts a run). It applies the migrations, creates or updates the job and its firewall right, and redeploys the web API (`-SkipApi` to leave it) |
+| **The pages** | The web API's public `GET /quotes` (docs/DATABASE.md) gives the newest quote of every company. `analysis/live.js`, loaded by every page that shows a price, recomputes from it with the formulas of `analysis/explore.py`. The **ticker page** (`explorer.js`) is drawn from the built JSON at once, then again with the quote: price and change in the header, market value, enterprise value, P/E, P/S, P/B, EV/EBITDA, EV/revenue, FCF and earnings yield, dividend yield, P/E now, every "vs price" distance (fair values, entry prices, the moving averages, the 52-week range) and the DCF's upside now; peers are rescaled by their own price change, so the sector medians move too. **All tickers, Sector valuations and the Earnings calendar** (`analysis/site.py`) mark their price-dependent cells (`data-live`, `data-live-med`, `data-live-sum`), and `live.js` refills them, their sort keys, the sector medians and sums, and a line saying when the prices were quoted. A quote in another currency than the page's, older than the page's close, or no answer from the API leaves the close as before. The dated analyses (watch list pages, screener) stay as they were run |
+| **Accuracy** | One hour: a quote is right if it lies within the hour bar (high–low) of when it traded. Checked against Google Finance, TradingView's pages, Smart Investor and Yahoo's hourly bars (2026-11-19, including Tokyo during its session) |
+
+`core_price_daily` (Yahoo's closes) stays the price of record for history, charts and the
+screener; the quotes are only the latest price between two closes.
+
 ## Settings (`config/ingest.toml`)
 
 - `max_minutes`: when the run stops starting new tasks.
