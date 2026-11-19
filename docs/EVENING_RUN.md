@@ -27,7 +27,9 @@ are the last close the ingest stored (the previous trading day), and the PDFs sa
      earnings report, update the verdict, entry price and, if a quarter's adjusted EPS
      includes a one-off, add an `eps_override` in the config.
    - `analyses/market/notes.md`: Verdict, Summary, What is driving the market, Stocks to
-     look at (comment on the screener's top names from step 2), What to watch.
+     look at (comment on the screener's top names from step 2), What to watch. Rewrite
+     every section each run, not only the Verdict: drop events that have passed (an
+     election, a meeting, a report already out) so nothing is described as still to come.
    - `analyses/summaries/notes.md`: Verdict across the watch list, and Analysis.
    - A new stock on the watch list with no `notes.md` gets a short first analysis.
    Every report keeps the same template: a high-level summary first, then the numbers,
