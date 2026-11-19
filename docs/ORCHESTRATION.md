@@ -191,7 +191,9 @@ evening: never before (nothing would run) and never after (everything would run 
    running, then unpauses both DAGs. To use a VM made on Azure's "Free account virtual
    machine" page instead, create it first as `airflow-vm`; the script then skips that step.
 5. Open the UI (the script prints its address), trigger `stock_quotes` once, and watch the
-   first night. The audit checks it from the next 3-hour slot on.
+   first night.
+6. Turn the audit on: `gh variable set PIPELINE_WATCH --body on`. It checks from the next
+   3-hour slot on.
 
 ## Not done yet
 

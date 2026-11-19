@@ -16,6 +16,9 @@ permissions:
 
 jobs:
   audit:
+    # On once Airflow is live (docs/ORCHESTRATION.md, "Going live"):
+    # gh variable set PIPELINE_WATCH --body on
+    if: vars.PIPELINE_WATCH == 'on'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
