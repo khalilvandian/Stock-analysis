@@ -26,7 +26,9 @@ import shutil
 import sys
 import tomllib
 import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 ANALYSES = ROOT / "analyses"
@@ -365,6 +367,20 @@ def stamp(name: str) -> str:
     """'2026-10-27_1657.pdf' -> '2026-10-27 16:57'."""
     m = re.match(r"(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})", name)
     return f"{m.group(1)} {m.group(2)}:{m.group(3)}" if m else name
+
+
+CET = ZoneInfo("Europe/Rome")
+
+
+def cet(when) -> str:
+    """A UTC time from the database (naive or ISO text) as Italy time: '2026-11-19 16:30 CET'
+    (CEST in summer). Every hour the site shows is in this zone."""
+    try:
+        t = when if isinstance(when, datetime) else datetime.fromisoformat(str(when))
+    except ValueError:
+        return str(when)[:16].replace("T", " ")
+    t = (t if t.tzinfo else t.replace(tzinfo=UTC)).astimezone(CET)
+    return t.strftime("%Y-%m-%d %H:%M ") + t.tzname()
 
 
 def esc(s) -> str:
@@ -1009,7 +1025,7 @@ def coverage_page(menu, d: dict | None = None) -> str:
         for k, v in sorted(p["sources"].items())
     )
     runs = "".join(
-        f"<tr><td class='d'>{esc(str(r['started_at'])[:16].replace('T', ' '))}</td>"
+        f"<tr><td class='d'>{esc(cet(r['started_at']))}</td>"
         f"<td>{esc(r['mode'])}</td><td>{esc(r['status'])}</td>"
         f"<td class='n'>{r['requests']:,}</td><td class='n'>{r['tasks_ok']:,}</td>"
         f"<td class='n'>{r['tasks_failed']:,}</td><td class='n'>{r['rows_stored']:,}</td>"
@@ -1020,7 +1036,7 @@ def coverage_page(menu, d: dict | None = None) -> str:
         "<h2>The ingest job</h2><div class='cols'>"
         + table(["Source", "Tasks", "Fetched", "Waiting", "Failed"], src)
         + table(
-            ["Run (UTC)", "Mode", "Result", "Requests", "Done", "Failed", "Rows", "Stopped by"],
+            ["Run (CET)", "Mode", "Result", "Requests", "Done", "Failed", "Rows", "Stopped by"],
             runs,
         )
         + "</div>"
