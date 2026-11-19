@@ -7,12 +7,12 @@ import pandas as pd
 import respx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "analysis"))
-import history  # noqa: E402
-import stage1  # noqa: E402
-import stage2  # noqa: E402
-from screen_common import load_config  # noqa: E402
-
-from stock_analysis import ecb, tradingview  # noqa: E402
+from stock_analysis import tradingview  # noqa: E402
+from stock_analysis.screener import (
+    stage1,  # noqa: E402
+    stage2,  # noqa: E402
+)
+from stock_analysis.screener.common import load_config  # noqa: E402
 
 
 @respx.mock
@@ -36,27 +36,6 @@ def test_tradingview_scan_reads_every_page(monkeypatch):
     assert list(d.index) == ["MIL:UCG", "MIL:ENEL", "MIL:ISP"]
     assert d.loc["MIL:ISP", "close"] == 5.2
     assert route.call_count == 2
-
-
-@respx.mock
-def test_ecb_rates_in_dollars_per_unit():
-    csv = "CURRENCY,OBS_VALUE\nUSD,1.10\nGBP,0.85\nCHF,0.95\n"
-    respx.get(url__startswith=ecb.URL).mock(return_value=httpx.Response(200, text=csv))
-    fx = ecb.usd_per_unit()
-    assert fx["USD"] == 1.0
-    assert round(fx["EUR"], 4) == 1.10
-    assert round(fx["GBP"], 4) == round(1.10 / 0.85, 4)
-    assert round(fx["GBX"] * 100, 4) == round(fx["GBP"], 4)
-
-
-def test_yahoo_symbols():
-    assert stage1.yahoo_symbol("MIL:UCG", "italy") == "UCG.MI"
-    assert stage1.yahoo_symbol("NYSE:BRK.B", "america") == "BRK-B"
-    assert stage1.yahoo_symbol("OMXSTO:INVE_A", "sweden") == "INVE-A.ST"
-    assert stage1.yahoo_symbol("EURONEXT:ASML", "netherlands") == "ASML.AS"
-    assert stage1.yahoo_symbol("EURONEXT:MC", "france") == "MC.PA"
-    assert stage1.yahoo_symbol("LSE:BT.A", "uk") == "BT-A.L"
-    assert stage1.yahoo_symbol("XYZ:ABC", "uk") is None
 
 
 def test_screener_type_by_industry():
@@ -188,22 +167,6 @@ def test_rank_lists_only_cheap_or_close_top_n():
     assert top.loc["b", "cheapness"] == "close"
 
 
-def test_split_adjust_only_values_filed_before_the_split():
-    hist = pd.DataFrame(
-        {
-            "symbol": "BKNG",
-            "fiscal_year_end": pd.to_datetime(["2024-12-31", "2024-12-31", "2026-12-31"]),
-            "column": ["_shares", "eps", "_shares"],
-            "value": [34e6, 172.7, 800e6],
-            "source": "SEC",
-            "filed": ["2026-02-18", "2026-02-18", "2027-02-18"],
-        }
-    )
-    splits = pd.Series([25.0], index=pd.to_datetime(["2026-06-08"]))
-    out = history.split_adjust(hist, splits)
-    assert list(out["value"]) == [34e6 * 25, 172.7 / 25, 800e6]
-
-
 def test_stage1_counts():
     d = pd.DataFrame(
         {
@@ -315,18 +278,15 @@ def test_lynch_rules():
     assert list(stage1._rule(d, "min_dividend_years", 10)) == [True, True, False]
 
 
-def test_stage2_refuses_stage1_output_without_its_columns(tmp_path):
-    path = tmp_path / "stage1_full.pkl"
-    pd.DataFrame({"status": ["pass"]}).to_pickle(path)
+def test_stage2_refuses_stage1_output_without_its_columns():
     try:
-        stage2.load_stage1(path)
-    except SystemExit as e:
+        stage2.check_stage1(pd.DataFrame({"status": ["pass"]}))
+    except RuntimeError as e:
         assert "lacks" in str(e)
     else:
-        raise AssertionError("expected SystemExit")
+        raise AssertionError("expected RuntimeError")
     full = pd.DataFrame({c: [1] for c in stage2.NEEDS})
-    full.to_pickle(path)
-    assert len(stage2.load_stage1(path)) == 1
+    assert len(stage2.check_stage1(full)) == 1
 
 
 def test_index_membership():
@@ -426,17 +386,18 @@ def test_latest_history_entry():
     assert stage2._latest([]) is None
 
 
-def test_split_factor_since(monkeypatch):
-    class T:
-        splits = pd.Series(
-            [25.0, 2.0],
-            index=pd.DatetimeIndex(["2026-03-02", "2020-06-01"]).tz_localize("America/New_York"),
-        )
-
-    monkeypatch.setattr(stage2.yf, "Ticker", lambda s: T())
-    assert stage2.split_factor_since("BKNG", 2025) == 25.0
-    assert stage2.split_factor_since("BKNG", 2019) == 50.0
-    assert stage2.split_factor_since(None, 2025) == 1.0
+def test_split_factor_since():
+    splits = pd.DataFrame(
+        {
+            "symbol": ["BKNG", "BKNG", "OTHER"],
+            "date": pd.to_datetime(["2026-03-02", "2020-06-01", "2026-01-01"]),
+            "split_ratio": [25.0, 2.0, 3.0],
+        }
+    )
+    assert stage2.split_factor_since(splits, "BKNG", 2025) == 25.0
+    assert stage2.split_factor_since(splits, "BKNG", 2019) == 50.0
+    assert stage2.split_factor_since(splits, None, 2025) == 1.0
+    assert stage2.split_factor_since(pd.DataFrame(), "BKNG", 2019) == 1.0
 
 
 def test_one_listing_per_company_keeps_secondary_members() -> None:

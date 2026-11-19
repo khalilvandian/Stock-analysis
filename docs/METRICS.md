@@ -151,7 +151,7 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 ## Left out
 
 - **technicals**: RSI, 50- and 200-day averages, 52-week range, one-year performance (Stage 2 timing only)
-- **analyst**: Analyst target upside and rating (sector.py analyst_upside, analyst_view; TradingView Recommend.All)
+- **analyst**: Analyst target upside and rating (the rows' analyst_upside, analyst_view from TradingView; Recommend.All)
 - **market**: Beta (used inside WACC), indices, sector breadth (market report)
 
 ## Detail
@@ -490,7 +490,7 @@ Years of operating earnings needed to repay the net debt. The standard leverage 
 - **Formula:** net_debt / ebitda (net cash always passes; EBITDA <= 0 fails)
 - **Unit:** x; **better:** lower; **period:** ttm
 - **Source:** sector: `net_debt_to_ebitda`; stage1: `net_debt_to_ebitda`
-- **Used in:** strict screen (<= 4.5x); weighted debt score; Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x); debt_to_ebitda.py history
+- **Used in:** strict screen (<= 4.5x); weighted debt score; Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x)
 - **Example (BSX, 2026-09-30):** 2.14x = 12.085 / 5.637. BKNG: 3.19 / 10.65 = 0.30
 - **Vector:** core
 - **Clipped in the vector:** lower 0.00x
@@ -624,7 +624,7 @@ Average yearly revenue growth over the fiscal years on record.
 - **Used in:** weighted screen growth gate (> 0)
 - **Example (BSX, FY2022-FY2025):** +16.6% = mean(+12.3%, +17.6%, +19.9%)
 - **Vector:** candidate
-- **Note:** sector.py uses Yahoo's 3-4 years; Stage 1 uses 5 years from TradingView. Open choice: which window.
+- **Note:** The rows (stock_analysis.stocks) use the last 4 fiscal years; Stage 1 uses 5 years from TradingView. Open choice: which window.
 
 <a id="revenue-growth-median"></a>
 #### Revenue growth, median year (`revenue_growth_median`)

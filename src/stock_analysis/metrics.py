@@ -1,22 +1,23 @@
 """The metrics dictionary (config/metrics.toml): pick a set of metrics, build each stock's vector.
 
-    from stock_analysis import metrics
+    from stock_analysis import metrics, stocks
     d = metrics.load()
     ids = metrics.select(d, "proposed")             # a named set, or a list of ids
-    frame = pd.read_csv("data/peers/medtech.csv", index_col=0)
+    frame = stocks.rows(data, ["BSX", "ABT", "MDT"])
     v = metrics.build_vectors(frame, ids, source="sector", dictionary=d)
     s = metrics.standardize(v, d)                   # 0-100 percentiles, higher = better
 
-`source` says which table the frame is: "sector" (analysis/sector.py, data/sector/*.csv and
-data/peers/*.csv), "stage1" (data/screener/stage1.csv; .cache/screener/stage1_full.pkl has
-every Stage 1 column), "stage2" (data/screener/top.csv) or
-"watchlist" (key_numbers() rows). Metrics the table doesn't have are worked out from other
-metrics where the formula allows (DERIVED), otherwise left blank.
+`source` says which table the frame is: "sector" (stock_analysis.stocks.rows, the columns
+analysis/peer_screen.py and the watch list use), "stage1" or "stage2" (the market
+screener's Stage 1 rows and Stage 2 top, stocks.screener_run) or "watchlist"
+(key_numbers() rows). Metrics the table doesn't have are worked out from other metrics where
+the formula allows (DERIVED), otherwise left blank.
 
 Usage:
     uv run python -m stock_analysis.metrics list [--set proposed]
     uv run python -m stock_analysis.metrics doc        # rewrite docs/METRICS.md
-    uv run python -m stock_analysis.metrics vector data/peers/medtech.csv --source sector
+    uv run python -m stock_analysis.metrics vector BSX ABT MDT --source sector
+    uv run python -m stock_analysis.metrics vector --source stage2     # the screener's top
 """
 
 from __future__ import annotations
@@ -250,8 +251,7 @@ def main() -> None:
     ls = sub.add_parser("list", help="print the metrics")
     ls.add_argument("--set", default=None, help="set, group or vector status")
     sub.add_parser("doc", help="rewrite docs/METRICS.md")
-    vec = sub.add_parser("vector", help="print the vectors for a table of stocks")
-    vec.add_argument("file", help="CSV, e.g. data/peers/medtech.csv")
+    vec = sub.add_parser("vector", help="print the vectors of stocks, from the database")
     vec.add_argument("--source", default="sector", choices=SOURCES)
     vec.add_argument("--set", default="proposed")
     vec.add_argument("--standardize", choices=["percentile", "zscore"])
@@ -266,7 +266,18 @@ def main() -> None:
         DOC.write_text(doc(d) + "\n")
         print(f"wrote {DOC.relative_to(ROOT)}")
     else:
-        frame = pd.read_csv(args.file, index_col=0)
+        from . import stocks
+
+        data = stocks.default_data()
+        if args.source == "sector":
+            if not args.symbols:
+                raise SystemExit("name the stocks: ... vector BSX ABT MDT")
+            frame = stocks.rows(data, args.symbols)
+        elif args.source in ("stage1", "stage2"):
+            _, s1, top = stocks.screener_run(data)
+            frame = s1 if args.source == "stage1" else top
+        else:
+            raise SystemExit("the watchlist rows come from analysis/watchlist.py's key_numbers")
         v = build_vectors(frame, args.set, args.source, d)
         if args.standardize:
             v = standardize(v, d, args.standardize)

@@ -11,7 +11,8 @@ their date.
 
 - **Who:** Babak, on Claude's test results (report 01).
 - **Decision:** Yahoo Finance supplies current figures and prices; SEC EDGAR supplies the
-  history. Financial Modeling Prep is kept only as a client (`FMPClient`).
+  history. Financial Modeling Prep was kept only as a client (`FMPClient`), removed in
+  issue #33 with the other unused code.
 - **Why:** FMP's free plan returned HTTP 402 for most symbols (every CEG endpoint but the
   profile), and by 2026-10-27 the key in use was invalid. The project works on free sources
   without any key.
@@ -19,7 +20,8 @@ their date.
 ### SEC is primary for the yearly history; Yahoo fills the gaps
 
 - **Who:** Babak, on Claude's proposal (in use since 2026-09-28, recorded in reports 01 and 10).
-- **Decision:** `history.py` takes annual 10-K, 20-F and 40-F figures from SEC company facts
+- **Decision:** (`history.py` was retired in issue #33; the database's build follows the same
+  rule.) `history.py` takes annual 10-K, 20-F and 40-F figures from SEC company facts
   back to 2016; Yahoo's annual statements fill only what SEC lacks. Every value records its
   source.
 - **Why:** Yahoo gives only about four years of annual statements. SEC filings are the
@@ -80,8 +82,9 @@ their date.
 ### Evening results are committed straight to `main`
 
 - **Who:** Babak.
-- **Decision:** The evening run commits `analyses/` (and, since this evening, the screener's
-  `data/screener/` files) to `main` and pushes, with no pull request each night.
+- **Decision:** The evening run commits `analyses/` to `main` and pushes, with no pull
+  request each night. (Until issue #33 it also committed the screener's `data/screener/`
+  files; the screener's runs are in the database now.)
 - **Why:** A nightly pull request would need a nightly review for generated files.
 
 ### "A list of dated analyses", not "an archive"
@@ -141,10 +144,9 @@ their date.
 - **Who:** Babak.
 - **Decision:** The evening run first runs the market screener (Stage 1 then Stage 2 on the
   S&P 500). The market report's "stocks to look at" is the screener's top 3 cheap or
-  close-to-cheap stocks per sector from `data/screener/top.csv`, with Stage 1's pass counts.
-  The site gets a Screener page, and the email's market section lists the names.
-  `data/screener/` (`top.csv`, `stage1.csv` and the dated CSV) is committed each evening with
-  the analyses.
+  close-to-cheap stocks per sector, with Stage 1's pass counts. The site gets a Screener
+  page, and the email's market section lists the names. (Read from the database's screener
+  run since issue #33.)
 - **Why:** The panic-sell screen was a one-off; the screener is the method.
 
 ### Metrics dictionary: Claude's defaults taken, pending Babak's review
@@ -252,8 +254,8 @@ their date.
   with two general routes instead of one per question: `/query` (any single read-only
   statement, as `stock_reader`) and `/execute` (write steps in one transaction, as
   `stock_writer`). `Data.open()` picks the backend, so scripts are the same everywhere. The key
-  reaches cloud sessions as a network secret, never as a variable. The existing files stay, so
-  Claude can still use them.
+  reaches cloud sessions as a network secret, never as a variable. (The files that stayed
+  then were retired in issue #33.)
 - **Why:** tested 2026-11-16: cloud sessions can't reach PostgreSQL in any way (direct
   connections are refused; the proxy's CONNECT tunnel passes only web traffic), while HTTPS
   works. Considered and rejected: a copy of the database per session (not the live database),
@@ -326,3 +328,59 @@ lives in one file, `docs/pipeline.html`, which is both the Claude artifact and t
 Pipeline page: its styles are scoped under `.pipeline` with `--p-` tokens, so the site can
 include it unchanged, and a push that edits it republishes the site.
 
+### The scripts work on the database alone, and what they don't use is removed (issue #33)
+
+- **Who:** Babak, 2026-11-18: "all the scripts now should be working on the server ... remove
+  after the switch all the redundant material"; the test is that the scheduled evening run
+  succeeds for the watch list; any script the scheduled run doesn't use is redundant.
+- **Decision:**
+  - Only the ingest job calls the sources. Every script reads the database through
+    `stock_analysis.data` and `stock_analysis.stocks` (a stock's row: absolute values in $bn,
+    ratios, growth, standard DCF; its fiscal-year history; prices; earnings dates; the latest
+    screener run) and records its results there: the screener's runs (`out_screener_*`), the
+    watch list's and the market report's runs, Claude's notes, the watch list itself.
+  - The ingest gained what the scripts needed: every TradingView screener field with each
+    snapshot (`extra_json`), a snapshot of the watch list's symbols outside the index, the
+    watch list's stocks and peers (and `extra_symbols`) fetched like members, the market
+    report's instruments (`config/market.toml`, `core_market_daily`), and earnings dates due
+    again on every run in the four days after a report.
+  - Removed: `data/` (every file), `analyses/*/runs.csv`, `config/market_universe.csv`, the
+    `db load-files` command, and the scripts the evening run and the site don't use:
+    `sector.py`, `history.py`, `compare.py`, `valuation.py`, `debt.py`, `debt_to_ebitda.py`,
+    `dcf.py`, `dcf_firm.py`, `dashboard/`, `stock_analysis.fetch`, `stock_analysis.fmp`,
+    `ecb.usd_per_unit`. Reports 01-12 keep their numbers; their reproduce commands name
+    scripts that no longer exist (`reports/README.md` says so).
+  - The site reads the runs, the screener, the coverage and the explorer from the database
+    through the web API at build time.
+- **Consequences:**
+  - Prices are the last close the ingest stored (after the US close), not a live quote at
+    21:00 Italy time; the PDFs say so.
+  - The utilities "sector" is the database's (the S&P 500's utilities and any added
+    symbols), not Yahoo's 102 US-listed utilities.
+  - Forward EPS, beta, the analysts' target and rating come from TradingView instead of
+    Yahoo's `info`; the growth measures use the database's last four fiscal years.
+  - The screener's universe is the ingest's (`SP:SPX`): `[universe] index = ""` (whole
+    markets) is refused until the ingest snapshots whole markets.
+- **Rejected:** keeping the files as a fallback (two sources of truth, and the scripts
+  drifted apart); porting the per-ticker scripts (they were ported first, then removed as
+  unused by the scheduled run).
+
+### The server computes; the scheduled Claude session only interprets (issue #33)
+
+- **Who:** Babak, 2026-11-18: "we should minimalize the task that the Claude schedule does ...
+  on a schedule we already execute them ... the Claude schedule only checks those ready-made
+  data and does its interpretation and analysis on top of them, and creates its own analysis
+  and PDFs."
+- **Decision:** after each night's ingest the job runs the nightly analyses
+  (`stock_analysis.nightly`): the market screener, each watch-list stock's numbers and the
+  market report's numbers, stored in `out_screener_*`, `out_stock_numbers` and
+  `out_market_numbers` (migration `015`). The evening session reads them, writes the notes
+  and renders the PDFs. Its scripts compute on the spot only what is missing: a stock whose
+  numbers are older than the last build, or whose watch-list settings (target, peers, EPS
+  corrections) changed since, and the market numbers when none were stored. The screener
+  and the computations moved into the package (`stock_analysis.screener`,
+  `stock_analysis.nightly`) so the job's image has them.
+- **Why:** the session's time and tokens go to judgement, not to arithmetic a schedule can
+  do; the numbers are ready before the session starts and the same for every reader.
+- **Rejected:** rendering the PDFs on the server too: they carry Claude's notes of the same
+  evening, so they are built after the notes.

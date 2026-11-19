@@ -10,11 +10,11 @@ the repository root. Each `uv run` uses the project's locked environment.
 1. Use the **Market analysis** cloud environment (or create one).
 2. Set the environment variables in its settings, never in the repository:
    `SEC_USER_AGENT` (recommended), `BREVO_API_KEY`, `WATCHLIST_EMAIL_FROM` and
-   `WATCHLIST_EMAIL_TO` (for the evening email), `FMP_API_KEY` (optional, unused).
-3. Allow the network hosts: `query1.finance.yahoo.com`, `query2.finance.yahoo.com`,
-   `fc.yahoo.com`, `www.sec.gov`, `data.sec.gov`, `scanner.tradingview.com`,
-   `data-api.ecb.europa.eu`, `api.brevo.com`, `pypi.org`, `files.pythonhosted.org`, and
-   `financialmodelingprep.com` if FMP is ever used.
+   `WATCHLIST_EMAIL_TO` (for the evening email), `STOCK_API_URL` (the web API; the
+   environment's network secret attaches its key).
+3. Allow the network hosts: `stock-api-bk.azurewebsites.net` (the database, through the web
+   API), `api.brevo.com`, `pypi.org`, `files.pythonhosted.org`. The market data sources are
+   only needed by the ingest job, which runs on Azure.
 4. Start a session on the repository. The SessionStart hook
    (`.claude/hooks/session-start.sh`) runs `uv sync` and puts `.venv/bin` on the `PATH`.
 5. The PDFs need Chrome or Chromium. `watchlist.chrome()` looks at `CHROME_PATH`, then
@@ -25,45 +25,31 @@ the repository root. Each `uv run` uses the project's locked environment.
 
 ```bash
 uv sync
-cp .env.example .env      # optional: FMP_API_KEY, SEC_USER_AGENT; never commit .env
+cp .env.example .env      # database passwords, SEC_USER_AGENT; never commit .env
 uv run ruff check . && uv run ruff format --check . && uv run pytest
 ```
 
 ## 2. Refreshing data
 
-The utilities data feeds the absolute-values screen, the sector screens and the dashboards.
+There is nothing to refresh by hand: the ingest job fills the database every night (section
+14, [`INGEST.md`](INGEST.md)) for the S&P 500, the watch list's stocks and peers,
+`extra_symbols` in `config/ingest.toml` and the market report's instruments
+(`config/market.toml`). A company the database lacks is added to the watch list's peers or to
+`extra_symbols`; the next ingest fetches it. To see how fresh the data is:
 
 ```bash
-uv run python analysis/sector.py      # Yahoo: every US-listed utility -> data/sector/utilities.csv (about 1 minute)
-uv run python analysis/history.py     # SEC EDGAR, Yahoo for gaps -> data/sector/history.csv
-uv run python analysis/history.py --refresh   # download the SEC company facts again
-```
-
-`history.py` needs `sector.py`'s output (`utilities.csv` and `history_yahoo.csv`). The first
-SEC download is about 250 MB, cached in `.cache/sec/`. One company's full Yahoo data:
-
-```bash
-uv run python -m stock_analysis.fetch CEG     # -> data/CEG/
-```
-
-Then rebuild the dashboards and ask Claude to republish them as artifacts:
-
-```bash
-uv run python dashboard/build_absolute.py && uv run python dashboard/build_sector.py && uv run python dashboard/build.py
+uv run python -c "from stock_analysis.data import Data; print(Data.open().status())"
 ```
 
 ## 3. The absolute-values screen (step 1 of every analysis)
 
 ```bash
-uv run python analysis/absolute.py                      # latest, every utility
-uv run python analysis/absolute.py CEG VST UGI          # latest, selected companies
+uv run python analysis/absolute.py CEG VST UGI          # latest 12 months, any company in the database
 uv run python analysis/absolute.py --history CEG VST    # every fiscal year on record + latest 12 months
 ```
 
-It writes `data/sector/absolute_values.csv` and `absolute_history.csv`. `absolute.py` reads
-the utilities tables only; for any other stock the absolute values and their SEC history come
-from the watch-list run or from `sector.analyse()` and `history.sec_history()` (section 4).
-Show this table first in every answer, before any ratio or score.
+Both read the database (`stock_analysis.stocks.rows` and `history`). Show this table first in
+every answer, before any ratio or score.
 
 ## 4. Single-stock analysis
 
@@ -76,19 +62,13 @@ this order.
    uv run python analysis/peer_screen.py medtech BSX ABT MDT SYK ISRG BDX EW ZBH DXCM STE PODD TFX GEHC RMD
    ```
 
-   This calls `sector.analyse()` for each symbol and writes `data/peers/<name>.csv` with the
-   absolute values and ratios. Check capex against SEC filings: Yahoo can count stakes and
-   acquisitions as capex.
-2. **History.** The yearly absolute values from SEC filings (Yahoo where SEC has no figure).
-   The quickest route is the watch-list code, which also adjusts for splits:
-
-   ```bash
-   uv run python analysis/watchlist.py BSX --numbers     # key numbers only, writes nothing
-   ```
-
-   The stock must be on the watch list (section 13) for the full PDF; otherwise use
-   `history.company_facts()`, `history.sec_history()` and `history.add_prices()` from Python.
-   For utilities, `analysis/absolute.py --history` does it.
+   This reads each symbol's row from the database (`stock_analysis.stocks.rows`: the
+   absolute values and ratios) and prints the screens. Check capex against SEC filings:
+   Yahoo can count stakes and acquisitions as capex.
+2. **History.** The yearly absolute values from SEC filings (Yahoo where SEC has no figure),
+   per share on today's basis: `uv run python analysis/absolute.py --history BSX`. For a
+   watch-list stock, `uv run python analysis/watchlist.py BSX --numbers` prints the key
+   numbers without writing anything.
 3. **Ratios.** Net debt / EBITDA, interest cover, cash / short-term debt, cash / long-term
    debt, revenue and EPS growth (average and median of yearly rates), net margin, P/E and
    EV / EBITDA against the peer median, forward against trailing P/E, price against the
@@ -96,8 +76,9 @@ this order.
 4. **Screens.** `peer_screen.py` prints the strict screen (every debt rule) and the weighted
    screen (debt 50%, profit and cash 25%, cheapness 25%, growth required) within the peers.
 5. **DCF.** The standard enterprise DCF is in the peer table (`dcf_fair_value`,
-   `price_vs_fair_value`, `wacc`, `fcff_before_growth`). For the guided power producers use
-   `uv run python analysis/dcf_firm.py` and `uv run python analysis/dcf.py`.
+   `price_vs_fair_value`, `wacc`, `fcff_before_growth`). A guided or scenario DCF (as in
+   reports 01-10) is worked out in the report from `stock_analysis.stocks`; the scripts that
+   did it were retired with the files (issue #33).
 6. **Own-history P/E.** Adjusted EPS is Yahoo's reported quarterly EPS, split-adjusted; the
    trailing figure is the sum of four consecutive quarters. Each year's P/E is that year's
    average price over the trailing EPS at the first report after the year ends (the Q4
@@ -111,30 +92,30 @@ this order.
 
 ## 5. The market screener
 
-Both stages in a row (about 1-2 minutes for the S&P 500 with a warm cache):
+Both stages in a row, from the database (a minute or two for the S&P 500):
 
 ```bash
-uv run python analysis/screener.py                 # Stage 1 then Stage 2
-uv run python analysis/screener.py --no-adjusted   # skip Yahoo adjusted EPS (faster, diluted EPS only)
-uv run python analysis/screener.py --refresh       # ignore today's cached downloads
-uv run python analysis/stage1.py [--refresh]       # Stage 1 only -> data/screener/stage1.csv
-uv run python analysis/stage2.py [--no-adjusted]   # Stage 2 only, on Stage 1's last output
+uv run python -m stock_analysis.screener                 # Stage 1 then Stage 2, saved in the database
+uv run python -m stock_analysis.screener --no-adjusted   # skip Yahoo adjusted EPS (diluted EPS only)
+uv run python -m stock_analysis.screener --dry-run       # print only, save nothing
+uv run python -m stock_analysis.screener.stage1                   # Stage 1's counts only
+uv run python -m stock_analysis.screener.stage2 [--no-adjusted]   # Stage 1 then Stage 2, printed
 ```
 
-Outputs: `data/screener/stage1.csv`, `data/screener/top.csv`, `data/screener/YYYY-MM-DD.csv`,
-and `.cache/screener/stage1_full.pkl` (Stage 1 with its yearly lists, read by Stage 2). Every
-threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the full reference.
+The run is saved as `out_screener_run` (one per day; a rerun the same day replaces it) and
+`out_screener_result` (stage 1 for every company screened, stage 2 for the top per sector,
+every other column in `detail_json`); `stock_analysis.stocks.screener_run` reads it back.
+Every threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the full
+reference.
 
-### Stage 1: good financial statements (`analysis/stage1.py`)
+### Stage 1: good financial statements (`stock_analysis/screener/stage1.py`)
 
-1. **Universe.** TradingView's screener is scanned market by market for the regions in
-   `[universe] regions` (now `["US"]`, the `america` market). With `[universe] index =
-   "SP:SPX"` the index's members remain, one listing per company (`tradingview.one_per_company`:
-   the primary listing where it is a member, else the member listing, so BRK.B, BF.B and GM
-   stay in; 500 companies); with `index = ""` every primary listing of common stock in the
-   regions. Cached for the day in
-   `.cache/screener/tradingview_<index>_<regions>_<date>.pkl`.
-2. **FX.** ECB rates convert each company's statements (`fundamental_currency_code`) and
+1. **Universe.** The index members (`[universe] index = "SP:SPX"`, the ingest's universe)
+   of the newest TradingView snapshot the ingest stored (`v_tv_latest`: every screener field
+   in `extra_json`, refreshed every night), one listing per company (the ingest keeps the
+   primary listing where it is a member, else the member listing, so BRK.B, BF.B and GM stay
+   in; 500 companies).
+2. **FX.** The ECB rates in the database convert each company's statements (`fundamental_currency_code`) and
    price (`currency`, GBX for London) to US dollars. Companies in a currency the ECB doesn't
    publish are dropped. Then the market-value floor applies: `min_market_cap_usd` ($1bn).
 3. **Screener type.** From TradingView's industry: banks, insurers, REITs, utilities (by
@@ -150,24 +131,23 @@ threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the ful
 6. **Lynch category**, tested in order: no profit, cyclical by industry, turnaround, cyclical
    by history, asset play, fast grower, stalwart, slow grower (tests in
    [`ENTITIES.md`](ENTITIES.md#peter-lynchs-categories)).
-7. **Gap filling from Yahoo.** For general, utility and REIT companies still missing
-   short-term or long-term debt, cash, EBITDA or total debt, or interest cover (unless net
-   cash), Yahoo's latest quarterly balance sheet and annual income statement fill the
-   blanks; interest cover becomes EBITDA / |interest expense|. Net debt left blank becomes
-   total debt minus cash. Each filled value is named in `filled`. Cached for the day.
+7. **Gap filling from the database.** For general, utility and REIT companies still
+   missing short-term or long-term debt, cash, EBITDA or total debt, or interest cover
+   (unless net cash), the core layer's latest twelve months (SEC filings, Yahoo for gaps)
+   fill the blanks; interest cover becomes EBITDA / |interest expense|. Net debt left blank
+   becomes total debt minus cash. Each filled value is named in `filled` ("(database)").
 8. **Rules.** Banks, insurers and REITs get `[screener.<type>]`; everyone else gets
    `[category.<category>]` (utilities without `min_altman_z`). No profit fails outright; a
    blank category is "incomplete". Each rule gives pass, fail or missing; any fail = `fail`,
    otherwise any missing required rule = `incomplete`, otherwise `pass`. Optional rules with
    no data are skipped and listed in `flags`.
-9. **Save.** `stage1.csv` (sorted by region, sector and market value) and the full pickle.
+9. **Hand over.** The table goes to Stage 2 in the same run (nothing is written).
 
-### Stage 2: cheapness (`analysis/stage2.py`)
+### Stage 2: cheapness (`stock_analysis/screener/stage2.py`)
 
-1. **Load and check.** Stage 1's pickle is read and every column in `stage2.NEEDS` must be
-   there, or Stage 2 stops and asks for Stage 1 to be rerun.
-2. **Own P/E history (diluted).** For each Stage 1 pass: monthly Yahoo closes (cached for
-   the day), converted to the statements' currency; for each of the last `history_years` (10)
+1. **Check.** Every column in `stage2.NEEDS` must be in Stage 1's table, or Stage 2 stops.
+2. **Own P/E history (diluted).** For each Stage 1 pass: monthly closes from the database,
+   converted to the statements' currency; for each of the last `history_years` (10)
    fiscal years, the average monthly close over that fiscal year (at least 9 months) divided
    by TradingView's diluted EPS for the year. Negative-EPS years are blank.
 3. **Cheap P/E.** The `cheap_percentile` (0.25, the bottom quarter) of the positive yearly
@@ -179,7 +159,7 @@ threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the ful
 5. **Cheap price** = cheap multiple x 12-month EPS, in the trading currency. `vs_cheap` =
    price / cheap price - 1.
 6. **Adjusted EPS refinement** (unless `--no-adjusted`). For the 9 closest names per sector
-   (three times `top_per_sector`), Yahoo's reported quarterly EPS replaces diluted EPS with
+   (three times `top_per_sector`), Yahoo's reported quarterly EPS (`v_earnings`) replaces diluted EPS with
    its own yearly P/E history (the watch list's method, calendar years) when it has 6 or more
    years and the adjusted figure is within a factor of 2 of diluted EPS (further apart is a
    data error, flagged). The cheap price is recomputed.
@@ -190,23 +170,25 @@ threshold is in `config/screeners.toml`; [`SCREENER.md`](SCREENER.md) is the ful
    `vs_cheap`, top `top_per_sector` (3) per region and sector. At or below the cheap price is
    "cheap"; up to 15% above is "close".
 9. **SEC cross-check.** For US names on the list, the latest fiscal year's diluted EPS is
-   compared with SEC EDGAR's frames API (`EarningsPerShareDiluted`, that calendar year); a
-   gap over 10% is written to `flags`, and `sec_eps` records SEC's figure.
+   compared with the SEC filing's in the database (`source` sec, put on today's share basis
+   with the splits since); a gap over 10% is written to `flags`, and `sec_eps` records SEC's
+   figure.
 10. **Cash-flow gaps.** Blank operating cash flow, capex or free cash flow of the listed
-    names are filled from Yahoo's last four quarters; then the ranking is redone.
-11. **Save.** `top.csv`; `screener.py` also writes the dated full table.
+    names are filled from the database's latest twelve months; then the ranking is redone.
+11. **Save.** `screener.py` saves both stages in the database.
 
 ## 6. Metrics vectors
 
 ```bash
 uv run python -m stock_analysis.metrics list --set proposed       # the 16 proposed metrics
 uv run python -m stock_analysis.metrics doc                       # rewrite docs/METRICS.md
-uv run python -m stock_analysis.metrics vector data/peers/medtech.csv --source sector BSX
-uv run python -m stock_analysis.metrics vector data/screener/stage1.csv --source stage1 \
-    --set stage1 --standardize percentile BSX
+uv run python -m stock_analysis.metrics vector BSX ABT MDT --source sector
+uv run python -m stock_analysis.metrics vector --source stage1 --set stage1 \
+    --standardize percentile BSX
 ```
 
-`--source` names the table (`sector`, `stage1`, `stage2`, `watchlist`); `--set` is a named
+`--source` names the table (`sector`: the database's rows of the stocks named; `stage1`,
+`stage2`: the latest screener run); `--set` is a named
 set, a group, a vector status or `all`; `--standardize` turns each metric into 0-100
 percentiles (or z-scores) within the stocks given, with lower-is-better metrics reversed.
 
@@ -216,32 +198,33 @@ percentiles (or z-scores) within the stocks given, with lower-is-better metrics 
 Europe/Rome. What happens, in order:
 
 1. **Set up.** `uv sync`, check out `main`, pull.
-2. **Numbers first.** `uv run python analysis/screener.py` refreshes the market screener,
-   then `uv run python analysis/watchlist.py --numbers` and
-   `uv run python analysis/market.py --numbers` print today's figures (the market numbers
-   include the screener's top names).
+2. **Read the numbers.** `uv run python analysis/watchlist.py --numbers` and
+   `uv run python analysis/market.py --numbers` print the figures the nightly analyses
+   stored after the ingest (the market numbers include the screener's top names).
 3. **Update Claude's notes** where the story changed (`Updated:` set to today): each stock's
    `notes.md` (search the news; after earnings update the verdict, the entry price and any
    `eps_override`), `analyses/market/notes.md` (the "Stocks to look at" section comments on
    the screener's names), `analyses/summaries/notes.md`.
 4. **Build.** `uv run python analysis/watchlist.py`. In order:
-   1. Fetch every watch-list stock and its peers from Yahoo.
-   2. Rerun the market screener (`screener.run()`: Stage 1 then Stage 2 on the S&P 500;
-      quick after step 2 because the day's downloads are cached). If it fails the run goes
-      on and the market report uses the last results, marked as not from today.
-      `--no-screener` skips it on purpose.
-   3. Build the market report: indices, sectors, breadth, then the screener's Stage 1 pass
-      counts and its top 3 cheap or close-to-cheap stocks per sector from
-      `data/screener/top.csv`. Adds a line to `analyses/market/runs.csv`.
-   4. One PDF per stock, a line in its `runs.csv`, its `README.md` rebuilt.
+   1. Copy `config/watchlist.toml` to the database if it changed (the ingest and the
+      nightly analyses read the stocks and peers from there) and save the notes that changed
+      (`out_note`). Read each stock's stored numbers (`out_stock_numbers`); a stock with none
+      since the last build, or whose settings changed since, is computed now.
+   2. `--screener` only: rerun the market screener (the nightly analyses already ran it).
+   3. Build the market report from the stored market numbers (`out_market_numbers`, or
+      computed now if none since the last build): indices, sectors, breadth, then the
+      screener's Stage 1 pass counts and its top 3 cheap or close-to-cheap stocks per sector.
+      Records the run in `out_market_run`. If it fails, the stocks are still built.
+   4. One PDF per stock, the run recorded in `out_watchlist_run`, its `README.md` rebuilt
+      from the recorded runs.
    5. The watch-list summary PDF, `analyses/README.md` rebuilt.
    6. The email body (`.cache/watchlist/email.html`) and `.cache/watchlist/last_run.json`.
 5. **Check.** `uv run python analysis/validate.py` (the outputs are complete and
    consistent; a FAIL goes in the email; `--verbose` lists the rows behind each WARN), then
    `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
-6. **Save.** Commit `analyses/` and `data/screener/` (`top.csv`, `stage1.csv` and the dated
-   `YYYY-MM-DD.csv`), and any config or notes changes, to `main` and push. The push starts
-   the Pages workflow, which also rebuilds the Screener page.
+6. **Save.** Commit `analyses/` and any config or notes changes to `main` and push. The
+   push starts the Pages workflow; the site reads the runs and the screener from the
+   database.
 7. **Email.** `uv run python analysis/send_email.py` (recipients from `WATCHLIST_EMAIL_TO`, or
    `--to`). If Brevo is missing a setting or refuses, no email is sent: say so in the thread.
 
@@ -252,36 +235,32 @@ Useful variants:
 ```bash
 uv run python analysis/watchlist.py BSX NFLX         # selected stocks only (no market report)
 uv run python analysis/watchlist.py --no-market      # skip the market report and the screener
-uv run python analysis/watchlist.py --no-screener    # market report on the last screener results
+uv run python analysis/watchlist.py --screener       # rerun the screener first
+uv run python analysis/watchlist.py --recompute      # compute every stock now, not the stored numbers
+uv run python -m stock_analysis.db nightly           # the nightly analyses by hand (after an ingest)
 uv run python analysis/market.py                     # the market PDF alone
 ```
 
 ## 8. Publishing the site
 
-Automatic: a push to `main` that touches `analyses/`, `data/screener/`, `analysis/site.py`
-or the workflow runs `.github/workflows/pages.yml`, which runs `python analysis/site.py
+Automatic: a push to `main` that touches `analyses/`, `analysis/site.py` or the workflow,
+the end of an ingest run and a daily schedule run `.github/workflows/pages.yml`, which runs `python analysis/site.py
 _site` and deploys `_site/` to GitHub Pages. To run it by hand: GitHub, Actions, "Publish
 analyses page", Run workflow. To preview locally:
 
 ```bash
-uv run python analysis/explore.py data/explore   # the explorer's data, from the database
-python analysis/site.py _site
+uv run python analysis/site.py _site    # the database straight from this PC
 python -m http.server -d _site 8000     # then open http://localhost:8000/
 ```
 
-`site.py` uses the standard library only, so it needs no `uv` environment.
+`site.py` uses the standard library only, so the workflow needs no install step. It reads
+the PDFs and notes from `analyses/` and everything else (the recorded runs, the screener run,
+the coverage, the ticker explorer's data from `analysis/explore.py`) from the database: the
+web API when `STOCK_API_URL` and `STOCK_API_KEY` are set (the workflow), else
+`stock_analysis.data`. Without a database those pages say there is no data;
+`STOCK_EXPLORE=off` skips the explorer.
 
-The ticker explorer's data (issue #20) comes from `analysis/explore.py`. `STOCK_EXPLORE`
-sets where `site.py` gets it:
-
-| `STOCK_EXPLORE` | Source |
-|---|---|
-| `api` | The web API. This is the default when `STOCK_API_URL` and `STOCK_API_KEY` are set, as in the workflow. |
-| `local` | `stock_analysis.data`, the database straight from your PC. |
-| `files` | A copy of `data/explore/tickers/`. This is the default when that folder exists. |
-| `off` | No data. The explorer pages say there is none. |
-
-`analysis/explore.py data/explore --symbols NVDA,NEE` exports only a few tickers, for a quick
+`analysis/explore.py OUT_DIR --symbols NVDA,NEE` exports only a few tickers, for a quick
 look. The export reads the database in about 30 bulk queries, by blocks of symbols, so none
 returns more than the API's 50,000 rows.
 
@@ -342,7 +321,7 @@ Babak's own Gmail.
 2. A new kind of rule needs code: a branch in `stage1._rule()` and a label in
    `stage1.RULE_LABELS` (`tests/test_screener.py` fails on an unknown rule). If Stage 2 needs a
    new Stage 1 column, add it to `stage2.NEEDS`.
-3. Run `uv run python analysis/screener.py` and compare the pass counts and the top list with
+3. Run `uv run python -m stock_analysis.screener` and compare the pass counts and the top list with
    the last run.
 4. Update [`SCREENER.md`](SCREENER.md), report 13 (numbers and date), and the methods doc;
    record the change and who decided it in [`DECISIONS.md`](DECISIONS.md).
@@ -354,11 +333,11 @@ Babak's own Gmail.
 
 1. Add it to the right group in `config/absolute_values.toml` (`column`, `label`, `unit`, and
    `history` if the yearly column has another name, or `""` if there is no history).
-2. If `data/sector/utilities.csv` has no such column, compute it in `sector.analyse()`; if
-   the history has none, add the tags to `history.py`.
-3. Refresh: `uv run python analysis/sector.py && uv run python analysis/history.py`.
-4. `uv run pytest tests/test_absolute.py`. The dashboard and the PDFs pick it up from the
-   config: `uv run python dashboard/build_absolute.py`.
+2. If the rows have no such column, compute it in `stock_analysis.stocks.stock_row`; if
+   the history has none, add it to `stocks.history` (and the item to `config/db_items.toml`
+   if the database doesn't have it yet).
+3. `uv run pytest tests/test_absolute.py`. The PDFs and `absolute.py` pick it up from the
+   config.
 
 **A metric:**
 

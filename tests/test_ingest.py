@@ -15,6 +15,7 @@ import respx
 from test_db import empty_db, pg_url  # noqa: F401  (pg_url is a fixture)
 
 from stock_analysis import ecb, tradingview
+from stock_analysis.db import build as build_module
 from stock_analysis.db import frame
 from stock_analysis.db.build import add_periods, derive_q4, to_month_end
 from stock_analysis.db.coverage import month_index, snapshot
@@ -142,8 +143,18 @@ def mock_sources(router: respx.MockRouter, symbols=SYMBOLS) -> None:
     router.get(ecb.URL).mock(return_value=httpx.Response(200, text=ECB_CSV))
 
 
-def config(**budgets) -> dict:
+WATCH_SOURCES = ("tradingview_watchlist", "yahoo_market")
+
+
+def config(watch: bool = False, **budgets) -> dict:
+    """config/ingest.toml without pauses; the watch list's and the market report's sources
+    (and extra_symbols) only with watch=True."""
     cfg = job.load_config()
+    if not watch:
+        for name in WATCH_SOURCES:
+            cfg["sources"].pop(name, None)
+        cfg.pop("extra_symbols", None)
+    cfg["nightly"] = False
     for g in cfg["groups"].values():
         g["min_interval_s"] = 0
     for name, n in budgets.items():
@@ -611,7 +622,7 @@ def test_coverage_page_renders(monkeypatch, tmp_path) -> None:
     site = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(site)
     monkeypatch.delenv("STOCK_API_KEY", raising=False)
-    monkeypatch.setattr(site, "COVERAGE", tmp_path / "none.json")
+    monkeypatch.setattr(site, "db", lambda: None)
     menu = [("index", "Watch list"), ("coverage", "Data")]
     assert "No coverage snapshot yet" in site.coverage_page(menu)
     company = {
@@ -693,6 +704,70 @@ def test_52_53_week_quarters_sit_on_the_fiscal_calendar() -> None:
         2026,
     ]
     assert out["period_end"].iloc[3] == "2025-05-31"
+
+
+# ---------------------------------------------------------------- issue #33: what the scripts read
+
+
+@respx.mock(assert_all_called=False)
+def test_watch_list_symbols_and_market_instruments_are_fetched(fresh, respx_mock, tmp_path):
+    """The watch list's peers outside the index get tasks and core rows like members, the
+    market instruments land in core_market_daily, and earnings dates are due again in the
+    days after a report."""
+    mock_sources(respx_mock)
+    with fresh.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO user_watchlist (symbol, position, target_pe) VALUES ('AAA', 1, 15)"
+        )
+        conn.exec_driver_sql("INSERT INTO user_watchlist_peer (symbol, peer, position) "
+                             "VALUES ('AAA', 'ZZZ', 1)")  # fmt: skip
+    market = tmp_path / "market.toml"
+    market.write_text('[markets]\n"^GSPC" = "S&P 500"\n[sectors]\nXLU = "Utilities"\n')
+    cfg = config(watch=True)
+    cfg["extra_symbols"] = []
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(job, "MARKET_CONFIG", market)
+        mp.setattr(build_module, "MARKET_CONFIG", market)
+        result = job.run_job(fresh, cfg, ctx=context(cfg))
+    assert result["status"] in ("ok", "partial"), result
+    tasks = rows(fresh, "SELECT source, request_key, status FROM ops_task")
+    by = {(r.source, r.request_key): r.status for r in tasks.itertuples()}
+    assert by[("yahoo_prices", "ZZZ")] == "ok"  # the peer, not in the index
+    assert by[("yahoo_market", "^GSPC")] == "ok" and by[("yahoo_market", "XLU")] == "ok"
+    assert ("tradingview_watchlist", "watchlist") in by
+    companies = set(rows(fresh, "SELECT symbol FROM core_company")["symbol"])
+    assert "ZZZ" in companies  # from the watch list's own TradingView snapshot
+    members = rows(fresh, "SELECT c.symbol FROM core_index_member m JOIN core_company c "
+                          "USING (company_id) WHERE m.end_date IS NULL")  # fmt: skip
+    assert "ZZZ" not in set(members["symbol"])  # but not an index member
+    m = rows(fresh, "SELECT symbol, COUNT(*) AS n FROM core_market_daily GROUP BY symbol")
+    assert set(m["symbol"]) == {"^GSPC", "XLU"} and (m["n"] > 100).all()
+    tv = rows(fresh, "SELECT extra_json FROM v_tv_latest WHERE symbol = 'AAA'")
+    assert "fundamental_currency_code" in tv["extra_json"].iloc[0]
+
+
+def test_earnings_are_due_again_after_a_report(fresh) -> None:
+    now = job.utcnow()
+    with fresh.begin() as conn:
+        f = conn.exec_driver_sql(
+            "INSERT INTO raw_fetch (source, request_key, url, fetched_at, loaded_at, status) "
+            "VALUES ('yahoo_earnings', 'AAA', 'x', '2026-01-01', '2026-01-01', 'ok') "
+            "RETURNING fetch_id"
+        ).scalar()
+        day = (now - pd.Timedelta(days=1)).date().isoformat()
+        conn.exec_driver_sql(
+            f"INSERT INTO raw_yahoo_earnings (fetch_id, symbol, report_date, eps_reported) "
+            f"VALUES ({f}, 'AAA', '{day}', 1.0), ({f}, 'BBB', '2020-01-01', 1.0)"
+        )
+        later = (now + pd.Timedelta(days=5)).isoformat()
+        before = (now - pd.Timedelta(days=3)).isoformat()
+        for sym in ("AAA", "BBB"):
+            conn.exec_driver_sql(
+                "INSERT INTO ops_task (source, request_key, symbol, created_at, next_due_at, "
+                f"last_success_at) VALUES ('yahoo_earnings', '{sym}', '{sym}', '{before}', "
+                f"'{later}', '{before}')"
+            )
+        assert job.earnings_due(conn, now) == 1  # AAA reported yesterday; BBB long ago
 
 
 def test_xbrl_units_named_as_company_facts_names_them() -> None:

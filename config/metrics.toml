@@ -17,11 +17,11 @@
 #               years), now (today's price), history (several years)
 #   definition  what it measures, in words
 #   formula     how it is calculated from other metrics or statement lines
-#   sources     where it lives: `sector` = column made by analysis/sector.py
-#               (data/sector/*.csv, data/peers/*.csv, Yahoo); `stage1` = column in
-#               data/screener/stage1.csv (analysis/stage1.py, TradingView, PR #7);
+#   sources     where it lives: `sector` = column of stock_analysis.stocks.rows() (the
+#               database's rows, as analysis/peer_screen.py and the watch list use them);
+#               `stage1` = column of the screener's Stage 1 (stock_analysis/screener/stage1.py, TradingView);
 #               `watchlist` = key from analysis/watchlist.py key_numbers(); `stage2` =
-#               column in data/screener/top.csv; `tradingview`, `yahoo` and `sec` name the
+#               column of the screener's Stage 2 top; `tradingview`, `yahoo` and `sec` name the
 #               raw field, statement line or XBRL tag. A source can be {column, scale} when
 #               the column's unit differs (TradingView gives percentages as 15.5, not 0.155).
 #   used_in     where the project uses it
@@ -442,7 +442,7 @@ period = "ttm"
 definition = "Years of operating earnings needed to repay the net debt. The standard leverage measure."
 formula = "net_debt / ebitda (net cash always passes; EBITDA <= 0 fails)"
 sources = { sector = "net_debt_to_ebitda", stage1 = "net_debt_to_ebitda" }
-used_in = ["strict screen (<= 4.5x)", "weighted debt score", "Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x)", "debt_to_ebitda.py history"]
+used_in = ["strict screen (<= 4.5x)", "weighted debt score", "Stage 1 slow grower, stalwart (<= 4.5x), REITs (<= 7x)"]
 example = { symbol = "BSX", value = 2.14, as_of = "2026-09-30", working = "12.085 / 5.637. BKNG: 3.19 / 10.65 = 0.30" }
 vector = "core"
 clip = { lower = 0.0 }
@@ -596,7 +596,7 @@ sources = { sector = "revenue_growth_avg" }
 used_in = ["weighted screen growth gate (> 0)"]
 example = { symbol = "BSX", value = 0.166, as_of = "FY2022-FY2025", working = "mean(+12.3%, +17.6%, +19.9%)" }
 vector = "candidate"
-notes = "sector.py uses Yahoo's 3-4 years; Stage 1 uses 5 years from TradingView. Open choice: which window."
+notes = "The rows (stock_analysis.stocks) use the last 4 fiscal years; Stage 1 uses 5 years from TradingView. Open choice: which window."
 
 [[metric]]
 id = "revenue_growth_median"
@@ -1286,5 +1286,5 @@ watchlist = ["price", "eps_adj_ttm", "pe_adj", "pe_median_10y", "pe_vs_own_media
 # Considered and left out of the dictionary: not from the financial statements.
 [excluded]
 technicals = "RSI, 50- and 200-day averages, 52-week range, one-year performance (Stage 2 timing only)"
-analyst = "Analyst target upside and rating (sector.py analyst_upside, analyst_view; TradingView Recommend.All)"
+analyst = "Analyst target upside and rating (the rows' analyst_upside, analyst_view from TradingView; Recommend.All)"
 market = "Beta (used inside WACC), indices, sector breadth (market report)"

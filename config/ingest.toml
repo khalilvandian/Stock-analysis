@@ -10,7 +10,14 @@
 
 universe = "SP:SPX"
 market = "america"             # TradingView market the constituents are read from
+# Fetched like the index members besides the watch list's stocks and peers (which come from
+# the database's copy of config/watchlist.toml): companies an analysis follows that are in
+# neither (a peer group for a report, say).
+extra_symbols = []
 max_minutes = 150              # stop starting new tasks after this long
+# After the build and the coverage snapshot, compute what the evening run reads: the market
+# screener, the watch list's numbers and the market report's (stock_analysis.nightly).
+nightly = true
 prices_from = "2015-12-01"     # a month before core starts, for the dividend adjustment
 price_overlap_days = 10        # refetch this many days before the newest stored price
 error_retry_hours = 6          # a failed task is due again after this (doubling per failure, at most a day)
@@ -42,6 +49,14 @@ stop_after_errors = 3
 # order: sources run in this order; tradingview and sec_tickers first, so the universe and
 # the CIKs are known before the per-company tasks are planned.
 [sources.tradingview]
+group = "tradingview"
+order = 1
+requests = 1
+refresh_days = { backfill = 1, maintain = 1 }
+
+# The watch list's stocks and peers outside the index (user_watchlist and its peers): their
+# names, sectors and screener fields, so they get tasks and core rows like the members.
+[sources.tradingview_watchlist]
 group = "tradingview"
 order = 1
 requests = 1
@@ -80,6 +95,15 @@ order = 5
 requests = 1
 refresh_days = { backfill = 1, maintain = 1 }
 
+# The market report's indices, rates, commodities, currencies and sector ETFs
+# (config/market.toml), kept in core_market_daily.
+[sources.yahoo_market]
+group = "yahoo"
+order = 5
+requests = 1
+refresh_days = { backfill = 1, maintain = 1 }
+
+# Every 7 days in maintenance, and on every run in the days after a report (job.earnings_due).
 [sources.yahoo_earnings]
 group = "yahoo"
 order = 6

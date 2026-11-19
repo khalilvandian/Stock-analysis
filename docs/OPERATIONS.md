@@ -10,27 +10,23 @@ policy. The step-by-step processes are in [`PROCESSES.md`](PROCESSES.md).
 | Install or update the environment | `uv sync` |
 | Everything the evening run builds | `uv run python analysis/watchlist.py` |
 | Key numbers only, nothing written | `uv run python analysis/watchlist.py --numbers` |
-| Market screener | `uv run python analysis/screener.py` |
+| Market screener | `uv run python -m stock_analysis.screener` |
+| The nightly analyses (screener, watch list and market numbers) | `uv run python -m stock_analysis.db nightly` |
 | Market report alone | `uv run python analysis/market.py` |
-| Check the latest outputs (no network) | `uv run python analysis/validate.py [--verbose] [--strict]` |
+| Check the run's outputs | `uv run python analysis/validate.py [--verbose] [--strict]` |
 | Build the site locally | `python analysis/site.py _site` |
-| Export the ticker explorer's data | `uv run python analysis/explore.py data/explore [--symbols NVDA,NEE]` |
+| Export the ticker explorer's data | `uv run python analysis/explore.py OUT_DIR [--symbols NVDA,NEE]` |
 | Send the last run's email | `uv run python analysis/send_email.py` |
-| Refresh the utilities data | `uv run python analysis/sector.py && uv run python analysis/history.py` |
-| Rebuild the dashboards | `uv run python dashboard/build_absolute.py && uv run python dashboard/build_sector.py && uv run python dashboard/build.py` |
+| Absolute values of any company | `uv run python analysis/absolute.py [--history] TICKERS` |
+| How fresh the database is | `uv run python -c "from stock_analysis.data import Data; print(Data.open().status())"` |
 | Regenerate the metrics doc | `uv run python -m stock_analysis.metrics doc` |
 | Pre-commit check | `uv run ruff check . && uv run ruff format --check . && uv run pytest` |
 
 ### Caches
 
-Delete a cache to force fresh downloads; nothing in it is needed to rebuild.
-
-| Cache | Lifetime | Clear it when |
-|---|---|---|
-| `.cache/screener/tradingview_*_<date>.pkl`, `yahoo_fill_<date>.pkl`, `prices_<date>.pkl` | One day (new date, new file) | A rerun the same day must see new data: use `--refresh` |
-| `.cache/screener/stage1_full.pkl` | Until the next Stage 1 run | Stage 2 complains about missing columns: rerun Stage 1 |
-| `.cache/sec/<SYMBOL>.json` | `history.py`: until `--refresh`; watch list: 1 day | A new 10-K is out and `history.py` should see it |
-| `.cache/watchlist/email.html`, `last_run.json` | Until the next run | Never needed by hand |
+There are none to manage: every number is in the database, refreshed by the ingest job.
+`.cache/watchlist/email.html` and `last_run.json` hand the last run's email to
+`send_email.py` and are never needed by hand.
 
 ### Where to change things
 
@@ -41,7 +37,8 @@ Delete a cache to force fresh downloads; nothing in it is needed to rebuild.
 | A screener threshold, rule set, category test or universe | `config/screeners.toml` | `PROCESSES.md` section 12 |
 | The absolute values list | `config/absolute_values.toml` | `PROCESSES.md` section 13 |
 | A metric | `config/metrics.toml` | Regenerate `docs/METRICS.md` |
-| The S&P 500 list for market breadth | `config/market_universe.csv` (`symbol,name,sector,industry`, Yahoo tickers such as `BRK-B`) | Refresh by hand from Wikipedia's "List of S&P 500 companies" |
+| The market report's indices, sector ETFs and other instruments | `config/market.toml` (Yahoo symbols and labels) | The next ingest fetches a new one (`yahoo_market`) |
+| A company the database should follow besides the S&P 500 and the watch list | `extra_symbols` in `config/ingest.toml` | The next ingest fetches it |
 | The evening steps | `docs/EVENING_RUN.md` | The scheduled session reads it every evening |
 | Run time | The scheduled task in Claude Code (not in the repository); `timezone` in `config/watchlist.toml` for file names | |
 
@@ -49,19 +46,19 @@ Delete a cache to force fresh downloads; nothing in it is needed to rebuild.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| FMP returns HTTP 402 "not available under your current subscription" | The free plan covers few symbols | Nothing to fix: no analysis uses FMP. Use Yahoo, SEC or TradingView |
-| FMP returns 401 or "Invalid API KEY" | The key in `FMP_API_KEY` is invalid (the current one is) | Only needed if FMP is ever used: generate a new key in the FMP account and set it in the cloud environment, never in the repository |
-| `RuntimeError: FMP_API_KEY is not set` | `FMPClient` created without a key | Set `FMP_API_KEY`, or don't use `FMPClient` |
+| A PDF or the email shows yesterday's (or older) prices | The scripts read the database, which the ingest fills after the US close; an older date means the night's ingest failed | Check `ops_run` and the job's log; the next run catches up |
+| `RuntimeError: X is not in the database yet` from the evening run | A stock just added to the watch list: the ingest fetches it on its next run | Wait for the night's ingest (or run `db ingest` for it) |
+| `The TradingView snapshot ... lacks [...]` from the screener | The snapshot predates a field added to `tradingview.SCREENER_FIELDS` | The next ingest stores it; meanwhile the market report uses the last screener run |
 | Yahoo: `401 Invalid Crumb`, `Unauthorized`, empty frames, or "No price data" | yfinance's cookie and crumb handshake failed, or Yahoo changed its interface | Make sure `fc.yahoo.com`, `query1` and `query2.finance.yahoo.com` are allowed; retry; update yfinance (`uv lock --upgrade-package yfinance && uv sync`) and run the tests |
-| Yahoo: `Too Many Requests` or `YFRateLimitError` | Heavy use (the screener's gap filling, many tickers) | Wait and rerun; the day caches mean finished work isn't downloaded again. `watchlist.fetch_row` already retries a missing price four times |
+| Yahoo: `Too Many Requests` or `YFRateLimitError` in the ingest | Heavy use | The group stops for the run and the tasks stay due; the next run goes on |
 | SEC: HTTP 403 | No or generic `User-Agent`; SEC blocks unidentified automated clients | Set `SEC_USER_AGENT` to `<project name> <contact>` in the cloud environment (never commit the contact) |
-| SEC: slow first run, about 250 MB | First download of company facts for every utility | Normal; cached in `.cache/sec/` |
-| SEC: market value 25x too low after a split | Share counts filed before a split | `history.split_adjust` and `watchlist.split_adjust` rescale shares and EPS; check the split is in Yahoo's `splits` |
-| TradingView: HTTP 400, or a column of blanks | The unofficial endpoint renamed or dropped a field | Find the field on tradingview.com/screener, update `stage1.COLUMNS` (and `stage2.NEEDS`, `screen_common.USD_FIELDS`, `config/metrics.toml` sources if used there), run `uv run pytest tests/test_screener.py` |
+| SEC: market value 25x too low after a split | Share counts filed before a split | The build records each value's split factor (`core_fundamental.split_factor`); check the split is in the prices (`core_price_daily.split_ratio`) |
+| TradingView: HTTP 400, or a column of blanks | The unofficial endpoint renamed or dropped a field | Find the field on tradingview.com/screener, update `tradingview.SCREENER_FIELDS` (and `stage2.NEEDS`, `screen_common.USD_FIELDS`, `config/metrics.toml` sources if used there), run `uv run pytest tests/test_screener.py` |
 | TradingView: far fewer companies than expected | Index code or filters changed, or one market failed | Check `[universe]` in `config/screeners.toml`; rerun with `--refresh` |
-| Stage 2: "Stage 1 output lacks [...]" | Stage 1's pickle is from an older Stage 1 | `uv run python analysis/stage1.py` |
+| Stage 2: "Stage 1 output lacks [...]" | A column Stage 2 needs isn't in the TradingView snapshot | Add the field to `tradingview.SCREENER_FIELDS`; the next ingest stores it |
+| The evening run says "Computed now" for every stock | The nightly analyses didn't run after the last build (`nightly` in `config/ingest.toml`, or `nightly_error` in the run's summary in `ops_run`) | Check the job's log; `uv run python -m stock_analysis.db nightly --target server-writer` runs them by hand |
 | `validate.py` reports FAIL | An output is broken (a missing PDF, an inconsistent screener row, a broken identity) | Read the check's detail (`--verbose` for WARN rows), fix the cause, rebuild; if it can't be fixed tonight, say so in the email |
-| Market report says the screener's data is not from today | The screener failed in the evening run; the report used the last results | Read the run's output for the error; rerun `uv run python analysis/screener.py`, then `uv run python analysis/watchlist.py --no-screener` if the PDFs must be rebuilt |
+| Market report says the screener's data is older than the prices | The night's screener failed (`screener_error` in the nightly summary); the report used the last run | Fix the cause; `uv run python analysis/watchlist.py --screener` reruns it |
 | `RuntimeError: No Chrome or Chromium found` | No browser for the PDFs | Set `CHROME_PATH`, or install Chromium |
 | Brevo: 401 "Key not found" or "unauthorized" | Wrong or missing `BREVO_API_KEY` | Check the key in the cloud environment settings |
 | Brevo: 401 "unrecognised IP address" | Brevo's "authorized IPs" blocking; the cloud environment's IP changes | In Brevo, Security, Authorized IPs: turn the blocking off |
@@ -76,26 +73,25 @@ Delete a cache to force fresh downloads; nothing in it is needed to rebuild.
 | `deploy\ingest-job.ps1`: "'Job' resources are not supported on express environments" | The environment was created in Express mode (the newer CLI's default) | Delete the empty environment (`az containerapp env delete -n stock-jobs-env -g stock-rg --yes`) and rerun the script, which creates it with `--environment-mode WorkloadProfiles` |
 | Azure job run fails at once with a connection timeout | The firewall rule `ingest-job` was not set: the job's identity lost its role, or `AZURE_SUBSCRIPTION_ID` is missing | Rerun `deploy\ingest-job.ps1`; check the run's log in the job's Log Analytics workspace |
 | Data page says "No coverage snapshot yet" or is a day old | The repository secret `STOCK_API_KEY` is missing, or the API or the night's run failed | Add the secret; check `ops_run`; run the Pages workflow by hand |
-| Explorer pages say "No explorer data in this build" | The export failed or found no source (`STOCK_EXPLORE`, `STOCK_API_KEY`); the workflow log has `explorer: export failed (...)` | Fix the API or the secret; run the Pages workflow by hand. Locally run `analysis/explore.py data/explore` first |
+| Explorer pages say "No explorer data in this build" | The export failed or found no source (`STOCK_EXPLORE`, `STOCK_API_KEY`); the workflow log has `explorer: export failed (...)` | Fix the API or the secret; run the Pages workflow by hand |
 | `git push` refused | The GitHub connection lapsed | Reconnect GitHub for Claude (see `SETUP.md`, section 5) |
 
 ## Test policy
 
 - **Tests never hit the network.** HTTP made with `httpx` is mocked with `respx`
-  (`tests/test_fmp.py`, the TradingView and ECB tests in `tests/test_screener.py`).
-  Code that calls `yfinance` or SEC is tested on small hand-made frames, not live calls.
+  (the TradingView tests, the ingest's sources); the Yahoo client is replaced by a fake; the
+  database tests use the local Docker PostgreSQL (`STOCK_TEST_PG_URL` picks another
+  database, e.g. when two sessions test at once) and code that reads the database is
+  otherwise tested with a small fake.
 - **Tests guard the contracts between parts:** configured absolute values exist in the
-  saved data (`test_absolute.py`); every metric is complete and `docs/METRICS.md` is up to
+  rows (`test_absolute.py`); every metric is complete and `docs/METRICS.md` is up to
   date (`test_metrics.py`); every configured screener rule is known and Stage 2 refuses
   Stage 1 output without its columns (`test_screener.py`); the watch list has what each
   stock needs and dated PDFs are never overwritten (`test_watchlist.py`); missing values,
-  splits, currencies and cross-checks between sources (`test_pipeline_units.py`, on saved
-  responses in `tests/fixtures/`).
+  splits, currencies and cross-checks between sources (`test_pipeline_units.py`).
 - A known bug can be pinned with `pytest.mark.xfail(strict=True)` and a reason saying what is
   wrong; when the bug is fixed the test starts passing, fails as "XPASS", and the mark must
   be removed.
-- `test_absolute.py` reads the committed `data/sector/` files, so keep them in the
-  repository.
 - A new feature gets a test in the same style: a small frame in, the expected frame out.
 
 **Before every commit:**
@@ -110,7 +106,7 @@ To fix formatting: `uv run ruff format .`.
 ## Secrets
 
 The repository is public. Never write an API key, a token or an email address into code,
-docs, notes, reports or commit messages. Refer to the variables by name: `FMP_API_KEY`,
+docs, notes, reports or commit messages. Refer to the variables by name:
 `SEC_USER_AGENT`, `BREVO_API_KEY`, `WATCHLIST_EMAIL_FROM`, `WATCHLIST_EMAIL_TO`,
 `STOCK_API_KEY`, `GITHUB_DISPATCH_TOKEN` and the database passwords. The ingest job's secrets
 live in the Azure job, set by `deploy/ingest-job.ps1` from `.env`. Set them in
