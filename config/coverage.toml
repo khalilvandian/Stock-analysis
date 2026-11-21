@@ -64,14 +64,9 @@ symbols = ["ADM", "ADP", "AES", "AVY", "BG", "CASY", "CLX", "COP", "CVX", "DD", 
 items = ["operating_income", "ebitda"]
 reason = "no operating-income line in the income statement (it goes to income before taxes)"
 
-# Fourth-quarter EPS: a 10-K reports the fiscal year, not the fourth quarter on its own, and
-# EPS can't be derived as the year less three quarters (the share count differs each quarter;
-# the result would be approximate). Present when Yahoo reports it; otherwise left out.
-[[not_reported]]
-all = true
-items = ["eps_diluted"]
-quarters = ["Q4"]
-reason = "fourth-quarter EPS is not filed (the 10-K reports the year) and is not approximated"
+# Fourth-quarter EPS is not filed (a 10-K reports the year) but derived since #49 as the year
+# less its first three quarters, as data providers build twelve-month EPS; a missing one is a
+# gap like any other.
 
 # Gaps checked by hand and accepted, so they count as explained:
 # [[explained]]
