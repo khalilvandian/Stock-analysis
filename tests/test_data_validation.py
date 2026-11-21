@@ -83,7 +83,18 @@ def _mini_repo(root: Path, today: str = "2026-10-27") -> Path:
     for folder in ("AAA", "market", "summaries"):
         (root / "analyses" / folder).mkdir(parents=True)
         (root / "analyses" / folder / f"{stamp}.pdf").write_bytes(b"%PDF-1.4 x")
-    (root / "analyses/AAA/notes.md").write_text("# AAA\n")
+    r = f"<!-- reviewed {today} -->"
+    sections = {
+        "Verdict": "**Cheap.**",
+        "Today": "Fell with the market.",
+        "Summary": "- cheap",
+        "Business": "Widgets.",
+        "Risks": "Competition.",
+        "News": f"- {today}: results ([source](https://example.com/a)).",
+        "What to watch": "- Margins (ongoing).",
+    }
+    body = "\n\n".join(f"## {k}\n\n{r}\n{v}" for k, v in sections.items())
+    (root / "analyses/AAA/notes.md").write_text(f"# AAA\n\nUpdated: {today}\n\n{body}\n")
     return root
 
 
@@ -297,3 +308,9 @@ def test_validate_main_exit_codes(tmp_path, monkeypatch, capsys):
     with pytest.raises(SystemExit) as e:
         validate.main()
     assert e.value.code == 1 and "FAIL  screener run" in capsys.readouterr().out
+
+
+def test_validate_fails_notes_not_reviewed_for_the_run(tmp_path):
+    root = _mini_repo(tmp_path)
+    assert "PASS" in _levels(validate.check_notes(root, TODAY), "AAA/notes.md")
+    assert "FAIL" in _levels(validate.check_notes(root, date(2026, 11, 19)), "AAA/notes.md")

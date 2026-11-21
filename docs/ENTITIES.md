@@ -129,9 +129,9 @@ overwritten.
 | Path | What it is |
 |---|---|
 | `analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf` | One stock's analysis: summary, the numbers, analysis. A second run in the same minute gets `-2`, `-3` |
-| `analyses/<SYMBOL>/notes.md` | Claude's notes, copied into the PDF: `Updated:` line, then `## Verdict`, `## Summary`, `## Business`, `## Risks`, `## News`, `## What to watch` |
+| `analyses/<SYMBOL>/notes.md` | Claude's notes, copied into the PDF: `Updated:` line, then `## Verdict`, `## Today`, `## Summary`, `## Business`, `## Risks`, `## News`, `## What to watch`; each section starts with `<!-- reviewed YYYY-MM-DD -->` (checked by `stock_analysis.notes_check`) |
 | `analyses/<SYMBOL>/README.md` | The stock's dated list, newest first, rebuilt each run from `out_watchlist_run` |
-| `analyses/market/YYYY-MM-DD_HHMM.pdf`, `notes.md` | The market report. Notes sections: Verdict, Summary, What is driving the market, Stocks to look at, What to watch |
+| `analyses/market/YYYY-MM-DD_HHMM.pdf`, `notes.md` | The market report. Notes sections: Verdict, Summary, What happened, Why it happened, What it means, Stocks to look at, What to watch, Sources |
 | `analyses/summaries/YYYY-MM-DD_HHMM.pdf`, `notes.md` | The watch-list summary. Notes sections: Verdict, Analysis |
 | `analyses/README.md` | The overview: latest run per stock, links to every dated list, and the market and summary PDFs |
 
