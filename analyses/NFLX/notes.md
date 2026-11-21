@@ -1,37 +1,37 @@
 # Netflix (NFLX): Claude's notes
 
-Updated: 2026-11-20
+Updated: 2026-11-21
 
 The evening run copies these sections into the PDF. Every section carries a review date; the build stops if one was not reviewed for the run (docs/EVENING_RUN.md).
 
 ## Verdict
 
-<!-- reviewed 2026-11-20 -->
-**Netflix is at its entry price. At $58.5 (Nov 19 close) it trades at 20.0x adjusted earnings, exactly the proposed 20x entry ($58.4) and its lowest valuation in a decade. Earnings still grow about 15% a year, but revenue growth has slowed four quarters running. View: a first, small position is justified if Babak confirms the 20x target; add only after the Jan 19 report shows growth steadying.**
+<!-- reviewed 2026-11-21 -->
+**Netflix is now 3% below its entry. At $56.7 (Nov 20 close) it trades at 19.4x adjusted earnings, below the proposed 20x entry ($58.4) and its lowest valuation in a decade. Earnings still grow about 15% a year, but revenue growth has slowed four quarters running. View: a first, small position is justified if Babak confirms the 20x target; add only after the Jan 19 report shows growth steadying.**
 
 ## Today
 
-<!-- reviewed 2026-11-20 -->
-Netflix fell about 2.8% on Nov 19 to $58.5, a new 52-week low, in line with the Nasdaq's 2.3% fall. There was no company news; the market fell on the Fed's signal of more rate hikes.
+<!-- reviewed 2026-11-21 -->
+Netflix fell 3.0% on Nov 20 to $56.7, a new 52-week low. The S&P 500 fell 3.7% on Nov 20, its seventh loss in a row, and is now in a correction (more than 10% below its high); the VIX fear gauge closed near 36 ([Motley Fool](https://www.fool.com/coverage/stock-market-today/2026/11/20/stock-market-today-nov-20-stocks-plunge-as-ai-trade-unwinds/)). There was no company news; Netflix fell with the Nasdaq (-5.3%) because investors sold most large tech names.
 
-**What it means for you:** Netflix now trades like a slow grower: 20x earnings for a business that still grows earnings about 15% a year and generates about $12bn of free cash flow. The market is worried about advertising (the 2026 ad forecast was cut to $2.7bn) and slower revenue growth, and those worries are real. But at 20x the price assumes little growth; if engagement holds, that is cheap. The target multiple is still a proposal, so the decision is Babak's.
+**What it means for you:** the price is now below the proposed entry for the first time. Netflix is not an AI company, so this is a mood-driven fall, not a change in the business. The open question is still advertising and growth, which the Jan 19 report will answer. The target multiple is a proposal, so the decision to buy is Babak's.
 
 ## Summary
 
-<!-- reviewed 2026-11-20 -->
-- **Cheap:** 20.0x adjusted earnings, the lowest in a decade and at the 20x entry.
+<!-- reviewed 2026-11-21 -->
+- **Cheap:** 19.4x adjusted earnings, the lowest in a decade and 3% below the 20x entry.
 - **Strong:** large and growing free cash flow (about $12bn guided for 2026) and modest debt.
 - **Weak:** guidance has disappointed three quarters running, and the advertising business is behind plan.
 - **Uncertain:** how much of the slowdown is lasting, and what the new content chief and job cuts change.
 
 ## Business
 
-<!-- reviewed 2026-11-20 -->
+<!-- reviewed 2026-11-21 -->
 Netflix is the largest paid streaming service, earning almost all its revenue from subscriptions, with a growing advertising tier. Q3 2026 revenue was about $12.9bn, up about 12% a year, with EPS of $0.87 against a $0.82 estimate. The stock split 10-for-1 in November 2025. Its failed bid for Warner Bros. Discovery's studios and streaming business left it with a $2.8bn termination fee in Q1 2026, which the adjusted EPS here leaves out.
 
 ## Risks
 
-<!-- reviewed 2026-11-20 -->
+<!-- reviewed 2026-11-21 -->
 - **Slowing growth:** full-year 2026 revenue was trimmed to about $51.1bn, and Q4 EPS guidance of $0.67 is below the $0.73 consensus.
 - **Advertising:** the 2026 ad revenue forecast was cut from about $3bn to $2.7bn because of delays in ad product features.
 - **Costs:** about 1,000 job cuts (about 6%) will reduce the Q4 operating margin by about 1.2 points.
@@ -39,7 +39,7 @@ Netflix is the largest paid streaming service, earning almost all its revenue fr
 
 ## News
 
-<!-- reviewed 2026-11-20 -->
+<!-- reviewed 2026-11-21 -->
 - 2026-11-17: the stock hit a new 52-week low of about $59.40 and closed at $59.68, about 48% below its 52-week high ([24/7 Wall St.](https://247wallst.com/investing/2026/11/18/netflix-just-hit-a-52-week-low-wheres-the-bottom/)). Piper Sandler cut its target to $78 from $85, keeping Overweight; the average target is about $89 ([Defense World](https://www.defenseworld.net/2026/11/18/netflix-inc-nasdaqnflx-stock-has-consensus-price-target-of-89-14-according-to-analysts.html)).
 - 2026-10-26/27: the stock broke below $65 and closed about $62.6 after a Bloomberg report that viewers spend less time on the service; Huatai downgraded it to Hold.
 - 2026-10-20: Q3 results beat on EPS, but soft Q4 guidance sent the stock down about 6% after hours. Free cash flow guidance was lowered to about $12bn, mainly because of a real-estate transaction.
@@ -47,7 +47,7 @@ Netflix is the largest paid streaming service, earning almost all its revenue fr
 
 ## What to watch
 
-<!-- reviewed 2026-11-20 -->
+<!-- reviewed 2026-11-21 -->
 - Q4 results around Jan 19, 2027, and the 2027 outlook for revenue, margin and advertising.
 - Whether subscriber engagement holds after the price increases (ongoing).
 - How the buyback is used at these prices (ongoing).
