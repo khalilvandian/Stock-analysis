@@ -27,7 +27,7 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Net debt](#net-debt) | total_debt - cash | lower | candidate |
 | [Shareholders' equity (book value)](#book-equity) | total assets - total liabilities | higher | candidate |
 
-**Income statement (absolute)** (8)
+**Income statement (absolute)** (9)
 
 | Metric | Formula | Better | Vector |
 |---|---|---|---|
@@ -37,6 +37,7 @@ Vector status: **core** = proposed for the first vector, **candidate** = worth c
 | [Interest expense](#interest-expense) | sum of the last 4 quarters' interest expense | lower | candidate |
 | [Depreciation and amortization](#d-and-a) | from the cash-flow statement | none | context |
 | [EPS, GAAP diluted](#eps-ttm) | net_income / diluted shares | higher | candidate |
+| [EPS, GAAP diluted, continuing operations](#eps-continuing-ttm) | income from continuing operations / diluted shares (else eps_ttm) | higher | context |
 | [EPS, adjusted](#eps-adj-ttm) | sum of the last 4 quarters' reported (adjusted) EPS, with eps_override corrections | higher | core |
 | [Forward EPS](#eps-fwd) | consensus estimate | higher | candidate |
 
@@ -347,6 +348,19 @@ Net income per share, after counting options and convertibles.
 - **Example (BSX, 2026-09-30):** $2.47 = 3.675bn / about 1.49bn diluted shares
 - **Vector:** candidate
 - **Note:** Includes amortization and one-offs, so it understates acquisitive companies like BSX (adjusted EPS $3.21).
+
+<a id="eps-continuing-ttm"></a>
+#### EPS, GAAP diluted, continuing operations (`eps_continuing_ttm`)
+
+Earnings per share without the businesses the company sold or spun off (discontinued operations). Where a company has none it doesn't report this figure, and diluted EPS is the same number.
+
+- **Formula:** income from continuing operations / diluted shares (else eps_ttm)
+- **Unit:** $; **better:** higher; **period:** ttm
+- **Source:** sec: `IncomeLossFromContinuingOperationsPerDilutedShare`; db: `eps_continuing`
+- **Used in:** P/E of the site's ratio history and the explorer (#49), as data providers measure it
+- **Example (JNJ, 2023-12-31):** $5.20 = 2023: 13.76 total diluted EPS less the Kenvue separation gain in discontinued operations
+- **Vector:** context
+- **Note:** Matches Koyfin's P/E basis (#49): price / this EPS within 10% in 127 of 127 months for JNJ and 118 of 119 for PFE.
 
 <a id="eps-adj-ttm"></a>
 #### EPS, adjusted (`eps_adj_ttm`)
