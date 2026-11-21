@@ -50,8 +50,9 @@ window.Live = (() => {
     const ev = ok(cap) && ok(s.net_debt) ? cap + s.net_debt : null;
     return {
       market_cap: cap, enterprise_value: ev,
-      pe: posDiv(p, s.eps_diluted), ps: posDiv(cap, s.revenue), pb: posDiv(cap, s.equity),
+      pe: posDiv(p, s.eps_continuing ?? s.eps_diluted), ps: posDiv(cap, s.revenue), pb: posDiv(cap, s.equity),
       ev_ebitda: posDiv(ev, s.ebitda), ev_revenue: posDiv(ev, s.revenue),
+      pfcf: posDiv(cap, s.free_cf),
       fcf_yield: sDiv(s.free_cf, cap), earnings_yield: sDiv(s.net_income, cap),
     };
   }
@@ -72,7 +73,7 @@ window.Live = (() => {
     s.price = p;
     s.market_cap = x.market_cap;
     s.enterprise_value = x.enterprise_value;
-    for (const k of ["pe", "ps", "pb", "ev_ebitda", "ev_revenue", "fcf_yield", "earnings_yield"]) t.ratios[k] = x[k];
+    for (const k of ["pe", "ps", "pb", "ev_ebitda", "ev_revenue", "fcf_yield", "earnings_yield", "pfcf"]) t.ratios[k] = x[k];
     t.valuation.pe_now = x.pe;
     if (t.dividends && ok(t.dividends.ttm)) t.dividends.yield = sDiv(t.dividends.ttm, p);
     t.live = { ...q, fetched_at: fetchedAt };

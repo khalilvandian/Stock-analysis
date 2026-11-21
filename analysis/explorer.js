@@ -144,6 +144,89 @@ function lineChart(points, name) {
   return `<div class="chart" id="${id}">${s}</div>`;
 }
 
+// A ratio by month (issue #22): the company's own median as a dashed line and, for valuation
+// multiples, its cheap zone (from its lowest month up to its cheap value) shaded; the latest
+// twelve months at today's price as the last point ("Now"). Every reference is named in text
+// on the chart, so colour is never the only cue.
+// labels: "2024-06"; band: {median, low, cheap?, months}; extra(i): more tooltip lines, or null.
+function historyChart(labels, values, now, band, fmt, name, extra = null) {
+  const W = 640, H = 300, PAD = { l: 56, r: 56, t: 14, b: 28 };
+  // start at the first point with a value (prices begin later than the statements)
+  const first = Math.max(0, values.findIndex(ok));
+  const extraAt = extra ? (i) => extra(i + first) : null;
+  labels = labels.slice(first);
+  const vals = values.slice(first).map((v) => (ok(v) ? v : null));
+  const pts = vals.map((v, i) => [i, v]).filter((p) => p[1] !== null);
+  if (pts.length < 2) return "<p class='empty'>Too few values to draw.</p>";
+  const last = labels.length - 1, nowOk = ok(now), n = labels.length + (nowOk ? 1 : 0);
+  const refs = [band?.median, band?.low, band?.cheap, nowOk ? now : null].filter(ok);
+  const all = [...pts.map((p) => p[1]), ...refs];
+  const t = ticks(Math.min(...all), Math.max(...all), 5);
+  const lo = t[0], hi = t[t.length - 1];
+  const step = (W - PAD.l - PAD.r) / Math.max(1, n - 1);
+  const x = (i) => PAD.l + i * step;
+  const y = (v) => PAD.t + (H - PAD.t - PAD.b) * (1 - (v - lo) / (hi - lo));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(name)} by month, with its median${ok(band?.cheap) ? " and cheap zone" : ""}">`;
+  for (const v of t) s += `<line class="grid" x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(v)}" y2="${y(v)}"/><text x="${PAD.l - 6}" y="${y(v) + 4}" text-anchor="end">${esc(axisLabel(v, fmt))}</text>`;
+  const medY = ok(band?.median) ? y(band.median) + 4 : null;
+  if (ok(band?.cheap) && ok(band?.low)) {
+    const top = y(band.cheap), bot = y(band.low);
+    s += `<rect class="cheapzone" x="${PAD.l}" y="${top}" width="${W - PAD.l - PAD.r}" height="${Math.max(1, bot - top)}"/>`;
+    let ly = Math.min(bot, top + 12);
+    if (medY !== null && Math.abs(ly - medY) < 12) ly = medY + 12; // keep clear of "median"
+    s += `<text class="reflab" x="${W - PAD.r + 5}" y="${ly}">cheap</text>`;
+  }
+  if (medY !== null) {
+    s += `<line class="ref" x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(band.median)}" y2="${y(band.median)}"/><text class="reflab" x="${W - PAD.r + 5}" y="${medY}">median</text>`;
+  }
+  // the line breaks where there is no value (a loss has no P/E)
+  let d = "", prev = -2;
+  for (const [i, v] of pts) { d += `${i === prev + 1 ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; prev = i; }
+  s += `<path class="line" d="${d}"/>`;
+  if (nowOk && vals[last] !== null) s += `<line class="nowlink" x1="${x(last)}" y1="${y(vals[last])}" x2="${x(last + 1)}" y2="${y(now)}"/>`;
+  if (nowOk) s += `<circle class="ptnow" cx="${x(last + 1)}" cy="${y(now)}" r="5.5"/>`;
+  // x axis: each year's January (thinned to about 10 years), and "Now"
+  const axis = [...labels, ...(nowOk ? ["Now"] : [])];
+  const years = new Set(labels.filter((l) => l.endsWith("-01")).map((l) => l.slice(0, 4)));
+  const every = Math.ceil(years.size / 10);
+  let k = 0;
+  axis.forEach((l, i) => {
+    const isNow = nowOk && i === n - 1;
+    const tick = isNow || l.endsWith("-01");
+    if (tick && (isNow || (years.size - 1 - k++) % every === 0)) s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${esc(isNow ? "Now" : l.slice(0, 4))}</text>`;
+  });
+  s += `<line class="cross" x1="0" x2="0" y1="${PAD.t}" y2="${H - PAD.b}" visibility="hidden"/><circle class="dotm" r="5" visibility="hidden"/>`;
+  s += `<rect class="hit wide" x="${PAD.l - step / 2}" y="${PAD.t}" width="${W - PAD.l - PAD.r + step}" height="${H - PAD.t - PAD.b}"/></svg>`;
+  const id = `c${Math.random().toString(36).slice(2)}`;
+  const vsMed = (v) => (ok(v) && ok(band?.median) && band.median !== 0 ? ` (${spct(v / band.median - 1, 0)} vs median)` : "");
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const title = (l) => `${MONTHS[+l.slice(5, 7) - 1]} ${l.slice(0, 4)} (month-end close)`;
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const svg = $("svg", el), cross = $(".cross", el), dot = $(".dotm", el), hit = $(".hit", el);
+    hit.addEventListener("mousemove", (e) => {
+      const b = svg.getBoundingClientRect();
+      const i = Math.max(0, Math.min(n - 1, Math.round(((((e.clientX - b.left) / b.width) * W) - PAD.l) / step)));
+      const isNow = nowOk && i === n - 1, v = isNow ? now : vals[i];
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+      if (ok(v)) { dot.setAttribute("cx", x(i)); dot.setAttribute("cy", y(v)); dot.setAttribute("visibility", "visible"); } else dot.setAttribute("visibility", "hidden");
+      const more = !isNow && extraAt ? extraAt(i) : "";
+      showTip(e, `<b>${isNow ? "Now (last twelve months, today's price)" : esc(title(labels[i]))}</b><br>${esc(name)}: ${FORMATS[fmt](v)}${vsMed(v)}${more}`);
+    });
+    hit.addEventListener("mouseleave", () => { cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); hideTip(); });
+  });
+  const span = ok(band?.months) ? `${band.months} months` : "";
+  const sum = [
+    nowOk ? `Now <b>${FORMATS[fmt](now)}</b>` : "",
+    ok(band?.median) ? `median ${FORMATS[fmt](band.median)}` : "",
+    ok(band?.cheap) ? `cheap ≤ ${FORMATS[fmt](band.cheap)}` : "",
+    ok(band?.low) ? `low ${FORMATS[fmt](band.low)}` : "",
+    span,
+  ].filter(Boolean).join(" · ");
+  return `<div class="chart" id="${id}">${s}</div>${sum ? `<p class="note">${sum}</p>` : ""}`;
+}
+
 // --- building blocks --------------------------------------------------------------------
 const tile = (label, value, note = "") => `<div class="card tile"><small>${esc(label)}</small><b>${value}</b>${note ? `<em>${note}</em>` : ""}</div>`;
 const tiles = (list) => `<div class="strip">${list.join("")}</div>`;
@@ -301,7 +384,7 @@ function charts(t, mode) {
   const netDebt = it.total_debt.map((v, i) => (ok(v) ? v - (it.cash[i] || 0) : null));
   const margin = it.net_income.map((v, i) => (ok(v) && ok(it.revenue[i]) && it.revenue[i] ? v / it.revenue[i] : null));
   const list = [["Revenue", it.revenue, "money"], ["EBITDA", it.ebitda, "money"], ["Net income", it.net_income, "money"], ["Diluted EPS", it.eps_diluted, "price"], ["Operating cash flow", it.operating_cf, "money"], ["Free cash flow", fcf, "money"], ["Net debt", netDebt, "money"], ["Net margin", margin, "pct"], ["Shares outstanding", it.shares_outstanding, "shares"]];
-  if (mode !== "Q") list.push(["Return on equity", t.annual_ratios.roe, "pct"], ["P/E at the fiscal year end", t.annual_ratios.pe, "mult"], ["Dividend per share (calendar year)", null, "price"]);
+  if (mode !== "Q") list.push(["Return on equity", t.annual_ratios.roe, "pct"], ["P/E (the year's average price)", t.ratio_history?.series.pe || t.annual_ratios.pe, "mult"], ["Dividend per share (calendar year)", null, "price"]);
   const seg = `<div class="seg" data-chart>${[["A", "Annual"], ["Q", "Quarterly"]].map(([k, l]) => `<button type="button" data-m="${k}"${k === mode ? " class=on" : ""}>${l}</button>`).join("")}</div>`;
   const cards = list.map(([name, vals, fmt]) => {
     if (vals === null) {
@@ -315,19 +398,19 @@ function charts(t, mode) {
 }
 
 const RATIO_ROWS = [
-  ["Valuation (price in the fiscal year-end week)", null],
+  ["Valuation (the year's average month-end close)", null],
   ["P/E", "pe", "mult"], ["Price / sales", "ps", "mult"], ["Price / book", "pb", "mult"], ["EV / EBITDA", "ev_ebitda", "mult"], ["FCF yield", "fcf_yield", "pct"],
   ["Profitability", null],
   ["Operating margin", "operating_margin", "pct"], ["EBITDA margin", "ebitda_margin", "pct"], ["Net margin", "net_margin", "pct"], ["FCF margin", "fcf_margin", "pct"], ["Return on equity", "roe", "pct"], ["Return on assets", "roa", "pct"],
   ["Debt", null],
   ["Debt / equity", "debt_to_equity", "mult"], ["Net debt / EBITDA", "net_debt_to_ebitda", "mult"], ["Interest cover (EBITDA / interest)", "interest_cover", "mult"],
   ["Per share (today's share basis)", null],
-  ["Free cash flow per share", "fcf_per_share", "price"], ["Book value per share", "book_per_share", "price"], ["Price at the year end", "price", "price"], ["Market value at the year end", "market_cap", "money"],
+  ["Free cash flow per share", "fcf_per_share", "price"], ["Book value per share", "book_per_share", "price"], ["Average price over the year", "avg_price", "price"], ["Price at the year end", "price", "price"], ["Market value at the year end", "market_cap", "money"],
 ];
 
 // The company now against its sector and against its own last five fiscal years.
 function ratioCompare(t, idx) {
-  const r = t.ratios, ar = t.annual_ratios;
+  const r = t.ratios, ar = { ...t.annual_ratios, ...(t.ratio_history?.series || {}) };
   const peers = (idx?.tickers || []).filter((x) => x.sector === t.profile.sector);
   const avg5 = (key) => { const v = (ar[key] || []).slice(-5).filter(ok); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   const diff = (a, b) => (ok(a) && ok(b) && b !== 0 ? spct(a / b - 1, 0) : DASH);
@@ -344,7 +427,9 @@ function ratioCompare(t, idx) {
 }
 
 function ratiosTab(t, idx) {
-  const r = t.annual_ratios, cols = t.annual.years.map((y) => `FY${y}`);
+  const rh = t.ratio_history?.series || {};
+  const r = { ...t.annual_ratios, ...Object.fromEntries(["pe", "ps", "pb", "ev_ebitda", "fcf_yield", "avg_price"].filter((k) => rh[k]).map((k) => [k, rh[k]])) };
+  const cols = t.annual.years.map((y) => `FY${y}`);
   let h = `<div class="wrap"><table class="fin"><thead><tr><th></th>${cols.map((c) => `<th class="n">${c}</th>`).join("")}<th class="n">Now (TTM)</th></tr></thead><tbody>`;
   const now = { ...t.ratios, price: t.snapshot.price, market_cap: t.snapshot.market_cap, book_per_share: t.snapshot.book_per_share, fcf_per_share: ok(t.snapshot.free_cf) && ok(t.snapshot.shares_outstanding) ? t.snapshot.free_cf / t.snapshot.shares_outstanding : null };
   for (const [label, key, fmt] of RATIO_ROWS) {
@@ -352,10 +437,30 @@ function ratiosTab(t, idx) {
     h += `<tr><th scope="row">${esc(label)}</th>${cols.map((_, i) => `<td class="n">${FORMATS[fmt](r[key]?.[i])}</td>`).join("")}<td class="n"><b>${FORMATS[fmt](now[key])}</b></td></tr>`;
   }
   h += "</tbody></table></div>";
-  const pick = [["P/E", "pe", "mult"], ["EV / EBITDA", "ev_ebitda", "mult"], ["Net margin", "net_margin", "pct"], ["Return on equity", "roe", "pct"], ["FCF yield", "fcf_yield", "pct"], ["Net debt / EBITDA", "net_debt_to_ebitda", "mult"]];
   return `<h2>Now, against the sector and the last five years</h2>${panel("", ratioCompare(t, idx), "Diff = how far the company's figure is above (+) or below (−) the comparison.")}
-    <h2>Ratios, every fiscal year</h2>${panel("", h,"Ratios of a loss, negative equity or negative EBITDA are left blank. Fiscal years from the statements; the last column uses the latest twelve months and today's price.")}
-    <div class="charts">${pick.map(([n, k, f]) => panel(n, barChart(t.annual.years.map(String), r[k] || [], f, n, true))).join("")}</div>`;
+    <h2>Ratios over time</h2>${historyCharts(t)}
+    <h2>Ratios, every fiscal year</h2>${panel("", h, "Ratios of a loss, negative equity or negative EBITDA are left blank. Fiscal years from the statements; P/E, price / sales, price / book, EV / EBITDA and FCF yield on the year's average month-end close; the last column uses the latest twelve months and today's price.")}`;
+}
+
+// The ratio history charts (issue #22): P/E, price / book, price / sales, price / free cash
+// flow (operating cash flow + capex) and EV / EBITDA at every month-end close, with the company's own median and cheap zone.
+const HISTORY_CHARTS = [
+  ["P/E (GAAP, TTM)", "pe", "mult"], ["Price / book (TTM)", "pb", "mult"],
+  ["Price / sales (TTM)", "ps", "mult"], ["Price / free cash flow (TTM)", "pfcf", "mult"],
+  ["EV / EBITDA (TTM)", "ev_ebitda", "mult"],
+];
+function historyCharts(t, keys = null) {
+  const rh = t.ratio_history, m = rh?.monthly;
+  if (!m?.month?.length) return "<p class='empty'>No monthly ratio history in this build.</p>";
+  const px = m.close || [];
+  const extra = (i) => (ok(px[i]) ? `<br>Close ${price(px[i])}` : "");
+  // a ratio with fewer than two values (EV / EBITDA of a bank) is left out
+  const list = HISTORY_CHARTS.filter(([, k]) => (!keys || keys.includes(k)) && (m[k] || []).filter(ok).length >= 2);
+  if (!list.length) return "<p class='empty'>Too few values to draw.</p>";
+  const cards = list.map(([name, k, f]) => panel(name, historyChart(m.month, m[k] || [], t.ratios[k], (m.bands || {})[k], f, name, extra)));
+  const pctl = Math.round((rh.cheap_percentile || 0.25) * 100);
+  const note = `One point per month: the month-end close against the trailing twelve months (and the balance sheet) as filed by that day, on today's share basis; the last point is now (today's price). Median, low and cheap over the last ${rh.history_years * 12} months with a value; the shaded cheap zone runs from the lowest month up to the bottom ${pctl}% of the months (${rh.min_history_years * 12} months needed). P/E uses GAAP diluted EPS; free cash flow = operating cash flow + capex (capex is negative). EV = market value + total debt − cash. A loss, negative equity, negative free cash flow or negative EBITDA has no multiple.`;
+  return `<div class="charts big">${cards.join("")}</div><p class="note">${note}</p>`;
 }
 
 function valuation(t, idx) {
@@ -364,7 +469,8 @@ function valuation(t, idx) {
   // Relative fair value: what the sector's median multiples would pay for this company.
   const peers = (idx?.tickers || []).filter((x) => x.sector === t.profile.sector && x.symbol !== t.symbol);
   const medPE = median(peers.map((x) => x.pe)), medEV = median(peers.map((x) => x.ev_ebitda));
-  const relPE = ok(medPE) && ok(s.eps_diluted) && s.eps_diluted > 0 ? medPE * s.eps_diluted : null;
+  const peEps = s.eps_continuing ?? s.eps_diluted;  // the EPS the P/E is measured on (#49)
+  const relPE = ok(medPE) && ok(peEps) && peEps > 0 ? medPE * peEps : null;
   const relEV = ok(medEV) && ok(s.ebitda) && s.ebitda > 0 && ok(s.shares_outstanding) ? (medEV * s.ebitda - (s.net_debt || 0)) / s.shares_outstanding : null;
   const relative = `<h2>Relative fair value</h2>${tiles([
     tile("Sector median P/E", mult(medPE), `${peers.length} peer${peers.length === 1 ? "" : "s"}`), tile("Price at the sector P/E", price(relPE), up(relPE)),
@@ -374,7 +480,6 @@ function valuation(t, idx) {
 }
 
 function valuationBody(t, v, s, up) {
-  const pe = t.annual_ratios.pe || [];
   return `<h2>EPS fair value: the company's own P/E history</h2>${tiles([
     tile("Price", price(s.price), priceWhen(t)),
     tile("P/E now (TTM)", mult(v.pe_now)),
@@ -385,8 +490,8 @@ function valuationBody(t, v, s, up) {
     tile("Graham number", price(v.graham_number), up(v.graham_number)),
     ...(ok(v.cheap_price) ? [tile("Screener cheap price", price(v.cheap_price), `at a cheap P/E of ${mult(v.cheap_pe)}`)] : []),
   ])}
-  <p class="note">Price at a P/E = that P/E × TTM diluted EPS; P/E per year = the price in the fiscal year-end week over that year's EPS. Graham number = √(22.5 × EPS × book value per share), only for positive earnings and equity. The cheap price comes from Stage 2 of the market screener (top 3 per sector only).</p>
-  ${panel("P/E at each fiscal year end", barChart(t.annual.years.map(String), pe, "mult", "P/E"))}`;
+  <p class="note">Price at a P/E = that P/E × TTM diluted EPS; P/E per year = the average month-end close over the fiscal year over that year's diluted EPS (as the screener's own-history P/E). Graham number = √(22.5 × EPS × book value per share), only for positive earnings and equity. The cheap price comes from Stage 2 of the market screener (top 3 per sector only).</p>
+  ${historyCharts(t, ["pe"])}`;
 }
 
 function valuationDcf(v, now) {

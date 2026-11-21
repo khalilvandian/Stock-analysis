@@ -3,8 +3,9 @@ database, plus an index, for the explorer pages of the GitHub Pages site (analys
 
     tickers/index.json        one row per company: snapshot, ratios, screener, next earnings
     tickers/<SYMBOL>.json     profile, absolute values (TTM), ratios, annual and quarterly
-                              statements, weekly and daily prices, technicals, dividends,
-                              earnings, screener verdict, valuations
+                              statements, the ratio history (issue #22), weekly and daily
+                              prices, technicals, dividends, earnings, screener verdict,
+                              valuations
 
 The database is read in a few bulk queries, by blocks of symbols, so that no query returns
 more than the web API's 50,000 rows. Backend: the web API when STOCK_API_URL and STOCK_API_KEY
@@ -24,6 +25,7 @@ import os
 import re
 import statistics
 import sys
+import tomllib
 import urllib.request
 from collections import defaultdict
 from pathlib import Path
@@ -39,6 +41,7 @@ FLOWS = [
     "d_and_a",
     "net_income",
     "eps_diluted",
+    "eps_continuing",
     "interest_expense",
     "operating_cf",
     "capex",
@@ -71,7 +74,7 @@ ORDER BY c.symbol"""
 Q_FUNDAMENTALS = f"""
 SELECT c.symbol, f.item, f.period_type, f.fiscal_year, f.fiscal_period,
        f.period_end, f.source,
-       CASE WHEN f.item = 'eps_diluted' THEN f.value / f.split_factor
+       CASE WHEN f.item IN ('eps_diluted', 'eps_continuing') THEN f.value / f.split_factor
             WHEN f.item = 'shares_outstanding' THEN f.value * f.split_factor
             ELSE f.value END AS value
 FROM v_fundamental_latest f
@@ -98,6 +101,31 @@ FROM (
 JOIN core_company c ON c.company_id = w.company_id
 WHERE w.rn = 1
 ORDER BY c.symbol, w.date"""
+
+# The last close of each month (as stock_analysis.stocks.Q_MONTHLY), for the yearly average
+# price of the ratio history (the same as Stage 2's own-history P/E).
+Q_MONTHLY = f"""
+SELECT symbol, month, day, close FROM (
+    SELECT c.symbol, date_trunc('month', p.date)::date AS month, p.date AS day, p.close,
+           ROW_NUMBER() OVER (PARTITION BY p.company_id, date_trunc('month', p.date)
+                              ORDER BY p.date DESC) AS rn
+    FROM core_price_daily p
+    JOIN core_company c ON c.company_id = p.company_id
+    WHERE c.symbol IN ({{symbols}}) AND p.date >= DATE '{FIRST_YEAR - 1}-01-01'
+) m WHERE rn = 1
+ORDER BY symbol, month"""
+
+# Every version of every trailing-twelve-month value (balance sheet: at the quarter end) with
+# its filing date, for the monthly ratios: each month-end close against what had been filed
+# by that day (as v_daily). On today's share basis.
+Q_TTM_HISTORY = f"""
+SELECT c.symbol, t.item, t.period_end, t.filed, t.value_adj AS value
+FROM core_fundamental_ttm t
+JOIN core_company c ON c.company_id = t.company_id
+WHERE c.symbol IN ({{symbols}}) AND t.filed >= DATE '{FIRST_YEAR}-01-01'
+  AND t.item IN ('revenue', 'eps_diluted', 'eps_continuing', 'operating_cf', 'capex', 'ebitda',
+                 'equity', 'cash', 'total_debt', 'shares_outstanding')
+ORDER BY c.symbol, t.item, t.filed, t.period_end"""
 
 Q_DAILY = f"""
 SELECT c.symbol, p.date, p.close, p.volume
@@ -254,6 +282,8 @@ def fetch(query, symbols: list[str] | None = None) -> dict:
         "fundamentals": chunked(Q_FUNDAMENTALS, 40),
         "ttm": query(Q_TTM),
         "weekly": chunked(Q_WEEKLY, 60),
+        "monthly": chunked(Q_MONTHLY, 150),
+        "ttm_history": chunked(Q_TTM_HISTORY, 30),
         "daily": chunked(Q_DAILY, 120),
         "dividends": query(Q_DIVIDENDS),
         "earnings": query(Q_EARNINGS),
@@ -411,6 +441,14 @@ def quarterly(rows: list[dict]) -> dict:
     }
 
 
+def pe_eps(g: dict) -> float | None:
+    """The EPS a P/E is measured on: from continuing operations, without the businesses a
+    company sold or spun off (as data providers measure it, #49), else diluted EPS (the same
+    figure for a company without discontinued operations)."""
+    v = g.get("eps_continuing")
+    return v if v is not None else g.get("eps_diluted")
+
+
 def annual_ratios(a: dict, weekly: list[list]) -> dict:
     """Per fiscal year: free cash flow, net debt, margins, returns, and the P/E at the
     fiscal year end (price that week on today's share basis over that year's EPS)."""
@@ -431,7 +469,7 @@ def annual_ratios(a: dict, weekly: list[list]) -> dict:
         out["market_cap"].append(r6(cap))
         out["free_cf"].append(r6(fcf))
         out["net_debt"].append(r6(net_debt))
-        out["pe"].append(r6(pos_div(price, g["eps_diluted"])))
+        out["pe"].append(r6(pos_div(price, pe_eps(g))))
         out["ps"].append(r6(pos_div(cap, g["revenue"])))
         out["pb"].append(r6(pos_div(cap, g["equity"])))
         out["ev_ebitda"].append(r6(pos_div(add(cap, net_debt), g["ebitda"])))
@@ -449,6 +487,155 @@ def annual_ratios(a: dict, weekly: list[list]) -> dict:
         out["fcf_per_share"].append(r6(div(fcf, g["shares_outstanding"])))
         out["book_per_share"].append(r6(div(g["equity"], g["shares_outstanding"])))
     return dict(out)
+
+
+def screener_settings() -> dict:
+    """The own-history settings of Stage 2 (config/screeners.toml), so the explorer's cheap
+    band is the screener's cheap P/E."""
+    out = {"cheap_percentile": 0.25, "history_years": 10, "min_history_years": 6}
+    try:
+        with open(ROOT / "config/screeners.toml", "rb") as fh:
+            cfg = tomllib.load(fh)
+    except OSError:
+        return out
+    return {k: cfg.get(k, v) for k, v in out.items()}
+
+
+SETTINGS = screener_settings()
+MIN_MONTHS = 9  # months of closes a fiscal year needs for its average price (as Stage 2)
+
+
+def average_price(monthly: list[list], end: str | None) -> float | None:
+    """The average of the month-end closes over the fiscal year ending on `end`: the months
+    starting after `end` less one year, up to `end` (Stage 2's fiscal_pe window)."""
+    if not end:
+        return None
+    start = shift_years(end, -1)
+    window = [row[1] for row in monthly if row[1] is not None and start < row[0] <= end]
+    return sum(window) / len(window) if len(window) >= MIN_MONTHS else None
+
+
+def quantile(xs: list[float], q: float) -> float | None:
+    """Linear interpolation between the closest ranks (pandas' default)."""
+    xs = sorted(xs)
+    if not xs:
+        return None
+    pos = (len(xs) - 1) * q
+    lo = math.floor(pos)
+    hi = min(lo + 1, len(xs) - 1)
+    return xs[lo] + (xs[hi] - xs[lo]) * (pos - lo)
+
+
+def ratio_history(a: dict, monthly: list[list]) -> dict:
+    """Per fiscal year, the valuation multiples at the year's average month-end close (the
+    same price as Stage 2's own-history P/E), for the yearly ratio table and the own P/E
+    history of the Fair value tab. The charts use the monthly series (monthly_ratios)."""
+    it, n = a["items"], len(a["years"])
+    series: dict[str, list] = defaultdict(list)
+    for k in range(n):
+        g = {i: it[i][k] for i in it}
+        price = average_price(monthly, a["period_end"][k])
+        shares = g["shares_outstanding"]
+        cap = price * shares if price is not None and shares is not None else None
+        net_debt = add(g["total_debt"], -(g["cash"] or 0)) if g["total_debt"] is not None else None
+        series["avg_price"].append(r6(price))
+        series["pe"].append(r6(pos_div(price, pe_eps(g))))
+        series["ps"].append(r6(pos_div(cap, g["revenue"])))
+        series["pb"].append(r6(pos_div(cap, g["equity"])))
+        series["ev_ebitda"].append(r6(pos_div(add(cap, net_debt), g["ebitda"])))
+        series["fcf_yield"].append(r6(div(add(g["operating_cf"], g["capex"]), cap)))
+    return {
+        "years": a["years"],
+        "series": dict(series),
+        "cheap_percentile": SETTINGS["cheap_percentile"],
+        "history_years": SETTINGS["history_years"],
+        "min_history_years": SETTINGS["min_history_years"],
+    }
+
+
+MONTHLY_ITEMS = [
+    "revenue",
+    "eps_diluted",
+    "eps_continuing",
+    "operating_cf",
+    "capex",
+    "ebitda",
+    "equity",
+    "cash",
+    "total_debt",
+    "shares_outstanding",
+]
+# The charted multiples: P/E (GAAP diluted EPS), price / book, price / sales, price / free
+# cash flow (operating cash flow + capex) and EV / EBITDA, each on the trailing twelve months.
+MONTHLY_KEYS = ["pe", "pb", "ps", "pfcf", "ev_ebitda"]
+
+
+def monthly_ratios(monthly: list[list], ttm_rows: list[dict]) -> dict:
+    """The MONTHLY_KEYS multiples at every month-end close, against the trailing-twelve-month
+    values (and the balance sheet) of the latest period published by that day, in the period's
+    latest (corrected) version: a period counts from its first publication (the earnings
+    release), with the figures as the company later restated them (Microsoft's 2016-17 under
+    the new revenue standard, Pfizer's without the businesses it spun off), as data providers
+    show history (#49)."""
+    by_item: dict[str, list] = defaultdict(list)
+    for r in ttm_rows:
+        if r["item"] in MONTHLY_ITEMS and r["filed"] is not None:
+            by_item[r["item"]].append((iso(r["filed"]), iso(r["period_end"]), f(r["value"])))
+    for item, rows in by_item.items():
+        rows.sort()
+        first, latest = {}, {}
+        for filed, end, value in rows:
+            first.setdefault(end, filed)
+            latest[end] = value
+        by_item[item] = sorted((first[e], e, latest[e]) for e in first)
+    pos = dict.fromkeys(MONTHLY_ITEMS, 0)
+    best: dict[str, tuple | None] = dict.fromkeys(MONTHLY_ITEMS)
+    out: dict[str, list] = defaultdict(list)
+    for row in monthly:
+        month, close, day = row[0], row[1], row[2] if len(row) > 2 else row[0]
+        g = {}
+        for item in MONTHLY_ITEMS:
+            rows = by_item.get(item, [])
+            while pos[item] < len(rows) and rows[pos[item]][0] <= day:
+                filed, end, value = rows[pos[item]]
+                b = best[item]
+                if b is None or (end, filed) >= (b[0], b[1]):
+                    best[item] = (end, filed, value)
+                pos[item] += 1
+            g[item] = best[item][2] if best[item] else None
+        shares = g["shares_outstanding"]
+        cap = close * shares if close is not None and shares is not None else None
+        out["month"].append(month[:7])
+        out["close"].append(r6(close))
+        out["pe"].append(r6(pos_div(close, pe_eps(g))))
+        out["pb"].append(r6(pos_div(cap, g["equity"])))
+        out["ps"].append(r6(pos_div(cap, g["revenue"])))
+        out["pfcf"].append(r6(pos_div(cap, add(g["operating_cf"], g["capex"]))))
+        # enterprise value = market value + total debt - cash
+        net_debt = add(g["total_debt"], -(g["cash"] or 0)) if g["total_debt"] is not None else None
+        out["ev_ebitda"].append(r6(pos_div(add(cap, net_debt), g["ebitda"])))
+    # start at the first month with any multiple
+    keys = MONTHLY_KEYS
+    first = next(
+        (i for i in range(len(out["month"])) if any(out[k][i] is not None for k in keys)),
+        len(out["month"]),
+    )
+    res = {k: v[first:] for k, v in out.items()}
+    # the monthly chart's own marks: the same rule over the last `history_years` of months
+    span, pct = SETTINGS["history_years"] * 12, SETTINGS["cheap_percentile"]
+    need = SETTINGS["min_history_years"] * 12
+    bands = {}
+    for key in keys:
+        vals = [v for v in res[key][-span:] if v is not None and v > 0]
+        if not vals:
+            continue
+        band = {"median": r6(median(vals)), "low": r6(min(vals)), "high": r6(max(vals))}
+        band["months"] = len(vals)
+        if len(vals) >= need:
+            band["cheap"] = r6(quantile(vals, pct))
+        bands[key] = band
+    res["bands"] = bands
+    return res
 
 
 def growth(a: dict) -> dict:
@@ -666,11 +853,12 @@ def snapshot(ttm_rows: list[dict], price: float | None) -> dict:
 def ratios(s: dict) -> dict:
     cap, ev = s["market_cap"], s["enterprise_value"]
     return {
-        "pe": pos_div(s["price"], s["eps_diluted"]),
+        "pe": pos_div(s["price"], pe_eps(s)),
         "ps": pos_div(cap, s["revenue"]),
         "pb": pos_div(cap, s["equity"]),
         "ev_ebitda": pos_div(ev, s["ebitda"]),
         "ev_revenue": pos_div(ev, s["revenue"]),
+        "pfcf": pos_div(cap, s["free_cf"]),
         "fcf_yield": div(s["free_cf"], cap),
         "earnings_yield": div(s["net_income"], cap),
         "operating_margin": div(s["operating_income"], s["revenue"]),
@@ -696,8 +884,11 @@ def ticker(sym: str, g: dict, today: str) -> dict:
     last = daily[-1] if daily else (weekly[-1] if weekly else None)
     asof, price = (last[0], last[1]) if last else (None, None)
     snap = snapshot(g["ttm"], price)
+    monthly = [[iso(r["month"]), r6(r["close"]), iso(r["day"])] for r in g["monthly"]]
     a = annual(g["fundamentals"])
     by_year = annual_ratios(a, weekly)
+    hist = ratio_history(a, monthly)
+    hist["monthly"] = monthly_ratios(monthly, g["ttm_history"])
     scr = screener(g["screener"])
     data = {
         "symbol": sym,
@@ -718,13 +909,17 @@ def ticker(sym: str, g: dict, today: str) -> dict:
         "growth": growth(a),
         "annual": a,
         "annual_ratios": by_year,
+        "ratio_history": hist,
         "quarterly": quarterly(g["fundamentals"]),
         "prices": {"weekly": weekly, "daily": daily},
         "technicals": technicals(daily, weekly),
         "dividends": dividends(g["dividends"], asof, price, snap["eps_diluted"]),
         "earnings": earnings(g["earnings"], today),
         "screener": scr,
-        "valuation": valuation(snap, by_year, g["valuations"], scr.get("stage2")),
+        # the own P/E history on the yearly average price, as the ratio charts and Stage 2
+        "valuation": valuation(
+            snap, {"pe": hist["series"]["pe"]}, g["valuations"], scr.get("stage2")
+        ),
     }
     return data
 

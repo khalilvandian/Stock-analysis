@@ -157,8 +157,18 @@ every day at 05:15 UTC, or by hand (`workflow_dispatch`). The top bar has four m
     - Summary: absolute values first, 10-year cards, price chart, financial health, ratios
       against the sector, growth, technicals.
     - Financials: income statement, balance sheet and cash flow, annual or quarterly.
-    - Ratios: against the sector and the 5-year average, then every fiscal year.
-    - Fair value: own P/E history, Graham number, relative (sector multiples), our DCF.
+    - Ratios: against the sector and the 5-year average; **ratios over time** (issue #22): a
+      monthly line chart of P/E, price / book, price / sales, price / free cash flow and
+      EV / EBITDA, each month-end close against the trailing twelve months of the latest
+      period announced by that day (its earnings release), in that period's latest, corrected
+      version, as data providers show history (#49; `ratio_history.monthly` in the ticker
+      JSON). P/E is on EPS from continuing operations. Plus "Now" (today's price),
+      with the company's own median over the last 120 months and, for the four multiples,
+      its cheap zone (lowest month up to the bottom quarter, the screener's
+      `cheap_percentile`); then every fiscal year as a table, its multiples on the year's
+      average month-end close, the same price as Stage 2's own-history P/E.
+    - Fair value: own P/E history (yearly, on the same average price; the monthly P/E chart),
+      Graham number, relative (sector multiples), our DCF.
     - Dividends, Earnings, Charts, and Screener (Stage 1 and 2).
 
     A tab with no data is left out.

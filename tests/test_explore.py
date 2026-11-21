@@ -88,6 +88,113 @@ def test_growth_and_ratios_by_year():
     assert g == {}  # fewer years than the shortest span
 
 
+def test_average_price_uses_the_fiscal_years_month_end_closes():
+    monthly = [[f"2024-{m:02d}-01", 10.0] for m in range(1, 13)]
+    monthly += [[f"2025-{m:02d}-01", float(m)] for m in range(1, 13)]
+    # calendar year: January to December 2025
+    assert explore.average_price(monthly, "2025-12-31") == pytest.approx(6.5)
+    # a September year end (as Stage 2): October 2024 to September 2025
+    assert explore.average_price(monthly, "2025-09-27") == pytest.approx((30 + 45) / 12)
+    # fewer than nine months: no average
+    assert explore.average_price(monthly[:20], "2025-12-31") is None
+    assert explore.average_price(monthly, None) is None
+
+
+def test_quantile_matches_pandas_linear():
+    assert explore.quantile([10.0, 20.0, 30.0, 40.0, 50.0], 0.25) == 20.0
+    assert explore.quantile([4.0, 1.0, 3.0, 2.0], 0.25) == pytest.approx(1.75)
+    assert explore.quantile([], 0.25) is None
+
+
+def test_ratio_history_on_the_average_price():
+    years = list(range(2016, 2026))
+    a = {
+        "years": years,
+        "period_end": [f"{y}-12-31" for y in years],
+        "items": {i: [None] * len(years) for i in explore.FLOWS + explore.INSTANTS},
+    }
+    eps = [1.0, 1.0, -0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]  # 2018 is a loss
+    a["items"]["eps_diluted"] = eps
+    a["items"]["revenue"] = [100.0] * len(years)
+    a["items"]["shares_outstanding"] = [10.0] * len(years)
+    # the price averages 10, 11, ... 19 over the years
+    monthly = [[f"{y}-{m:02d}-01", 10.0 + k] for k, y in enumerate(years) for m in range(1, 13)]
+    h = explore.ratio_history(a, monthly)
+    assert h["series"]["avg_price"][0] == 10.0
+    assert h["series"]["pe"][2] is None  # a loss has no P/E
+    assert h["series"]["pe"][-1] == 19.0
+    assert h["series"]["ps"][-1] == pytest.approx(19 * 10 / 100)
+
+
+def test_monthly_bands_median_low_and_cheap_over_ten_years():
+    # 130 months with an EPS of 1 and closes 1 ... 130: the last 120 months are 11 ... 130
+    monthly = [[f"{2015 + i // 12}-{i % 12 + 1:02d}-01", float(i + 1), None] for i in range(130)]
+    for row in monthly:
+        row[2] = row[0][:8] + "28"
+    rows = [ttm_row("eps_diluted", "2014-12-31", "2015-01-01", 1.0)]
+    pe = explore.monthly_ratios(monthly, rows)["bands"]["pe"]
+    assert pe["months"] == 120 and pe["low"] == 11.0 and pe["high"] == 130.0
+    assert pe["median"] == 70.5
+    assert pe["cheap"] == pytest.approx(11 + 119 * 0.25)  # the bottom quarter
+
+
+def ttm_row(item, end, filed, value):
+    return {"symbol": "ABC", "item": item, "period_end": end, "filed": filed, "value": value}
+
+
+def test_monthly_ratios_use_what_was_filed_by_each_month_end():
+    monthly = [
+        ["2025-01-01", 20.0, "2025-01-31"],
+        ["2025-02-01", 22.0, "2025-02-28"],
+        ["2025-03-01", 24.0, "2025-03-31"],
+        ["2025-04-01", 30.0, "2025-04-30"],
+    ]
+    rows = [
+        ttm_row("eps_diluted", "2024-09-30", "2024-11-01", 1.0),
+        # Q4 filed in mid-February: from the February month end
+        ttm_row("eps_diluted", "2024-12-31", "2025-02-15", 2.0),
+        # Q4 restated in April: the corrected figure, from Q4's first publication (#49)
+        ttm_row("eps_diluted", "2024-12-31", "2025-04-10", 1.5),
+        # an older period filed late does not replace a newer one
+        ttm_row("eps_diluted", "2024-06-30", "2025-03-05", 9.0),
+        ttm_row("revenue", "2024-12-31", "2025-02-15", 100.0),
+        ttm_row("shares_outstanding", "2024-12-31", "2025-02-15", 10.0),
+        ttm_row("operating_cf", "2024-12-31", "2025-02-15", 30.0),
+        ttm_row("capex", "2024-12-31", "2025-02-15", -10.0),
+        ttm_row("equity", "2024-12-31", "2025-02-15", -5.0),
+        ttm_row("ebitda", "2024-12-31", "2025-02-15", 50.0),
+        ttm_row("total_debt", "2024-12-31", "2025-02-15", 40.0),
+        ttm_row("cash", "2024-12-31", "2025-02-15", 10.0),
+    ]
+    m = explore.monthly_ratios(monthly, rows)
+    assert m["month"] == ["2025-01", "2025-02", "2025-03", "2025-04"]
+    assert m["pe"] == [20.0, 14.6667, 16.0, 20.0]  # 20/1, then 22, 24, 30 / 1.5
+    assert m["ps"] == [None, 2.2, 2.4, 3.0]  # no revenue or shares known in January
+    assert m["pfcf"] == [None, 11.0, 12.0, 15.0]  # market value / (30 - 10) free cash flow
+    assert m["pb"] == [None] * 4  # negative equity has no price / book
+    assert m["ev_ebitda"] == [None, 5.0, 5.4, 6.6]  # (220 + 40 - 10) / 50 in February
+    assert set(m["bands"]) == {"pe", "ps", "pfcf", "ev_ebitda"}
+    assert m["bands"]["pe"]["median"] == 18.0 and "cheap" not in m["bands"]["pe"]  # 4 months
+
+
+def test_pe_on_eps_from_continuing_operations():
+    """#49: P/E is price over EPS from continuing operations where the company reports it (JNJ
+    2023: 5.20, while total EPS with the Kenvue gain was 13.76), else diluted EPS."""
+    monthly = [["2024-02-01", 160.0, "2024-02-29"]]
+    rows = [ttm_row("eps_diluted", "2023-12-31", "2024-02-15", 13.76),
+            ttm_row("eps_continuing", "2023-12-31", "2024-02-15", 5.20)]  # fmt: skip
+    assert explore.monthly_ratios(monthly, rows)["pe"] == [round(160 / 5.20, 4)]
+    only_total = explore.monthly_ratios(monthly, rows[:1])["pe"]
+    assert only_total == [round(160 / 13.76, 4)]
+    assert explore.pe_eps({"eps_continuing": None, "eps_diluted": 2.0}) == 2.0
+
+
+def test_monthly_ratios_start_at_the_first_month_with_a_value():
+    monthly = [["2016-01-01", 10.0, "2016-01-29"], ["2016-02-01", 11.0, "2016-02-29"]]
+    m = explore.monthly_ratios(monthly, [ttm_row("eps_diluted", "2015-12-31", "2016-02-10", 1.0)])
+    assert m["month"] == ["2016-02"] and m["pe"] == [11.0]
+
+
 def test_snapshot_and_ratios_skip_meaningless_multiples():
     ttm = [
         {"item": "net_income", "value": -5.0, "period_end": "2025-12-31"},
@@ -103,6 +210,7 @@ def test_snapshot_and_ratios_skip_meaningless_multiples():
     r = explore.ratios(s)
     assert r["pe"] is None  # a loss has no P/E
     assert r["ps"] == pytest.approx(1.2)
+    assert r["pfcf"] is None  # no free cash flow
     assert r["debt_to_assets"] is None  # no total assets
 
 
@@ -215,6 +323,16 @@ def fake_query(sql: str) -> list[dict]:
         ]
     if "date_trunc('week'" in sql:
         return [{"symbol": "ABC", "date": "2025-12-26", "close": 24.0, "adj_close": 24.0}]
+    if "date_trunc('month'" in sql:
+        return [
+            {
+                "symbol": "ABC",
+                "month": f"2025-{m:02d}-01",
+                "day": f"2025-{m:02d}-28",
+                "close": 20.0 + m,
+            }
+            for m in range(1, 13)
+        ]
     if "p.volume" in sql:
         return [
             {"symbol": "ABC", "date": "2026-01-02", "close": 25.0, "volume": 100},
@@ -247,6 +365,9 @@ def test_export_writes_one_file_per_ticker_and_an_index(tmp_path):
     assert t["asof"] == "2026-01-05" and t["snapshot"]["price"] == 26.0
     assert t["profile"]["watchlist"] is True
     assert t["earnings"]["next"]["date"] == "2026-02-10"
+    # FY2025's P/E on its average month-end close (26.5) over its EPS (1.2)
+    assert t["ratio_history"]["series"]["pe"][-1] == pytest.approx(26.5 / 1.2, rel=1e-5)
+    assert t["valuation"]["pe_median_10y"] == pytest.approx(26.5 / 1.2, rel=1e-5)
     row = idx["tickers"][0]
     assert row["symbol"] == "ABC" and row["pe"] == pytest.approx(26 / 1.2, rel=1e-5)
     assert idx["asof"] == "2026-01-05"

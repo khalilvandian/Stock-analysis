@@ -15,3 +15,7 @@ _site/
 
 # Files downloaded or found by hand, waiting to be imported (db import); never committed
 inbox/
+
+# Working data for GitHub issues (issues/<number>/), e.g. Koyfin reference snapshots: licensed
+# third-party data, kept on this machine only; never committed
+issues/

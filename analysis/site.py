@@ -245,8 +245,15 @@ table.fin th.grp { text-transform: uppercase; font-size: .75em; letter-spacing: 
 .chart .line { fill: none; stroke: var(--brand); stroke-width: 2; stroke-linejoin: round; }
 .chart .cross { stroke: var(--muted); stroke-dasharray: 3 3; }
 .chart .dotm { fill: var(--brand); stroke: var(--card); stroke-width: 2; }
+.charts.big { grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr)); }
+.chart .ref { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart .reflab { font-size: 10px; }
+.chart .cheapzone { fill: var(--good-soft); }
+.chart .ptnow { fill: var(--card); stroke: var(--brand); stroke-width: 2.5; }
+.chart .nowlink { stroke: var(--brand); stroke-width: 1.5; stroke-dasharray: 2 3; }
 .chart .hit { fill: transparent; }
 .chart rect.hit:hover { fill: color-mix(in srgb, var(--brand) 7%, transparent); }
+.chart rect.hit.wide:hover { fill: transparent; }
 .tip { position: fixed; z-index: 20; pointer-events: none; background: var(--card);
   color: var(--text);
   border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: .85em;
