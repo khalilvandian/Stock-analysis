@@ -4,6 +4,7 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-24 00:04 CET | $144.94 | 14.1x | 21.2x | $154.35 | +6.5% | Booking is still 6% below its entry. | [2026-11-24_0004.pdf](2026-11-24_0004.pdf) |
 | 2026-11-21 07:07 CET | $144.91 | 14.1x | 21.2x | $154.35 | +6.5% | Booking is 6% below its entry price. | [2026-11-21_0707.pdf](2026-11-21_0707.pdf) |
 | 2026-11-20 00:10 CET | $147.32 | 14.3x | 21.2x | $154.35 | +4.8% | Booking is now below its entry price. | [2026-11-20_0010.pdf](2026-11-20_0010.pdf) |
 | 2026-11-19 11:59 CET | $154.92 | 15.1x | 21.2x | $154.35 | -0.4% | Booking is at its entry price. | [2026-11-19_1159.pdf](2026-11-19_1159.pdf) |
