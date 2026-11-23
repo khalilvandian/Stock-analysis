@@ -63,3 +63,9 @@ eps_override = [
   { reported = "2026-08-05", eps = 0.81, reason = "Uber's non-GAAP EPS: excludes the $1.6bn equity revaluation gain (Delivery Hero, Aurora)." },
   { reported = "2026-11-04", eps = 0.88, reason = "Uber's non-GAAP EPS: excludes the $476m equity revaluation loss, $484m of legal and regulatory reserves and $186m of restructuring (GAAP EPS $0.25)." },
 ]
+
+[[stock]]
+symbol = "CEG"
+peers = ["VST", "NRG", "TLN", "NEE", "DUK", "SO", "D", "AEP", "EXC", "PEG"]
+target_pe = 17
+target_note = "Proposed 2026-11-23, not yet confirmed by Babak: the P/E history starts with the 2022 spin-off (16.5x 2022, 18x 2023, 23x 2024, 32.5x 2025; median about 20.5x); 17x, near the 2022-23 levels before the AI power rerating, a discount for the Calpine debt and the more cyclical gas earnings."

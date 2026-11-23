@@ -4,6 +4,8 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-24 00:34 CET | $282.10 | 24.4x | 23.6x | $255.83 | -9.3% | <!-- reviewed 2026-11-24 -->
+Moved away from its entry. | [2026-11-24_0034.pdf](2026-11-24_0034.pdf) |
 | 2026-11-24 00:04 CET | $282.10 | 24.4x | 23.6x | $255.83 | -9.3% | Moved away from its entry. | [2026-11-24_0004.pdf](2026-11-24_0004.pdf) |
 | 2026-11-21 07:07 CET | $265.29 | 22.9x | 23.6x | $255.83 | -3.6% | Getting close. | [2026-11-21_0707.pdf](2026-11-21_0707.pdf) |
 | 2026-11-20 00:10 CET | $272.66 | 23.5x | 23.6x | $255.83 | -6.2% | Closer to its entry, still not cheap. | [2026-11-20_0010.pdf](2026-11-20_0010.pdf) |

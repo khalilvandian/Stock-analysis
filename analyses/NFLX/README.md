@@ -4,6 +4,8 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-24 00:34 CET | $58.10 | 19.9x | 61.3x | $58.40 | +0.5% | <!-- reviewed 2026-11-24 -->
+Netflix is at its entry. | [2026-11-24_0034.pdf](2026-11-24_0034.pdf) |
 | 2026-11-24 00:04 CET | $58.10 | 19.9x | 61.3x | $58.40 | +0.5% | Netflix is at its entry. | [2026-11-24_0004.pdf](2026-11-24_0004.pdf) |
 | 2026-11-21 07:07 CET | $56.73 | 19.4x | 61.3x | $58.40 | +2.9% | Netflix is now 3% below its entry. | [2026-11-21_0707.pdf](2026-11-21_0707.pdf) |
 | 2026-11-20 00:10 CET | $58.46 | 20.0x | 61.3x | $58.40 | -0.1% | Netflix is at its entry price. | [2026-11-20_0010.pdf](2026-11-20_0010.pdf) |
