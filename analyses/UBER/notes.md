@@ -1,37 +1,37 @@
 # Uber (UBER): Claude's notes
 
-Updated: 2026-11-21
+Updated: 2026-11-24
 
 The evening run copies these sections into the PDF. Every section carries a review date; the build stops if one was not reviewed for the run (docs/EVENING_RUN.md).
 
 ## Verdict
 
-<!-- reviewed 2026-11-21 -->
-**Close to its entry. At $63.5 (Nov 20 close) Uber trades at 20.3x non-GAAP earnings, for earnings growing 35-40% a year. The entry is $62 (20x), 2% below. Nothing in the business changed this week. View: buy at about $62, in steps.**
+<!-- reviewed 2026-11-24 -->
+**Close to its entry. At $64.1 (Nov 23 close) Uber trades at 20.5x non-GAAP earnings, for earnings growing 35-40% a year. The entry is $62 (20x), 3% below. Nothing in the business changed. View: buy at about $62, in steps.**
 
 ## Today
 
-<!-- reviewed 2026-11-21 -->
-Uber fell 3.2% on Nov 20 to $63.5. The S&P 500 fell 3.7% on Nov 20, its seventh loss in a row, and is now in a correction (more than 10% below its high); the VIX fear gauge closed near 36 ([Motley Fool](https://www.fool.com/coverage/stock-market-today/2026/11/20/stock-market-today-nov-20-stocks-plunge-as-ai-trade-unwinds/)). There was no company news.
+<!-- reviewed 2026-11-24 -->
+Uber rose 0.9% on Nov 23 to $64.1. The S&P 500 jumped 4.7% on Nov 23, its best day since April 2025, after Nvidia reinstated Jensen Huang as CEO; the Nasdaq rose 6.5% and the VIX fear gauge fell from about 36 to 27 ([CNBC](https://www.cnbc.com/2026/11/22/stock-market-today-live-updates.html)). There was no company news.
 
-**What it means for you:** at 20x earnings that grow 35-40% a year, Uber is close to good value, and it is now 2% from the entry. Robotaxis remain the main doubt, but this week's launches on its app (Zoox in Las Vegas, Momenta in Munich) support the view that robotaxis will run on Uber's network.
+**What it means for you:** Uber gained far less than the market on Monday because the rebound was concentrated in AI chip stocks. At 20x earnings that grow 35-40% a year it is close to good value, and it is 3% from the entry.
 
 ## Summary
 
-<!-- reviewed 2026-11-21 -->
-- **Cheap:** not quite; 20.3x non-GAAP earnings, fair for EPS growth of 35-40% a year.
+<!-- reviewed 2026-11-24 -->
+- **Cheap:** not quite; 20.5x non-GAAP earnings, fair for EPS growth of 35-40% a year.
 - **Strong:** operating income up about 30% a year, little capital spending (about $0.3bn a year) and modest net debt (about $10bn).
 - **Weak:** reported EPS is dominated by tax releases and revaluations of its stakes, so the own-history P/E is not a reliable guide.
 - **Uncertain:** whether robotaxis (Waymo, Tesla) bypass Uber's network or run on it.
 
 ## Business
 
-<!-- reviewed 2026-11-21 -->
+<!-- reviewed 2026-11-24 -->
 Uber runs ride-hailing (Mobility), food and grocery delivery (Delivery) and Freight in about 70 countries. Q2 2026 revenue was about $14.2bn; GAAP income from operations rose about 30% to $1.9bn and non-GAAP EPS rose 35% to $0.81. Uber holds stakes in Didi, Grab, Aurora, Delivery Hero and others, whose revaluations swing GAAP EPS by about $1.5bn a quarter either way; Q3 2025 also included a $4.9bn tax benefit. The adjusted EPS here is Uber's non-GAAP EPS (see `eps_override` in the config): about $3.12 over the last 12 months (Yahoo's figure includes the GAAP swings). Uber has been profitable only since 2023, so the 10-year P/E history is short and distorted.
 
 ## Risks
 
-<!-- reviewed 2026-11-21 -->
+<!-- reviewed 2026-11-24 -->
 - **Autonomous vehicles:** robotaxi operators could build their own networks instead of using Uber's.
 - **Competition:** DoorDash and Instacart in delivery, Lyft in US rides, local rivals abroad.
 - **Regulation:** driver employment status, and taxes and rules in many countries.
@@ -39,7 +39,7 @@ Uber runs ride-hailing (Mobility), food and grocery delivery (Delivery) and Frei
 
 ## News
 
-<!-- reviewed 2026-11-21 -->
+<!-- reviewed 2026-11-24 -->
 - 2026-11-17: Zoox robotaxis went live on the Uber app in Las Vegas, with Uber and Zoox named MGM Resorts' rideshare partners; Uber and Momenta also started Germany's first robotaxi rides on the app, in Munich. The stock fell about 3% that morning on fears that robotaxi rivals will take trips or force lower prices ([Benzinga](https://www.benzinga.com/markets/tech/26/11/63287514/uber-riders-in-vegas-can-now-get-driverless-zoox-robotaxi), [TradingView](https://www.tradingview.com/news/gurufocus:877ed9690094b:0-uber-stocks-fall-2-87-even-as-zoox-robotaxis-go-live-on-its-vegas-app/), [electric-vehicles.com](https://eletric-vehicles.com/momenta/uber-starts-first-robotaxi-rides-in-germany-with-momenta-in-munich/)).
 - 2026-11-12: chief legal officer Tony West sold 35,800 shares ([MarketBeat](https://www.marketbeat.com/instant-alerts/price-uber-technologies-nyse-uber-stock-falls-46-heres-why-2026-11-19/)).
 - 2026-11-04: Q3 results: revenue $14.77bn (about $0.1bn above estimates); gross bookings +20% to $59.8bn; trips +16%; non-GAAP EPS $0.88 (+35%, a cent above consensus). GAAP EPS was $0.25 after a $476m equity revaluation loss, $484m of legal and regulatory reserves and $186m of restructuring. Q4 guide: gross bookings $63.25-65.25bn (+18-22%), non-GAAP EPS $0.95-0.99. About 700 driverless vehicles on the platform by year-end, over 2,000 in 2027. Buybacks slowed to $750m. The stock rose about 5% to about $70 (intraday).
@@ -48,7 +48,7 @@ Uber runs ride-hailing (Mobility), food and grocery delivery (Delivery) and Frei
 
 ## What to watch
 
-<!-- reviewed 2026-11-21 -->
+<!-- reviewed 2026-11-24 -->
 - Q4 results around Feb 3, 2027: non-GAAP EPS against the $0.95-0.99 guide, and the 2027 outlook.
 - Robotaxi partnerships and how much of each ride Uber keeps (ongoing).
 - Gross bookings growth in Mobility and Delivery (ongoing).
