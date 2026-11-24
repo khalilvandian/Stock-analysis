@@ -49,7 +49,7 @@ def stock_quotes():
 
     @task
     def finish(key: str) -> str:
-        return runlog.set_status(key, "finish", "ok", "Quotes run finished ok")
+        return runlog.set_status(key, "finish", "ok", "Quotes run finished ok", closing=True)
 
     quotes = ContainerAppJobOperator(
         task_id="quotes",

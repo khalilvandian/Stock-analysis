@@ -224,6 +224,11 @@ def test_run_log_start_steps_and_status(conn) -> None:
     p.set_status(conn, "scheduled__1", "failed", now)
     p.set_status(conn, "scheduled__1", "ok", now)  # a failure isn't hidden by a later step
     assert p.run_row(conn, "scheduled__1")["status"] == "failed"
+    p.set_status(conn, "scheduled__1", "ready", now, closing=True)  # only ok closes a run
+    assert p.run_row(conn, "scheduled__1")["status"] == "failed"
+    # the failed steps rerun in Airflow passed and `finish` ran: the night is ok
+    p.set_status(conn, "scheduled__1", "ok", now, closing=True)
+    assert p.run_row(conn, "scheduled__1")["status"] == "ok"
     with pytest.raises(LookupError):
         p.run_row(conn, "nope")
 
