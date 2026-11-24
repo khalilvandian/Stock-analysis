@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy_again.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -51,5 +51,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      # deploy-pages sometimes doesn't yet see the artifact the step above just uploaded ("No
+      # artifacts named github-pages were found"; 21 and 23 Nov 2026): wait and try once more.
       - id: deploy
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.deploy.outcome == 'failure'
+        run: sleep 60
+      - id: deploy_again
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4

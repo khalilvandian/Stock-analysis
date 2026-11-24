@@ -41,7 +41,7 @@ start → fetch → check_fetch → build → check_build, then in parallel:
 | `publish_site` | GitHub's API: start the Pages workflow | GitHub accepts it | No `GITHUB_DISPATCH_TOKEN`, or GitHub refuses |
 | `check_prices` | SQL: each current S&P 500 member's newest price in `core_price_daily` | At least 95% have the last US close | Fewer: the prices are stale |
 | `mark_ready` | Sets the run to `ready`: the marker | Always | The database can't be reached |
-| `wait_for_evening` | In the triggerer, every 10 minutes: a `Watch list analyses …` commit on `main` since the start, then a successful Pages run for it | Both found | No commit 5 hours after the start, or the Pages run failed |
+| `wait_for_evening` | In the triggerer, every 10 minutes: the first `Watch list analyses …` commit on `main` since the start (so a rerun of an old night finds that night's session), then a successful Pages run for it or any later Pages run on `main` (each publishes `main` as it is then; `pages.yml` retries a deploy once) | Both found | No commit 5 hours after the start, or its Pages run failed and no later one succeeded |
 | `finish` | Sets the run to `ok` (a run already `failed` stays `failed`) | Every branch passed | — |
 
 ### `stock_quotes`: 5 minutes past every hour, Monday to Friday
