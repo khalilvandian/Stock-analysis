@@ -147,10 +147,13 @@ def log_step(conn, run_key: str, step: str, result: Result, now: dt.datetime) ->
     )
 
 
-def set_status(conn, run_key: str, status: str, now: dt.datetime) -> None:
-    """A failed run stays failed: a later step can't hide an earlier failure."""
+def set_status(conn, run_key: str, status: str, now: dt.datetime, closing: bool = False) -> None:
+    """A failed run stays failed: a later step can't hide an earlier failure. The exception
+    is `closing` (the DAG's last task, `finish`): Airflow runs it only once every branch has
+    succeeded, so a failed night whose failed steps were rerun (cleared in Airflow) and
+    passed reaches it and is ok."""
     column = {"ready": "ready_at", "ok": "finished_at", "failed": "finished_at"}[status]
-    keep = "" if status == "failed" else " AND status <> 'failed'"
+    keep = "" if status == "failed" or (closing and status == "ok") else " AND status <> 'failed'"
     rows(
         conn,
         f"UPDATE ops_pipeline_run SET status = %(s)s, {column} = %(t)s WHERE run_key = %(k)s{keep}",
@@ -339,7 +342,13 @@ def check_evening(
     started: dt.datetime, now: dt.datetime, cfg: dict, client: httpx.Client
 ) -> Result:
     """The scheduled Claude session's commit on main since the run started (it keeps its own
-    schedule), then a successful Pages run for it."""
+    schedule), then a successful Pages run for it.
+
+    The night's commit is the first one after the run started (the commits come newest
+    first), so a rerun of an old night looks at that night's session, not a later one. It
+    counts as published when its own Pages run succeeded or any later Pages run on main did:
+    each run publishes main as it then is, so a later one carries the commit too (a deploy
+    that failed and the next one that worked)."""
     ev = cfg["evening"]
     late = (now - started).total_seconds() / 3600 >= ev["wait_hours"]
     commits = github(
@@ -355,15 +364,23 @@ def check_evening(
                 {},
             )
         return Result(NOT_YET, "Waiting for the Claude session's commit", {})
-    sha = ours[0]["sha"]
-    runs = github(
-        f"/repos/{ev['repo']}/actions/workflows/{ev['pages_workflow']}/runs?head_sha={sha}",
-        client,
-    )["workflow_runs"]
-    detail = {"commit": sha, "message": ours[0]["commit"]["message"].splitlines()[0]}
+    night = ours[-1]
+    sha = night["sha"]
+    pages = f"/repos/{ev['repo']}/actions/workflows/{ev['pages_workflow']}/runs"
+    runs = github(f"{pages}?head_sha={sha}", client)["workflow_runs"]
+    detail = {"commit": sha, "message": night["commit"]["message"].splitlines()[0]}
     done = [r for r in runs if r["status"] == "completed"]
     if any(r["conclusion"] == "success" for r in done):
         return Result(DONE, f"Commit {sha[:7]} published to the site", detail)
+    committed = night["commit"]["committer"]["date"]
+    later = github(
+        f"{pages}?branch=main&status=success&created=%3E%3D{committed}&per_page=1", client
+    )["workflow_runs"]
+    if later:
+        by = later[0]["head_sha"]
+        return Result(
+            DONE, f"Commit {sha[:7]} published to the site by the Pages run for {by[:7]}", detail
+        )
     if done:
         return Result(FAILED, f"The Pages run for {sha[:7]} ended {done[0]['conclusion']}", detail)
     if late:

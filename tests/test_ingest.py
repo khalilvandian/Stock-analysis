@@ -188,6 +188,18 @@ def test_companyfacts_keeps_only_mapped_tags() -> None:
     assert df.loc[df["tag"] == "Assets", "period_start"].isna().all()
 
 
+def test_never_known_before_the_stored_period_end() -> None:
+    """#49: AutoZone's quarter ends 2019-05-04 and is stored at its slot's month end, May 31;
+    released 2019-05-21, it counts from May 31, not before."""
+    c = pd.DataFrame([
+        {"company_id": 1, "period_type": "FY", "period_end": "2018-08-25", "filed": "2018-10-20"},
+        {"company_id": 1, "period_type": "Q", "period_end": "2019-05-04", "filed": "2019-05-21"},
+    ])  # fmt: skip
+    out = add_periods(c).set_index("period_type")
+    assert out.loc["Q", "period_end"] == "2019-05-31" and out.loc["Q", "filed"] == "2019-05-31"
+    assert out.loc["FY", "filed"] == "2018-10-20"
+
+
 def test_ecb_rates_are_dollars_per_unit() -> None:
     r = market.rates_frame(ECB_CSV).set_index(["currency", "date"])["usd_per_unit"]
     assert r[("USD", "2026-11-16")] == pytest.approx(1.0)
@@ -226,6 +238,194 @@ def test_month_end_and_fourth_quarter() -> None:
     assert q4["period_end"].iloc[0] == "2025-12-31" and q4["method"].iloc[0] == "derived"
 
 
+def quarter_rows(item: str, values: dict, **extra) -> list[dict]:
+    """Fiscal 2025 rows (calendar year) of one item: values = {(period, filed): value}."""
+    ends = {"Q1": "2025-03-31", "Q2": "2025-06-30", "Q3": "2025-09-30", "FY": "2025-12-31"}
+    base = {"company_id": 1, "source": "sec", "fiscal_year": 2025, "method": "reported",
+            "rank": 1, "tag": "T", "filed_estimated": False, "item": item}  # fmt: skip
+    return [{**base, **extra, "period_type": "FY" if p == "FY" else "Q", "fiscal_period": p,
+             "period_end": ends[p], "filed": filed, "value": v}
+            for (p, filed), v in values.items()]  # fmt: skip
+
+
+def test_fourth_quarter_is_known_when_the_10k_is_filed() -> None:
+    """#49: Q4 is dated by the 10-K that reports the year, not by the next 10-K repeating it."""
+    items = pd.DataFrame({"item": ["revenue"], "kind": ["flow"]})
+    rows = quarter_rows("revenue", {
+        ("Q1", "2025-05-01"): 110.0, ("Q2", "2025-08-01"): 111.0, ("Q3", "2025-11-01"): 112.0,
+        ("FY", "2026-02-20"): 500.0,
+        ("Q1", "2026-05-01"): 108.0,  # next year's 10-Q restates the quarter
+        ("FY", "2027-02-20"): 500.0,  # next year's 10-K repeats the year
+    })  # fmt: skip
+    out = derive_q4(pd.DataFrame(rows), items)
+    q4 = out[out["fiscal_period"] == "Q4"].sort_values("filed")
+    assert q4["filed"].tolist() == ["2026-02-20", "2026-05-01"]
+    assert q4["value"].tolist() == pytest.approx([167.0, 169.0])
+    # A later 10-K reports the quarter itself (JNJ, restated): derived until then
+    q4_reported = {**rows[0], "period_type": "Q", "fiscal_period": "Q4",
+                   "period_end": "2025-12-31", "filed": "2026-05-01", "value": 168.0}  # fmt: skip
+    out = derive_q4(pd.DataFrame([*rows, q4_reported]), items)
+    q4 = out[out["fiscal_period"] == "Q4"].sort_values("filed")
+    assert list(zip(q4["filed"], q4["method"], q4["value"], strict=True)) == [
+        ("2026-02-20", "derived", 167.0), ("2026-05-01", "reported", 168.0)]  # fmt: skip
+
+
+def test_period_known_from_its_first_filing_under_any_field() -> None:
+    """#49: the preferred tag first appears in a later 10-K; until then the next-best tag the
+    company did file dates the period. A lower source never fills in."""
+    from stock_analysis.db.build import choose
+
+    base = {"company_id": 1, "item": "revenue", "period_type": "FY", "period_end": "2018-12-31",
+            "fetch_id": 1, "value": 136.8}  # fmt: skip
+    c = pd.DataFrame([
+        {**base, "rank": 1, "priority": 1, "tag": "Revenues", "filed": "2021-02-03"},
+        {**base, "rank": 1, "priority": 2, "tag": "RevenueFromContract", "filed": "2019-02-05"},
+        {**base, "rank": 1, "priority": 2, "tag": "RevenueFromContract", "filed": "2020-02-04"},
+        {**base, "rank": 1, "priority": 2, "tag": "RevenueFromContract", "filed": "2021-02-03"},
+        {**base, "rank": 3, "priority": 1, "tag": "TotalRevenue", "filed": "2019-01-15"},
+    ])  # fmt: skip
+    out = choose(c).sort_values("filed")
+    assert out["filed"].tolist() == ["2019-02-05", "2020-02-04", "2021-02-03"]
+    assert out["tag"].tolist() == ["RevenueFromContract", "RevenueFromContract", "Revenues"]
+
+
+def test_figures_count_from_the_earnings_release() -> None:
+    """#49: a 10-Q's own quarter counts from the press release before it; last year's
+    comparative in the same 10-Q, an amendment and a release long before the filing don't move."""
+    from stock_analysis.db.build import date_by_release
+
+    base = {"symbol": "AAA", "tag": "T", "value": 1.0}
+    sec = pd.DataFrame([
+        {**base, "form": "10-Q", "period_end": "2025-06-30", "filed": "2025-08-05"},  # own
+        {**base, "form": "10-Q", "period_end": "2024-06-30", "filed": "2025-08-05"},  # comparative
+        {**base, "form": "10-Q/A", "period_end": "2025-06-30", "filed": "2025-08-20"},
+        {**base, "form": "10-K", "period_end": "2025-12-31", "filed": "2026-06-01"},  # 4 months
+    ])  # fmt: skip
+    releases = pd.DataFrame(
+        {"symbol": ["AAA", "AAA", "AAA"], "report_date": ["2024-07-25", "2025-07-24", "2026-01-29"]}
+    )
+    out = date_by_release(sec, releases)
+    assert out["filed"].tolist() == ["2025-07-24", "2025-08-05", "2025-08-20", "2026-06-01"]
+
+
+def test_twelve_month_eps_is_anchored_on_the_year() -> None:
+    """#49: JNJ Q1 2018 twelve-month EPS = FY2017 0.47 + Q1 2018 1.60 - Q1 2017 1.61 = 0.46
+    (Koyfin 0.45), not the four quarters' 1.40 + 1.37 - 3.99 + 1.60 = 0.38. EPS from
+    continuing operations only for a window reported throughout, else diluted EPS."""
+    from stock_analysis.db.build import per_share_ttm
+
+    def rows(item, values, method="reported"):
+        out = []
+        for (year, period, end, filed), v in values.items():
+            out.append({"company_id": 1, "item": item, "fiscal_year": year,
+                        "fiscal_period": period, "period_type": "FY" if period == "FY" else "Q",
+                        "period_end": end, "filed": filed, "filed_estimated": False, "value": v,
+                        "value_adj": v, "source": "sec", "method": method})  # fmt: skip
+        return out
+
+    eps = {(2017, "Q1", "2017-03-31", "2017-04-18"): 1.61,
+           (2017, "FY", "2017-12-31", "2018-01-23"): 0.47,
+           (2018, "Q1", "2018-03-31", "2018-04-17"): 1.60}  # fmt: skip
+    f = pd.DataFrame(rows("eps_diluted", eps))
+    t = per_share_ttm(f)
+    assert len(t) == 1 and t[0]["value_adj"] == pytest.approx(0.46)
+    assert t[0]["period_end"] == "2018-03-31" and t[0]["filed"] == "2018-04-17"
+    # continuing EPS restated for 2018 only: the window mixes bases, so it takes diluted EPS
+    cont = rows("eps_continuing", {k: v for k, v in eps.items() if k[0] == 2017}, "derived")
+    cont += rows("eps_continuing", {(2018, "Q1", "2018-03-31", "2018-04-17"): 1.20})
+    t = per_share_ttm(pd.concat([f, pd.DataFrame(cont)]))
+    c = [r for r in t if r["item"] == "eps_continuing"]
+    assert len(c) == 1 and c[0]["value_adj"] == pytest.approx(0.46)
+
+
+def test_split_between_release_and_filing_is_not_applied_twice() -> None:
+    """#49: Walmart released FY2024 on 2024-02-20, split 3:1 on 2024-02-26 and filed the 10-K,
+    on the new basis, in March. The figures count from the release; their share basis is the
+    filing's."""
+    from stock_analysis.db.build import add_split_factor
+
+    f = pd.DataFrame([{"company_id": 1, "item": "eps_diluted", "source": "sec", "value": 1.91,
+                       "filed": "2024-02-20", "split_basis": "2024-03-15"}])  # fmt: skip
+    splits = pd.DataFrame({"company_id": [1], "date": ["2024-02-26"], "ratio": [3.0]})
+    out = add_split_factor(f, splits)
+    assert out["split_factor"].iloc[0] == 1.0 and out["value_adj"].iloc[0] == 1.91
+    out = add_split_factor(f.drop(columns="split_basis"), splits)  # dated by the release only
+    assert out["split_factor"].iloc[0] == 3.0
+
+
+def test_continuing_eps_reported_wins_and_the_copy_fills_the_rest() -> None:
+    """#49: EPS from continuing operations as the company reports it; where it reports none
+    (no discontinued operations, or not yet), diluted EPS stands in, only until it is filed."""
+    from stock_analysis.db.build import derive
+
+    items = pd.DataFrame([{"item": "eps_continuing", "kind": "flow", "derive": "eps_diluted",
+                           "derive_mode": "fallback"}])  # fmt: skip
+    rows = quarter_rows("eps_diluted", {("Q1", "2025-05-01"): 2.0, ("Q2", "2025-08-01"): 1.5,
+                                        ("Q1", "2026-05-01"): 2.0})  # fmt: skip
+    # a spin-off: next year's 10-Q restates Q1 2025 without the spun-off business
+    rows += quarter_rows("eps_continuing", {("Q1", "2026-05-01"): 1.2})
+    out = derive(pd.DataFrame(rows), items)
+    e = out[out["item"] == "eps_continuing"].sort_values(["period_end", "filed"])
+    assert list(zip(e["period_end"], e["filed"], e["method"], e["value"], strict=True)) == [
+        ("2025-03-31", "2025-05-01", "derived", 2.0),  # known from the 10-Q, as diluted EPS
+        ("2025-03-31", "2026-05-01", "reported", 1.2),  # the company's own figure from then on
+        ("2025-06-30", "2025-08-01", "derived", 1.5),
+    ]
+
+
+def test_quarters_from_year_to_date_are_known_on_the_10q_date() -> None:
+    from stock_analysis.db.build import sec_quarters_from_ytd
+
+    base = {"symbol": "AAA", "taxonomy": "us-gaap", "tag": "T", "unit": "USD",
+            "period_start": "2025-01-01", "method": "reported"}  # fmt: skip
+    sec = pd.DataFrame([
+        {**base, "period_end": "2025-03-31", "span": "Q", "filed": "2025-05-01", "value": 100.0},
+        {**base, "period_end": "2025-06-30", "span": "H", "filed": "2025-08-01", "value": 210.0},
+        {**base, "period_end": "2025-09-30", "span": "N", "filed": "2025-11-01", "value": 330.0},
+        # next year's 10-Qs repeat the year-to-date totals as comparatives
+        {**base, "period_end": "2025-06-30", "span": "H", "filed": "2026-08-01", "value": 210.0},
+        {**base, "period_end": "2025-09-30", "span": "N", "filed": "2026-11-01", "value": 330.0},
+    ])  # fmt: skip
+    d = sec_quarters_from_ytd(sec)
+    first = d.sort_values("filed").drop_duplicates("period_end").set_index("period_end")
+    assert first["filed"].to_dict() == {"2025-06-30": "2025-08-01", "2025-09-30": "2025-11-01"}
+    assert first["value"].to_dict() == {"2025-06-30": 110.0, "2025-09-30": 120.0}
+    assert set(d["period_start"]) == {"2025-04-01", "2025-07-01"}
+
+
+def test_derived_value_is_known_when_its_last_part_is() -> None:
+    from stock_analysis.db.build import derive
+
+    items = pd.DataFrame(
+        [{"item": "ebitda", "kind": "flow", "derive": "operating_income + d_and_a"}]
+    )
+    rows = quarter_rows("operating_income", {("Q1", "2025-05-01"): 7.0, ("Q1", "2026-05-01"): 7.0})
+    rows += quarter_rows("d_and_a", {("Q1", "2025-05-02"): 5.0, ("Q1", "2026-05-01"): 6.0})
+    out = derive(pd.DataFrame(rows), items)
+    e = out[out["item"] == "ebitda"].sort_values("filed")
+    assert e["filed"].tolist() == ["2025-05-02", "2026-05-01"]  # each date a part changed
+    assert e["value"].tolist() == [12.0, 13.0]
+
+
+def test_fourth_quarter_eps_on_todays_share_basis() -> None:
+    """#49 P2: Q4 EPS = FY - Q1 - Q2 - Q3 with each on today's basis (a 2:1 split mid-year,
+    a 3:1 one after the 10-K); the value as filed is on the 10-K date's basis."""
+    from stock_analysis.db.build import add_split_factor, derive_q4_per_share
+
+    rows = quarter_rows("eps_diluted", {
+        ("Q1", "2025-05-01"): 2.0, ("Q2", "2025-08-01"): 1.1, ("Q3", "2025-11-01"): 1.2,
+        ("FY", "2026-02-20"): 4.5,
+    }, raw_table="t", raw_id=1)  # fmt: skip
+    splits = pd.DataFrame(
+        {"company_id": [1, 1], "date": ["2025-07-01", "2026-06-01"], "ratio": [2.0, 3.0]}
+    )
+    f = add_split_factor(pd.DataFrame(rows), splits)
+    q4 = derive_q4_per_share(f, splits).query("fiscal_period == 'Q4'")
+    assert len(q4) == 1 and q4["filed"].iloc[0] == "2026-02-20"
+    assert q4["value_adj"].iloc[0] == pytest.approx(1.5 - 2.0 / 6 - 1.1 / 3 - 1.2 / 3)
+    assert q4["value"].iloc[0] == pytest.approx(1.2) and q4["split_factor"].iloc[0] == 3.0
+
+
 # ---------------------------------------------------------------- the job (database)
 
 
@@ -258,11 +458,14 @@ def test_job_fills_the_database_and_reruns_store_nothing(fresh, respx_mock) -> N
     assert list(shares["period_end"]) == ["2025-12-31"]
     q4 = rows(
         fresh,
-        "SELECT value, method FROM core_fundamental f JOIN core_company c USING (company_id) "
-        "WHERE c.symbol = 'AAA' AND item = 'revenue' AND period_type = 'Q' "
-        "AND period_end = '2025-12-31'",
+        "SELECT value, method, source, filed FROM core_fundamental f JOIN core_company c "
+        "USING (company_id) WHERE c.symbol = 'AAA' AND item = 'revenue' AND period_type = 'Q' "
+        "AND period_end = '2025-12-31' ORDER BY filed",
     )
-    assert q4["value"].iloc[0] == pytest.approx(130.0)  # Yahoo reported Q4, so not derived
+    # Yahoo reports Q4: its figure wins from its date; before it, FY - Q1 - Q2 - Q3 from the
+    # earnings release (2026-01-28) is all that is known
+    assert q4[["method", "source"]].values.tolist() == [["derived", "sec"], ["reported", "yahoo"]]
+    assert q4["value"].iloc[-1] == pytest.approx(130.0) and q4["filed"].iloc[0] == "2026-01-28"
     fy = rows(
         fresh,
         "SELECT value, filed, filed_estimated FROM core_fundamental f JOIN core_company c "

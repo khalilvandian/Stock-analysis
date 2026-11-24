@@ -279,6 +279,21 @@ vector = "candidate"
 notes = "Includes amortization and one-offs, so it understates acquisitive companies like BSX (adjusted EPS $3.21)."
 
 [[metric]]
+id = "eps_continuing_ttm"
+name = "EPS, GAAP diluted, continuing operations"
+group = "income"
+unit = "$"
+better = "higher"
+period = "ttm"
+definition = "Earnings per share without the businesses the company sold or spun off (discontinued operations). Where a company has none it doesn't report this figure, and diluted EPS is the same number."
+formula = "income from continuing operations / diluted shares (else eps_ttm)"
+sources = { sec = "IncomeLossFromContinuingOperationsPerDilutedShare", db = "eps_continuing" }
+used_in = ["P/E of the site's ratio history and the explorer (#49), as data providers measure it"]
+example = { symbol = "JNJ", value = 5.20, as_of = "2023-12-31", working = "2023: 13.76 total diluted EPS less the Kenvue separation gain in discontinued operations" }
+vector = "context"
+notes = "Matches Koyfin's P/E basis (#49): price / this EPS within 10% in 127 of 127 months for JNJ and 118 of 119 for PFE."
+
+[[metric]]
 id = "eps_adj_ttm"
 name = "EPS, adjusted"
 group = "income"
@@ -1230,7 +1245,7 @@ sources = { watchlist = "entry_price" }
 used_in = ["watch list"]
 example = { symbol = "BSX", value = 41.73, as_of = "2026-10-27", working = "13 x 3.21" }
 vector = "derived"
-notes = "Depends on a chosen target, so it belongs to the decision, not the vector. Blank for a stock without a target (target_pe is optional; NFLX has none since 2026-11-12)."
+notes = "Depends on a chosen target, so it belongs to the decision, not the vector. Blank for a stock without a target (target_pe is optional since 2026-11-12)."
 
 [[metric]]
 id = "price_vs_cheap"

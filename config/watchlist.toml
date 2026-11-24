@@ -18,27 +18,6 @@
 timezone = "Europe/Rome"
 
 [[stock]]
-symbol = "BSX"
-peers = ["ABT", "MDT", "SYK", "ISRG", "BDX", "EW", "ZBH", "DXCM", "STE", "PODD", "TFX", "GEHC", "RMD"]
-target_pe = 13
-target_note = "Proposed 2026-10-27: about half the 10-year median, a discount for slower growth and the Penumbra debt."
-
-[[stock]]
-symbol = "BKNG"
-peers = ["EXPE", "ABNB", "TCOM", "TRIP", "MMYT", "TRVG"]
-target_pe = 15
-target_note = "Proposed 2026-10-25, not yet confirmed by Babak: below the 18x decade low, a discount for the AI-agent risk."
-
-[[stock]]
-symbol = "NFLX"
-peers = ["DIS", "WBD", "CMCSA", "SPOT", "ROKU", "GOOGL", "META", "PSKY"]
-target_note = "No target: Babak chose not to set one (2026-11-12). Report 15 shows the price at Netflix's own P/E levels instead."
-eps_override = [
-  { reported = "2025-10-21", eps = 0.73, reason = "excludes the Brazilian tax charge of about $619m (about $0.14 a share)." },
-  { reported = "2026-04-16", eps = 0.69, reason = "excludes the $2.8bn Warner Bros. Discovery termination fee (about $0.54 a share after an estimated 18% tax); Claude's estimate." },
-]
-
-[[stock]]
 symbol = "GOOGL"
 peers = ["MSFT", "META", "AMZN", "AAPL", "ORCL", "IBM", "PINS", "SNAP", "TTD"]
 target_pe = 22

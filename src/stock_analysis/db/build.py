@@ -42,7 +42,8 @@ FIRST_DATE = "2016-01-01"
 SOURCE_RANK = {"sec": 1, "history": 2, "yahoo": 3}
 # No source loaded so far records filing dates: estimate them as the latest SEC deadline.
 FILED_LAG_DAYS = {"year": 90, "quarter": 45}
-SPLIT_ITEMS = {"shares_outstanding": "multiply", "eps_diluted": "divide"}
+SPLIT_ITEMS = {"shares_outstanding": "multiply", "eps_diluted": "divide",
+               "eps_continuing": "divide"}  # fmt: skip
 KEY = ["company_id", "item", "period_type", "period_end"]
 
 # The companies the running build rebuilds (symbols); None while a full build runs. Every
@@ -297,29 +298,115 @@ def read_compact(
     return df
 
 
+def as_of(rows: pd.DataFrame, group: list[str], part: str) -> pd.DataFrame:
+    """A combination of parts as it was known over time: for each group (a period, a fiscal
+    year) and each date one of its parts was filed, the latest version of every part filed by
+    then, with that date as `asof`. A value computed from them is known on the day its last
+    part was filed; taking each part's latest version instead dates it by whichever later report
+    repeated a part (next year's 10-Q or 10-K), up to two years late (#49)."""
+    dates = rows[[*group, "filed"]].drop_duplicates().rename(columns={"filed": "asof"})
+    x = rows.merge(dates, on=group)
+    x = x[x["filed"] <= x["asof"]]
+    return x.sort_values("filed", kind="stable").drop_duplicates([*group, "asof", part],
+                                                                 keep="last")  # fmt: skip
+
+
+def before_reported(d: pd.DataFrame, reported: pd.DataFrame, on: list[str]) -> pd.DataFrame:
+    """Derived versions (d) filed before the period's first reported version: JNJ's 2023 10-K
+    reports 2022's quarters (restated for Kenvue), but its fourth quarter was known, as the
+    year less three quarters, from the 2022 10-K on."""
+    first = reported.groupby(on)["filed"].min().rename("reported_from").reset_index()
+    d = d.merge(first, on=on, how="left")
+    return d[d["reported_from"].isna() | (d["filed"] < d["reported_from"])].drop(
+        columns="reported_from"
+    )
+
+
+def drop_repeats(d: pd.DataFrame, value: str = "value") -> pd.DataFrame:
+    """Versions of a computed value without those equal to the version before (a later report
+    repeating its parts adds nothing)."""
+    d = d.sort_values([*KEY, "filed"])
+    return d[~d.groupby(KEY)[value].shift().eq(d[value])]
+
+
 def sec_quarters_from_ytd(sec: pd.DataFrame) -> pd.DataFrame:
     """10-Q cash flows are year to date (3, 6 and 9 months): the second quarter is the six
     months less the first quarter, the third the nine months less the six, both from the same
-    start date and in their latest versions. Only where SEC reports no such quarter itself."""
+    start date, in every version as known on each filing date (as_of). Only until SEC reports
+    the quarter itself (before_reported)."""
     cols = ["symbol", "taxonomy", "tag", "unit"]
-    latest = sec.sort_values("filed").drop_duplicates([*cols, "period_start", "period_end"],
-                                                      keep="last")  # fmt: skip
-    q, h, n = (latest[latest["span"] == x] for x in ("Q", "H", "N"))
+    ends = [*cols, "period_start", "period_end"]
+    group = [*ends, "short_end"]
+    q, h, n = (sec[sec["span"] == x] for x in ("Q", "H", "N"))
     out = []
     for longer, shorter in ((h, q), (n, h)):
-        m = longer.merge(shorter, on=[*cols, "period_start"], suffixes=("", "_s"))
-        m = m[m["period_end_s"] < m["period_end"]]
-        if m.empty:
+        shorter = shorter.rename(columns={"period_end": "short_end"})
+        pairs = (
+            longer[ends]
+            .drop_duplicates()
+            .merge(
+                shorter[[*cols, "period_start", "short_end"]].drop_duplicates(),
+                on=[*cols, "period_start"],
+            )
+        )
+        pairs = pairs[pairs["short_end"] < pairs["period_end"]]
+        if pairs.empty:
             continue
-        start = (pd.to_datetime(m["period_end_s"]) + pd.Timedelta(days=1)).dt.strftime("%F")
+        parts = pd.concat(
+            [longer.merge(pairs, on=ends).assign(part="long"),
+             shorter.merge(pairs, on=[*cols, "period_start", "short_end"]).assign(part="short")],
+            ignore_index=True,
+        )  # fmt: skip
+        x = as_of(parts, group, "part")
+        short = x.loc[x["part"] == "short", [*group, "asof", "value"]]
+        m = x[x["part"] == "long"].merge(short, on=[*group, "asof"], suffixes=("", "_s"))
+        start = (pd.to_datetime(m["short_end"]) + pd.Timedelta(days=1)).dt.strftime("%F")
         out.append(m.assign(value=m["value"] - m["value_s"], period_start=start, span="Q",
-                            method="derived")[latest.columns])  # fmt: skip
+                            filed=m["asof"], method="derived")[sec.columns])  # fmt: skip
     if not out:
         return sec.iloc[0:0]
-    d = pd.concat(out, ignore_index=True)
-    have = q[[*cols, "period_end"]].drop_duplicates()
-    d = d.merge(have, on=[*cols, "period_end"], how="left", indicator=True)
-    return d[d["_merge"] == "left_only"].drop(columns="_merge")
+    return before_reported(pd.concat(out, ignore_index=True), q, [*cols, "period_end"])
+
+
+RELEASE_LEAD_DAYS = 60  # an earnings release at most this long before its 10-Q / 10-K
+
+
+def release_dates(conn: Connection) -> pd.DataFrame:
+    """Yahoo's earnings report dates (symbol, report_date) that have a reported EPS."""
+    return frame(
+        conn,
+        "SELECT symbol, to_char(report_date, 'YYYY-MM-DD') AS report_date FROM v_earnings "
+        f"WHERE eps_reported IS NOT NULL{scoped('symbol')}",
+        with_scope({}),
+    )
+
+
+def date_by_release(sec: pd.DataFrame, releases: pd.DataFrame) -> pd.DataFrame:
+    """A 10-Q's or 10-K's figures for its own period count from the company's earnings press
+    release, which announces them one to four weeks before the filing (#49; data providers date
+    them so): `filed` becomes the period's release (the first after the period ended) when it
+    came before the filing and at most RELEASE_LEAD_DAYS before it. The filing's comparatives
+    (last year's quarter, the year-end balance sheet in a 10-Q) had their release long before
+    and keep their date, as do amendments."""
+    if releases.empty or sec.empty:
+        return sec
+    own = sec["form"].isin(["10-Q", "10-K"])
+    keys = sec.loc[own, ["symbol", "period_end", "filed"]].drop_duplicates()
+    keys = keys.assign(at=pd.to_datetime(keys["period_end"]),
+                       by=keys["symbol"].astype(object)).sort_values("at")  # fmt: skip
+    rel = releases.assign(at=pd.to_datetime(releases["report_date"]),
+                          by=releases["symbol"].astype(object)).sort_values("at")  # fmt: skip
+    m = pd.merge_asof(keys, rel[["by", "at", "report_date"]], on="at", by="by",
+                      direction="forward", allow_exact_matches=False)  # fmt: skip
+    r, filed = pd.to_datetime(m["report_date"]), pd.to_datetime(m["filed"])
+    ok = (r < filed) & ((filed - r).dt.days <= RELEASE_LEAD_DAYS)
+    m = m[ok.fillna(False)][["symbol", "period_end", "filed", "report_date"]]
+    if m.empty:
+        return sec
+    sec = sec.merge(m, on=["symbol", "period_end", "filed"], how="left")
+    shift = own.to_numpy() & sec["report_date"].notna().to_numpy()
+    sec.loc[shift, "filed"] = sec.loc[shift, "report_date"]
+    return sec.drop(columns="report_date")
 
 
 def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.DataFrame:
@@ -396,6 +483,14 @@ def sec_candidates(conn: Connection, kind: pd.Series, tags: pd.DataFrame) -> pd.
     sec = pd.concat([sec, class_facts(conn, tags), custom_facts(conn, tags)], ignore_index=True)
     if sec.empty:
         return sec
+    # the filing's own date fixes the share basis of its per-share figures and share counts,
+    # even when they count from the earlier release: Walmart released FY2024 before its 3:1
+    # split of 2024-02-26 and filed it, on the new basis, after (add_split_factor)
+    sec["split_basis"] = sec["filed"]
+    # A fact filed before its own period ended is an error in the company's XBRL (AES's 10-Q
+    # for June 2025 carries a "nine months to September" value): it is left out.
+    sec = sec[sec["filed"] >= sec["period_end"]]
+    sec = date_by_release(sec, release_dates(conn))
     days = (pd.to_datetime(sec["period_end"]) - pd.to_datetime(sec["period_start"])).dt.days + 1
     sec["span"] = np.select(
         [days.between(*QUARTER_DAYS), days.between(*HALF_DAYS), days.between(*NINE_MONTH_DAYS),
@@ -630,7 +725,9 @@ def candidates(
     c["method"] = c["method"].fillna("reported") if "method" in c else "reported"
     cols = [*KEY, "kind", "filed", "filed_estimated", "fiscal_year", "fiscal_period", "value"]
     cols += ["source", "tag", "raw_table", "raw_id", "rank", "priority", "fetch_id", "method"]
-    return c[cols]
+    if "split_basis" not in c:
+        c["split_basis"] = np.nan
+    return c[[*cols, "split_basis"]]
 
 
 def month_index(dates: pd.Series) -> pd.Series:
@@ -690,16 +787,26 @@ def add_periods(c: pd.DataFrame) -> pd.DataFrame:
     known = c["filed"].notna() if "filed" in c else pd.Series(False, index=c.index)
     c["filed"] = c["filed"].where(known, estimate) if "filed" in c else estimate
     c["filed"] = c["filed"].astype(str).str[:10]
+    # never known before the stored period end: a 52/53-week quarter (AutoZone's ends in early
+    # May) is stored at its slot's month end (May 31), after its earnings release (May 21)
+    c["filed"] = c["filed"].where(c["filed"] >= c["period_end"], c["period_end"])
     c["filed_estimated"] = ~known
     return c
 
 
 def choose(c: pd.DataFrame) -> pd.DataFrame:
-    """Per period, the best source and field; all its versions (filing dates) are kept."""
+    """Per period, the best source and field; all its versions (filing dates) are kept. Before
+    the best field's first version, the best other field of that source filed by then: Alphabet
+    filed 2018 revenue as RevenueFromContractWithCustomer... in 2019 and as Revenues only in
+    2021, and the year is known from 2019 (#49)."""
     c = c.sort_values(["rank", "priority", "fetch_id"], ascending=[True, True, False])
     best = c.drop_duplicates(KEY)[[*KEY, "rank", "tag"]]
-    c = c.merge(best, on=[*KEY, "rank", "tag"])
-    return c.drop_duplicates([*KEY, "filed"]).reset_index(drop=True)
+    chosen = c.merge(best, on=[*KEY, "rank", "tag"])
+    first = chosen.groupby(KEY)["filed"].min().rename("first_filed").reset_index()
+    early = c.merge(best[[*KEY, "rank"]], on=[*KEY, "rank"]).merge(first, on=KEY)
+    early = early[early["filed"] < early["first_filed"]].drop(columns="first_filed")
+    out = pd.concat([chosen, early], ignore_index=True)  # in rank, priority order
+    return out.drop_duplicates([*KEY, "filed"]).reset_index(drop=True)
 
 
 def latest(f: pd.DataFrame) -> pd.DataFrame:
@@ -718,9 +825,11 @@ def derive(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
         terms = parse_derive(it["derive"])
         parts = [t[1] for t in terms]
         needed = [t[1] for t in terms if not t[2]]
-        have = latest(f[f["item"].isin(parts)])
+        have = f[f["item"].isin(parts)]
         idx = ["company_id", "period_type", "period_end"]
-        wide = have.pivot_table(index=idx, columns="item", values="value", aggfunc="first")
+        x = as_of(have, idx, "item")  # every version, as known on each filing date
+        wide = x.pivot_table(index=[*idx, "asof"], columns="item", values="value",
+                             aggfunc="first")  # fmt: skip
         if not set(needed) <= set(wide.columns):
             continue
         wide = wide.reindex(columns=parts).dropna(subset=needed)
@@ -729,53 +838,59 @@ def derive(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
         if wide.empty:
             continue
         signs = pd.Series({t[1]: t[0] for t in terms})
-        meta = have.groupby(idx).agg(
-            filed=("filed", "max"),
+        g = x.groupby([*idx, "asof"])
+        meta = g.agg(
             filed_estimated=("filed_estimated", "max"),
             fiscal_year=("fiscal_year", "first"),
             fiscal_period=("fiscal_period", "first"),
-            source=("source", lambda s: s.iloc[0] if s.nunique() == 1 else "derived"),
-            rank=("rank", "max"),  # as good as its worst part
         )
+        sources = g["source"].agg(["first", "nunique"])
+        meta["source"] = sources["first"].where(sources["nunique"] == 1, "derived")
+        if "split_basis" in x:  # the share basis of the latest part (add_split_factor)
+            meta["split_basis"] = g["split_basis"].max()
         total = (wide.fillna(0) * signs).sum(axis=1)
         d = total.rename("value").to_frame().join(meta).reset_index()
+        rank = have.groupby(idx)["rank"].max().rename("rank")  # as good as its worst part
+        d = d.merge(rank.reset_index(), on=idx).rename(columns={"asof": "filed"})
         d = d.assign(item=it["item"], kind=it["kind"], tag=it["derive"], method="derived")
-        reported = f[f["item"] == it["item"]].groupby(KEY)["rank"].min().rename("reported_rank")
-        d = d.merge(reported.reset_index(), on=KEY, how="left")
+        d = drop_repeats(d)
+        rep = f[f["item"] == it["item"]]
         if it.get("derive_mode") == "fallback":
-            d = d[~(d["reported_rank"] <= d["rank"])]
+            # A value reported by a source as good or better always wins; the derived one only
+            # fills the period until that is first filed (as Q4 until a 10-K reports it), and
+            # replaces only a value from a lower-ranked source.
+            d_rank = d[[*KEY, "rank"]].drop_duplicates(KEY).rename(columns={"rank": "rank_d"})
+            pair = rep[[*KEY, "rank", "filed"]].merge(d_rank, on=KEY)
+            d = before_reported(d, pair[pair["rank"] <= pair["rank_d"]], KEY)
+            d_rank = d[[*KEY, "rank"]].drop_duplicates(KEY).rename(columns={"rank": "rank_d"})
+            m = f[KEY + ["rank"]].merge(d_rank, on=KEY, how="left")
+            drop = (m["rank_d"].notna() & (m["rank"] > m["rank_d"])).to_numpy()
         else:
-            d = d[~(d["reported_rank"] < d["rank"])]
-        d = d.drop(columns="reported_rank")
-        drop = f.merge(d[KEY], on=KEY, how="left", indicator=True)["_merge"] == "both"
-        f = pd.concat([f[~drop.to_numpy()], d], ignore_index=True)
+            reported = rep.groupby(KEY)["rank"].min().rename("reported_rank")
+            d = d.merge(reported.reset_index(), on=KEY, how="left")
+            d = d[~(d["reported_rank"] < d["rank"])].drop(columns="reported_rank")
+            drop = f.merge(d[KEY].drop_duplicates(), on=KEY, how="left", indicator=True)
+            drop = (drop["_merge"] == "both").to_numpy()
+        f = pd.concat([f[~drop], d], ignore_index=True)
     return f
 
 
-def derive_q4(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
-    """SEC filings have no fourth quarter (the 10-K reports the year): for flows, Q4 = the
-    fiscal year less its first three quarters, in their latest versions, where all four are
-    from SEC and Q4 is not reported. Not for EPS (shares differ between quarters)."""
-    flows = set(items.loc[items["kind"] == "flow", "item"]) - {"eps_diluted"}
-    have = latest(f[f["item"].isin(flows) & (f["source"] == "sec")])
-    if have.empty:
-        return f
-    fy = have[have["period_type"] == "FY"]
-    q = have[(have["period_type"] == "Q") & have["fiscal_period"].isin(["Q1", "Q2", "Q3"])]
-    parts = q.groupby(["company_id", "item", "fiscal_year"]).agg(
-        n=("value", "size"), total=("value", "sum")
-    )
-    d = fy.merge(parts.reset_index(), on=["company_id", "item", "fiscal_year"])
+def fourth_quarters(f: pd.DataFrame, have: pd.DataFrame, value: str = "value") -> pd.DataFrame:
+    """Q4 = the fiscal year less its first three quarters, from SEC rows (`have`), until f has
+    a reported Q4 (before_reported). Every version as known on each filing date (as_of): Q4 is
+    known when the 10-K is filed, not when the next 10-K repeats the year."""
+    have = have[(have["period_type"] == "FY") | have["fiscal_period"].isin(["Q1", "Q2", "Q3"])]
+    group = ["company_id", "item", "fiscal_year"]
+    x = as_of(have, group, "fiscal_period")
+    fy, q = x[x["fiscal_period"] == "FY"], x[x["fiscal_period"] != "FY"]
+    agg = {"n": (value, "size"), "total": (value, "sum")}
+    if "filed_estimated" in q:
+        agg["parts_estimated"] = ("filed_estimated", "max")
+    d = fy.merge(q.groupby([*group, "asof"]).agg(**agg).reset_index(), on=[*group, "asof"])
     d = d[d["n"] == 3]
-    reported = f[(f["period_type"] == "Q") & (f["fiscal_period"] == "Q4")][
-        ["company_id", "item", "period_end"]
-    ].drop_duplicates()
-    d = d.merge(reported, how="left", on=["company_id", "item", "period_end"], indicator=True)
-    d = d[d["_merge"] == "left_only"]
-    if d.empty:
-        return f
     d = d.assign(
-        value=d["value"] - d["total"],
+        **{value: d[value] - d["total"]},
+        filed=d["asof"],
         period_type="Q",
         fiscal_period="Q4",
         method="derived",
@@ -783,19 +898,58 @@ def derive_q4(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
         raw_table=None,
         raw_id=None,
     )
+    if "parts_estimated" in d:
+        d["filed_estimated"] = d["filed_estimated"].astype(bool) | d["parts_estimated"].astype(bool)
+    reported = f[(f["period_type"] == "Q") & (f["fiscal_period"] == "Q4")]
+    return drop_repeats(before_reported(d, reported, ["company_id", "item", "period_end"]), value)
+
+
+def derive_q4(f: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
+    """SEC filings have no fourth quarter (the 10-K reports the year): for flows, Q4 = the
+    fiscal year less its first three quarters, where all four are from SEC, until a Q4 is
+    reported. Per-share values come later, on today's share basis (derive_q4_per_share)."""
+    flows = set(items.loc[items["kind"] == "flow", "item"]) - set(SPLIT_ITEMS)
+    have = f[f["item"].isin(flows) & (f["source"] == "sec")]
+    if have.empty:
+        return f
+    d = fourth_quarters(f, have)
+    if d.empty:
+        return f
+    return pd.concat([f, d[f.columns.intersection(d.columns)]], ignore_index=True)
+
+
+def derive_q4_per_share(f: pd.DataFrame, splits: pd.DataFrame) -> pd.DataFrame:
+    """Q4 diluted EPS = the fiscal year's less its first three quarters' (how data providers
+    build twelve-month EPS; the four quarters then add up to the year), on today's share basis:
+    a split during the year leaves Q1 in old shares and the 10-K in new ones. Without it a
+    twelve-month EPS exists only at fiscal year ends (#49). Runs after add_split_factor; the
+    derived value as filed is put back on its filing date's basis. For every per-share item
+    (diluted EPS, EPS from continuing operations)."""
+    per_share = [k for k, how in SPLIT_ITEMS.items() if how == "divide"]
+    have = f[f["item"].isin(per_share) & (f["source"] == "sec")]
+    if have.empty:
+        return f
+    d = fourth_quarters(f, have, "value_adj")
+    if d.empty:
+        return f
+    adj = d["value_adj"].to_numpy()
+    d = add_split_factor(d.drop(columns=["split_factor"]).assign(value=adj), splits)
+    d["value"], d["value_adj"] = adj * d["split_factor"].to_numpy(), adj
     return pd.concat([f, d[f.columns.intersection(d.columns)]], ignore_index=True)
 
 
 def add_split_factor(f: pd.DataFrame, splits: pd.DataFrame) -> pd.DataFrame:
     """Shares and per-share values filed before a split, on today's (split-adjusted) basis.
-    history.csv is already adjusted."""
+    history.csv is already adjusted. The basis is the filing's own date (`split_basis`), which
+    can be after `filed` when the figures count from the earnings release (#49)."""
     f = f.reset_index(drop=True)
     f["split_factor"] = 1.0
     todo = f["item"].isin(list(SPLIT_ITEMS)) & ~f["source"].str.startswith("history")
     if todo.any() and not splits.empty:
-        rows = f.loc[todo, ["company_id", "filed"]].reset_index()
+        basis = f["split_basis"].fillna(f["filed"]) if "split_basis" in f else f["filed"]
+        rows = f.loc[todo, ["company_id"]].assign(basis=basis[todo]).reset_index()
         pairs = rows.merge(splits, on="company_id")
-        pairs = pairs[pairs["date"] > pairs["filed"]]
+        pairs = pairs[pairs["date"] > pairs["basis"]]
         factor = pairs.groupby("index")["ratio"].prod()
         f.loc[factor.index, "split_factor"] = factor.astype(float)
     how = f["item"].map(SPLIT_ITEMS)
@@ -816,7 +970,7 @@ def build_fundamentals(conn, companies, items, tags, splits) -> tuple[pd.DataFra
     f = derive(derive_q4(f, items), items)
     helpers = set(items.loc[items["helper"], "item"])
     f, c = f[~f["item"].isin(helpers)], c[~c["item"].isin(helpers)]
-    f = add_split_factor(f, splits)
+    f = derive_q4_per_share(add_split_factor(f, splits), splits)
     cols = [*KEY, "filed", "filed_estimated", "fiscal_year", "fiscal_period", "value"]
     cols += ["split_factor", "method", "source", "tag", "raw_table", "raw_id"]
     out = f[cols].copy()
@@ -831,13 +985,85 @@ def build_fundamentals(conn, companies, items, tags, splits) -> tuple[pd.DataFra
     return f, c
 
 
+PER_SHARE = [k for k, how in SPLIT_ITEMS.items() if how == "divide"]
+
+
+def per_share_ttm(f: pd.DataFrame) -> list[dict]:
+    """Twelve-month EPS anchored on the reported year, for the windows ending in Q1-Q3: the
+    last fiscal year's EPS plus this year's quarters so far less the same quarters a year
+    before (how data providers build it, #49). Four quarterly EPS don't add up to the year's
+    (each has its own share count; a loss quarter has no dilution): Johnson & Johnson's Q4
+    2017 is -3.99 against 0.47 - 1.61 - 1.40 - 1.37 = -3.91, 18% of its twelve-month EPS then.
+    Every version as known on each filing date. EPS from continuing operations only where
+    every part reports it: a window mixing restated quarters (JNJ's 2022, without Kenvue) with
+    ones never restated (2021, total EPS standing in) is neither, so such a window takes
+    diluted EPS throughout."""
+    p = f[f["item"].isin(PER_SHARE) & f["period_type"].isin(["Q", "FY"])]
+    if p.empty:
+        return []
+    p = p[p["fiscal_period"].isin(["FY", "Q1", "Q2", "Q3"])].sort_values("filed")
+    versions: dict[tuple, list] = {}
+    ends: dict[tuple, str] = {}
+    for r in p.itertuples(index=False):
+        k = (r.company_id, r.item, int(r.fiscal_year), r.fiscal_period)
+        versions.setdefault(k, []).append(
+            (r.filed, bool(r.filed_estimated), r.value, r.value_adj, r.source,
+             r.method == "reported")
+        )  # fmt: skip
+        ends[k] = r.period_end
+    out = []
+    for (cid, item, year, period), _ in versions.items():
+        if period == "FY":
+            continue
+        n = int(period[1])
+        parts = [(year - 1, "FY")] + [(year, f"Q{i}") for i in range(1, n + 1)]
+        parts += [(year - 1, f"Q{i}") for i in range(1, n + 1)]
+        signs = [1] + [1] * n + [-1] * n
+        keys = [(cid, item, y, fp) for y, fp in parts]
+        if not all(k in versions for k in keys):
+            continue
+        filed_of = [[v[0] for v in versions[k]] for k in keys]
+        first_known = max(fl[0] for fl in filed_of)
+        dates = sorted({d for fl in filed_of for d in fl if d >= first_known})
+        for day in dates:
+            used = [versions[k][bisect.bisect_right(fl, day) - 1]
+                    for k, fl in zip(keys, filed_of, strict=True)]  # fmt: skip
+            out.append({
+                "company_id": cid, "item": item, "period_end": ends[(cid, item, year, period)],
+                "filed": day, "filed_estimated": any(u[1] for u in used),
+                "value": sum(s * u[2] for s, u in zip(signs, used, strict=True)),
+                "value_adj": sum(s * u[3] for s, u in zip(signs, used, strict=True)),
+                "source": used[1][4], "basis": "4q", "all_reported": all(u[5] for u in used),
+            })  # fmt: skip
+    # EPS from continuing operations: a window not reported throughout takes diluted EPS
+    total: dict[tuple, list] = {}
+    for r in out:
+        if r["item"] == "eps_diluted":
+            total.setdefault((r["company_id"], r["period_end"]), []).append(r)
+    for rows in total.values():
+        rows.sort(key=lambda r: r["filed"])
+    kept = []
+    for r in out:
+        if r["item"] == "eps_continuing" and not r["all_reported"]:
+            rows = total.get((r["company_id"], r["period_end"]), [])
+            i = bisect.bisect_right([x["filed"] for x in rows], r["filed"]) - 1
+            if i < 0:
+                continue
+            r = {**r, "value": rows[i]["value"], "value_adj": rows[i]["value_adj"]}
+        kept.append({k: v for k, v in r.items() if k != "all_reported"})
+    return kept
+
+
 def build_ttm(conn: Connection, f: pd.DataFrame) -> pd.DataFrame:
-    """Trailing twelve months for every version: as known on each filing date."""
+    """Trailing twelve months for every version: as known on each filing date. Per-share
+    values are anchored on the fiscal year (per_share_ttm) where it is known; otherwise, and
+    for everything else, four quarters are summed."""
     if f.empty:
         return f
     base = ["company_id", "item", "period_end", "filed", "filed_estimated", "value", "value_adj"]
     inst = f[f["period_type"] == "I"][base + ["source"]].assign(basis="instant")
     fy = f[f["period_type"] == "FY"][base + ["source"]].assign(basis="fy")
+    anchored = per_share_ttm(f)
     sums = []
     cols = ["company_id", "item", "period_end", "filed", "filed_estimated", "value", "value_adj",
             "source"]  # fmt: skip
@@ -875,6 +1101,13 @@ def build_ttm(conn: Connection, f: pd.DataFrame) -> pd.DataFrame:
                     }
                 )
     q = pd.DataFrame(sums)
+    if anchored:  # a per-share window anchored on the year replaces its four-quarter sum
+        a = pd.DataFrame(anchored)
+        if not q.empty:
+            done = a[["company_id", "item", "period_end"]].drop_duplicates()
+            m = q.merge(done, how="left", on=["company_id", "item", "period_end"], indicator=True)
+            q = q[(m["_merge"] == "left_only").to_numpy()]
+        q = pd.concat([q, a], ignore_index=True)
     if not q.empty and not fy.empty:  # at a fiscal year end the fiscal-year value is used
         has_fy = q.merge(
             fy[["company_id", "item", "period_end"]].drop_duplicates(),

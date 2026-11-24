@@ -30,7 +30,7 @@ are the last close the ingest stored (the previous trading day), and the PDFs sa
      (dated, newest first), What to watch. Search the news for each stock; after an
      earnings report, update the verdict, entry price and, if a quarter's adjusted EPS
      includes a one-off, add an `eps_override` in the config. A stock without `target_pe`
-     has no target by Babak's choice (NFLX since 2026-11-12): don't mention an entry price
+     has no target by Babak's choice (2026-11-12): don't mention an entry price
      or ask Babak to confirm one; compare the P/E with the stock's own history instead.
    - `analyses/market/notes.md`: Verdict, Summary, What is driving the market, Stocks to
      look at (comment on the screener's top names from step 2), What to watch. Rewrite

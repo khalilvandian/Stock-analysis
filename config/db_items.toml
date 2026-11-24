@@ -57,6 +57,21 @@ history_scale = 1
 yahoo = ["Diluted EPS"]
 
 [[items]]
+item = "eps_continuing"
+label = "Diluted EPS, continuing operations"
+kind = "flow"
+unit = "USD/share"
+# Earnings per share without the businesses a company sold or spun off (discontinued
+# operations): what P/E is measured on, as data providers do (#49: Koyfin's P/E is price / this
+# for Pfizer and Johnson & Johnson, whose total EPS includes Upjohn's and Kenvue's results and
+# the gains on them). A company without discontinued operations doesn't report it, and its
+# diluted EPS is the same figure: it is copied (derive_mode "fallback": the reported value
+# always wins, the copy only fills the periods the company reports no such figure for).
+sec = ["IncomeLossFromContinuingOperationsPerDilutedShare"]
+derive = "eps_diluted"
+derive_mode = "fallback"
+
+[[items]]
 item = "operating_cf"
 label = "Operating cash flow"
 kind = "flow"

@@ -50,9 +50,11 @@ def check(run_key: str, step: str, name: str) -> str:
     return result.message
 
 
-def set_status(run_key: str, step: str, status: str, message: str) -> str:
+def set_status(run_key: str, step: str, status: str, message: str, closing: bool = False) -> str:
+    """`closing`: the DAG's `finish` task, which runs only when every other task succeeded,
+    so it may turn a failed run (rerun in Airflow) ok."""
     with p.connect() as conn:
-        p.set_status(conn, run_key, status, p.utcnow())
+        p.set_status(conn, run_key, status, p.utcnow(), closing=closing)
         p.log_step(conn, run_key, step, p.Result(p.DONE, message), p.utcnow())
     return message
 
