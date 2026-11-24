@@ -101,7 +101,7 @@ def stock_nightly():
 
     @task
     def finish(key: str) -> str:
-        return runlog.set_status(key, "finish", "ok", "Run finished ok")
+        return runlog.set_status(key, "finish", "ok", "Run finished ok", closing=True)
 
     fetch = job_step("fetch", ["ingest", "--no-build", "--no-site"], hours=3)
     build = job_step("build", ["build"], hours=1.5)

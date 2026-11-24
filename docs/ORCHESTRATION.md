@@ -147,6 +147,23 @@ docker compose -f orchestration/compose.yaml down                   # stop; the 
 - Every check also runs by hand: `uv run python -m stock_analysis.pipeline check-prices
   RUN_KEY` (after `start RUN_KEY`).
 
+## Rerunning a failed night
+
+A failed run stays failed in `ops_pipeline_run` whatever later steps do, except the last
+task, `finish`: Airflow runs it only once every branch succeeded, so it marks the night ok.
+Once the cause is fixed, clear the night's failed tasks and those after them, and Airflow
+reruns just those (here 19 to 23 Nov 2026, through Azure's run-command):
+
+```bash
+az vm run-command invoke -g stock-rg -n airflow-vm --command-id RunShellScript --scripts \
+  "docker exec airflow-scheduler-1 airflow tasks clear stock_nightly \
+   -s 2026-11-19T00:00:00+00:00 -e 2026-11-24T00:00:00+00:00 --only-failed --downstream --yes"
+```
+
+`wait_for_evening` then looks for that night's own session commit and accepts any later
+successful Pages run, so an old night can pass days later. The audit (`pipeline-watch.yml`,
+also started by hand with `gh workflow run pipeline-watch.yml`) reads the run log.
+
 ## Checks
 
 - `tests/test_pipeline.py` (the usual `uv run pytest`): trading days, every check against the

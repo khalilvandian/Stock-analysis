@@ -147,10 +147,13 @@ def log_step(conn, run_key: str, step: str, result: Result, now: dt.datetime) ->
     )
 
 
-def set_status(conn, run_key: str, status: str, now: dt.datetime) -> None:
-    """A failed run stays failed: a later step can't hide an earlier failure."""
+def set_status(conn, run_key: str, status: str, now: dt.datetime, closing: bool = False) -> None:
+    """A failed run stays failed: a later step can't hide an earlier failure. The exception
+    is `closing` (the DAG's last task, `finish`): Airflow runs it only once every branch has
+    succeeded, so a failed night whose failed steps were rerun (cleared in Airflow) and
+    passed reaches it and is ok."""
     column = {"ready": "ready_at", "ok": "finished_at", "failed": "finished_at"}[status]
-    keep = "" if status == "failed" else " AND status <> 'failed'"
+    keep = "" if status == "failed" or (closing and status == "ok") else " AND status <> 'failed'"
     rows(
         conn,
         f"UPDATE ops_pipeline_run SET status = %(s)s, {column} = %(t)s WHERE run_key = %(k)s{keep}",
