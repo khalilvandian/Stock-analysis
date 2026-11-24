@@ -127,8 +127,19 @@ RUNS = f"https://api.github.com/repos/{REPO}/actions/workflows/pages.yml/runs"
 DISPATCH = f"https://api.github.com/repos/{REPO}/actions/workflows/pages.yml/dispatches"
 
 
-def commit(message: str, sha: str = "abc1234def") -> dict:
-    return {"sha": sha, "commit": {"message": message}}
+def commit(message: str, sha: str = "abc1234def", date: str = "2026-11-18T23:10:00Z") -> dict:
+    return {"sha": sha, "commit": {"message": message, "committer": {"date": date}}}
+
+
+def pages_runs(own: list[dict], later: list[dict]):
+    """The Pages runs API: `own` for the commit's runs (head_sha), `later` for the successful
+    runs on main since it (created)."""
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        runs = own if "head_sha" in request.url.params else later
+        return httpx.Response(200, json={"workflow_runs": runs})
+
+    return answer
 
 
 def test_evening_waits_then_fails_without_the_commit(respx_mock) -> None:
@@ -143,17 +154,33 @@ def test_evening_passes_when_pages_published_the_commit(respx_mock) -> None:
     msg = "Watch list analyses, 2026-11-19 00:20 CET"
     respx_mock.get(COMMITS).mock(return_value=httpx.Response(200, json=[commit(msg)]))
     route = respx_mock.get(RUNS)
-    route.mock(return_value=httpx.Response(200, json={"workflow_runs": []}))
+    route.mock(side_effect=pages_runs([], []))
     later = STARTED + dt.timedelta(hours=1)
     with httpx.Client() as c:
         assert p.check_evening(STARTED, later, CFG, c).code == p.NOT_YET
-        done = {"workflow_runs": [{"status": "completed", "conclusion": "success"}]}
-        route.mock(return_value=httpx.Response(200, json=done))
+        route.mock(side_effect=pages_runs([{"status": "completed", "conclusion": "success"}], []))
         assert p.check_evening(STARTED, later, CFG, c).code == p.DONE
-        bad = {"workflow_runs": [{"status": "completed", "conclusion": "failure"}]}
-        route.mock(return_value=httpx.Response(200, json=bad))
+        assert route.calls.last.request.url.params["head_sha"] == "abc1234def"
+        route.mock(side_effect=pages_runs([{"status": "completed", "conclusion": "failure"}], []))
         assert p.check_evening(STARTED, later, CFG, c).code == p.FAILED
-    assert route.calls.last.request.url.params["head_sha"] == "abc1234def"
+
+
+def test_evening_takes_the_nights_commit_and_a_later_publish(respx_mock) -> None:
+    # A rerun days later: main has that night's session commit and a newer one; the night's
+    # own Pages run failed, a later run on main published the site.
+    newer = commit("Watch list analyses, 2026-11-22", "newer99", "2026-11-21T23:05:00Z")
+    night = commit("Watch list analyses, 2026-11-19", "night11", "2026-11-18T23:10:00Z")
+    respx_mock.get(COMMITS).mock(return_value=httpx.Response(200, json=[newer, night]))
+    failed = [{"status": "completed", "conclusion": "failure"}]
+    route = respx_mock.get(RUNS)
+    route.mock(side_effect=pages_runs(failed, [{"head_sha": "after55", "conclusion": "success"}]))
+    rerun = STARTED + dt.timedelta(days=4)
+    with httpx.Client() as c:
+        result = p.check_evening(STARTED, rerun, CFG, c)
+    assert result.code == p.DONE and result.detail["commit"] == "night11"
+    assert "after55" in result.message
+    since = route.calls.last.request.url.params
+    assert since["created"] == ">=2026-11-18T23:10:00Z" and since["status"] == "success"
 
 
 def test_publish_site_needs_the_token_and_dispatches(respx_mock, monkeypatch) -> None:
