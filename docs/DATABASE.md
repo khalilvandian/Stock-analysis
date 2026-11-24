@@ -754,7 +754,8 @@ Free cash flow, net debt and market value are calculated in the views, not store
    worst part and never replaces a value from a better source: `history.csv`'s SEC EBITDA is
    not overridden by Yahoo's operating income + D&A. With `derive_mode = "replace"` (EBITDA,
    total debt) it replaces a reported value of the same rank; with `"fallback"` (total
-   liabilities) the company's own figure always wins and the derived one only fills a gap.
+   liabilities, EPS from continuing operations) the company's own figure always wins and the
+   derived one only fills a gap, or the period until the reported figure is first filed.
    Items with `helper = true` (the parts of the liabilities formula) are used inside the
    build only: they are not stored in `core_item` or `core_fundamental`, nor counted by the
    coverage.
@@ -773,16 +774,37 @@ Free cash flow, net debt and market value are calculated in the views, not store
      A twelve-month total that doesn't end in the fiscal year-end month (10-Qs show trailing
      years) is not a fiscal year.
    - 10-Q cash flows are year to date. The second quarter is the six months less the first
-     quarter, the third the nine months less the six (same start date, latest versions,
-     `method` `derived`), where SEC doesn't report the quarter itself.
+     quarter, the third the nine months less the six (same start date, `method` `derived`),
+     until SEC reports the quarter itself.
+   - **Every derived value is versioned like a reported one (#49):** for each date one of its
+     parts was filed, it is computed from the versions known that day, so it is known when its
+     last part was filed (the 10-Q, the 10-K), not when a later report repeats a part. Taking
+     each part's latest version instead dated a quarter by next year's comparatives, up to two
+     years late. A version equal to the one before is not stored again.
+   - **Reported before derived:** a value a source reports is used as it is. A derived one
+     (Q4, a quarter from year-to-date totals, a `"fallback"` item) only fills the period until
+     the reported one is first filed (JNJ's 2023 10-K reports 2022's quarters, restated: its
+     Q4 is the year less three quarters until then).
+   - Before a period's preferred tag first appears, the best other tag of the same source
+     filed by then dates it (Alphabet filed 2018 revenue as
+     RevenueFromContractWithCustomer... in 2019, as Revenues only in 2021).
    - SEC reports capex as a positive payment; `sec_scale = -1` in `config/db_items.toml`
      stores it negative like the other sources.
    - SEC's fourth quarter is derived as the fiscal year less its three quarters (all from
-     SEC, latest versions), except for EPS. A Q4 that Yahoo reports wins over the derived one.
+     SEC). Diluted EPS and EPS from continuing operations too (as data providers build
+     twelve-month EPS), on today's share basis so a split during the year doesn't mix bases.
+     A Q4 that Yahoo reports wins over the derived one from its date.
+   - `eps_continuing` is EPS from continuing operations as the company reports it; where it
+     reports none (no discontinued operations), diluted EPS is copied (`derive_mode`
+     `"fallback"`). P/E in the ratio history is measured on it (#49).
    - Cover-page share counts (`dei`) are dated at their filing's balance-sheet date.
    - SEC values start with periods in 2015, a year before core, because splits before the
      price history are unknown.
-5. **Filing dates:** SEC facts carry the real filing date (`filed_estimated` false). Other
+5. **Filing dates:** SEC facts carry the real filing date (`filed_estimated` false), except
+   that a 10-Q's or 10-K's figures for its own period count from the company's earnings
+   release (Yahoo's report date) when it came after the period ended and at most 60 days
+   before the filing (#49): the release announces them first, and data providers date them
+   so. The filing's comparatives keep their date, as do amendments. Other
    sources have none, so it is estimated as the period end plus the latest SEC deadline (90
    days after a year, 45 after a quarter) and marked `filed_estimated`. The view can show an
    estimated figure late but never early.
