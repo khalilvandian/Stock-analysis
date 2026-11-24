@@ -1,72 +1,72 @@
 # Market report: Claude's notes
 
-Updated: 2026-11-24
+Updated: 2026-11-25
 
 The evening run copies these sections into the market PDF. Every section carries a review date; the build stops if one was not reviewed for the run (docs/EVENING_RUN.md).
 
 ## Verdict
 
-<!-- reviewed 2026-11-24 -->
-**A huge bounce: the S&P 500 jumped 4.7% on Nov 23 to 7,237 and the Nasdaq 6.5%, their best day since April 2025, after Nvidia's board reinstated Jensen Huang as CEO. The market recovered about half of last week's fall, and the VIX fell from 36 to 27. The gains were concentrated in AI and chip stocks; the watch list, apart from Alphabet, barely moved, so Booking, Netflix, Boston Scientific and Uber remain at or near their entry prices.**
+<!-- reviewed 2026-11-25 -->
+**The AI bounce faded on Nov 24: the S&P 500 fell 0.5% to 7,201 and the Nasdaq 1.5% as chip stocks gave back part of Monday's surge, while the Dow rose 0.9% to its first close above 50,000. Most stocks rose; the fall was in tech. Note: the tables in this report show Monday's (Nov 23) close, because the server's price download for Tuesday failed.**
 
 ## Summary
 
-<!-- reviewed 2026-11-24 -->
-- **Indices (Nov 23 close):** S&P 500 7,237 (+4.7%), Nasdaq 24,090 (+6.5%), Dow 49,595 (+3.0%), Russell 2000 2,670 (+3.4%). The S&P 500 is still 7% below its high.
-- **Cause:** Nvidia rose 31% after its board brought back Jensen Huang, who resigned on Nov 12.
-- **Fear:** the VIX fell 26% to 26.6, still above its usual level of about 15-20.
-- **Not everyone rose:** energy and consumer staples slipped; Anthropic fell about 3%.
+<!-- reviewed 2026-11-25 -->
+- **Indices (Nov 24 close, from news reports):** S&P 500 7,201 (-0.5%), Nasdaq 23,734 (-1.5%), Dow 50,019 (+0.9%), Russell 2000 2,685 (+0.6%).
+- **Cause:** chip stocks fell (Nvidia about -6%, Micron more than -10%) as investors doubted how far the AI rebound can run; rate-hike bets for Dec 9 rose to about 95%.
+- **Good news:** consumer confidence jumped to 103.3, its highest since January 2025.
+- **Data caveat:** the tables are Monday's close; the server's download for Tuesday failed.
 
 ## What happened
 
-<!-- reviewed 2026-11-24 -->
-- **Nov 23:** the S&P 500 rose 327 points (4.7%) to 7,237, the Nasdaq 1,472 points (6.5%) to 24,090 and the Dow 1,448 points (3.0%) to 49,595, ending the S&P 500's seven-day losing streak ([AP](https://www.springfieldnewssun.com/nation-world/us-stocks-soar-and-recover-more-than-half-of-last-weeks-plunge-after-jensen-huang/article_c7ce571f-ef87-56b5-b097-78c48c84544c.html), [CNBC](https://www.cnbc.com/2026/11/22/stock-market-today-live-updates.html)).
-- **AI and chips led:** Nvidia +31% (one of its best days ever), Micron +19%, CoreWeave +22%, Oracle +12% on funding for its OpenAI deal, AMD +7%, Alphabet and Meta +6% ([CNBC](https://www.cnbc.com/2026/11/22/stock-market-today-live-updates.html), [AP](https://www.springfieldnewssun.com/nation-world/us-stocks-soar-and-recover-more-than-half-of-last-weeks-plunge-after-jensen-huang/article_c7ce571f-ef87-56b5-b097-78c48c84544c.html)). The technology sector rose about 9%.
-- **Laggards:** energy (-1%) and consumer staples (flat), last week's safe havens; Anthropic fell about 3% to around $87 ([CNBC](https://www.cnbc.com/2026/11/22/stock-market-today-live-updates.html)).
-- **Other markets:** gold rose about 3%, oil fell, and the 10-year Treasury yield was little changed near 4.92%.
+<!-- reviewed 2026-11-25 -->
+- **Nov 24:** the S&P 500 fell 36 points (0.5%) to 7,201 and the Nasdaq 356 points (1.5%) to 23,734; the Dow rose 423 points (0.9%) to 50,019, its first close above 50,000, and the Russell 2000 rose 0.6% ([Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/), [24/7 Wall St](https://247wallst.com/cards/the-dow-closed-above-50-000-for-the-first-time-while-the-nas-gspc-market-bell-01m87nyn7mshvn15b2vdser41w)).
+- **Losers:** technology about -3.3%. Nvidia about -6% a day after its 31% jump; Micron and SK Hynix more than -10%; HPE -17% on a weak outlook for AI server margins; Dell -12%; CoreWeave -12% ([Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-tuesday-november-24-dow-sp-500-nasdaq-chip-stocks-nvidia-140629923.html), [24/7 Wall St](https://247wallst.com/cards/the-dow-closed-above-50-000-for-the-first-time-while-the-nas-gspc-market-bell-01m87nyn7mshvn15b2vdser41w)).
+- **Winners:** health care +3% (Sanofi +11% after agreeing to buy Insmed for $41bn; Moderna, Amgen), consumer staples +1.7%, real estate +1.3%; Best Buy and Kohl's rose on strong holiday-season sales ([24/7 Wall St](https://247wallst.com/cards/the-dow-closed-above-50-000-for-the-first-time-while-the-nas-gspc-market-bell-01m87nyn7mshvn15b2vdser41w), [Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)).
+- **Anthropic** fell about 6.5% to around $82, below its $83 IPO price ([Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)).
+- **Other markets:** the 10-year Treasury yield slipped to 4.90%; the VIX was little changed at 26.4.
 
 ## Why it happened
 
-<!-- reviewed 2026-11-24 -->
-1. **Nvidia got its CEO back.** Jensen Huang resigned on Nov 12 over reported personal relationships, one with an executive suspected of links to Chinese intelligence. That news, at the company at the centre of the AI boom, was a big part of last week's sell-off. On Monday the board reinstated him, saying it had input from senior US government officials that his return poses no national-security risk; President Trump said his intervention was important ([CNBC](https://www.cnbc.com/2026/11/22/stock-market-today-live-updates.html), [Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-monday-november-23-dow-sp-500-nasdaq-surge-after-nvidia-reinstates-jensen-huang-182039397.html)). The board's investigation continues.
-2. **Prices had fallen too far, too fast.** After the worst week since April 2025, many investors had bet on further falls. When the news turned, they had to buy back, which pushed prices up faster. Nomura called it a "mechanical" short-covering bounce ([Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-monday-november-23-dow-sp-500-nasdaq-surge-after-nvidia-reinstates-jensen-huang-182039397.html)).
-3. **Rates are unchanged.** The Fed is still expected to raise rates on Dec 9 (markets price about 90%); Monday's rally did not change that ([Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-monday-november-23-dow-sp-500-nasdaq-surge-after-nvidia-reinstates-jensen-huang-182039397.html)).
+<!-- reviewed 2026-11-25 -->
+1. **The bounce was mostly short sellers buying back.** Monday's 31% jump in Nvidia came from the board bringing back Jensen Huang, not from new earnings. With that news priced in, investors went back to the question that started the sell-off: how long will the AI spending boom last ([Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-tuesday-november-24-dow-sp-500-nasdaq-chip-stocks-nvidia-140629923.html))? HPE's warning about thinner margins on AI servers added to that doubt.
+2. **Rate hikes are back in focus.** Traders now price about a 95% chance the Fed raises rates by a quarter point on Dec 9 ([Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-tuesday-november-24-dow-sp-500-nasdaq-chip-stocks-nvidia-140629923.html)). Higher rates hurt expensive growth stocks most.
+3. **The rest of the economy looks fine.** Consumer confidence jumped 11 points to 103.3 and retailers reported strong sales ([Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)), so money moved into health care, consumer and value stocks rather than out of the market.
 
 ## What it means
 
-<!-- reviewed 2026-11-24 -->
-In plain terms: last week's fall was mostly about one company's leadership crisis and AI fears, and Monday showed how quickly that mood can flip. The market recovered half the loss in one day.
+<!-- reviewed 2026-11-25 -->
+In plain terms: the market is splitting in two. AI and chip stocks swing wildly on news about one company or one customer, while the rest of the market is calmer and rising. Most stocks went up on Tuesday even though the S&P 500 fell, because a few huge tech companies weigh so much in the index.
 
 For a Lynch-style investor:
 
-- **Don't chase the bounce.** One-day jumps of this size usually happen in nervous markets, not calm ones; the VIX is still well above normal and the Fed is expected to raise rates in two weeks.
-- **The opportunities did not go away.** Booking, Netflix, Boston Scientific and Uber barely moved on Monday, so they are still at or near their entry prices. Only Alphabet rose away from its entry.
-- **Stay away from what you can't judge.** Nvidia's 31% day came from a governance decision, and its board investigation is still open. That is not a business you can value from its numbers this week.
+- **Look past the index.** The S&P 500's move mostly reflects a handful of AI names. Businesses you can understand, outside that trade, are doing fine.
+- **Don't chase AI swings.** A 31% day followed by a 6% fall is a sign of a nervous market, not of value.
+- **Use the data caveat.** The prices in the tables are one day old; for Alphabet, Uber and Constellation the difference is likely small, but check the live price before acting.
 
 ## Stocks to look at
 
-<!-- reviewed 2026-11-24 -->
-The screener's top 3 cheap or close-to-cheap stocks per sector are in the table above, from the companies that pass Stage 1 (good financial statements for their Lynch category), at the Nov 23 close.
+<!-- reviewed 2026-11-25 -->
+The screener's top 3 cheap or close-to-cheap stocks per sector are in the table above, from the companies that pass Stage 1 (good financial statements for their Lynch category), at the Nov 23 close (the server did not run the screener for Nov 24).
 
 - **Cheapest against their own history:** Adobe, Intuit and Gartner are still 50-60% below their cheap price: software and data businesses still growing earnings.
-- **Nvidia** stays on the list after its 31% day, but its leadership investigation is still open.
+- **Nvidia** is still on the list, but it has swung 31% up and 6% down in two days and its board investigation is still open.
 - **Check before trusting:** Allstate and Comcast look cheap because recent earnings are unusually high.
-- **On the watch list too:** Booking (14.1x) is about 28% below its screener cheap price and 6% below its watch-list entry.
 
 Each name still needs step 1 (absolute values with history) before any decision.
 
 ## What to watch
 
-<!-- reviewed 2026-11-24 -->
-- Thanksgiving: US markets are closed on Thursday, Nov 26, and close early (1 p.m. New York) on Friday, Nov 27. Thin trading can exaggerate moves.
-- Earnings this week: Dell and Workday (Nov 24).
-- The Fed's meeting on Dec 8-9: a hike of a quarter point is expected; anything larger would be a new shock.
-- Whether the rebound holds or fades (ongoing): a VIX back below 20 would signal the panic has passed.
+<!-- reviewed 2026-11-25 -->
+- The PCE inflation report on Nov 25, the Fed's preferred inflation measure, the day before Thanksgiving.
+- Thanksgiving: US markets are closed on Thursday, Nov 26, and close early (1 p.m. New York) on Friday, Nov 27.
+- The Fed's meeting on Dec 8-9: a quarter-point hike is almost fully expected; anything larger would be a new shock.
+- Whether the server's price download recovers tonight (ongoing), so the next report has current prices.
 
 ## Sources
 
-<!-- reviewed 2026-11-24 -->
-- [CNBC: Dow soars 1,400 points; Nasdaq surges 6% as Jensen Huang returns to Nvidia (Nov 23)](https://www.cnbc.com/2026/11/22/stock-market-today-live-updates.html)
-- [AP: US stocks soar and recover more than half of last week’s plunge (Nov 23)](https://www.springfieldnewssun.com/nation-world/us-stocks-soar-and-recover-more-than-half-of-last-weeks-plunge-after-jensen-huang/article_c7ce571f-ef87-56b5-b097-78c48c84544c.html)
-- [Yahoo Finance: Stock market today, Monday Nov 23](https://finance.yahoo.com/markets/live/stock-market-today-monday-november-23-dow-sp-500-nasdaq-surge-after-nvidia-reinstates-jensen-huang-182039397.html)
-- Index levels, sectors, breadth, the screener and watch-list prices: the database (Nov 23 close).
+<!-- reviewed 2026-11-25 -->
+- [Yahoo Finance: Dow rises, S&P 500 and Nasdaq decline as chip sector tumbles (Nov 24)](https://finance.yahoo.com/markets/live/stock-market-today-tuesday-november-24-dow-sp-500-nasdaq-chip-stocks-nvidia-140629923.html)
+- [Vista Partners: Dow tops 50,000 as Nasdaq slides, consumer confidence surges (Nov 24)](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)
+- [24/7 Wall St: The Dow closed above 50,000 for the first time (Nov 24)](https://247wallst.com/cards/the-dow-closed-above-50-000-for-the-first-time-while-the-nas-gspc-market-bell-01m87nyn7mshvn15b2vdser41w)
+- Index tables, sectors, breadth, the screener and watch-list prices: the database (Nov 23 close; the Nov 24 download failed).

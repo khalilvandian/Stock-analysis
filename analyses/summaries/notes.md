@@ -1,25 +1,25 @@
 # Watch list summary: Claude's notes
 
-Updated: 2026-11-24
+Updated: 2026-11-25
 
 The evening run copies these sections into the watch list summary PDF. Every section carries a review date; the build stops if one was not reviewed for the run (docs/EVENING_RUN.md).
 
 ## Verdict
 
-<!-- reviewed 2026-11-24 -->
-**Monday's 4.7% market bounce lifted AI stocks, not the watch list. At the Nov 23 close Booking is 6% below its $154 entry and Netflix about at its $58.4 entry; Boston Scientific (2% above $41.5) and Uber (3% above $62) are close; Alphabet jumped 6% and is now 9% above its $256 entry. None had company news. Constellation Energy joins the list: at $251.7 its proposed $215 entry (17x) is 15% below the price.**
+<!-- reviewed 2026-11-25 -->
+**The watch list is now Alphabet, Uber and Constellation Energy. At the Nov 23 close (Tuesday's prices are missing because the server's download failed) Uber is 3% above its $62 entry, Alphabet 9% above its $256 entry and Constellation 15% above its $215 entry. None had company news on Nov 24.**
 
 ## Analysis
 
-<!-- reviewed 2026-11-24 -->
-The entry prices are proposals until Babak confirms the target multiples (13x BSX, 15x BKNG, 20x NFLX, 22x GOOGL plus its stakes, 20x UBER, 17x CEG).
+<!-- reviewed 2026-11-25 -->
+The entry prices are proposals until Babak confirms the target multiples (22x GOOGL plus its stakes, 20x UBER, 17x CEG). Boston Scientific, Booking and Netflix left the watch list on Nov 24; their dated analyses stay on the site.
 
-**What the day did.** The market recovered about half of last week's fall in one session, driven by Nvidia's CEO returning. Alphabet rose 6.3% with the AI group; Netflix rose 2.4%; Uber and Boston Scientific under 1%; Booking was flat.
+**What the day did.** Chip stocks fell back after Monday's surge while most other stocks rose. Anthropic fell below its IPO price, which slightly lowers the value of Alphabet's stake.
 
-**Where to act.** Booking (14.1x, still growing earnings 17%, more cash than debt) is the clearest buy. Netflix (19.9x) is at the proposed entry; a small position if Babak confirms 20x. Uber and Boston Scientific are within 2-3% of their entries.
+**Where to act.** Uber is the closest to its entry: 20.5x earnings growing 35-40% a year. Buying in steps near $62 is reasonable.
 
-**How to act.** The bounce does not mean the danger is over: fear is still above normal, Thanksgiving week trading is thin and the Fed is expected to raise rates on Dec 9. Buying in steps over several weeks still beats one purchase.
+**Where to wait.** Alphabet is at its long-term valuation and Constellation at its post-2022 median; both are priced partly on the AI trade, which is still swinging hard.
 
-**Where to wait.** Alphabet is back at its long-term valuation, 9% above the entry. Constellation Energy, added on Nov 23, trades at 19.9x record adjusted earnings after the Calpine deal, about its median since the 2022 spin-off; its debt has nearly tripled to $23.4bn, so wait for about $215 or for the 2027 guidance in February.
+**Data caveat.** All prices here are Monday's close; check the live price before acting.
 
 Each stock's verdict and key points follow.

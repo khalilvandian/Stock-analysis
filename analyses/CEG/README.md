@@ -4,5 +4,6 @@ Every analysis of this stock, newest first. Each PDF has the summary, the number
 
 | Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price | Verdict | PDF |
 |---|---|---|---|---|---|---|---|
+| 2026-11-25 00:43 CET | $251.72 | 19.9x | 20.5x | $215.05 | -14.6% | Not yet cheap. | [2026-11-25_0043.pdf](2026-11-25_0043.pdf) |
 | 2026-11-24 00:34 CET | $251.72 | 19.9x | 20.5x | $215.05 | -14.6% | <!-- reviewed 2026-11-24 -->
 Not yet cheap. | [2026-11-24_0034.pdf](2026-11-24_0034.pdf) |
