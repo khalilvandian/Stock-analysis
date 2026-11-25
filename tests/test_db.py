@@ -907,6 +907,8 @@ def api(pg_url: str, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", url)
     monkeypatch.setenv("DATABASE_WRITER_URL", url)
     monkeypatch.setenv("STOCK_API_KEY", "test-key")
+    monkeypatch.setenv("CLAUDE_API_KEY", "claude-key")
+    monkeypatch.syspath_prepend(str(ROOT / "api"))  # app.py imports operations.py beside it
     spec = importlib.util.spec_from_file_location("stock_api_app", ROOT / "api" / "app.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules["stock_api_app"] = module
@@ -998,3 +1000,148 @@ def test_companies_config_is_well_formed() -> None:
         assert c["symbol"] and c["item"] and c["tags"]
     for c in cfg.get("predecessor", []):
         assert c["symbol"] and int(c["cik"]) and c["until"]
+
+
+# --- the application's operations (issue #60) -------------------------------------------
+
+CLAUDE = {"X-API-Key": "claude-key"}
+RUN = "manual__2026-11-25T22:30:00+00:00"
+RUN_URL = "/app/runs/manual__2026-11-25T22%3A30%3A00%2B00%3A00"
+HEADINGS = ("Verdict", "Today", "Summary", "Business", "Risks", "News", "What to watch")
+STOCK_NOTE = {s: f"{s} text" for s in HEADINGS}
+
+
+def open_run(con: Database, subjects: list[str]) -> None:
+    with con.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO out_analysis_run (run_key, trading_day, subjects_json, opened_at) "
+                "VALUES (:k, CURRENT_DATE - 1, :s, now() AT TIME ZONE 'UTC')"
+            ),
+            {"k": RUN, "s": json.dumps(subjects)},
+        )
+
+
+def test_app_claude_key_has_operations_but_no_general_sql(con: Database, api) -> None:
+    assert api.get("/app/watchlist").status_code == 401
+    assert api.get("/app/watchlist", headers=CLAUDE).status_code == 200
+    body = {"steps": [{"sql": "DELETE FROM out_note"}]}
+    assert api.post("/execute", json=body, headers=CLAUDE).status_code == 403
+    assert api.post("/query", json={"sql": "SELECT 1"}, headers=CLAUDE).status_code == 403
+    ok = api.post("/app/query", json={"sql": "SELECT 41 + 1 AS n"}, headers=CLAUDE)
+    assert ok.json()["rows"] == [[42]]
+    sneaky = "WITH d AS (DELETE FROM out_note RETURNING *) SELECT * FROM d"
+    assert api.post("/app/query", json={"sql": sneaky}, headers=CLAUDE).status_code == 400
+    calls = one(con, "SELECT string_agg(status::text, ' ' ORDER BY call_id) FROM ops_api_call")
+    assert calls == "200 200 400"
+    assert one(con, "SELECT detail FROM ops_api_call WHERE call_id = 2") == "SELECT 41 + 1 AS n"
+
+
+def test_app_analysis_is_checked_saved_and_submitted(con: Database, api) -> None:
+    api.headers.update(CLAUDE)
+    assert api.get("/app/runs/current").status_code == 404
+    open_run(con, ["AAA", "summaries"])
+    assert api.get("/app/runs/current").json()["missing"] == ["AAA", "summaries"]
+    assert "Today" in api.get(RUN_URL).json()["sections"]["AAA"]
+    today = one(con, "SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD')")
+    put = f"{RUN_URL}/analyses"
+
+    bad = api.put(f"{put}/AAA", json={"reviewed": today, "sections": {**STOCK_NOTE, "Risks": " "}})
+    assert bad.status_code == 422 and bad.json()["detail"] == ["section missing or empty: Risks"]
+    stale = api.put(f"{put}/AAA", json={"reviewed": "2026-01-01", "sections": STOCK_NOTE})
+    assert stale.status_code == 422
+    other = api.put(f"{put}/ZZZ", json={"reviewed": today, "sections": STOCK_NOTE})
+    assert other.status_code == 422
+    assert api.post(f"{RUN_URL}/submit", json={}).status_code == 409  # nothing saved
+
+    fix = {"reported": "2026-02-01", "eps": 1.5, "reason": "a tax gain", "source": "10-Q, p. 4"}
+    good = {"reviewed": today, "sections": STOCK_NOTE, "corrections": [fix]}
+    overrides = one(con, "SELECT COUNT(*) FROM user_eps_override")
+    for _ in range(2):  # saving again replaces
+        saved = api.put(f"{put}/AAA", json=good)
+        assert saved.json() == {"saved": "AAA", "missing": ["summaries"]}
+    assert one(con, "SELECT COUNT(*) FROM out_analysis") == 1
+    assert one(con, "SELECT COUNT(*) FROM user_eps_override") == overrides  # report only
+    note = {"reviewed": today, "sections": {"Verdict": "v", "Analysis": "a"}}
+    with_fix = api.put(f"{put}/summaries", json={**note, "corrections": [fix]})
+    assert with_fix.status_code == 422
+    assert api.put(f"{put}/summaries", json=note).status_code == 200
+    assert api.post(f"{RUN_URL}/submit", json={"note": "all done"}).status_code == 200
+    assert api.post(f"{RUN_URL}/submit", json={"note": "again"}).status_code == 200
+    assert one(con, "SELECT submit_note FROM out_analysis_run") == "all done"
+    assert api.put(f"{put}/AAA", json=good).status_code == 409
+    newest = api.get("/app/analyses/aaa").json()[0]
+    assert newest["corrections"] == [fix] and newest["saved_by"] == "claude"
+
+
+def test_app_watchlist_changes_are_checked_kept_and_undone(con: Database, api) -> None:
+    api.headers.update(CLAUDE)
+    start = api.get("/app/watchlist").json()
+    first = next(s for s in start if s["symbol"] == "AAA")
+
+    for bad in (
+        {"target_pe": 15},
+        {"target_pe": 15, "peers": ["NEW"]},
+        {"target_pe": 0, "peers": ["BBB"]},
+        {"target_pe": 15, "peers": ["B B"]},
+        {"target_pe": 15, "peers": ["BBB"], "reason": ""},
+    ):
+        answer = api.put("/app/watchlist/NEW", json={"reason": "try it", **bad})
+        assert answer.status_code == 422, bad
+    assert api.get("/app/watchlist").json() == start  # a refused change changes nothing
+
+    body = {"reason": "asked by Babak", "target_pe": 15, "peers": ["bbb", "CCC"]}
+    added = api.put("/app/watchlist/new", json=body).json()
+    assert added["stock"]["peers"] == ["BBB", "CCC"] and "warning" in added
+    assert api.put("/app/watchlist/NEW", json=body).json()["changed"] is False
+
+    changed = api.put("/app/watchlist/AAA", json={"reason": "cheaper", "target_pe": 11}).json()
+    assert changed["stock"] == {**first, "target_pe": 11}  # everything else kept
+    removed = api.request("DELETE", "/app/watchlist/AAA", json={"reason": "drop it"}).json()
+    assert "AAA" not in [s["symbol"] for s in api.get("/app/watchlist").json()]
+    early = api.post(f"/app/watchlist/undo/{changed['change_id']}", json={"reason": "oops"})
+    assert early.status_code == 409
+    back = api.post(f"/app/watchlist/undo/{removed['change_id']}", json={"reason": "oops"})
+    assert back.json()["stock"] == {**first, "target_pe": 11}  # with its corrections and peers
+    history = api.get("/app/watchlist/history?symbol=aaa").json()
+    assert [h["action"] for h in history] == ["undo", "remove", "change"]
+    assert history[0]["by"] == "claude"
+
+
+def test_app_run_requests(con: Database, api) -> None:
+    api.headers.update(CLAUDE)
+    bad = api.post("/app/requests", json={"subjects": ["NOPE"], "reason": "why not"})
+    assert bad.status_code == 422
+    ok = api.post("/app/requests", json={"subjects": ["aaa"], "reason": "earnings out"})
+    assert ok.status_code == 200
+    assert one(con, "SELECT subjects_json FROM ops_run_request") == '["AAA"]'
+
+
+def test_app_client_runs_the_operations(con: Database, api, tmp_path, capsys) -> None:
+    from stock_analysis.app import App, main
+
+    api.headers.update(CLAUDE)
+    app = App(client=api)
+    open_run(con, ["AAA"])
+    today = one(con, "SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD')")
+    file = tmp_path / "AAA.json"
+    file.write_text(json.dumps({"reviewed": today, "sections": {**STOCK_NOTE, "News": ""}}))
+    assert main(["save", RUN, "AAA", str(file)], app) == 1
+    assert "section missing or empty: News" in capsys.readouterr().err
+    file.write_text(json.dumps({"reviewed": today, "sections": STOCK_NOTE}))
+    assert main(["save", RUN, "AAA", str(file)], app) == 0
+    assert main(["submit", RUN, "--note", "ok"], app) == 0
+    assert main(["run"], app) == 1  # no open run any more
+    capsys.readouterr()
+    assert main(["watchlist-set", "AAA", "--reason", "test it", "--target-pe", "12"], app) == 0
+    answer = json.loads(capsys.readouterr().out)
+    assert answer["stock"]["target_pe"] == 12 and answer["stock"]["peers"]
+    with con.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO out_stock_numbers VALUES ('AAA', CURRENT_DATE, "
+                "now() AT TIME ZONE 'UTC', 'k', :p)"
+            ),
+            {"p": '{"pe": Infinity}'},
+        )
+    assert app.numbers("AAA")["payload"]["pe"] == float("inf")

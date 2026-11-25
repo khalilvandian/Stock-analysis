@@ -1,6 +1,7 @@
-"""A small, general web API in front of the database, for Claude's cloud sessions (they can only
-reach the internet over HTTPS, not PostgreSQL directly). Not one route per question: any SQL,
-with the database users' rights deciding what is allowed.
+"""The web API in front of the database. Claude uses the operations under /app (operations.py,
+docs/APPLICATION.md), with its own key (CLAUDE_API_KEY). The scripts and the site, where
+PostgreSQL can't be reached, use the general routes below: any SQL, with the database users'
+rights deciding what is allowed.
 
     GET  /health    no key; says the app is up
     GET  /quotes    no key; the newest intraday quote of every company (issue #35), for the
@@ -17,10 +18,10 @@ with the database users' rights deciding what is allowed.
                     Answer: {"rowcounts": [...]}
 
 Parameters use :name placeholders (SQLAlchemy style). Every route but /health and /quotes
-needs the header `X-API-Key: <STOCK_API_KEY>`. App settings: DATABASE_URL (stock_reader),
-DATABASE_WRITER_URL (stock_writer), STOCK_API_KEY, optionally QUOTES_ORIGINS. stock_writer
-can't change the schema, can't touch schema_version and can't change or delete raw data, so
-neither can this API.
+needs the header `X-API-Key` (the general SQL routes: STOCK_API_KEY only). App settings:
+DATABASE_URL (stock_reader), DATABASE_WRITER_URL (stock_writer), STOCK_API_KEY, CLAUDE_API_KEY,
+optionally QUOTES_ORIGINS. stock_writer can't change the schema, can't touch schema_version and
+can't change or delete raw data, so neither can this API.
 No dependency on the rest of the repository, so it deploys as this folder alone.
 """
 
@@ -34,6 +35,7 @@ import re
 import time
 from functools import cache
 
+import operations
 from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -86,10 +88,22 @@ def engine(setting: str) -> Engine:
                          connect_args={"connect_timeout": 10})  # fmt: skip
 
 
+# Each key and the name its calls are logged under.
+KEYS = {"STOCK_API_KEY": "scripts", "CLAUDE_API_KEY": "claude"}
+
+
+def caller_of(key: str | None) -> str:
+    for setting, name in KEYS.items():
+        expected = os.environ.get(setting, "")
+        if expected and key and hmac.compare_digest(key.encode(), expected.encode()):
+            return name
+    raise HTTPException(status_code=401, detail="missing or wrong X-API-Key")
+
+
 def check_key(key: str | None) -> None:
-    expected = os.environ.get("STOCK_API_KEY", "")
-    if not expected or not key or not hmac.compare_digest(key, expected):
-        raise HTTPException(status_code=401, detail="missing or wrong X-API-Key")
+    """The general SQL routes: the scripts' key only (Claude uses the operations)."""
+    if caller_of(key) != "scripts":
+        raise HTTPException(status_code=403, detail="use the operations under /app")
 
 
 def one_statement(sql: str, allowed: tuple[str, ...]) -> str:
@@ -146,22 +160,26 @@ def quotes(response: Response) -> dict:
     return body
 
 
-@app.post("/query")
-def query(body: Query, x_api_key: str | None = Header(default=None)) -> dict:
-    check_key(x_api_key)
-    statement = one_statement(body.sql, READ_START)
-    limit = max(1, min(body.limit, MAX_ROWS))
+def run_query(sql: str, params: dict, limit: int) -> dict:
+    statement = one_statement(sql, READ_START)
+    limit = max(1, min(limit, MAX_ROWS))
     try:
         with engine("DATABASE_URL").connect() as conn, conn.begin() as trans:
             conn.exec_driver_sql("SET TRANSACTION READ ONLY")
             conn.exec_driver_sql(f"SET LOCAL statement_timeout = '{QUERY_TIMEOUT_S}s'")
-            result = conn.execute(text(statement), body.params)
+            result = conn.execute(text(statement), params)
             columns = list(result.keys())
             rows = [[plain(v) for v in row] for row in result.fetchmany(limit + 1)]
             trans.rollback()
     except (DBAPIError, StatementError) as exc:
         raise database_error(exc) from exc
     return {"columns": columns, "rows": rows[:limit], "truncated": len(rows) > limit}
+
+
+@app.post("/query")
+def query(body: Query, x_api_key: str | None = Header(default=None)) -> dict:
+    check_key(x_api_key)
+    return run_query(body.sql, body.params, body.limit)
 
 
 @app.post("/execute")
@@ -180,3 +198,6 @@ def execute(body: Execute, x_api_key: str | None = Header(default=None)) -> dict
     except (DBAPIError, StatementError) as exc:
         raise database_error(exc) from exc
     return {"rowcounts": counts}
+
+
+app.include_router(operations.router(engine, caller_of, run_query))
