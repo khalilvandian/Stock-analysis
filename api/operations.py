@@ -13,6 +13,8 @@ calls that are checked and logged (ops_api_call). Claude never writes SQL or fil
     PUT    /app/watchlist/{symbol}         add or change a stock
     DELETE /app/watchlist/{symbol}         remove a stock
     POST   /app/watchlist/undo/{change_id} put a stock back as it was before a change
+    GET    /app/guide                      the standing guide: what every run must know
+    PUT    /app/guide                      a new version (the earlier ones are kept)
     POST   /app/query                      one read-only SELECT, logged
 
 Airflow's run keys contain ':' and '+': clients URL-encode them.
@@ -37,6 +39,7 @@ except ImportError:
     from stock_analysis import notes_check
 
 MARKET, SUMMARIES = "market", "summaries"
+GUIDE = "guide"  # its versions in out_note
 SECTIONS = {k: v for k, v in notes_check.SECTIONS.items() if k != "stock"}
 STOCK_SECTIONS = notes_check.SECTIONS["stock"]
 SYMBOL = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
@@ -81,6 +84,11 @@ class Stock(BaseModel):
 
 
 class Reason(BaseModel):
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class Guide(BaseModel):
+    text: str = Field(min_length=200, max_length=200_000)
     reason: str = Field(min_length=3, max_length=1000)
 
 
@@ -480,6 +488,47 @@ def router(
             put_stock(conn, symbol, after)
             change = log_change(conn, caller, "undo", symbol, body.reason, before, after)
         return {"changed": True, "change_id": change, "stock": after}
+
+    # The standing guide -----------------------------------------------------------------
+    def newest_guide(conn: Connection) -> dict | None:
+        found = rows(
+            conn,
+            "SELECT updated_at, text, source FROM out_note WHERE subject = :s "
+            "ORDER BY updated_at DESC LIMIT 1",
+            s=GUIDE,
+        )
+        return found[0] if found else None
+
+    @api.get("/guide")
+    def get_guide(caller: str = Depends(call)) -> dict:
+        with read() as conn:
+            guide = newest_guide(conn)
+        if guide is None:
+            raise refuse(404, "no guide yet")
+        return guide
+
+    @api.put("/guide")
+    def put_guide(body: Guide, request: Request, caller: str = Depends(call)) -> dict:
+        request.state.detail = body.reason
+        with write() as conn:
+            conn.execute(text("SELECT pg_advisory_xact_lock(:n)"), {"n": LOCK})
+            before = newest_guide(conn)
+            if before and before["text"] == body.text:
+                return {"changed": False, "length": len(body.text)}
+            if before and len(body.text) < len(before["text"]) / 2:
+                raise refuse(422, "shorter than half the present guide: send the whole text")
+            at = now()
+            if before and before["updated_at"] >= at:  # one version a second
+                at = before["updated_at"] + dt.timedelta(seconds=1)
+            conn.execute(
+                text(
+                    "INSERT INTO out_note (subject, updated_at, text, source) "
+                    "VALUES (:s, :at, :text, :source)"
+                ),
+                {"s": GUIDE, "at": at, "text": body.text,
+                 "source": f"{caller}: {body.reason}"},
+            )  # fmt: skip
+        return {"changed": True, "length": len(body.text)}
 
     # Ad hoc reads -----------------------------------------------------------------------
     @api.post("/query")

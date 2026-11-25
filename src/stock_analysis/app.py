@@ -14,6 +14,8 @@ save its analyses and edit the watch list. Every command is one operation of the
         [--peers A B ...] [--target-note TEXT] [--stakes X]
     python -m stock_analysis.app watchlist-remove SYMBOL --reason TEXT
     python -m stock_analysis.app watchlist-undo CHANGE_ID --reason TEXT
+    python -m stock_analysis.app guide                     # what every run must know
+    python -m stock_analysis.app guide-set FILE.md --reason TEXT
     python -m stock_analysis.app query "SELECT ..."
 
 FILE.json: {"reviewed": "YYYY-MM-DD", "sections": {"Verdict": "...", ...}, "corrections":
@@ -102,6 +104,12 @@ class App:
     def watchlist_undo(self, change_id: int, reason: str):
         return self.call("POST", f"watchlist/undo/{change_id}", {"reason": reason})
 
+    def guide(self):
+        return self.call("GET", "guide")
+
+    def guide_set(self, text: str, reason: str):
+        return self.call("PUT", "guide", {"text": text, "reason": reason})
+
     def query(self, sql: str, limit: int = 5000):
         return self.call("POST", "query", {"sql": sql, "limit": limit})
 
@@ -144,6 +152,10 @@ def parser() -> argparse.ArgumentParser:
     p = add("watchlist-undo")
     p.add_argument("change_id", type=int)
     p.add_argument("--reason", required=True)
+    add("guide")
+    p = add("guide-set")
+    p.add_argument("file", type=Path)
+    p.add_argument("--reason", required=True)
     p = add("query")
     p.add_argument("sql")
     return ap
@@ -154,6 +166,8 @@ def main(argv: list[str] | None = None, app: App | None = None) -> int:
     command = args.pop("command").replace("-", "_")
     if command == "save":
         args["analysis"] = json.loads(args.pop("file").read_text(encoding="utf-8"))
+    if command == "guide_set":
+        args["text"] = args.pop("file").read_text(encoding="utf-8")
     if command == "watchlist_set":
         args = {k: v for k, v in args.items() if v is not None}
     try:
@@ -161,7 +175,10 @@ def main(argv: list[str] | None = None, app: App | None = None) -> int:
     except Refused as exc:
         print(exc, file=sys.stderr)
         return 1
-    print(json.dumps(answer, indent=1, ensure_ascii=False))
+    if command == "guide":
+        print(answer["text"])
+    else:
+        print(json.dumps(answer, indent=1, ensure_ascii=False))
     return 0
 
 

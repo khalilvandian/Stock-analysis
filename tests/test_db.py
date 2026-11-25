@@ -1159,3 +1159,22 @@ def test_app_client_runs_the_operations(con: Database, api, tmp_path, capsys) ->
             {"p": '{"pe": Infinity}'},
         )
     assert app.numbers("AAA")["payload"]["pe"] == float("inf")
+
+
+def test_app_guide_keeps_every_version(con: Database, api, tmp_path, capsys) -> None:
+    from stock_analysis.app import App, main
+
+    api.headers.update(CLAUDE)
+    app = App(client=api)
+    assert main(["guide"], app) == 1  # none yet
+    file = tmp_path / "guide.md"
+    for text_ in ("# Guide\n" + "a" * 600, "# Guide\n" + "b" * 700):
+        file.write_text(text_, encoding="utf-8")
+        assert main(["guide-set", str(file), "--reason", "learned it"], app) == 0
+    capsys.readouterr()
+    assert main(["guide"], app) == 0
+    assert capsys.readouterr().out.startswith("# Guide\nbbb")
+    file.write_text("# Guide\n" + "c" * 250, encoding="utf-8")
+    assert main(["guide-set", str(file), "--reason", "cut it"], app) == 1
+    assert one(con, "SELECT COUNT(*) FROM out_note WHERE subject = 'guide'") == 2
+    assert app.guide()["source"] == "claude: learned it"
