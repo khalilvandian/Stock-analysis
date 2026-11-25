@@ -44,7 +44,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -52,7 +52,7 @@ import markdown
 import numpy as np
 import pandas as pd
 
-from stock_analysis import nightly, stocks
+from stock_analysis import nightly, notes_check, stocks
 from stock_analysis import watchlist as wl
 from stock_analysis.data import Data
 from stock_analysis.nightly import (  # noqa: F401 - the computations, under their old names
@@ -92,15 +92,26 @@ NOTE_SECTIONS = ["Verdict", "Summary", "Business", "Risks", "News", "What to wat
 
 
 def read_notes(symbol: str) -> tuple[str, dict[str, str]]:
-    """analyses/<SYMBOL>/notes.md split into its '## ' sections; returns (updated, sections)."""
+    """analyses/<SYMBOL>/notes.md split into its '## ' sections; returns (updated, sections).
+    The review markers (<!-- reviewed DATE -->, checked by stock_analysis.notes_check) are
+    left out of the text."""
     path = OUT / symbol / "notes.md"
     if not path.exists():
         return "", {}
-    text = path.read_text(encoding="utf-8")
-    m = re.search(r"^Updated:\s*(.+)$", text, re.M)
-    parts = re.split(r"^## +(.+)$", text, flags=re.M)
-    sections = {parts[i].strip(): parts[i + 1].strip() for i in range(1, len(parts) - 1, 2)}
-    return (m.group(1).strip() if m else ""), sections
+    updated, sections = notes_check.split(path.read_text(encoding="utf-8"))
+    return updated, {k: notes_check.strip_markers(v) for k, v in sections.items()}
+
+
+def notes_problems(subjects: list[str], run: date) -> dict[str, list[str]]:
+    """Each subject's notes failures (stock_analysis.notes_check) for a run on `run`."""
+    out = {}
+    for s in subjects:
+        path = OUT / s / "notes.md"
+        text = path.read_text(encoding="utf-8") if path.exists() else ""
+        found = notes_check.problems(notes_check.kind_of(s), text, run)
+        if found:
+            out[s] = found
+    return out
 
 
 # --- HTML ----------------------------------------------------------------------------
@@ -411,6 +422,8 @@ Claude's notes updated {html.escape(updated or "never")}.</div>
  <div><span>Entry at {k["target_pe"]:g}x</span><b>{money(k["entry_price"])}</b>
   <span>{gap_text}</span></div>
 </div>
+<h3>Today</h3>
+{note("Today")}
 {note("Summary")}
 
 <h2 class="page">2. The numbers</h2>
@@ -447,7 +460,8 @@ show very high P/Es). {nxt}</p>
 live quotes. Yahoo data is unofficial; capex can include acquisitions or stakes, so check
 SEC capex.</li>
 <li>The peer group is hand-picked, so the weighted scores depend on it.</li>
-<li>Claude's notes are dated above and may be older than the numbers.</li>
+<li>Claude's notes are written for each run from the day's news, linked in News; the build
+stops if a section was not reviewed for the run.</li>
 </ul>
 <p class="note">Reproduce: <code>uv run python analysis/watchlist.py {sym}</code></p>
 </body></html>"""
@@ -679,6 +693,11 @@ def main() -> None:
         action="store_true",
         help="compute every stock's numbers now instead of reading the stored ones",
     )
+    ap.add_argument(
+        "--allow-stale-notes",
+        action="store_true",
+        help="build even if Claude's notes fail stock_analysis.notes_check (say so in the email)",
+    )
     args = ap.parse_args()
 
     cfg = load_watchlist()
@@ -690,6 +709,15 @@ def main() -> None:
     now = pd.Timestamp(local.astimezone(ZoneInfo("UTC")).replace(tzinfo=None))
     run_at = local.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
+    if not args.numbers and not args.symbols and not args.allow_stale_notes:
+        subjects = [s["symbol"] for s in cfg["stock"]] + ["market", "summaries"]
+        found = notes_problems(subjects, local.date())
+        if found:
+            print("Claude's notes are not ready for this run (docs/EVENING_RUN.md, step 3):")
+            for s, items in found.items():
+                print(f"  {s}:")
+                print("\n".join(f"    - {i}" for i in items))
+            raise SystemExit("Nothing built. Fix the notes, or pass --allow-stale-notes.")
     data = Data.open()
     if not args.numbers:
         if wl.sync(data, cfg):
