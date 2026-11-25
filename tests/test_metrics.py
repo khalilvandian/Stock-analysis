@@ -5,7 +5,7 @@ import pytest
 from stock_analysis import metrics
 
 ROOT = metrics.ROOT
-# Columns made at run time by analysis/screen.py rather than saved by sector.py
+# Columns made at run time by stock_analysis.screen rather than saved by sector.py
 SCREEN_COLUMNS = {"debt_score", "quality_score", "cheap_score", "total_score", "pe_rel", "ev_rel",
                   "pe_change_expected"}  # fmt: skip
 

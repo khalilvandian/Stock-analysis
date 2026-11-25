@@ -3,13 +3,13 @@
 Pages: an overview (market strip and one card per stock), one page per stock (verdict,
 key numbers, Claude's notes, every dated PDF), the market reports, the market screener's
 latest top 3 per sector, the watch list summaries, the data coverage and the pipeline
-diagram (docs/pipeline.html), with grouped menus on every page. The PDFs and notes are
-files in analyses/; the recorded runs (out_watchlist_run, out_market_run), the screener
-run, the coverage and the explorer's data come from the database: through the web API
-when STOCK_API_URL and STOCK_API_KEY are set (the Pages workflow), else stock_analysis.data
-on a PC. The PDFs are copied next to the pages, so a link opens the report in the browser.
-The evening run commits to `main`; the Pages workflow (.github/workflows/pages.yml) then
-runs this and publishes `_site/` at https://khalilvandian.github.io/Stock-analysis/.
+diagram (docs/pipeline.html), with grouped menus on every page. Claude's analyses, the
+recorded runs (out_watchlist_run, out_market_run), the screener run, the coverage and the
+explorer's data come from the database: through the web API when STOCK_API_URL and
+STOCK_API_KEY are set (the Pages workflow), else stock_analysis.data on a PC. The PDFs come
+from STOCK_REPORTS_DIR, where the workflow (.github/workflows/pages.yml) copies them from
+Blob storage; they are published next to the pages, so a link opens the report in the
+browser: https://khalilvandian.github.io/Stock-analysis/.
 
 Standard library only, so the workflow needs no install step.
 
@@ -32,7 +32,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
-ANALYSES = ROOT / "analyses"
+# The PDFs, as the report job stores them (pages.yml copies them here from Blob storage).
+ANALYSES = Path(os.environ.get("STOCK_REPORTS_DIR") or ROOT / ".cache/reports")
 SITE = ROOT / "_site"
 PIPELINE = ROOT / "docs/pipeline.html"  # the hand-drawn pipeline diagram
 # The menus: (group, [(page, label)]). A page is <page>.html; "index" is the home page.
@@ -335,43 +336,47 @@ def pdfs(folder: Path) -> list[str]:
     return sorted((p.name for p in folder.glob("*.pdf")), reverse=True)
 
 
-def title(folder: Path) -> str:
-    """Company name from the folder's README heading, e.g. 'Boston Scientific Corporation (BSX)'."""
-    readme = folder / "README.md"
-    if readme.exists():
-        m = re.match(r"#\s*(.+?):", readme.read_text(encoding="utf-8").splitlines()[0])
-        if m:
-            return m.group(1)
-    return folder.name
+@cache
+def names() -> dict[str, str]:
+    return {r["symbol"]: r["name"] for r in query("SELECT symbol, name FROM core_company")}
 
 
 def company(folder: Path) -> str:
-    """'Boston Scientific Corporation (BSX)' -> 'Boston Scientific Corporation'."""
-    return re.sub(r"\s*\([^)]*\)$", "", title(folder))
+    return names().get(folder.name) or folder.name
+
+
+LATEST_ANALYSES = """
+SELECT DISTINCT ON (a.subject) a.subject, a.sections_json
+FROM out_analysis a JOIN out_analysis_run r USING (run_key)
+WHERE r.submitted_at IS NOT NULL ORDER BY a.subject, r.submitted_at DESC"""
+
+
+@cache
+def all_notes() -> dict[str, dict[str, str]]:
+    """Claude's latest analysis of each subject, by heading; a subject analysed only before
+    the application (issue #60) has its last notes (out_note)."""
+    out = {}
+    for r in query("SELECT subject, text FROM v_note_latest"):
+        sections, name = {}, None
+        for line in str(r["text"]).splitlines():
+            if line.startswith("## "):
+                name = line[3:].strip()
+                sections[name] = []
+            elif name and not line.startswith("<!-- reviewed"):
+                sections[name].append(line)
+        out[r["subject"]] = {k: "\n".join(v).strip() for k, v in sections.items()}
+    for r in query(LATEST_ANALYSES):
+        out[r["subject"]] = json.loads(r["sections_json"])
+    return out
 
 
 def notes(folder: Path) -> dict[str, str]:
-    """Sections of Claude's notes.md, by heading."""
-    path = folder / "notes.md"
-    if not path.exists():
-        return {}
-    out, name = {}, None
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("## "):
-            name = line[3:].strip()
-            out[name] = []
-        elif name:
-            out[name].append(line)
-    return {k: "\n".join(v).strip() for k, v in out.items()}
+    return all_notes().get(folder.name, {})
 
 
 def stocks() -> list[Path]:
     """Stock folders with recorded runs, most recently analysed first."""
-    found = [
-        f
-        for f in ANALYSES.iterdir()
-        if f.is_dir() and f.name not in ("market", "summaries") and read_runs(f)
-    ]
+    found = [ANALYSES / name for name in all_runs() if name != "market"]
     return sorted(found, key=lambda f: str(read_runs(f)[0]["run_at"]), reverse=True)
 
 
@@ -1449,7 +1454,10 @@ def build(out: Path = SITE) -> Path:
     idx = explore_index(out)
     shutil.copy2(EXPLORER_JS, out / "explorer.js")
     shutil.copy2(LIVE_JS, out / "live.js")
-    for pdf in ANALYSES.glob("*/*.pdf"):
+    pdfs = sorted(ANALYSES.glob("*/*.pdf"))
+    if not pdfs and os.environ.get("STOCK_REPORTS_DIR"):
+        raise SystemExit(f"No PDFs in {ANALYSES}: the site would lose every report")
+    for pdf in pdfs:
         dst = out / pdf.parent.name / pdf.name
         dst.parent.mkdir(exist_ok=True)
         shutil.copy2(pdf, dst)

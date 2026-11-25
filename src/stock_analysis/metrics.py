@@ -8,7 +8,7 @@
     s = metrics.standardize(v, d)                   # 0-100 percentiles, higher = better
 
 `source` says which table the frame is: "sector" (stock_analysis.stocks.rows, the columns
-analysis/peer_screen.py and the watch list use), "stage1" or "stage2" (the market
+stock_analysis.peer_screen and the watch list use), "stage1" or "stage2" (the market
 screener's Stage 1 rows and Stage 2 top, stocks.screener_run) or "watchlist"
 (key_numbers() rows). Metrics the table doesn't have are worked out from other metrics where
 the formula allows (DERIVED), otherwise left blank.
@@ -277,7 +277,7 @@ def main() -> None:
             _, s1, top = stocks.screener_run(data)
             frame = s1 if args.source == "stage1" else top
         else:
-            raise SystemExit("the watchlist rows come from analysis/watchlist.py's key_numbers")
+            raise SystemExit("the watchlist rows come from stock_analysis.nightly.key_numbers")
         v = build_vectors(frame, args.set, args.source, d)
         if args.standardize:
             v = standardize(v, d, args.standardize)

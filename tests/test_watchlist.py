@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from stock_analysis import nightly
 from stock_analysis.report import render
@@ -64,9 +65,6 @@ def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
     analyses = tmp_path / "analyses"
     (analyses / "BSX").mkdir(parents=True)
     (analyses / "market").mkdir()
-    (analyses / "BSX/README.md").write_text(
-        "# Boston Scientific Corporation (BSX): dated analyses\n"
-    )
     (analyses / "OLD").mkdir()  # analysed before, since removed from the watch list
 
     def run(symbol, run_at, file, price, verdict):
@@ -83,6 +81,14 @@ def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
     def query(sql):
         if "user_watchlist" in sql:
             return [{"symbol": "BSX"}]
+        if "core_company" in sql:
+            return [{"symbol": "BSX", "name": "Boston Scientific Corporation"}]
+        if "v_note_latest" in sql:  # from before the application: notes.md as it was kept
+            old = "# N\n\n## Verdict\n\n<!-- reviewed 2026-10-20 -->\nGone **now**.\n"
+            return [{"subject": "OLD", "text": old}]
+        if "out_analysis" in sql:
+            sections = '{"Verdict": "Cheap **today**.", "Risks": "- debt"}'
+            return [{"subject": "BSX", "sections_json": sections}]
         return [dict(r) for r in runs] if "out_watchlist_run" in sql else []
 
     monkeypatch.setattr(site, "db", lambda: query)
@@ -100,6 +106,13 @@ def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
     # the stock page: the report viewer can switch to every earlier analysis
     assert 'value="BSX/2026-10-26_2100.pdf"' in bsx and 'id="previous"' in bsx
     assert bsx.index("2026-10-27 21:00 CET") < bsx.index("2026-10-26 21:00 CET")  # newest first
+    old = (out / "OLD.html").read_text()
+    assert "Cheap <b>today</b>" in bsx or "Cheap <strong>today</strong>" in bsx
+    assert "Gone" in old and "reviewed 2026" not in old
+    monkeypatch.setenv("STOCK_REPORTS_DIR", str(tmp_path))
+    monkeypatch.setattr(site, "ANALYSES", tmp_path / "empty")
+    with pytest.raises(SystemExit, match="No PDFs"):  # a failed copy must not empty the site
+        site.build(tmp_path / "_site2")
     assert "Boston Scientific Corporation" in bsx and 'href="market.html"' in bsx  # the menu
 
 

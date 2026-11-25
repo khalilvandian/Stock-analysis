@@ -2,8 +2,8 @@
 # ticker explorer and the data coverage page as a web page on GitHub Pages:
 # https://khalilvandian.github.io/Stock-analysis/
 # One-time setup: Settings > Pages > Build and deployment > Source: GitHub Actions.
-# Everything but the PDFs and notes comes from the database through the web API (the
-# recorded runs, the screener run, the coverage snapshot, the explorer's data): add the
+# Everything but the PDFs comes from the database through the web API (the recorded runs,
+# Claude's analyses, the screener run, the coverage snapshot, the explorer's data): add the
 # repository secret STOCK_API_KEY (Settings > Secrets and variables > Actions). Without it
 # those pages say there is no data yet.
 # No schedule of its own: Airflow starts it after each night (docs/ORCHESTRATION.md).
@@ -13,7 +13,6 @@ on:
   push:
     branches: [main]
     paths:
-      - "analyses/**"
       - "analysis/site.py"
       - "analysis/explore.py"
       - "analysis/explorer.js"
@@ -44,8 +43,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # The PDFs: kept in a private Blob container, public on this site. Copies of earlier builds
+      # are cached, so a build fetches only the new ones.
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: actions/cache@v4
+        with:
+          path: reports
+          key: reports-${{ github.run_id }}
+          restore-keys: reports-
+      - name: Copy the PDFs from Blob storage
+        run: |
+          mkdir -p reports
+          az storage blob download-batch --account-name stockreportsbk --source reports \
+            --destination reports --pattern "*/*.pdf" --overwrite true --auth-mode login \
+            --only-show-errors -o none
+          find reports -name "*.pdf" | wc -l
       - run: python analysis/site.py _site
         env:
+          STOCK_REPORTS_DIR: reports
           STOCK_API_URL: https://stock-api-bk.azurewebsites.net
           STOCK_API_KEY: ${{ secrets.STOCK_API_KEY }}
       - uses: actions/upload-pages-artifact@v3

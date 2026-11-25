@@ -1,4 +1,4 @@
-# The market instruments of the market report (analysis/market.py): indices, rates,
+# The market instruments of the market report (stock_analysis.report.market): indices, rates,
 # commodities, currencies and the S&P 500 sector ETFs. The ingest job fetches their daily
 # prices from Yahoo (source yahoo_market, config/ingest.toml) and the build keeps them in
 # core_market_daily. The symbols are Yahoo's; the labels are shown in the report.

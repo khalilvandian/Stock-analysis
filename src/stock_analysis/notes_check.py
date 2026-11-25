@@ -19,8 +19,8 @@ written by Claude each run. Nothing else checks the words, so this module does
 6. The market notes end with a Sources section of at least MIN_SOURCES links.
 
 `problems(kind, text, run_date)` returns the failures as plain sentences; an empty list
-means the notes pass. analysis/watchlist.py refuses to build with failures and
-analysis/validate.py reports them.
+means the notes pass. The application refuses an analysis with failures
+(api/operations.py, content_problems).
 """
 
 from __future__ import annotations

@@ -13,7 +13,7 @@ session only reads it, writes its interpretation and renders the PDFs.
    -> out_market_numbers.
 
 The same functions compute a stock or the market on the fly when a stored result is missing
-or older than the last build (analysis/watchlist.py, analysis/market.py).
+or older than the last build (stock_analysis.report).
 """
 
 from __future__ import annotations
