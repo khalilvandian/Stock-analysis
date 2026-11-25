@@ -43,18 +43,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # The PDFs: kept in a private Blob container, public on this site. Copies of earlier builds
-      # are cached, so a build fetches only the new ones.
+      # The PDFs: kept in a private Blob container, public on this site.
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - uses: actions/cache@v4
-        with:
-          path: reports
-          key: reports-${{ github.run_id }}
-          restore-keys: reports-
       - name: Copy the PDFs from Blob storage
         run: |
           mkdir -p reports
