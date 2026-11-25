@@ -1150,6 +1150,9 @@ def test_app_client_runs_the_operations(con: Database, api, tmp_path, capsys) ->
     assert main(["watchlist-set", "AAA", "--reason", "test it", "--target-pe", "12"], app) == 0
     answer = json.loads(capsys.readouterr().out)
     assert answer["stock"]["target_pe"] == 12 and answer["stock"]["peers"]
+    assert main(["watchlist-set", "AAA", "--reason", "no target", "--no-target"], app) == 0
+    answer = json.loads(capsys.readouterr().out)
+    assert answer["stock"]["target_pe"] is None and answer["stock"]["peers"]
     with con.begin() as conn:
         conn.execute(
             text(

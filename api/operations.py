@@ -229,8 +229,8 @@ def check_stock(symbol: str, stock: dict) -> None:
     if symbol in peers or len(peers) != len(set(peers)):
         wrong.append("a peer is repeated, or is the stock itself")
     target, stakes = stock.get("target_pe"), stock.get("stakes_per_share")
-    if target is None or not math.isfinite(target) or not 1 <= target <= 200:
-        wrong.append("target_pe must be between 1 and 200")
+    if target is not None and (not math.isfinite(target) or not 1 <= target <= 200):
+        wrong.append("target_pe must be between 1 and 200, or null for no target")
     if stakes is not None and (not math.isfinite(stakes) or not 0 <= stakes <= 100_000):
         wrong.append("stakes_per_share must be 0 or more")
     if wrong:

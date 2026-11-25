@@ -392,9 +392,10 @@ def watched() -> tuple[list[Path], list[Path]]:
 
 def num(v, fmt: str) -> str:
     try:
-        return fmt.format(float(v))
+        v = float(v)
     except (TypeError, ValueError):
         return "–"
+    return "–" if v != v else fmt.format(v)  # NaN: e.g. a stock without a target
 
 
 def stamp(name: str) -> str:
@@ -471,6 +472,8 @@ def badge(to_entry) -> str:
         d = float(to_entry)
     except (TypeError, ValueError):
         return ""
+    if d != d:  # NaN: no target set, so no entry price
+        return '<span class="badge">No target</span>'
     if d >= 0:
         return '<span class="badge good">At or below entry price</span>'
     if d > -0.10:

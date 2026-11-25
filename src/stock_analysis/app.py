@@ -10,7 +10,7 @@ save its analyses and edit the watch list. Every command is one operation of the
     python -m stock_analysis.app request analysis|recompute [SUBJECT ...] --reason TEXT
     python -m stock_analysis.app watchlist
     python -m stock_analysis.app watchlist-history [SYMBOL]
-    python -m stock_analysis.app watchlist-set SYMBOL --reason TEXT [--target-pe X]
+    python -m stock_analysis.app watchlist-set SYMBOL --reason TEXT [--target-pe X | --no-target]
         [--peers A B ...] [--target-note TEXT] [--stakes X]
     python -m stock_analysis.app watchlist-remove SYMBOL --reason TEXT
     python -m stock_analysis.app watchlist-undo CHANGE_ID --reason TEXT
@@ -142,7 +142,9 @@ def parser() -> argparse.ArgumentParser:
     p = add("watchlist-set")
     p.add_argument("symbol")
     p.add_argument("--reason", required=True)
-    p.add_argument("--target-pe", type=float)
+    target = p.add_mutually_exclusive_group()
+    target.add_argument("--target-pe", type=float)
+    target.add_argument("--no-target", action="store_true")
     p.add_argument("--peers", nargs="+")
     p.add_argument("--target-note")
     p.add_argument("--stakes", type=float, dest="stakes_per_share")
@@ -169,7 +171,10 @@ def main(argv: list[str] | None = None, app: App | None = None) -> int:
     if command == "guide_set":
         args["text"] = args.pop("file").read_text(encoding="utf-8")
     if command == "watchlist_set":
+        no_target = args.pop("no_target")
         args = {k: v for k, v in args.items() if v is not None}
+        if no_target:
+            args["target_pe"] = None  # sent as null: no target, no entry price
     try:
         answer = getattr(app or App(), command)(**args)
     except Refused as exc:

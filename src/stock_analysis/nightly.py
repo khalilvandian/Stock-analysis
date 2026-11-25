@@ -187,7 +187,9 @@ def key_numbers(d: dict) -> dict:
     # Equity stakes (stakes_per_share) are kept out of the P/E: the price paid for the
     # business is the price less the stakes, and the entry price adds them back.
     stakes = wl.number(stock.get("stakes_per_share"))
-    entry = stock["target_pe"] * eps + stakes if eps > 0 else np.nan
+    # target_pe is optional (Babak, 2026-11-12): blank or 0 means no target, no entry price
+    target = float(stock.get("target_pe") or np.nan)
+    entry = target * eps + stakes if eps > 0 and np.isfinite(target) else np.nan
     q = d["quarters"]
     eps_next = (
         eps - float(q.iloc[-4]) + d["next_estimate"]
@@ -203,13 +205,13 @@ def key_numbers(d: dict) -> dict:
         "pe_median_5y": float(yearly["pe"].tail(5).median()) if not yearly.empty else np.nan,
         "pe_low_10y": float(yearly["pe"].min()) if not yearly.empty else np.nan,
         "pe_high_10y": float(yearly["pe"].max()) if not yearly.empty else np.nan,
-        "target_pe": stock["target_pe"],
+        "target_pe": target,
         "entry_price": entry,
         "to_entry": entry / price - 1 if np.isfinite(entry) else np.nan,
         "next_report": d["next_report"].date().isoformat() if d["next_report"] is not None else "",
         "next_estimate": d["next_estimate"],
         "stakes_per_share": stakes,
-        "entry_after_next": stock["target_pe"] * eps_next + stakes if eps_next > 0 else np.nan,
+        "entry_after_next": target * eps_next + stakes if eps_next > 0 else np.nan,
     }
 
 
