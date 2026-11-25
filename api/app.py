@@ -1,5 +1,6 @@
 """The web API in front of the database. Claude uses the operations under /app (operations.py,
-docs/APPLICATION.md), with its own key (CLAUDE_API_KEY). The scripts and the site, where
+docs/APPLICATION.md), with CLAUDE_API_KEY, or NIGHTLY_API_KEY in the unattended session that
+Airflow starts, which may not change who gets the reports. The scripts and the site, where
 PostgreSQL can't be reached, use the general routes below: any SQL, with the database users'
 rights deciding what is allowed.
 
@@ -20,8 +21,8 @@ rights deciding what is allowed.
 Parameters use :name placeholders (SQLAlchemy style). Every route but /health and /quotes
 needs the header `X-API-Key` (the general SQL routes: STOCK_API_KEY only). App settings:
 DATABASE_URL (stock_reader), DATABASE_WRITER_URL (stock_writer), STOCK_API_KEY, CLAUDE_API_KEY,
-optionally QUOTES_ORIGINS. stock_writer can't change the schema, can't touch schema_version and
-can't change or delete raw data, so neither can this API.
+NIGHTLY_API_KEY, optionally QUOTES_ORIGINS. stock_writer can't change the schema, can't touch
+schema_version and can't change or delete raw data, so neither can this API.
 No dependency on the rest of the repository, so it deploys as this folder alone.
 """
 
@@ -89,7 +90,7 @@ def engine(setting: str) -> Engine:
 
 
 # Each key and the name its calls are logged under.
-KEYS = {"STOCK_API_KEY": "scripts", "CLAUDE_API_KEY": "claude"}
+KEYS = {"STOCK_API_KEY": "scripts", "CLAUDE_API_KEY": "claude", "NIGHTLY_API_KEY": "nightly"}
 
 
 def caller_of(key: str | None) -> str:

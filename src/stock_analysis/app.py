@@ -14,7 +14,7 @@ save its analyses and edit the watch list. Every command is one operation of the
         [--peers A B ...] [--target-note TEXT] [--stakes X]
     python -m stock_analysis.app watchlist-remove SYMBOL --reason TEXT
     python -m stock_analysis.app watchlist-undo CHANGE_ID --reason TEXT
-    python -m stock_analysis.app recipients                # who gets the reports (STOCK_API_KEY)
+    python -m stock_analysis.app recipients                # who gets the reports (not nightly)
     python -m stock_analysis.app recipient-add EMAIL --reason TEXT [--name NAME]
     python -m stock_analysis.app recipient-remove EMAIL --reason TEXT
     python -m stock_analysis.app guide                     # what every run must know
@@ -24,7 +24,8 @@ save its analyses and edit the watch list. Every command is one operation of the
 FILE.json: {"reviewed": "YYYY-MM-DD", "sections": {"Verdict": "...", ...}, "corrections":
 [{"reported": "YYYY-MM-DD", "eps": 1.23, "reason": "...", "source": "..."}]}.
 
-Settings: STOCK_API_URL (default: the deployed API) and CLAUDE_API_KEY, else STOCK_API_KEY; in
+Settings: STOCK_API_URL (default: the deployed API) and NIGHTLY_API_KEY, CLAUDE_API_KEY or
+STOCK_API_KEY, the first that is set; in
 Claude's cloud environment the network attaches the key. A refusal prints why and exits 1.
 """
 
@@ -40,6 +41,7 @@ from urllib.parse import quote
 
 import httpx
 
+KEYS = ("NIGHTLY_API_KEY", "CLAUDE_API_KEY", "STOCK_API_KEY")
 API_URL = "https://stock-api-bk.azurewebsites.net"
 
 
@@ -50,7 +52,7 @@ class Refused(RuntimeError):
 class App:
     def __init__(self, url: str | None = None, key: str | None = None, client=None):
         if client is None:
-            key = key or os.environ.get("CLAUDE_API_KEY") or os.environ.get("STOCK_API_KEY")
+            key = key or next((os.environ[k] for k in KEYS if os.environ.get(k)), None)
             client = httpx.Client(
                 base_url=(url or os.environ.get("STOCK_API_URL") or API_URL).rstrip("/"),
                 headers={"X-API-Key": key} if key else {},
@@ -195,10 +197,8 @@ def main(argv: list[str] | None = None, app: App | None = None) -> int:
         args = {k: v for k, v in args.items() if v is not None}
         if no_target:
             args["target_pe"] = None  # sent as null: no target, no entry price
-    # The recipients are Babak's: Claude's key is refused, so the scripts' key is used
-    key = os.environ.get("STOCK_API_KEY") if command.startswith("recipient") else None
     try:
-        answer = getattr(app or App(key=key), command)(**args)
+        answer = getattr(app or App(), command)(**args)
     except Refused as exc:
         print(exc, file=sys.stderr)
         return 1

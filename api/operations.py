@@ -13,9 +13,9 @@ calls that are checked and logged (ops_api_call). Claude never writes SQL or fil
     PUT    /app/watchlist/{symbol}         add or change a stock
     DELETE /app/watchlist/{symbol}         remove a stock
     POST   /app/watchlist/undo/{change_id} put a stock back as it was before a change
-    GET    /app/recipients                 who gets the reports by email (the scripts' key only,
-    PUT    /app/recipients                 like adding and removing one: not the unattended
-    DELETE /app/recipients                 session, which reads the web)
+    GET    /app/recipients                 who gets the reports by email
+    PUT    /app/recipients                 add someone (these three: not the nightly session,
+    DELETE /app/recipients                 which reads the web unattended); remove someone
     GET    /app/guide                      the standing guide: what every run must know
     PUT    /app/guide                      a new version (the earlier ones are kept)
     POST   /app/query                      one read-only SELECT, logged
@@ -501,9 +501,9 @@ def router(
         return {"changed": True, "change_id": change, "stock": after}
 
     # Who gets the reports ---------------------------------------------------------------
-    def owner(caller: str = Depends(call)) -> str:
-        if caller != "scripts":
-            raise refuse(403, "the recipients are changed by Babak, not by the analysis session")
+    def attended(caller: str = Depends(call)) -> str:
+        if caller == "nightly":
+            raise refuse(403, "the nightly session has no access to the recipients")
         return caller
 
     def address(body: Recipient) -> str:
@@ -520,12 +520,12 @@ def router(
         )
 
     @api.get("/recipients")
-    def recipients(caller: str = Depends(owner)) -> list[dict]:
+    def recipients(caller: str = Depends(attended)) -> list[dict]:
         with read() as conn:
             return active_recipients(conn)
 
     @api.put("/recipients")
-    def add_recipient(body: Recipient, request: Request, caller: str = Depends(owner)) -> dict:
+    def add_recipient(body: Recipient, request: Request, caller: str = Depends(attended)) -> dict:
         email = address(body)
         request.state.detail = f"add {email}: {body.reason}"
         with write() as conn:
@@ -550,7 +550,9 @@ def router(
             return {"changed": True, "recipients": len(listed | {email: None})}
 
     @api.delete("/recipients")
-    def remove_recipient(body: Recipient, request: Request, caller: str = Depends(owner)) -> dict:
+    def remove_recipient(
+        body: Recipient, request: Request, caller: str = Depends(attended)
+    ) -> dict:
         email = address(body)
         request.state.detail = f"remove {email}: {body.reason}"
         with write() as conn:

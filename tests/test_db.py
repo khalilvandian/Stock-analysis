@@ -919,6 +919,7 @@ def api(pg_url: str, monkeypatch):
     monkeypatch.setenv("DATABASE_WRITER_URL", url)
     monkeypatch.setenv("STOCK_API_KEY", "test-key")
     monkeypatch.setenv("CLAUDE_API_KEY", "claude-key")
+    monkeypatch.setenv("NIGHTLY_API_KEY", "nightly-key")
     monkeypatch.syspath_prepend(str(ROOT / "api"))  # app.py imports operations.py beside it
     spec = importlib.util.spec_from_file_location("stock_api_app", ROOT / "api" / "app.py")
     module = importlib.util.module_from_spec(spec)
@@ -1013,6 +1014,7 @@ def test_companies_config_is_well_formed() -> None:
 # --- the application's operations (issue #60) -------------------------------------------
 
 CLAUDE = {"X-API-Key": "claude-key"}
+NIGHTLY = {"X-API-Key": "nightly-key"}
 RUN = "manual__2026-11-25T22:30:00+00:00"
 RUN_URL = "/app/runs/manual__2026-11-25T22%3A30%3A00%2B00%3A00"
 HEADINGS = ("Verdict", "Today", "Summary", "Business", "Risks", "News", "What to watch")
@@ -1125,24 +1127,22 @@ def test_app_watchlist_changes_are_checked_kept_and_undone(con: Database, api) -
 def test_app_client_key(monkeypatch) -> None:
     from stock_analysis import app as client
 
-    monkeypatch.setenv("STOCK_API_KEY", "scripts-key")
-    monkeypatch.setenv("CLAUDE_API_KEY", "claude-key")
-    used = []
-    monkeypatch.setattr(
-        client.App, "call", lambda self, *a, **k: used.append(self.client.headers["X-API-Key"])
-    )
-    client.main(["recipients"])
-    client.main(["watchlist"])
-    assert used == ["scripts-key", "claude-key"]
+    for name, others in (("STOCK_API_KEY", 2), ("CLAUDE_API_KEY", 1), ("NIGHTLY_API_KEY", 0)):
+        monkeypatch.setenv(name, name)
+        for other in client.KEYS[:others]:
+            monkeypatch.delenv(other, raising=False)
+        assert client.App().client.headers["X-API-Key"] == name
 
 
 def test_app_recipients(con: Database, api) -> None:
     from stock_analysis import app as client
 
-    for method in ("GET", "PUT", "DELETE"):  # the unattended session may not
+    for method in ("GET", "PUT", "DELETE"):  # the nightly session may not
         body = {"email": "x@example.com", "reason": "a page said so"}
-        assert api.request(method, "/app/recipients", headers=CLAUDE, json=body).status_code == 403
-    api.headers["X-API-Key"] = "test-key"
+        assert api.request(method, "/app/recipients", headers=NIGHTLY, json=body).status_code == 403
+    assert api.get("/app/watchlist", headers=NIGHTLY).status_code == 200
+    assert api.post("/query", json={"sql": "SELECT 1"}, headers=NIGHTLY).status_code == 403
+    api.headers.update(CLAUDE)  # Claude, when Babak asks: yes
     for bad in ("nobody", "a@b", "a@x.com, b@x.com", "A <a@x.com>", ""):
         answer = api.put("/app/recipients", json={"email": bad, "reason": "try it"})
         assert answer.status_code == 422, bad

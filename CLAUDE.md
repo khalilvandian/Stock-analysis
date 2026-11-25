@@ -113,7 +113,10 @@ runs `uv run python analysis/watchlist.py` (which renders the PDFs from the stor
 and the notes, and computes on the spot only a stock whose numbers are missing or whose
 watch-list settings changed), checks the outputs with `analysis/validate.py`, commits the
 dated PDFs and notes to `main` and emails Babak. It records its runs and notes in the
-database. Work that needs no judgement belongs in the nightly analyses, not in the session.
+database. When Babak asks to change the watch list or who gets the report email, use the application
+(`uv run python -m stock_analysis.app watchlist-set | recipient-add | recipient-remove ...`,
+every command in `src/stock_analysis/app.py`): it checks and logs the change. Never write an
+email address into the repository. Work that needs no judgement belongs in the nightly analyses, not in the session.
 Every run is kept: `analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf` plus a dated list in each
 stock folder's `README.md`, rebuilt from `out_watchlist_run` (market reports and summaries are listed in
 `analyses/README.md`). Call it a list of dated analyses, not an archive. The public page of all dated analyses is
