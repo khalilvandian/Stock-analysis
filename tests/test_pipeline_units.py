@@ -6,20 +6,12 @@ Four tests here first exposed bugs (double split, reverse splits, NaN price, emp
 history); they are regression tests now.
 """
 
-import sys
-from pathlib import Path
-
-import httpx
 import numpy as np
 import pandas as pd
 import pytest
-import respx
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "analysis"))
-import send_email  # noqa: E402
-import watchlist  # noqa: E402
-
-from stock_analysis import stocks  # noqa: E402
+from stock_analysis import nightly, stocks  # noqa: E402
+from stock_analysis.report import render  # noqa: E402
 from stock_analysis.screener import common as screen_common  # noqa: E402
 from stock_analysis.screener import (
     stage1,  # noqa: E402
@@ -48,7 +40,7 @@ def _key_inputs(price=100.0, q=None, next_estimate=np.nan) -> dict:
         "row": {"price": price},
         "prices": prices,
         "quarters": q,
-        "ttm": watchlist.trailing_eps(q),
+        "ttm": nightly.trailing_eps(q),
         "next_report": None,
         "next_estimate": next_estimate,
     }
@@ -62,58 +54,58 @@ def test_quarterly_eps_of_an_empty_or_all_blank_frame_is_empty():
         {"EPS Estimate": [], "Reported EPS": []},
         index=pd.DatetimeIndex([], tz="America/New_York"),
     )
-    assert watchlist.quarterly_eps(empty).empty
+    assert nightly.quarterly_eps(empty).empty
     blank = _earnings([("2026-01-20", None), ("2026-04-20", np.nan)])
-    q = watchlist.quarterly_eps(blank)
+    q = nightly.quarterly_eps(blank)
     assert q.empty and q.dtype == float
-    assert watchlist.trailing_eps(q).empty
+    assert nightly.trailing_eps(q).empty
 
 
 def test_quarterly_eps_ignores_overrides_for_unknown_dates_and_keeps_order():
     d = _earnings([("2026-07-16", 1.2), ("2026-01-20", 1.0), ("2026-04-16", None)])
-    q = watchlist.quarterly_eps(d, [{"reported": "2025-01-01", "eps": 99.0}])
+    q = nightly.quarterly_eps(d, [{"reported": "2025-01-01", "eps": 99.0}])
     assert list(q) == [1.0, 1.2]  # blank quarter dropped, oldest first, override ignored
     assert q.index.is_monotonic_increasing and q.index.tz is None
 
 
 def test_quarterly_eps_keeps_the_later_of_two_entries_for_the_same_quarter():
     d = _earnings([("2026-01-20", 1.0), ("2026-02-05", 1.1), ("2026-04-20", 1.2)])
-    assert list(watchlist.quarterly_eps(d)) == [1.1, 1.2]
+    assert list(nightly.quarterly_eps(d)) == [1.1, 1.2]
 
 
 def test_trailing_eps_needs_four_quarters():
-    assert watchlist.trailing_eps(_quarters(3)).empty
-    assert watchlist.trailing_eps(pd.Series(dtype=float, index=pd.DatetimeIndex([]))).empty
-    ttm = watchlist.trailing_eps(_quarters(5))
+    assert nightly.trailing_eps(_quarters(3)).empty
+    assert nightly.trailing_eps(pd.Series(dtype=float, index=pd.DatetimeIndex([]))).empty
+    ttm = nightly.trailing_eps(_quarters(5))
     assert list(ttm) == [4.0, 4.0]
 
 
 def test_yearly_pe_blank_for_a_loss_year_and_empty_without_eps():
     prices = pd.Series(100.0, index=pd.bdate_range("2023-01-01", "2026-06-30"))
     ttm = pd.Series([-2.0, 5.0], index=pd.to_datetime(["2024-02-10", "2025-02-10"]))
-    y = watchlist.yearly_pe(prices, ttm)
+    y = nightly.yearly_pe(prices, ttm)
     assert np.isnan(y.loc[2023, "pe"]) and y.loc[2024, "pe"] == 20.0
-    assert watchlist.yearly_pe(prices, pd.Series(dtype=float, index=pd.DatetimeIndex([]))).empty
+    assert nightly.yearly_pe(prices, pd.Series(dtype=float, index=pd.DatetimeIndex([]))).empty
     # a year whose Q4 report never came (no EPS before April 30) is left out
     late = pd.Series([5.0], index=pd.to_datetime(["2025-06-10"]))
-    assert watchlist.yearly_pe(prices, late).empty
+    assert nightly.yearly_pe(prices, late).empty
 
 
 def test_daily_pe_blank_while_eps_is_negative():
     prices = pd.Series(50.0, index=pd.bdate_range("2025-01-01", "2025-12-31"))
     ttm = pd.Series([-1.0, 2.0], index=pd.to_datetime(["2024-12-01", "2025-07-01"]))
-    pe = watchlist.daily_pe(prices, ttm)
+    pe = nightly.daily_pe(prices, ttm)
     assert pe.index.min() >= pd.Timestamp("2025-07-01") and set(pe) == {25.0}
 
 
 def test_next_report_none_when_every_report_is_in():
     d = _earnings([("2026-01-20", 1.0), ("2026-04-20", 1.1)])
-    when, est = watchlist.next_report(d, pd.Timestamp("2026-10-27"))
+    when, est = nightly.next_report(d, pd.Timestamp("2026-10-27"))
     assert when is None and np.isnan(est)
 
 
 def test_key_numbers_entry_price_from_target_pe_and_adjusted_eps():
-    k = watchlist.key_numbers(_key_inputs(next_estimate=1.5))
+    k = nightly.key_numbers(_key_inputs(next_estimate=1.5))
     assert k["eps_adj_ttm"] == 4.0 and k["pe_adj"] == 25.0
     assert k["pe_median_10y"] == 25.0
     assert k["entry_price"] == 60.0 and round(k["to_entry"], 4) == -0.4
@@ -124,7 +116,7 @@ def test_key_numbers_entry_price_from_target_pe_and_adjusted_eps():
 def test_key_numbers_keeps_equity_stakes_out_of_the_pe_and_adds_them_to_the_entry():
     d = _key_inputs(next_estimate=1.5)
     d["stock"]["stakes_per_share"] = 20.0
-    k = watchlist.key_numbers(d)
+    k = nightly.key_numbers(d)
     assert k["pe_adj"] == 20.0  # (100 - 20) / 4
     assert k["entry_price"] == 80.0 and k["entry_after_next"] == 15 * 4.5 + 20
 
@@ -132,38 +124,38 @@ def test_key_numbers_keeps_equity_stakes_out_of_the_pe_and_adds_them_to_the_entr
 def test_key_numbers_without_a_target_has_no_entry_price():
     d = _key_inputs(next_estimate=1.5)
     del d["stock"]["target_pe"]
-    k = watchlist.key_numbers(d)
+    k = nightly.key_numbers(d)
     assert k["pe_adj"] == 25.0
     assert np.isnan(k["target_pe"]) and np.isnan(k["entry_price"])
     assert np.isnan(k["to_entry"]) and np.isnan(k["entry_after_next"])
-    assert watchlist.target_text(k["target_pe"]) == "–"
-    assert watchlist.price_at(k, "pe_median_10y") == "$100.00"
+    assert render.target_text(k["target_pe"]) == "–"
+    assert render.price_at(k, "pe_median_10y") == "$100.00"
     # the database stores a missing target as 0: that is no target too
     d["stock"]["target_pe"] = 0.0
-    assert np.isnan(watchlist.key_numbers(d)["entry_price"])
+    assert np.isnan(nightly.key_numbers(d)["entry_price"])
 
 
 def test_key_numbers_without_eps_history_is_blank_not_an_error():
     no_eps = pd.Series(dtype=float, index=pd.DatetimeIndex([]))
-    k = watchlist.key_numbers(_key_inputs(q=no_eps))
+    k = nightly.key_numbers(_key_inputs(q=no_eps))
     for key in ("eps_adj_ttm", "pe_adj", "pe_median_10y", "entry_price", "to_entry"):
         assert np.isnan(k[key]), key
     assert k["price"] == 100.0 and k["next_report"] == ""
 
 
 def test_key_numbers_with_a_loss_has_no_entry_price():
-    k = watchlist.key_numbers(_key_inputs(q=_quarters(eps=-0.5), next_estimate=0.1))
+    k = nightly.key_numbers(_key_inputs(q=_quarters(eps=-0.5), next_estimate=0.1))
     assert k["eps_adj_ttm"] == -2.0
     assert np.isnan(k["pe_adj"]) and np.isnan(k["entry_price"])
     assert np.isnan(k["entry_after_next"])
 
 
 def test_key_numbers_falls_back_to_the_last_close_when_yahoo_has_no_price():
-    assert watchlist.key_numbers(_key_inputs(price=None))["price"] == 100.0
+    assert nightly.key_numbers(_key_inputs(price=None))["price"] == 100.0
 
 
 def test_key_numbers_falls_back_to_the_last_close_when_the_price_is_nan():
-    assert watchlist.key_numbers(_key_inputs(price=np.nan))["price"] == 100.0
+    assert nightly.key_numbers(_key_inputs(price=np.nan))["price"] == 100.0
 
 
 # --- 1. missing values: Stage 1 rules -------------------------------------------------
@@ -318,58 +310,6 @@ def test_fiscal_pe_skips_years_without_eps_or_nine_months_of_prices():
     assert empty.empty and "pe" in empty.columns
 
 
-@pytest.mark.parametrize(
-    "path, name",
-    [
-        ("analyses/BSX/2026-10-27_2100.pdf", "BSX_2026-10-27_2100.pdf"),
-        ("analyses/summaries/2026-10-27_2100-2.pdf", "summaries_2026-10-27_2100-2.pdf"),
-        ("analyses/market/2026-10-27_2100.pdf", "market_2026-10-27_2100.pdf"),
-    ],
-)
-def test_attachment_names_keep_the_folder(path, name):
-    assert send_email.attachment_name(path) == name
-
-
-def test_recipients_limits_and_blanks():
-    assert send_email.recipients(" a@x.com , b@y.com ,") == ["a@x.com", "b@y.com"]
-    five = ",".join(f"{i}@x.com" for i in range(5))
-    assert len(send_email.recipients(five)) == send_email.MAX_RECIPIENTS
-    for bad in ("", " , ,", five + ",5@x.com"):
-        with pytest.raises(SystemExit):
-            send_email.recipients(bad)
-
-
-def test_email_without_a_sender_name_and_with_a_missing_pdf(tmp_path, monkeypatch):
-    monkeypatch.setattr(send_email, "ROOT", tmp_path)
-    (tmp_path / "email.html").write_text("<p>hi</p>")
-    msg = send_email.build_message(
-        {"subject": "S", "html": "email.html", "files": []}, "a@x.com", "bot@x.com"
-    )
-    assert msg["sender"] == {"email": "bot@x.com"} and msg["attachment"] == []
-    assert msg["subject"] == "S" and "Test" not in msg["htmlContent"]
-    run = {"subject": "S", "html": "email.html", "files": ["analyses/BSX/missing.pdf"]}
-    with pytest.raises(FileNotFoundError):
-        send_email.build_message(run, "a@x.com", "bot@x.com")
-
-
-@respx.mock
-def test_brevo_refusal_stops_with_the_reason():
-    respx.post(send_email.API).mock(return_value=httpx.Response(401, text="bad key"))
-    with pytest.raises(SystemExit, match="401"):
-        send_email.send({"to": []}, "k")
-
-
-def test_email_main_refuses_without_key_or_sender(monkeypatch):
-    monkeypatch.setattr(sys, "argv", ["send_email.py", "--to", "a@x.com"])
-    monkeypatch.delenv("BREVO_API_KEY", raising=False)
-    with pytest.raises(SystemExit, match="BREVO_API_KEY"):
-        send_email.main()
-    monkeypatch.setenv("BREVO_API_KEY", "k")
-    monkeypatch.delenv("WATCHLIST_EMAIL_FROM", raising=False)
-    with pytest.raises(SystemExit, match="WATCHLIST_EMAIL_FROM"):
-        send_email.main()
-
-
 # --- 2. splits ------------------------------------------------------------------------
 
 # 2:1 and 10:1 forward splits, a 1-for-20 reverse split (Yahoo writes it as 0.05)
@@ -383,10 +323,10 @@ def test_yahoo_quarterly_eps_is_used_as_split_adjusted():
     rows = [
         (d.strftime("%Y-%m-%d"), 0.5) for d in pd.date_range("2018-02-15", periods=36, freq="91D")
     ]
-    q = watchlist.quarterly_eps(_earnings(rows))
+    q = nightly.quarterly_eps(_earnings(rows))
     assert set(q) == {0.5}  # no rescaling on either side of the split
     prices = pd.Series(50.0, index=pd.bdate_range("2018-01-01", "2026-10-23"))  # adjusted
-    yearly = watchlist.yearly_pe(prices, watchlist.trailing_eps(q))
+    yearly = nightly.yearly_pe(prices, nightly.trailing_eps(q))
     assert len(yearly) >= 6 and set(yearly["pe"]) == {25.0}
     assert yearly.index.min() < split_day.year < yearly.index.max()
     # had Yahoo not adjusted a 25:1 split, the EPS would be 25x diluted: rejected

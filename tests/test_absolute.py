@@ -1,6 +1,5 @@
-from analysis_absolute import columns, load_config
-
 from stock_analysis import stocks
+from stock_analysis.absolute import columns, load_config
 
 
 def test_every_configured_value_exists_in_the_rows():

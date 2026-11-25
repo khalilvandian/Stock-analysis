@@ -1,5 +1,5 @@
 """Screens for low debt, cheapness and expected cheapening, on a table of stocks with the
-columns of stock_analysis.stocks.rows (analysis/peer_screen.py passes a peer group's; the
+columns of stock_analysis.stocks.rows (stock_analysis.peer_screen passes a peer group's; the
 watch list's PDFs show the strict and weighted screens against each stock's peers).
 
 - Low debt: net debt / EBITDA <= --max-leverage (or net cash) and EBITDA / interest >= 4x.
@@ -8,7 +8,7 @@ watch list's PDFs show the strict and weighted screens against each stock's peer
 - Getting cheaper: forward P/E at least 15% below trailing P/E, i.e. analysts expect
   earnings to rise enough to lower the P/E at today's price.
 
-Usage: uv run python analysis/screen.py NEE DUK SO ... [--balanced | --strict]
+Usage: uv run python -m stock_analysis.screen NEE DUK SO ... [--balanced | --strict]
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from stock_analysis import stocks
+from . import stocks
 
 
 def table(symbols: list[str]) -> pd.DataFrame:

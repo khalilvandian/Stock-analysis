@@ -1,10 +1,8 @@
-"""Tests of analysis/validate.py on small hand-built repositories: the screener run, the
+"""Tests of stock_analysis.report.validate on small hand-built repositories: the screener run, the
 recorded runs and the watch list's rows are made here and the database calls replaced, so
 no database or network is needed."""
 
-import json
 import shutil
-import sys
 from datetime import date
 from pathlib import Path
 
@@ -12,9 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "analysis"))
-import validate  # noqa: E402
-
+from stock_analysis.report import validate
 from stock_analysis.screener.common import ABSOLUTE  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -78,22 +74,6 @@ def _mini_repo(root: Path, today: str = "2026-10-27") -> Path:
     (root / "config").mkdir(parents=True)
     for name in ("screeners.toml", "absolute_values.toml"):
         shutil.copy(ROOT / "config" / name, root / "config" / name)
-    stamp = today + "_2100"
-    for folder in ("AAA", "market", "summaries"):
-        (root / "analyses" / folder).mkdir(parents=True)
-        (root / "analyses" / folder / f"{stamp}.pdf").write_bytes(b"%PDF-1.4 x")
-    r = f"<!-- reviewed {today} -->"
-    sections = {
-        "Verdict": "**Cheap.**",
-        "Today": "Fell with the market.",
-        "Summary": "- cheap",
-        "Business": "Widgets.",
-        "Risks": "Competition.",
-        "News": f"- {today}: results ([source](https://example.com/a)).",
-        "What to watch": "- Margins (ongoing).",
-    }
-    body = "\n\n".join(f"## {k}\n\n{r}\n{v}" for k, v in sections.items())
-    (root / "analyses/AAA/notes.md").write_text(f"# AAA\n\nUpdated: {today}\n\n{body}\n")
     return root
 
 
@@ -138,18 +118,6 @@ def _levels(checks, name_part: str) -> set[str]:
     return {c.level for c in checks if name_part in c.name}
 
 
-def test_validate_passes_a_consistent_repository(tmp_path, monkeypatch):
-    root = _mini_repo(tmp_path)
-    s1, top = _screener()
-    _fake_database(monkeypatch, s1, top)
-    checks = validate.run_checks(root, TODAY, data=FakeData(_runs()))
-    assert [c for c in checks if c.level == "FAIL"] == [], validate.report(checks)
-    assert _levels(checks, "vs_cheap") == {"PASS"}
-    assert _levels(checks, "AAA runs") == {"PASS"}
-    assert _levels(checks, "last_run.json") == {"WARN"}  # not built in this checkout
-    assert validate.overall(checks) == "WARN"
-
-
 @pytest.mark.parametrize(
     "change, check",
     [
@@ -187,64 +155,6 @@ def test_validate_no_screener_run_fails(tmp_path, monkeypatch):
         validate.stocks, "screener_run", lambda data: (None, pd.DataFrame(), pd.DataFrame())
     )
     assert _levels(validate.check_screener(root, TODAY, None), "screener run") == {"FAIL"}
-
-
-def test_validate_recorded_runs_problems(tmp_path):
-    from zoneinfo import ZoneInfo
-
-    root = _mini_repo(tmp_path)
-    folder, tz = root / "analyses/AAA", ZoneInfo("Europe/Rome")
-    assert {c.level for c in validate.check_runs(folder, _runs(), tz)} == {"PASS"}
-    bad = {
-        "missing PDF": _runs(file="2026-10-26_2100.pdf", run_at="2026-10-26T20:00:00"),
-        "time mismatch": _runs(run_at="2026-10-27T19:55:00"),
-        "entry price": _runs(entry_price=31.0),
-    }
-    for what, runs in bad.items():
-        assert "FAIL" in {c.level for c in validate.check_runs(folder, runs, tz)}, what
-    (folder / "2026-10-27_2100.pdf").write_bytes(b"")
-    assert "FAIL" in {c.level for c in validate.check_runs(folder, _runs(), tz)}
-
-
-def test_validate_pdfs_not_recorded_are_listed(tmp_path):
-    from zoneinfo import ZoneInfo
-
-    root = _mini_repo(tmp_path)
-    folder = root / "analyses/AAA"
-    (folder / "2026-10-20_2100.pdf").write_bytes(b"%PDF-1.4 x")
-    checks = validate.check_runs(folder, _runs(), ZoneInfo("Europe/Rome"))
-    assert _levels(checks, "not recorded") == {"WARN"}
-
-
-def test_validate_last_run_lists_files_that_exist(tmp_path):
-    root = _mini_repo(tmp_path)
-    cache = root / ".cache/watchlist"
-    cache.mkdir(parents=True)
-    (cache / "email.html").write_text("<p>x</p>")
-    run = {
-        "subject": "Watch list analyses",
-        "html": ".cache/watchlist/email.html",
-        "files": ["analyses/AAA/2026-10-27_2100.pdf"],
-    }
-    (cache / "last_run.json").write_text(json.dumps(run))
-    assert [c.level for c in validate.check_last_run(root)] == ["PASS"]
-    run["files"].append("analyses/AAA/2026-10-28_2100.pdf")
-    (cache / "last_run.json").write_text(json.dumps(run))
-    assert [c.level for c in validate.check_last_run(root)] == ["FAIL"]
-
-
-def test_validate_newest_pdfs_should_come_from_one_run(tmp_path):
-    root = _mini_repo(tmp_path)
-    (root / "analyses/market/2026-10-28_2100.pdf").write_bytes(b"%PDF-1.4 x")
-    checks = validate.check_analyses(root, date(2026, 10, 28), _runs(), ["AAA"])
-    assert _levels(checks, "same run") == {"WARN"}
-    (root / "analyses/AAA/notes.md").unlink()
-    assert "FAIL" in _levels(
-        validate.check_analyses(root, date(2026, 10, 28), _runs(), ["AAA"]), "notes.md"
-    )
-    assert _levels(validate.check_analyses(root, TODAY, _runs().iloc[:0], ["AAA"]), "runs") == {
-        "WARN"
-    }
 
 
 def test_validate_lists_outliers():
@@ -293,32 +203,45 @@ def test_implied_share_jumps_catch_unapplied_splits_and_unit_errors():
     assert _levels(validate.history_checks(pd.DataFrame(rows)), "steady") == {"WARN"}
 
 
-def test_validate_main_exit_codes(tmp_path, monkeypatch, capsys):
-    root = _mini_repo(tmp_path)
+class Store(dict):
+    def get(self, path):  # a missing file raises, like the real stores
+        return self[path]
+
+
+def _run(**report):
+    made = {"subject": "S", "html": "<p>", "files": ["AAA/2026-10-27_2100.pdf"], "failed": []}
+    return {"run_key": "r", "subjects": ["AAA"], "report": made | report}
+
+
+def test_validate_the_runs_reports():
+    store = Store({"AAA/2026-10-27_2100.pdf": b"%PDF-1.4" + b"x" * 6000})
+    good = validate.check_report(_run(), store, _runs())
+    assert validate.overall(good) == "PASS"
+    assert (
+        validate.check_report({"run_key": "r", "report": None}, store, _runs())[0].level == "FAIL"
+    )
+    assert "FAIL" in _levels(validate.check_report(_run(html=""), store, _runs()), "report")
+    two = _run() | {"subjects": ["AAA", "market"]}
+    assert "FAIL" in _levels(validate.check_report(two, store, _runs()), "report")
+    assert "FAIL" in _levels(validate.check_report(_run(), Store(), _runs()), "PDFs")
+    small = Store({"AAA/2026-10-27_2100.pdf": b"%PDF-1.4"})
+    assert "FAIL" in _levels(validate.check_report(_run(), small, _runs()), "PDFs")
+    unlisted = validate.check_report(_run(), store, _runs().iloc[:0])
+    assert "FAIL" in _levels(unlisted, "recorded run")
+    wrong = validate.check_report(_run(), store, _runs(entry_price=31.0))
+    assert "FAIL" in _levels(wrong, "entry price")
+    no_target = _runs(target_pe=None, entry_price=None, to_entry=None)
+    assert validate.overall(validate.check_report(_run(), store, no_target)) == "PASS"
+
+
+def test_validate_separates_the_reports_from_the_data(monkeypatch):
     s1, top = _screener()
     _fake_database(monkeypatch, s1, top)
-    monkeypatch.setattr(validate.stocks, "default_data", lambda: FakeData(_runs()))
-    monkeypatch.setattr(validate, "ROOT", root)
-    monkeypatch.setattr(sys, "argv", ["validate.py", "--today", "2026-10-27"])
-    with pytest.raises(SystemExit) as e:
-        validate.main()
-    assert e.value.code == 0 and "Result: WARN" in capsys.readouterr().out
-    monkeypatch.setattr(sys, "argv", ["validate.py", "--today", "2026-10-27", "--strict"])
-    with pytest.raises(SystemExit) as e:
-        validate.main()
-    assert e.value.code == 1
+    store = Store({"AAA/2026-10-27_2100.pdf": b"%PDF-1.4" + b"x" * 6000})
+    own, behind = validate.run_checks(_run(), store, FakeData(_runs()), TODAY)
+    assert validate.overall(own) == "PASS" and validate.overall(behind) != "FAIL"
     monkeypatch.setattr(
         validate.stocks, "screener_run", lambda data: (None, pd.DataFrame(), pd.DataFrame())
     )
-    monkeypatch.setattr(sys, "argv", ["validate.py", "--today", "2026-10-27"])
-    with pytest.raises(SystemExit) as e:
-        validate.main()
-    assert e.value.code == 1 and "FAIL  screener run" in capsys.readouterr().out
-
-
-def test_validate_fails_notes_not_reviewed_for_the_run(tmp_path):
-    root = _mini_repo(tmp_path)
-    assert "PASS" in _levels(validate.check_notes(root, TODAY, ["AAA"]), "AAA/notes.md")
-    assert "FAIL" in _levels(
-        validate.check_notes(root, date(2026, 11, 19), ["AAA"]), "AAA/notes.md"
-    )
+    own, behind = validate.run_checks(_run(), store, FakeData(_runs()), TODAY)
+    assert validate.overall(own) == "PASS" and validate.overall(behind) == "FAIL"

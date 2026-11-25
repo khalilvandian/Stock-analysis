@@ -8,8 +8,8 @@ With --history, shows each company's values for every fiscal year on record (SEC
 back to 2016, Yahoo for gaps) next to the latest 12 months.
 
 Usage:
-    uv run python analysis/absolute.py CEG VST UGI            # latest 12 months
-    uv run python analysis/absolute.py --history CEG VST      # yearly history
+    uv run python -m stock_analysis.absolute CEG VST UGI            # latest 12 months
+    uv run python -m stock_analysis.absolute --history CEG VST      # yearly history
 """
 
 from __future__ import annotations
@@ -20,9 +20,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from stock_analysis import stocks
+from . import stocks
+from .db import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config/absolute_values.toml"
 
 
@@ -82,7 +82,7 @@ def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     symbols = [s.upper() for s in args]
     if not symbols:
-        raise SystemExit("Name the companies: uv run python analysis/absolute.py NEE DUK")
+        raise SystemExit("Name the companies: uv run python -m stock_analysis.absolute NEE DUK")
     pd.set_option("display.width", 250)
     if "--history" in sys.argv:
         rows = latest(symbols)

@@ -1,50 +1,28 @@
-"""Analyse every stock on the watch list and save each analysis as a dated PDF.
+"""The pages of a run's reports, and their PDFs: one per stock and the watch list summary
+(market.py has the market report), and the email's body. Everything comes from the numbers and
+analyses passed in; run.py reads them from the database.
 
-For each stock on the watch list the PDF has three parts, in this order:
-  1. Summary: the verdict and key points from analyses/<SYMBOL>/notes.md, plus price
-     against the entry price.
-  2. The numbers: absolute values (latest 12 months and SEC yearly history), ratios, the
-     strict and weighted screens against the stock's peers, and the standard DCF.
-  3. Analysis: adjusted P/E against the stock's own 10-year history, the entry price at the
-     target multiple, then business, risks, news and what to watch from notes.md.
+A stock's report has three parts, in this order:
+  1. Summary: the verdict and key points of Claude's analysis, plus price against entry price.
+  2. The numbers: absolute values (latest 12 months and yearly history), ratios, the strict
+     and weighted screens against the stock's peers, and the standard DCF.
+  3. Analysis: adjusted P/E against the stock's own 10-year history, Claude's EPS corrections
+     next to the stored figures, the entry price if the stock has a target, then business,
+     risks, news and what to watch.
 
-Every number comes from the database. The server computes them after each night's ingest
-(stock_analysis.nightly: the absolute values and ratios, the yearly history, the prices,
-Yahoo's earnings dates, the peers) and stores them; this script reads them, adds Claude's
-notes and renders the PDFs. A stock whose stored numbers are older than the last build, or
-whose watch-list settings changed since, is computed on the spot.
-
-Adjusted EPS is Yahoo's reported quarterly EPS, which is on the same basis as analysts'
-estimates (excluding amortization and one-offs), split-adjusted, so the own-history P/E
-needs no hand-kept table. One-offs Yahoo still includes can be corrected
-in user_eps_override.
-
-The run reads the watch list from the database and saves Claude's notes that changed
-(out_note). Each run writes
-analyses/<SYMBOL>/<YYYY-MM-DD_HHMM>.pdf, records the run in the database
-(out_watchlist_run) and rebuilds the dated lists analyses/<SYMBOL>/README.md and
-analyses/README.md from the recorded runs. Earlier PDFs are never overwritten.
-
-Usage:
-    uv run python analysis/watchlist.py              # market report, every stock, summary
-    uv run python analysis/watchlist.py --screener   # same, rerunning the screener first
-    uv run python analysis/watchlist.py --recompute  # compute every stock now, not the stored
-    uv run python analysis/watchlist.py BSX NFLX     # selected stocks
-    uv run python analysis/watchlist.py --numbers    # print the key numbers, no PDF
+Adjusted EPS is Yahoo's reported quarterly EPS, on the same basis as analysts' estimates
+(excluding amortization and one-offs), split-adjusted, with user_eps_override applied.
 """
 
 from __future__ import annotations
 
-import argparse
 import html
-import json
 import os
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
-from datetime import UTC, date, datetime
+from dataclasses import dataclass, field
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -52,58 +30,22 @@ import markdown
 import numpy as np
 import pandas as pd
 
-from stock_analysis import nightly, notes_check, stocks
-from stock_analysis import watchlist as wl
-from stock_analysis.data import Data
-from stock_analysis.nightly import (  # noqa: F401 - the computations, under their old names
-    YEARS,
-    daily_pe,
-    gather,
-    has_price,
-    key_numbers,
-    load_inputs,
-    next_report,
-    plain,
-    quarterly_eps,
-    trailing_eps,
-    yearly_pe,
-)
+from .. import absolute, peer_screen, screen, stocks
+from ..nightly import YEARS, daily_pe, key_numbers, trailing_eps, yearly_pe
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import absolute  # noqa: E402
-import peer_screen  # noqa: E402
-import screen  # noqa: E402
-
-ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "analyses"
+PAGES_URL = "https://khalilvandian.github.io/Stock-analysis"  # built by analysis/site.py
 
 
-# --- notes (Claude's own analysis, kept as Markdown) ---------------------------------
+@dataclass
+class Analysis:
+    """Claude's analysis of one subject (out_analysis)."""
 
-NOTE_SECTIONS = ["Verdict", "Summary", "Business", "Risks", "News", "What to watch"]
-
-
-def read_notes(symbol: str) -> tuple[str, dict[str, str]]:
-    """analyses/<SYMBOL>/notes.md split into its '## ' sections; returns (updated, sections).
-    The review markers (<!-- reviewed DATE -->, checked by stock_analysis.notes_check) are
-    left out of the text."""
-    path = OUT / symbol / "notes.md"
-    if not path.exists():
-        return "", {}
-    updated, sections = notes_check.split(path.read_text(encoding="utf-8"))
-    return updated, {k: notes_check.strip_markers(v) for k, v in sections.items()}
+    reviewed: str = ""
+    sections: dict[str, str] = field(default_factory=dict)
+    corrections: list[dict] = field(default_factory=list)
 
 
-def notes_problems(subjects: list[str], run: date) -> dict[str, list[str]]:
-    """Each subject's notes failures (stock_analysis.notes_check) for a run on `run`."""
-    out = {}
-    for s in subjects:
-        path = OUT / s / "notes.md"
-        text = path.read_text(encoding="utf-8") if path.exists() else ""
-        found = notes_check.problems(notes_check.kind_of(s), text, run)
-        if found:
-            out[s] = found
-    return out
+EMPTY = Analysis()
 
 
 # --- HTML ----------------------------------------------------------------------------
@@ -400,12 +342,64 @@ def pe_history_html(d: dict, k: dict) -> str:
     )
 
 
-def render(d: dict, k: dict, run_label: str) -> str:
+def with_corrections(d: dict, corrections: list[dict]) -> dict:
+    """The stock's numbers with Claude's EPS corrections in place of the stored quarters
+    (only for the report: nothing stored changes). Dates that match no quarter are ignored."""
+    q = d["quarters"].copy()
+    for c in corrections:
+        day = pd.Timestamp(c["reported"]).normalize()
+        if day in q.index:
+            q[day] = float(c["eps"])
+    return {**d, "quarters": q, "ttm": trailing_eps(q)}
+
+
+def corrections_html(d: dict, k: dict, a: Analysis) -> str:
+    """Claude's EPS corrections: each one, and the figures stored and corrected side by side."""
+    if not a.corrections:
+        return ""
+    quarters = d["quarters"]
+    items = []
+    for c in sorted(a.corrections, key=lambda c: c["reported"]):
+        day = pd.Timestamp(c["reported"]).normalize()
+        stored = money(quarters[day]) if day in quarters.index else "no quarter on that date"
+        items.append(
+            [
+                html.escape(c["reported"]),
+                stored,
+                money(c["eps"]),
+                html.escape(c["reason"]),
+                inline_source(c["source"]),
+            ]
+        )
+    f = key_numbers(with_corrections(d, a.corrections))
+    rows = [
+        ["Adjusted EPS, 12 months", money(k["eps_adj_ttm"]), money(f["eps_adj_ttm"])],
+        ["Adjusted P/E", times(k["pe_adj"]), times(f["pe_adj"])],
+        ["10-year median P/E", times(k["pe_median_10y"]), times(f["pe_median_10y"])],
+    ]
+    if np.isfinite(k["target_pe"]):
+        rows.append(["Entry price", money(k["entry_price"]), money(f["entry_price"])])
+    return (
+        "<h3>Claude's EPS corrections</h3>"
+        + table(["Reported", "Stored EPS", "Corrected", "Reason", "Source"], items)
+        + table(["", "As stored", "With the corrections"], rows)
+        + "<p class='note'>The corrections are part of this analysis only. Every other figure "
+        "in the report, and the stored data, is as stored.</p>"
+    )
+
+
+def inline_source(source: str) -> str:
+    """A source as text, or as a link when it is an address."""
+    text = html.escape(source)
+    return f'<a href="{text}">link</a>' if re.fullmatch(r"https?://\S+", source) else text
+
+
+def render(d: dict, k: dict, run_label: str, a: Analysis) -> str:
     stock, row = d["stock"], d["row"]
     sym = stock["symbol"]
     name = row.get("name") or sym
-    updated, notes = read_notes(sym)
-    verdict = notes.get("Verdict", "_No verdict written yet: add one to notes.md._")
+    updated, notes = a.reviewed, a.sections
+    verdict = notes.get("Verdict", "_No verdict written yet._")
     latest, yearly = absolute_tables(d)
 
     def note(section: str) -> str:
@@ -479,6 +473,7 @@ Claude's notes updated {html.escape(updated or "never")}.</div>
 <h2 class="page">3. Analysis</h2>
 <h3>Adjusted P/E against its own 10-year history</h3>
 {pe_history_html(d, k)}
+{corrections_html(d, k, a)}
 <h3>Entry price</h3>
 {entry_section}
 <h3>Business</h3>
@@ -499,11 +494,12 @@ SEC capex.</li>
 <li>Claude's notes are written for each run from the day's news, linked in News; the build
 stops if a section was not reviewed for the run.</li>
 </ul>
-<p class="note">Reproduce: <code>uv run python analysis/watchlist.py {sym}</code></p>
 </body></html>"""
 
 
-def render_summary(results: list[tuple[dict, dict]], run_label: str) -> str:
+def render_summary(
+    results: list[tuple[dict, dict]], run_label: str, analyses: dict[str, Analysis]
+) -> str:
     """One PDF summarising every stock analysed in this run, in the same three parts."""
     rows, lines, parts = [], [], []
     for d, k in results:
@@ -528,13 +524,14 @@ def render_summary(results: list[tuple[dict, dict]], run_label: str) -> str:
         else:
             where = f"{abs(gap):.0%} above its entry price of {money(k['entry_price'])}"
         lines.append(f"<li><b>{sym}</b> {money(k['price'])}: {where}.</li>")
-        _, notes = read_notes(sym)
+        notes = analyses.get(sym, EMPTY).sections
         parts.append(
             f"<h3>{html.escape(d['row'].get('name') or sym)} ({sym})</h3>"
             f"<div class='verdict'>{md(notes.get('Verdict', 'No verdict written yet.'))}</div>"
             f"{md(notes.get('Summary', ''))}"
         )
-    updated, notes = read_notes("summaries")
+    a = analyses.get("summaries", EMPTY)
+    updated, notes = a.reviewed, a.sections
     verdict = notes.get("Verdict", "")
     head = table(
         [
@@ -569,7 +566,7 @@ with a target. A negative "entry vs price" means the entry price is below today'
 </body></html>"""
 
 
-# --- PDF and the dated lists ---------------------------------------------------------
+# --- PDF ---
 
 
 def chrome() -> str:
@@ -629,246 +626,15 @@ def first_sentence(text: str) -> str:
     return re.split(r"(?<=[.!?])\s", plain, maxsplit=1)[0] if plain else ""
 
 
-def record_run(data, sym: str, run_at: str, file: str, k: dict) -> None:
-    """The run's numbers in out_watchlist_run (run_at in UTC)."""
-    _, notes = read_notes(sym)
-    row = {c: plain(k.get(c)) for c in RUN_COLUMNS}
-    row |= {"symbol": sym, "run_at": run_at, "file": file,
-            "verdict": first_sentence(notes.get("Verdict", "")) or None}  # fmt: skip
-    data.save_watchlist_run(row)
-
-
-def stock_index(sym: str, name: str, runs: pd.DataFrame, tz: ZoneInfo) -> str:
-    lines = [
-        f"# {name} ({sym}): dated analyses",
-        "",
-        "Every analysis of this stock, newest first. Each PDF has the summary, the numbers, "
-        "and Claude's analysis. Claude's current notes are in [notes.md](notes.md).",
-        "",
-        "| Date and time | Price | Adjusted P/E | 10-yr median | Entry price | vs price "
-        "| Verdict | PDF |",
-        "|---|---|---|---|---|---|---|---|",
-    ]
-    for _, r in runs.sort_values("run_at", ascending=False).iterrows():
-        lines.append(
-            f"| {local_label(r['run_at'], tz)} | {money(r['price'])} | {times(r['pe_adj'])} "
-            f"| {times(r['pe_median_10y'])} | {money(r['entry_price'])} "
-            f"| {pct(r['to_entry'])} | {r['verdict'] if isinstance(r['verdict'], str) else ''} "
-            f"| [{r['file']}]({r['file']}) |"
-        )
-    return "\n".join(lines) + "\n"
-
-
-def overview(full_list: list[dict], runs: pd.DataFrame) -> str:
-    """analyses/README.md: the latest run of each stock (from out_watchlist_run)."""
-    lines = [
-        "# Watch list analyses",
-        "",
-        "Each stock on the watch list is "
-        "analysed every evening and saved as a dated PDF in its own folder. Nothing is "
-        "overwritten: every run, including several in one day, stays in the stock's dated "
-        "list. Each run also writes one summary PDF of all the stocks to "
-        "[summaries/](summaries/). Built by `uv run python analysis/watchlist.py`.",
-        "",
-        "| Stock | Latest analysis | Price | Adjusted P/E | 10-yr median | Target | "
-        "Entry price | vs price | All analyses |",
-        "|---|---|---|---|---|---|---|---|---|",
-    ]
-    tz = ZoneInfo(wl.TIMEZONE)
-    on_list = [s["symbol"] for s in full_list]
-    have = set(runs["symbol"]) if len(runs) else set()
-    others = sorted(have - set(on_list))
-    for sym in on_list + others:
-        mine = runs[runs["symbol"] == sym] if len(runs) else runs
-        if mine.empty:
-            lines.append(f"| {sym} | none yet | | | | | | | |")
-            continue
-        r = mine.sort_values("run_at").iloc[-1]
-        tag = "" if sym in on_list else " (off the list)"
-        label = local_label(r["run_at"], tz)
-        lines.append(
-            f"| {sym}{tag} | [{label}]({sym}/{r['file']}) | {money(r['price'])} "
-            f"| {times(r['pe_adj'])} | {times(r['pe_median_10y'])} | {target_text(r['target_pe'])} "
-            f"| {money(r['entry_price'])} | {pct(r['to_entry'])} | [list]({sym}/README.md) |"
-        )
-    lines.append("")
-    for folder, title in (("market", "Market report"), ("summaries", "Watch list summary")):
-        pdfs = sorted((OUT / folder).glob("*.pdf"), reverse=True)
-        links = ", ".join(f"[{p.stem}]({folder}/{p.name})" for p in pdfs)
-        lines.append(f"**{title}**, newest first: {links or 'none yet'}")
-        lines.append("")
-    return "\n".join(lines)
-
-
-# --- main ----------------------------------------------------------------------------
-
-
-def sync_notes(data, subjects: list[str]) -> int:
-    """Save each notes.md whose text differs from the database's latest version."""
-    latest = data.notes()
-    have = dict(zip(latest["subject"], latest["text"], strict=True)) if len(latest) else {}
-    saved = 0
-    for subject in subjects:
-        path = OUT / subject / "notes.md"
-        if path.exists() and path.read_text(encoding="utf-8") != have.get(subject):
-            saved += data.save_note(subject, path.read_text(encoding="utf-8"))
-    return saved
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("symbols", nargs="*", help="only these stocks (default: the whole list)")
-    ap.add_argument("--numbers", action="store_true", help="print key numbers, write nothing")
-    ap.add_argument("--no-market", action="store_true", help="skip the market report")
-    ap.add_argument(
-        "--screener",
-        action="store_true",
-        help="rerun the market screener first (the nightly analyses already ran it)",
-    )
-    ap.add_argument(
-        "--recompute",
-        action="store_true",
-        help="compute every stock's numbers now instead of reading the stored ones",
-    )
-    ap.add_argument(
-        "--allow-stale-notes",
-        action="store_true",
-        help="build even if Claude's notes fail stock_analysis.notes_check (say so in the email)",
-    )
-    args = ap.parse_args()
-
-    data = Data.open()
-    full_list = wl.load(data)
-    stock_list = [s for s in full_list if not args.symbols or s["symbol"] in args.symbols]
-    if not stock_list:
-        raise SystemExit(f"Not on the watch list: {args.symbols}")
-    tz = ZoneInfo(wl.TIMEZONE)
-    local = datetime.now(tz)
-    now = pd.Timestamp(local.astimezone(ZoneInfo("UTC")).replace(tzinfo=None))
-    run_at = local.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S")
-
-    if not args.numbers and not args.symbols and not args.allow_stale_notes:
-        subjects = [s["symbol"] for s in full_list] + ["market", "summaries"]
-        found = notes_problems(subjects, local.date())
-        if found:
-            print("Claude's notes are not ready for this run (docs/EVENING_RUN.md, step 3):")
-            for s, items in found.items():
-                print(f"  {s}:")
-                print("\n".join(f"    - {i}" for i in items))
-            raise SystemExit("Nothing built. Fix the notes, or pass --allow-stale-notes.")
-    if not args.numbers:
-        subjects = [s["symbol"] for s in full_list] + ["market", "summaries"]
-        saved = sync_notes(data, subjects)
-        if saved:
-            print(f"Saved {saved} changed notes to the database")
-    # The numbers were computed on the server after the night's ingest (stock_analysis.nightly);
-    # a stock with none since the last build, or whose watch-list settings changed since
-    # (target, peers, EPS corrections), is computed here.
-    ready = {} if args.recompute else nightly.stored_stocks(data, stock_list)
-    todo = [s for s in stock_list if s["symbol"] not in ready]
-    computed, errors, missing = nightly.compute_stocks(data, todo, now) if todo else ({}, {}, [])
-    if ready:
-        print(f"Stored numbers (computed on the server): {', '.join(sorted(ready))}")
-    if todo:
-        print(f"Computed now: {', '.join(s['symbol'] for s in todo)}")
-    if missing:
-        print(f"Not in the database (left out of the peer screens): {', '.join(missing)}")
-
-    stamp = local.strftime("%Y-%m-%d_%H%M")
-    run_label = local.strftime("%Y-%m-%d %H:%M ") + local.tzname()
-    results, written, failed = [], [], []
-    if not args.numbers and not args.no_market and not args.symbols:
-        import market  # the whole-market report goes with the full evening run
-
-        if args.screener:
-            from stock_analysis.screener import run as run_screener
-
-            try:
-                run_screener(data=data)
-            except Exception as e:  # noqa: BLE001 - the report then uses the last results
-                print(f"Screener failed ({e}); the market report uses its last results")
-                failed.append(f"Market screener: {e}")
-        try:
-            written.append(market.build(local, data=data))
-        except Exception as e:  # noqa: BLE001 - the stocks' PDFs still get built
-            print(f"Market report failed: {e}")
-            failed.append(f"Market report: {e}")
-    for stock in stock_list:
-        sym = stock["symbol"]
-        d = ready.get(sym) or computed.get(sym)
-        if d is None:
-            print(f"{sym}: failed ({errors.get(sym, 'no numbers')})")
-            failed.append(f"{sym}: {errors.get(sym, 'no numbers')}")
-            continue
-        d = {**d, "stock": stock}  # the config's entry (its target note, for the PDF)
-        k = key_numbers(d)
-        print(
-            f"{sym}: price {money(k['price'])} ({k['price_date']}), adjusted EPS "
-            f"{money(k['eps_adj_ttm'])}, P/E {times(k['pe_adj'])} vs 10-yr median "
-            f"{times(k['pe_median_10y'])}, entry {money(k['entry_price'])} at "
-            f"{target_text(k['target_pe'])} ({pct(k['to_entry'])}), "
-            f"next report {k['next_report'] or '–'}"
-        )
-        if args.numbers:
-            continue
-        results.append((d, k))
-        pdf = new_pdf(OUT / sym, stamp)
-        to_pdf(render(d, k, run_label), pdf)
-        record_run(data, sym, run_at, pdf.name, k)
-        runs = data.watchlist_runs(sym)
-        name = d["row"].get("name") or sym
-        (OUT / sym / "README.md").write_text(stock_index(sym, name, runs, tz), encoding="utf-8")
-        written.append(pdf)
-    if args.numbers:
-        return
-    pdf = new_pdf(OUT / "summaries", stamp)
-    to_pdf(render_summary(results, run_label), pdf)
-    written.append(pdf)
-    (OUT / "README.md").write_text(overview(full_list, data.watchlist_runs()), encoding="utf-8")
-    print("\nWrote:")
-    for p in written:
-        print(f"  {p.relative_to(ROOT)}")
-    EMAIL.parent.mkdir(parents=True, exist_ok=True)
-    EMAIL.write_text(email_html(run_label, written, results, data, failed), encoding="utf-8")
-    print(f"\nEmail subject: Watch list analyses, {run_label}")
-    print(f"Email body (HTML): {EMAIL.relative_to(ROOT)}")
-    LAST_RUN.write_text(
-        json.dumps(
-            {
-                "subject": f"Watch list analyses, {run_label}",
-                "html": str(EMAIL.relative_to(ROOT)),
-                "files": [str(p.relative_to(ROOT)) for p in written],
-                "failed": failed,
-            },
-            indent=2,
-        )
-    )
-
-
-# --- the evening email ---------------------------------------------------------------
-
-REPO_URL = "https://github.com/khalilvandian/Stock-analysis/blob"
-EMAIL = ROOT / ".cache/watchlist/email.html"
-LAST_RUN = ROOT / ".cache/watchlist/last_run.json"  # read by analysis/send_email.py
-
-
-PAGES_URL = "https://khalilvandian.github.io/Stock-analysis"  # built by analysis/site.py
-
-
-def link(path: Path) -> str:
-    """Public link to a file: the Pages site for runs on main, else GitHub on the run's branch."""
-    branch = os.environ.get("WATCHLIST_BRANCH", "main")
-    rel = path.relative_to(OUT if path.is_relative_to(OUT) else ROOT).as_posix()
-    if branch == "main" and path.is_relative_to(OUT):
-        return f"{PAGES_URL}/" if rel == "README.md" else f"{PAGES_URL}/{rel}"
-    return f"{REPO_URL}/{branch}/{path.relative_to(ROOT).as_posix()}"
+# --- the email ---
 
 
 def email_html(
     run_label: str,
-    written: list[Path],
+    files: list[str],
     results: list[tuple[dict, dict]],
-    data=None,
+    analyses: dict[str, Analysis],
+    market: dict | None = None,
     failed: list[str] | None = None,
 ) -> str:
     """Email body: what failed (if anything), the high-level summary, then the PDFs."""
@@ -877,10 +643,9 @@ def email_html(
         parts.append("<p><b>Not built tonight:</b></p><ul>")
         parts += [f"<li>{html.escape(f)}</li>" for f in failed]
         parts.append("</ul>")
-    market_runs = data.market_runs() if data is not None else pd.DataFrame()
-    if any(p.parent.name == "market" for p in written) and len(market_runs):
-        r = market_runs.sort_values("run_at").iloc[-1]
-        _, notes = read_notes("market")
+    if market:
+        r = market
+        notes = analyses.get("market", EMPTY).sections
         parts += [
             "<h3>Market</h3>",
             md(notes.get("Verdict", "")),
@@ -888,7 +653,7 @@ def email_html(
             f"{r['vix']:.1f}, {r['above_200d']:.0%} of S&amp;P 500 stocks above their "
             f"200-day average.</p>",
         ]
-        if "screener_listed" in r and pd.notna(r["screener_listed"]):
+        if r.get("screener_listed") is not None:
             parts.append(
                 f"<p>Market screener: {int(r['screener_passed'])} of "
                 f"{int(r['screener_screened'])} S&amp;P 500 companies have good financial "
@@ -898,11 +663,11 @@ def email_html(
             )
         else:
             parts.append(f"<p>Stocks to look at: {html.escape(str(r['stocks_to_look_at']))}.</p>")
-    _, notes = read_notes("summaries")
+    notes = analyses.get("summaries", EMPTY).sections
     parts += ["<h3>Watch list</h3>", md(notes.get("Verdict", "")), "<ul>"]
     for d, k in results:
         sym = d["stock"]["symbol"]
-        verdict = first_sentence(read_notes(sym)[1].get("Verdict", ""))
+        verdict = first_sentence(analyses.get(sym, EMPTY).sections.get("Verdict", ""))
         parts.append(
             f"<li><b>{sym}</b> {money(k['price'])}, adjusted P/E {times(k['pe_adj'])} "
             f"(10-yr median {times(k['pe_median_10y'])}); "
@@ -916,25 +681,12 @@ def email_html(
         )
     parts += ["</ul>", "<h3>The PDFs (attached, and online here)</h3>", "<ul>"]
     names = {"market": "Market report", "summaries": "Watch list summary"}
-    for p in written:
-        title = names.get(p.parent.name, f"{p.parent.name} analysis")
-        parts.append(f'<li><a href="{link(p)}">{title}</a> ({p.name})</li>')
+    for f in files:
+        folder, name = f.split("/")
+        title = names.get(folder, f"{folder} analysis")
+        parts.append(f'<li><a href="{PAGES_URL}/{f}">{title}</a> ({name})</li>')
     parts += [
         "</ul>",
-        f'<p>Every dated analysis: <a href="{link(OUT / "README.md")}">analyses</a>.</p>',
+        f'<p>Every dated analysis: <a href="{PAGES_URL}/">analyses</a>.</p>',
     ]
     return "\n".join(parts)
-
-
-def new_pdf(folder: Path, stamp: str) -> Path:
-    """A dated PDF path that never overwrites an earlier run."""
-    folder.mkdir(parents=True, exist_ok=True)
-    pdf, n = folder / f"{stamp}.pdf", 1
-    while pdf.exists():
-        n += 1
-        pdf = folder / f"{stamp}-{n}.pdf"
-    return pdf
-
-
-if __name__ == "__main__":
-    main()

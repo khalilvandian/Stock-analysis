@@ -92,9 +92,9 @@ def _rule_url(subscription: str, group: str, server: str, rule: str) -> str:
     )
 
 
-def managed_identity_token(http) -> str | None:
-    """An Azure Resource Manager token from the managed identity of a Container App or Job
-    (IDENTITY_ENDPOINT and IDENTITY_HEADER are set there); None elsewhere."""
+def managed_identity_token(http, resource: str = ARM + "/") -> str | None:
+    """A token for `resource` (Azure Resource Manager by default) from the managed identity of
+    a Container App or Job (IDENTITY_ENDPOINT and IDENTITY_HEADER are set there); None elsewhere."""
     import os
 
     endpoint, header = os.environ.get("IDENTITY_ENDPOINT"), os.environ.get("IDENTITY_HEADER")
@@ -102,7 +102,7 @@ def managed_identity_token(http) -> str | None:
         return None
     r = http.get(
         endpoint,
-        params={"resource": ARM + "/", "api-version": "2019-08-01"},
+        params={"resource": resource, "api-version": "2019-08-01"},
         headers={"X-IDENTITY-HEADER": header},
     )
     r.raise_for_status()

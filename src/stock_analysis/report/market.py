@@ -1,49 +1,28 @@
-"""A short whole-market report, saved as a dated PDF next to the watch list analyses.
+"""The market report's page, in the same three parts as every report.
 
-Same template as every report: 1. Summary, 2. The numbers, 3. Analysis.
   - Market: main indices, rates, oil, gold, the dollar and bitcoin; the 11 S&P 500 sectors;
     breadth (share of S&P 500 stocks above their 200-day average, near 52-week highs/lows).
   - Stocks to look at: the market screener's top 3 cheap or close-to-cheap stocks per
-    sector (stock_analysis.screener, docs/SCREENER.md): Stage 1 keeps companies with good financial
-    statements for their Lynch category, Stage 2 ranks the survivors by price against
-    their own cheap price. Read from the database's latest screener run; the evening run
-    refreshes it first (analysis/watchlist.py).
-  - Claude's view (summary; what happened, why, what it means; comments on the names; what
-    to watch; sources) comes from analyses/market/notes.md (sections in
-    stock_analysis.notes_check).
+    sector (stock_analysis.screener, docs/SCREENER.md).
+  - Claude's analysis: what happened, why, what it means, the names, what to watch, sources.
 
-The numbers are computed on the server after each ingest (stock_analysis.nightly:
-the instruments of config/market.toml, breadth of the S&P 500 members, the screener's top)
-and read here; if none were stored since the last build, they are computed on the spot.
-
-Writes analyses/market/<YYYY-MM-DD_HHMM>.pdf and records the run in out_market_run.
-
-Usage:
-    uv run python analysis/market.py             # build the PDF
-    uv run python analysis/market.py --numbers   # print the numbers only
+The numbers are computed on the server after each night's ingest (stock_analysis.nightly:
+the instruments of config/market.toml, breadth of the S&P 500 members, the screener's top).
 """
 
 from __future__ import annotations
 
-import argparse
 import html
-import sys
 import tomllib
-from datetime import UTC, datetime
-from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
 
-from stock_analysis import nightly, stocks
+from ..db import ROOT
+from ..nightly import plain
+from . import render as w
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import watchlist as w  # noqa: E402
-
-ROOT = Path(__file__).resolve().parent.parent
 MARKET_CONFIG = ROOT / "config/market.toml"
-OUT = w.OUT / "market"
 
 _instruments = tomllib.loads(MARKET_CONFIG.read_text(encoding="utf-8"))
 INDICES: dict[str, str] = _instruments["markets"]
@@ -74,8 +53,9 @@ def render(
     info: dict,
     run_label: str,
     price_date: str,
+    a: w.Analysis,
 ) -> str:
-    updated, notes = w.read_notes("market")
+    updated, notes = a.reviewed, a.sections
     top_n, close = info.get("top_n", 3), info.get("close", 0.15)
 
     def note(section: str) -> str:
@@ -198,67 +178,32 @@ acting.</p>
 {note("What to watch")}
 <h3>Sources</h3>
 {note("Sources")}
-<p class="note">Reproduce: <code>uv run python analysis/market.py</code></p>
 </body></html>"""
 
 
-def build(local: datetime, numbers: bool = False, data=None) -> Path | None:
-    """Read, print the numbers and (unless numbers) write the dated PDF; returns its path."""
-    data = data or stocks.default_data()
-    n = nightly.stored_market(data)  # computed on the server after the ingest
-    if n is None:
-        print("Market numbers: none stored since the last build; computing them now")
-        n = nightly.market_numbers(data)
-    m, sec, b, top, info = n["markets"], n["sectors"], n["breadth"], n["top"], n["screener"]
-    price_date = n["price_date"]
-    if "^GSPC" not in m.index or m["last"].isna().all():
+def page(n: dict, run_label: str, a: w.Analysis) -> str:
+    """The report's page from nightly's market numbers and Claude's analysis."""
+    if "^GSPC" not in n["markets"].index or n["markets"]["last"].isna().all():
         raise RuntimeError("no market prices in the database yet (core_market_daily)")
-
-    spx = m.loc["^GSPC"]
-    print(
-        f"Market: S&P 500 {spx['last']:,.0f} ({pct(spx['day'])} today, {pct(spx['ytd'])} this "
-        f"year), VIX {m.loc['^VIX', 'last']:.1f}, {b['above_200d']:.0%} above 200-day; "
-        f"stocks to look at: {' '.join(top['name'].head(TOP)) if len(top) else 'none'}"
-    )
-    if numbers:
-        print(m.round(4).to_string())
-        cols = ["name", "sector", "category", "close", "pe_now", "cheap_price", "vs_cheap"]
-        print(
-            top[[c for c in cols if c in top]].round(3).to_string(index=False) if len(top) else ""
-        )
-        return None
-
-    stamp = local.strftime("%Y-%m-%d_%H%M")
-    run_label = local.strftime("%Y-%m-%d %H:%M ") + local.tzname()
-    pdf = w.new_pdf(OUT, stamp)
-    w.to_pdf(render(m, sec, b, top, info, run_label, price_date), pdf)
-    data.save_market_run(
-        {
-            "run_at": local.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
-            "file": pdf.name,
-            "sp500": w.plain(spx["last"]),
-            "sp500_day": w.plain(spx["day"]),
-            "vix": w.plain(m.loc["^VIX", "last"]),
-            "above_200d": w.plain(b["above_200d"]),
-            "stocks_to_look_at": " ".join(top["name"].head(TOP)) if len(top) else "",
-            "screener_date": info.get("date") or None,
-            "screener_passed": info.get("passed", 0),
-            "screener_screened": info.get("screened", 0),
-            "screener_listed": info.get("listed", 0),
-        }
-    )
-    return pdf
+    return render(
+        n["markets"], n["sectors"], n["breadth"], n["top"], n["screener"], run_label,
+        n["price_date"], a,
+    )  # fmt: skip
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--numbers", action="store_true", help="print the numbers, write nothing")
-    args = ap.parse_args()
-    local = datetime.now(ZoneInfo(w.wl.TIMEZONE))
-    pdf = build(local, args.numbers)
-    if pdf:
-        print(f"Wrote {pdf.relative_to(ROOT)}")
-
-
-if __name__ == "__main__":
-    main()
+def run_row(n: dict, run_at: str, file: str) -> dict:
+    """The run's row in out_market_run."""
+    m, top, info = n["markets"], n["top"], n["screener"]
+    return {
+        "run_at": run_at,
+        "file": file,
+        "sp500": plain(m.loc["^GSPC", "last"]),
+        "sp500_day": plain(m.loc["^GSPC", "day"]),
+        "vix": plain(m.loc["^VIX", "last"]),
+        "above_200d": plain(n["breadth"]["above_200d"]),
+        "stocks_to_look_at": " ".join(top["name"].head(TOP)) if len(top) else "",
+        "screener_date": info.get("date") or None,
+        "screener_passed": info.get("passed", 0),
+        "screener_screened": info.get("screened", 0),
+        "screener_listed": info.get("listed", 0),
+    }

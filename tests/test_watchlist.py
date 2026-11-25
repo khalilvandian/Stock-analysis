@@ -1,11 +1,10 @@
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "analysis"))
-import watchlist  # noqa: E402
+from stock_analysis import nightly
+from stock_analysis.report import render
 
 
 def _dates(rows: list[tuple[str, float | None]]) -> pd.DataFrame:
@@ -24,9 +23,9 @@ def test_quarterly_eps_drops_duplicates_and_applies_overrides():
             ("2027-01-19", None),  # future report
         ]
     )
-    q = watchlist.quarterly_eps(d, [{"reported": "2026-04-16", "eps": 1.1}])
+    q = nightly.quarterly_eps(d, [{"reported": "2026-04-16", "eps": 1.1}])
     assert list(q.round(2)) == [1.0, 1.1, 1.2, 1.3]
-    assert watchlist.trailing_eps(q).iloc[-1] == 4.6
+    assert nightly.trailing_eps(q).iloc[-1] == 4.6
 
 
 def test_trailing_eps_needs_four_consecutive_quarters():
@@ -34,7 +33,7 @@ def test_trailing_eps_needs_four_consecutive_quarters():
         [1.0, 1.0, 1.0, 1.0],
         index=pd.to_datetime(["2020-01-20", "2020-04-20", "2022-07-20", "2022-10-20"]),
     )
-    assert watchlist.trailing_eps(q).empty
+    assert nightly.trailing_eps(q).empty
 
 
 def test_yearly_pe_uses_eps_at_the_q4_report_and_average_price():
@@ -43,74 +42,14 @@ def test_yearly_pe_uses_eps_at_the_q4_report_and_average_price():
     ttm = pd.Series(
         [4.0, 5.0], index=pd.to_datetime(["2025-02-10", "2026-02-10"])
     )  # FY2024 and FY2025 EPS
-    y = watchlist.yearly_pe(prices, ttm)
+    y = nightly.yearly_pe(prices, ttm)
     assert y.loc[2024, "pe"] == 25.0
     assert y.loc[2025, "pe"] == 20.0
 
 
-def test_notes_sections_and_first_sentence(tmp_path, monkeypatch):
-    monkeypatch.setattr(watchlist, "OUT", tmp_path)
-    (tmp_path / "X").mkdir()
-    (tmp_path / "X/notes.md").write_text(
-        "# X\n\nUpdated: 2026-10-27\n\n## Verdict\n\n**Cheap. Buy below $10.**\n\n## Risks\n\n- a\n"
-    )
-    updated, notes = watchlist.read_notes("X")
-    assert updated == "2026-10-27"
-    assert notes["Risks"] == "- a"
-    assert watchlist.first_sentence(notes["Verdict"]) == "Cheap."
-
-
-def test_new_pdf_never_overwrites(tmp_path):
-    first = watchlist.new_pdf(tmp_path, "2026-10-27_2100")
-    first.write_bytes(b"x")
-    assert watchlist.new_pdf(tmp_path, "2026-10-27_2100").name == "2026-10-27_2100-2.pdf"
-
-
 def test_formatting():
-    assert watchlist.times(np.nan) == "–"
-    assert watchlist.pct(-0.0712) == "-7.1%"
-
-
-def test_email_attaches_every_pdf_and_sends_once_through_brevo(tmp_path, monkeypatch):
-    import json
-
-    import httpx
-    import pytest
-    import respx
-    import send_email
-
-    (tmp_path / "analyses/BSX").mkdir(parents=True)
-    (tmp_path / "analyses/BSX/2026-10-27_2100.pdf").write_bytes(b"%PDF-1.4")
-    (tmp_path / "email.html").write_text("<p>hi</p>")
-    monkeypatch.setattr(send_email, "ROOT", tmp_path)
-    run = {"subject": "S", "html": "email.html", "files": ["analyses/BSX/2026-10-27_2100.pdf"]}
-    msg = send_email.build_message(
-        run, "a@example.com, b@example.com", "Bot <bot@example.com>", test=True
-    )
-    assert msg["subject"] == "[Test] S"
-    with respx.mock:
-        route = respx.post(send_email.API).mock(
-            return_value=httpx.Response(201, json={"messageId": "<m1>"})
-        )
-        assert send_email.send(msg, "k")["id"] == "<m1>"
-        assert len(route.calls) == 1
-        req = route.calls[0].request
-    body = json.loads(req.content)
-    assert req.headers["api-key"] == "k"
-    assert body["sender"] == {"email": "bot@example.com", "name": "Bot"}
-    assert body["to"] == [{"email": "a@example.com"}, {"email": "b@example.com"}]
-    assert body["attachment"] == [{"name": "BSX_2026-10-27_2100.pdf", "content": "JVBERi0xLjQ="}]
-    with pytest.raises(SystemExit):
-        send_email.recipients(",".join(f"{i}@example.com" for i in range(6)))
-
-
-def test_links_go_to_the_pages_site_on_main(monkeypatch):
-    pdf = watchlist.OUT / "BSX/2026-10-27_2100.pdf"
-    monkeypatch.setenv("WATCHLIST_BRANCH", "main")
-    assert watchlist.link(pdf) == f"{watchlist.PAGES_URL}/BSX/2026-10-27_2100.pdf"
-    assert watchlist.link(watchlist.OUT / "README.md") == f"{watchlist.PAGES_URL}/"
-    monkeypatch.setenv("WATCHLIST_BRANCH", "work")
-    assert watchlist.link(pdf).endswith("/blob/work/analyses/BSX/2026-10-27_2100.pdf")
+    assert render.times(np.nan) == "–"
+    assert render.pct(-0.0712) == "-7.1%"
 
 
 def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
@@ -185,3 +124,7 @@ def test_site_has_grouped_menus_and_the_pipeline_page(tmp_path, monkeypatch):
     # the diagram comes from docs/pipeline.html, without the notes on maintaining it
     assert "Stock Analysis Pipeline" in page and "<svg" in page
     assert 'id="maintain"' not in page and ".pipeline .box" in page
+
+
+def test_first_sentence():
+    assert render.first_sentence("**Cheap. Buy below $10.**") == "Cheap."

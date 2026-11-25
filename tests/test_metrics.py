@@ -44,7 +44,7 @@ def test_sector_columns_exist():
 
     d = metrics.load()
     header = set(stocks.row_columns())
-    screen_src = (ROOT / "analysis/screen.py").read_text()
+    screen_src = (ROOT / "src/stock_analysis/screen.py").read_text()
     for m in d["metric"]:
         col, _ = metrics._source(m, "sector")
         if col in SCREEN_COLUMNS:

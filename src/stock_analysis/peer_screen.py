@@ -1,25 +1,21 @@
 """Run the sector metrics and screens on a hand-picked peer group outside utilities.
 
 Reads each symbol's row from the database (stock_analysis.stocks.rows, the same columns as
-the utilities table) and applies the strict and weighted screens of analysis/screen.py to
+the utilities table) and applies the strict and weighted screens of stock_analysis.screen to
 that group (one peer median for P/E and EV / EBITDA). Stocks the database lacks are listed;
 add them to the watch list's peers or to extra_symbols in config/ingest.toml so the ingest
 fetches them.
 
-Usage: uv run python analysis/peer_screen.py medtech BSX ABT MDT SYK ...
+Usage: uv run python -m stock_analysis.peer_screen medtech BSX ABT MDT SYK ...
 """
 
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 import pandas as pd
 
-from stock_analysis import stocks
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import screen  # noqa: E402
+from . import screen, stocks
 
 
 def peer_table(symbols: list[str], data=None) -> pd.DataFrame:

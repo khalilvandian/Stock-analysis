@@ -1,58 +1,37 @@
-"""Check the latest pipeline outputs and print a short PASS / WARN / FAIL report.
+"""Check a run's reports and the data behind them: PASS / WARN / FAIL.
 
-Reads the run's outputs in the database (the newest screener run, the watch list's runs,
-the watch list's rows and history) and the files of the repository (the PDFs, notes.md and
-.cache/watchlist/last_run.json). Run it in the evening run right after the build
-(docs/EVENING_RUN.md, step 5).
-
-What it checks:
+  - The run (check_report): an email body, a stored PDF for every subject, the recorded rows,
+    entry price = target P/E x adjusted EPS (+ equity stakes per share where set).
   - Market screener (the newest run in out_screener_result): required columns, at most
     `top_per_sector` rows per region and sector, only Stage 1 passes listed, vs_cheap equal
     to close / cheap_price - 1, the cheap / close labels against `close_to_cheap`, ranks in
     order, P/E and cheap price consistent with EPS and the exchange rates, market value in
     dollars consistent with the statement currency, and whether the screener ran today.
-  - Identities on the absolute values (the screener's, and the watch list's rows from the
-    database), with tolerances: net debt = total debt - cash, total debt = short-term +
-    long-term debt, free cash flow = operating cash flow - |capex|. In the watch list's
-    yearly history the implied share count (market value / price) must not jump between
-    years, which catches splits not applied and share counts in the wrong unit.
+  - Identities on the absolute values, with tolerances: net debt = total debt - cash, total
+    debt = short-term + long-term debt, free cash flow = operating cash flow - |capex|. In the
+    yearly history the implied share count must not jump between years, which catches splits
+    not applied and share counts in the wrong unit.
   - Suspicious outliers in the screener's list: P/E under 5 or over 100, EPS far from SEC,
     adjusted EPS far from diluted, extreme EPS growth, infinite ratios.
-  - Dated analyses (out_watchlist_run): run times match the file names, every recorded
-    PDF exists and is a non-empty PDF, the newest PDF of every folder is non-empty, entry
-    price = target P/E x adjusted EPS (+ equity stakes per share where set), every watch
-    list stock has notes.md; .cache/watchlist/last_run.json lists files that exist.
 
-WARN = worth a look (known data differences between sources); FAIL = the outputs are broken.
-Exits 1 on any FAIL (with --strict, also on WARN).
-
-Usage:
-    uv run python analysis/validate.py             # the report
-    uv run python analysis/validate.py --verbose   # also list every row behind a WARN
-    uv run python analysis/validate.py --strict    # exit non-zero on WARN as well
+WARN = worth a look (known data differences between sources); FAIL = broken.
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import re
-import sys
 import tomllib
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
 
-from stock_analysis import notes_check, stocks, watchlist
+from .. import stocks
+from ..db import ROOT
+from ..screener.common import ABSOLUTE
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from stock_analysis.screener.common import ABSOLUTE  # noqa: E402
-
-ROOT = Path(__file__).resolve().parent.parent
+MIN_PDF = 5_000  # bytes; a report is about 200 KB
 
 # Columns the market report and the site read from top.csv, plus the absolute values
 TOP_REQUIRED = [
@@ -90,8 +69,6 @@ STAGE1_REQUIRED = [
     *ABSOLUTE,
 ]
 STATUSES = {"pass", "fail", "incomplete"}
-RUN_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})")
-FILE_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(-\d+)?\.pdf$")
 
 # Tolerances: amounts are in US dollar billions, rounded to 4 decimals in the CSVs
 ABS_TOL_BN = 0.01
@@ -414,42 +391,11 @@ def history_checks(h: pd.DataFrame) -> list[Check]:
     return out
 
 
-# --- dated analyses ------------------------------------------------------------------
+# --- the run's reports ---------------------------------------------------------------
 
 
-def is_pdf(path: Path) -> bool:
-    if not path.is_file() or path.stat().st_size == 0:
-        return False
-    with path.open("rb") as f:
-        return f.read(5) == b"%PDF-"
-
-
-def check_runs(folder: Path, runs: pd.DataFrame, tz: ZoneInfo) -> list[Check]:
-    """One stock's recorded runs (out_watchlist_run): run times match the file names, the
-    files exist, the entry price follows from the numbers."""
-    name = f"{folder.name} runs"
-    if runs.empty:
-        return [_warn(name, "no runs yet")]
-    out = []
-    problems = []
-    runs = runs.sort_values("run_at").reset_index(drop=True)
-    for r in runs.itertuples():
-        f = FILE_TIME.match(str(r.file))
-        local = pd.Timestamp(r.run_at).tz_localize("UTC").tz_convert(tz)
-        if not f:
-            problems.append(f"unreadable file name: {r.file!r}")
-            continue
-        if (local.strftime("%Y-%m-%d"), local.strftime("%H"), local.strftime("%M")) != (
-            f[1], f[2], f[3]
-        ):  # fmt: skip
-            problems.append(f"{r.file} recorded for the run at {local:%Y-%m-%d %H:%M}")
-    lost = [f for f in runs["file"] if not is_pdf(folder / str(f))]
-    if lost:
-        problems.append(f"missing or empty PDFs: {', '.join(map(str, lost))}")
-    if problems:
-        out.append(_fail(name, "; ".join(problems)))
-    else:
-        out.append(_pass(name, f"{len(runs)} runs, latest {runs['run_at'].iloc[-1]} UTC"))
+def check_numbers(sym: str, runs: pd.DataFrame) -> list[Check]:
+    """One stock's recorded runs: the entry price and the P/E follow from the numbers."""
     r = runs.copy()
     for c in ("price", "eps_adj_ttm", "target_pe", "entry_price", "pe_adj", "to_entry"):
         r[c] = pd.to_numeric(r[c], errors="coerce")
@@ -462,125 +408,71 @@ def check_runs(folder: Path, runs: pd.DataFrame, tz: ZoneInfo) -> list[Check]:
         | off(pe, r["pe_adj"], 1e-3)
         | off(to_entry, r["to_entry"], 1e-3)
     )
+    name = f"{sym}: entry price = target P/E x adjusted EPS"
     if wrong.any():
-        out.append(
-            _fail(
-                f"{folder.name}: entry price = target P/E x adjusted EPS",
-                f"runs {list(r.loc[wrong, 'run_at'])}",
-            )
-        )
-    unlisted = sorted({p.name for p in folder.glob("*.pdf")} - set(runs["file"].astype(str)))
-    if unlisted:
-        out.append(_warn(f"{folder.name}: PDFs not recorded", ", ".join(unlisted)))
-    return out
+        return [_fail(name, f"runs {list(r.loc[wrong, 'run_at'])}")]
+    return [_pass(name, f"{len(r)} runs")]
 
 
-def newest_pdf(folder: Path) -> Path | None:
-    pdfs = sorted(p for p in folder.glob("*.pdf") if FILE_TIME.match(p.name))
-    return pdfs[-1] if pdfs else None
-
-
-def check_analyses(root: Path, today: date, runs: pd.DataFrame, symbols: list[str]) -> list[Check]:
-    analyses = root / "analyses"
-    if not analyses.exists():
-        return [_fail("analyses", "folder not found")]
+def check_report(run: dict, store, runs: pd.DataFrame) -> list[Check]:
+    """The run made what it should: an email, a real PDF per subject, recorded rows."""
+    report = run.get("report")
+    if not report:
+        return [_fail("report", f"run {run['run_key']} is not rendered")]
     out = []
-    tz = ZoneInfo(watchlist.TIMEZONE)
-    no_notes = [s for s in symbols if not (analyses / s / "notes.md").exists()]
-    have = set(runs["symbol"]) if len(runs) else set()
-    no_runs = [s for s in symbols if s not in have]
-    if no_notes:
-        out.append(_fail("watch list notes.md", f"missing for {', '.join(no_notes)}"))
-    else:
-        out.append(_pass("watch list notes.md", ", ".join(symbols)))
-    if no_runs:
-        out.append(_warn("watch list runs", f"no runs yet for {', '.join(no_runs)}"))
-    for sym in sorted(have):
-        out += check_runs(analyses / sym, runs[runs["symbol"] == sym], tz)
-    stamps = {}
-    for folder in [analyses / s for s in symbols] + [analyses / "market", analyses / "summaries"]:
-        pdf = newest_pdf(folder) if folder.exists() else None
-        if pdf is None:
-            out.append(_warn(f"{folder.name}: newest PDF", "none"))
-            continue
-        if not is_pdf(pdf):
-            out.append(_fail(f"{folder.name}: newest PDF", f"{pdf.name} empty or not a PDF"))
-            continue
-        stamps[folder.name] = pdf.name[:15]
-    if stamps:
-        latest = max(stamps.values())
-        behind = [k for k, v in stamps.items() if v != latest]
-        if behind:
-            out.append(_warn("newest PDFs from the same run", f"older than {latest}: {behind}"))
-        else:
-            out.append(_pass("newest PDFs from the same run", f"{latest}, {len(stamps)} folders"))
-        # runs are stamped in the watch list's time zone (Italy), the screener in UTC
-        local = datetime.now(ZoneInfo("Europe/Rome")).date().isoformat()
-        if latest[:10] not in (today.isoformat(), local):
-            out.append(_warn("newest run date", f"{latest[:10]}, not today ({today})"))
-    return out
-
-
-def check_notes(root: Path, today: date, symbols: list[str]) -> list[Check]:
-    """Claude's notes are current, sourced and free of past events (notes_check)."""
-    run, out = today, []
-    for s in [*symbols, "market", "summaries"]:
-        path = root / "analyses" / s / "notes.md"
-        if not path.exists():
-            continue  # check_analyses reports a missing notes.md
-        found = notes_check.problems(notes_check.kind_of(s), path.read_text("utf-8"), run)
-        name = f"{s}/notes.md: current and sourced"
-        detail = f"{len(found)} problems: " + "; ".join(found[:3]) if found else ""
-        out.append(_fail(name, detail, found) if found else _pass(name))
-    return out
-
-
-def check_last_run(root: Path) -> list[Check]:
-    path = root / ".cache/watchlist/last_run.json"
-    name = "last_run.json"
-    if not path.exists():
-        return [_warn(name, "not found (written by analysis/watchlist.py; not committed)")]
-    try:
-        run = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        return [_fail(name, f"does not parse: {e}")]
-    problems = []
-    if not run.get("subject"):
-        problems.append("no subject")
-    if not run.get("html") or not (root / run["html"]).is_file():
-        problems.append(f"email body {run.get('html')!r} not found")
-    files = run.get("files") or []
-    if not files:
-        problems.append("no files")
-    lost = [f for f in files if not is_pdf(root / f)]
+    problems = [f"no {k}" for k in ("subject", "html", "files") if not report.get(k)]
+    made = {f.split("/")[0]: f for f in report.get("files") or []}
+    lost = [s for s in run["subjects"] if s not in made]
     if lost:
-        problems.append(f"missing or empty: {', '.join(lost)}")
-    if problems:
-        return [_fail(name, "; ".join(problems))]
-    return [_pass(name, f"{len(files)} PDFs")]
+        problems.append(f"no report of {', '.join(lost)} ({'; '.join(report.get('failed', []))})")
+    out.append(_fail("report", "; ".join(problems)) if problems else _pass("report"))
+    bad = []
+    for file in made.values():
+        try:
+            content = store.get(file)
+        except Exception as e:  # noqa: BLE001 - a file that can't be read is the finding
+            bad.append(f"{file}: {e}")
+            continue
+        if not content.startswith(b"%PDF-") or len(content) < MIN_PDF:
+            bad.append(f"{file}: empty or not a PDF ({len(content)} bytes)")
+    out.append(_fail("PDFs", "; ".join(bad)) if bad else _pass("PDFs", f"{len(made)} stored"))
+    for sym, file in made.items():
+        if sym in ("market", "summaries"):
+            continue
+        mine = runs[(runs["symbol"] == sym) & (runs["file"] == file.split("/")[1])]
+        if len(mine) != 1:
+            out.append(_fail(f"{sym}: recorded run", f"{len(mine)} rows for {file}"))
+        else:
+            out += check_numbers(sym, mine)
+    return out
 
 
 # --- report --------------------------------------------------------------------------
 
 
-def run_checks(root: Path = ROOT, today: date | None = None, data=None) -> list[Check]:
+def run_checks(run: dict, store, data, today: date | None = None) -> tuple[list, list]:
+    """(the report's own checks, the data's checks): a FAIL of the first stops the email, one
+    of the second is shown at its top."""
     today = today or date.today()
-    data = data or stocks.default_data()
-    symbols = data.watchlist()["symbol"].tolist()
-    checks: list[Check] = []
-    for part in (
-        lambda: check_screener(root, today, data),
-        lambda: check_rows(root, data, symbols),
-        lambda: check_history(data, symbols),
-        lambda: check_analyses(root, today, data.watchlist_runs(), symbols),
-        lambda: check_notes(root, today, symbols),
-        lambda: check_last_run(root),
-    ):
-        try:
-            checks += part()
-        except Exception as e:  # noqa: BLE001 - a crash in one part is a FAIL, not a stop
-            checks.append(_fail("validate.py", f"{type(e).__name__}: {e}"))
-    return checks
+    symbols = [s for s in run["subjects"] if s not in ("market", "summaries")]
+
+    def safely(*parts) -> list[Check]:
+        checks: list[Check] = []
+        for part in parts:
+            try:
+                checks += part()
+            except Exception as e:  # noqa: BLE001 - a crash in one part is a FAIL, not a stop
+                checks.append(_fail("validate", f"{type(e).__name__}: {e}"))
+        return checks
+
+    return (
+        safely(lambda: check_report(run, store, data.watchlist_runs())),
+        safely(
+            lambda: check_screener(ROOT, today, data),
+            lambda: check_rows(ROOT, data, symbols),
+            lambda: check_history(data, symbols),
+        ),
+    )
 
 
 def overall(checks: list[Check]) -> str:
@@ -600,22 +492,3 @@ def report(checks: list[Check], verbose: bool = False) -> str:
         f"Result: {overall(checks)} ({n['PASS']} pass, {n['WARN']} warn, {n['FAIL']} fail)",
     ]
     return "\n".join(lines)
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--verbose", action="store_true", help="list every row behind a WARN")
-    ap.add_argument("--strict", action="store_true", help="exit non-zero on WARN too")
-    ap.add_argument("--today", help="date the outputs should be from (default: today)")
-    args = ap.parse_args()
-    # the run's date in Italy, as the PDFs are stamped: a midnight run is already the next day
-    italy = datetime.now(ZoneInfo("Europe/Rome")).date()
-    today = date.fromisoformat(args.today) if args.today else italy
-    checks = run_checks(ROOT, today)
-    print(report(checks, args.verbose))
-    result = overall(checks)
-    sys.exit(1 if result == "FAIL" or (args.strict and result == "WARN") else 0)
-
-
-if __name__ == "__main__":
-    main()

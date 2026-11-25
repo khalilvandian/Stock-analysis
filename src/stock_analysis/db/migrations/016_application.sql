@@ -12,6 +12,8 @@ CREATE TABLE out_analysis_run (
     session_url     TEXT,
     submitted_at    TIMESTAMP,
     submit_note     TEXT,               -- what Claude says about the run
+    rendered_at     TIMESTAMP,
+    report_json     TEXT,               -- the files, the email, what failed (stock_analysis.report)
     emailed_at      TIMESTAMP           -- one email per run
 );
 
