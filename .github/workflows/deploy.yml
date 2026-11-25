@@ -93,7 +93,8 @@ jobs:
       - name: 2. Web API
         if: steps.ready.outputs.ok == 'true'
         run: |
-          (cd api && zip -q ../stock-api.zip app.py operations.py requirements.txt)
+          cp src/stock_analysis/notes_check.py api/
+          (cd api && zip -q ../stock-api.zip app.py operations.py notes_check.py requirements.txt)
           az webapp deploy -g "$RESOURCE_GROUP" -n "$WEB_APP" --src-path stock-api.zip --type zip --only-show-errors -o none
 
       - name: 3. Airflow UI

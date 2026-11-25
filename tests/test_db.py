@@ -1008,7 +1008,10 @@ CLAUDE = {"X-API-Key": "claude-key"}
 RUN = "manual__2026-11-25T22:30:00+00:00"
 RUN_URL = "/app/runs/manual__2026-11-25T22%3A30%3A00%2B00%3A00"
 HEADINGS = ("Verdict", "Today", "Summary", "Business", "Risks", "News", "What to watch")
-STOCK_NOTE = {s: f"{s} text" for s in HEADINGS}
+STOCK_NOTE = {s: f"{s} text" for s in HEADINGS} | {
+    "News": "- 2026-11-20: deal ([Reuters](https://example.test/a))",
+    "What to watch": "- Margins (ongoing)",
+}
 
 
 def open_run(con: Database, subjects: list[str]) -> None:
@@ -1048,6 +1051,9 @@ def test_app_analysis_is_checked_saved_and_submitted(con: Database, api) -> None
 
     bad = api.put(f"{put}/AAA", json={"reviewed": today, "sections": {**STOCK_NOTE, "Risks": " "}})
     assert bad.status_code == 422 and bad.json()["detail"] == ["section missing or empty: Risks"]
+    unsourced = {**STOCK_NOTE, "News": "- 2026-11-20: deal", "What to watch": "- Margins"}
+    poor = api.put(f"{put}/AAA", json={"reviewed": today, "sections": unsourced})
+    assert poor.status_code == 422 and len(poor.json()["detail"]) == 2  # no source, no date
     stale = api.put(f"{put}/AAA", json={"reviewed": "2026-01-01", "sections": STOCK_NOTE})
     assert stale.status_code == 422
     other = api.put(f"{put}/ZZZ", json={"reviewed": today, "sections": STOCK_NOTE})

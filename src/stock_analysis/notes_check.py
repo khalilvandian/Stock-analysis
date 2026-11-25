@@ -216,6 +216,12 @@ def problems(kind: str, text: str, run: date) -> list[str]:
             out.append(f"section '{name}' was last reviewed {max(seen)}, not {run}")
         if not strip_markers(body):
             out.append(f"section '{name}' is empty")
+    return out + content_problems(kind, sections, run)
+
+
+def content_problems(kind: str, sections: dict[str, str], run: date) -> list[str]:
+    """Rules 3 to 6: what the sections say."""
+    out = []
     for name, body in sections.items():
         if name == "News":
             out += check_news(body, run)

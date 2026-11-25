@@ -31,13 +31,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
+try:  # deployed beside this file (deploy.yml copies it from src/stock_analysis)
+    import notes_check
+except ImportError:
+    from stock_analysis import notes_check
+
 MARKET, SUMMARIES = "market", "summaries"
-STOCK_SECTIONS = ["Verdict", "Today", "Summary", "Business", "Risks", "News", "What to watch"]
-SECTIONS = {
-    MARKET: ["Verdict", "Summary", "What happened", "Why it happened", "What it means",
-             "Stocks to look at", "What to watch", "Sources"],
-    SUMMARIES: ["Verdict", "Analysis"],
-}  # fmt: skip
+SECTIONS = {k: v for k, v in notes_check.SECTIONS.items() if k != "stock"}
+STOCK_SECTIONS = notes_check.SECTIONS["stock"]
 SYMBOL = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 MAX_SECTION = 20_000
 MAX_PEERS = 25
@@ -130,6 +131,7 @@ def check_analysis(subject: str, body: Analysis, trading_day: dt.date) -> dict[s
         wrong.append(f"reviewed {body.reviewed} is not between {trading_day} and today")
     if body.corrections and subject in SECTIONS:
         wrong.append("corrections belong to a stock")
+    wrong += notes_check.content_problems(notes_check.kind_of(subject), given, body.reviewed)
     days = [c.reported for c in body.corrections]
     if len(days) != len(set(days)):
         wrong.append("two corrections for the same report date")
