@@ -306,7 +306,7 @@ sources = { watchlist = "eps_adj_ttm", yahoo = "earnings_dates: Reported EPS" }
 used_in = ["watch list: own-history P/E and entry price", "screener Stage 2 (top stocks)"]
 example = { symbol = "BSX", value = 3.21, as_of = "2026-09-30", working = "sum of the last 4 reported quarters" }
 vector = "core"
-notes = "Company-defined, so not identical across companies. One-offs Yahoo still includes are fixed by hand in config/watchlist.toml (NFLX)."
+notes = "Company-defined, so not identical across companies. One-offs Yahoo still includes can be corrected per quarter in user_eps_override."
 
 [[metric]]
 id = "eps_fwd"

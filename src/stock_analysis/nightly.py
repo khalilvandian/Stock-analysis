@@ -322,34 +322,7 @@ def market_numbers(data) -> dict:
     }
 
 
-# --- the watch list from the database ------------------------------------------------------
-
-
-def watch_list(data) -> list[dict]:
-    """The database's watch list (user_*), in the shape of config/watchlist.toml's stocks."""
-    w = data.watchlist()
-    peers = data.sql("SELECT symbol, peer, position FROM user_watchlist_peer ORDER BY position")
-    over = data.sql("SELECT symbol, reported, eps, reason FROM user_eps_override")
-    out = []
-    for r in w.sort_values("position").itertuples():
-        out.append(
-            {
-                "symbol": r.symbol,
-                "peers": peers.loc[peers["symbol"] == r.symbol, "peer"].tolist(),
-                "target_pe": wl.number(r.target_pe),
-                "target_note": wl.text(r.target_note),
-                "stakes_per_share": wl.number(r.stakes_per_share),
-                "eps_override": [
-                    {
-                        "reported": str(o.reported)[:10],
-                        "eps": float(o.eps),
-                        "reason": wl.text(o.reason),
-                    }
-                    for o in over[over["symbol"] == r.symbol].itertuples()
-                ],
-            }
-        )
-    return out
+# --- what the numbers depend on ------------------------------------------------------
 
 
 def stock_key(stock: dict) -> str:
@@ -542,7 +515,7 @@ def run(data, screener: bool = True) -> dict:
             summary["screener"] = {"screened": len(d), "listed": len(top)}
         except Exception as exc:  # noqa: BLE001 - the rest still runs
             summary["screener_error"] = repr(exc)[:300]
-    stock_list = watch_list(data)
+    stock_list = wl.load(data)
     done, failed, missing = compute_stocks(data, stock_list)
     keys = {s["symbol"]: stock_key(s) for s in stock_list}
     save_stock_numbers(

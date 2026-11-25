@@ -165,9 +165,6 @@ class Data:
     def save_valuations(self, rows: list[dict]) -> int:
         raise NotImplementedError
 
-    def set_watchlist(self, stocks: list[dict]) -> int:
-        raise NotImplementedError
-
     def save_screener_run(
         self, run_date: str, universe: str, source: str, results: list[dict]
     ) -> int:
@@ -248,38 +245,6 @@ def note_row(subject: str, text: str) -> dict:
     return {"subject": subject, "updated_at": now_utc(), "text": text, "source": "script"}
 
 
-def watchlist_rows(stocks: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
-    """set_watchlist's input as rows of user_watchlist, user_watchlist_peer, user_eps_override."""
-    w = [
-        {
-            "symbol": s["symbol"],
-            "position": i,
-            "target_pe": s.get("target_pe"),
-            "target_note": s.get("target_note"),
-            "stakes_per_share": s.get("stakes_per_share"),
-        }
-        for i, s in enumerate(stocks, start=1)
-    ]
-    peers = [
-        {"symbol": s["symbol"], "peer": p, "position": i}
-        for s in stocks
-        for i, p in enumerate(s.get("peers", []), start=1)
-    ]
-    overrides = [
-        {"symbol": s["symbol"], **{k: o.get(k) for k in ("reported", "eps", "reason")}}
-        for s in stocks
-        for o in s.get("eps_override", [])
-    ]
-    return w, peers, overrides
-
-
-WATCHLIST_TABLES = [
-    ("user_watchlist", ["symbol", "position", "target_pe", "target_note", "stakes_per_share"]),
-    ("user_watchlist_peer", ["symbol", "peer", "position"]),
-    ("user_eps_override", ["symbol", "reported", "eps", "reason"]),
-]
-
-
 class DbData(Data):
     """Straight from PostgreSQL: reads as stock_reader, writes as stock_writer."""
 
@@ -344,18 +309,6 @@ class DbData(Data):
                 counts.append(res.rowcount if res.rowcount is not None else -1)
         return counts
 
-    def set_watchlist(self, stocks: list[dict]) -> int:
-        """Replace the watch list: [{symbol, target_pe, target_note, stakes_per_share,
-        peers: [...], eps_override: [{reported, eps, reason}]}]."""
-        tables = watchlist_rows(stocks)
-        with self.writer.begin() as conn:
-            for table, _ in reversed(WATCHLIST_TABLES):
-                run(conn, f"DELETE FROM {table}")
-            return sum(
-                insert_rows(conn, table, columns, rows)
-                for (table, columns), rows in zip(WATCHLIST_TABLES, tables, strict=True)
-            )
-
 
 class ApiData(Data):
     """Through the web API (api/app.py): the same SQL as DbData, sent over HTTPS. For Claude's
@@ -415,10 +368,3 @@ class ApiData(Data):
 
     def save_valuations(self, rows: list[dict]) -> int:
         return self._insert("out_valuation", VALUATION_COLUMNS, rows)
-
-    def set_watchlist(self, stocks: list[dict]) -> int:
-        steps = [(f"DELETE FROM {t}", []) for t, _ in reversed(WATCHLIST_TABLES)]
-        for (table, columns), rows in zip(WATCHLIST_TABLES, watchlist_rows(stocks), strict=True):
-            if rows:
-                steps.append(insert_sql(table, columns, rows))
-        return sum(self.execute(steps)[len(WATCHLIST_TABLES) :])

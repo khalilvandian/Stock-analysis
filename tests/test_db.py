@@ -740,7 +740,18 @@ def test_watchlist(con, tmp_path: Path, data_dir: Path) -> None:
     ]
     assert one(con, "SELECT peer FROM user_watchlist_peer WHERE position = 2") == "CCC"
     assert one(con, "SELECT eps FROM user_eps_override WHERE symbol = 'AAA'") == 0.25
-    # The TOML is the master copy: an edit replaces the mirror, no edit changes nothing.
+    from stock_analysis import watchlist
+    from stock_analysis.data import DbData
+
+    listed = watchlist.load(DbData(con, con))
+    assert [(x["symbol"], x["target_pe"], x["stakes_per_share"]) for x in listed] == [
+        ("AAA", 12.0, 0.0),
+        ("BBB", 20.0, 1.5),
+    ]
+    assert listed[0]["eps_override"] == [
+        {"reported": "2026-02-01", "eps": 0.25, "reason": "one-off"}
+    ]
+    # The seed file: an edit replaces the list, no edit changes nothing.
     toml = tmp_path / "config" / "watchlist.toml"
     toml.write_text(WATCHLIST.replace("target_pe = 20", "target_pe = 25"), encoding="utf-8")
     assert load_all(con, data_dir)["user_watchlist"] == 5
@@ -956,9 +967,6 @@ def test_api_data_matches_the_database(con: Database, api) -> None:
 
     assert via_api.save_note("AAA", "via the API") == 1
     assert direct.notes("AAA")["text"].tolist() == ["via the API"]
-    stocks = [{"symbol": "BBB", "target_pe": 15, "peers": ["AAA"]}]
-    assert via_api.set_watchlist(stocks) == 2
-    assert direct.watchlist()["symbol"].tolist() == ["BBB"]
 
     before = direct.notes()["text"].tolist()
     with pytest.raises(RuntimeError, match="400"):

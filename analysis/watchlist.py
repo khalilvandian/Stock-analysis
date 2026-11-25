@@ -1,6 +1,6 @@
 """Analyse every stock on the watch list and save each analysis as a dated PDF.
 
-For each stock in config/watchlist.toml the PDF has three parts, in this order:
+For each stock on the watch list the PDF has three parts, in this order:
   1. Summary: the verdict and key points from analyses/<SYMBOL>/notes.md, plus price
      against the entry price.
   2. The numbers: absolute values (latest 12 months and SEC yearly history), ratios, the
@@ -17,10 +17,10 @@ whose watch-list settings changed since, is computed on the spot.
 Adjusted EPS is Yahoo's reported quarterly EPS, which is on the same basis as analysts'
 estimates (excluding amortization and one-offs), split-adjusted, so the own-history P/E
 needs no hand-kept table. One-offs Yahoo still includes can be corrected
-with eps_override in the config.
+in user_eps_override.
 
-The run first mirrors config/watchlist.toml into the database (the ingest reads the stocks
-and peers from there) and saves Claude's notes that changed (out_note). Each run writes
+The run reads the watch list from the database and saves Claude's notes that changed
+(out_note). Each run writes
 analyses/<SYMBOL>/<YYYY-MM-DD_HHMM>.pdf, records the run in the database
 (out_watchlist_run) and rebuilds the dated lists analyses/<SYMBOL>/README.md and
 analyses/README.md from the recorded runs. Earlier PDFs are never overwritten.
@@ -75,15 +75,7 @@ import peer_screen  # noqa: E402
 import screen  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-CONFIG = ROOT / "config/watchlist.toml"
 OUT = ROOT / "analyses"
-
-
-# --- configuration -------------------------------------------------------------------
-
-
-def load_watchlist(path: Path = CONFIG) -> dict:
-    return wl.load(path)
 
 
 # --- notes (Claude's own analysis, kept as Markdown) ---------------------------------
@@ -622,12 +614,12 @@ def stock_index(sym: str, name: str, runs: pd.DataFrame, tz: ZoneInfo) -> str:
     return "\n".join(lines) + "\n"
 
 
-def overview(cfg: dict, runs: pd.DataFrame) -> str:
+def overview(full_list: list[dict], runs: pd.DataFrame) -> str:
     """analyses/README.md: the latest run of each stock (from out_watchlist_run)."""
     lines = [
         "# Watch list analyses",
         "",
-        "Each stock on the watch list ([config/watchlist.toml](../config/watchlist.toml)) is "
+        "Each stock on the watch list is "
         "analysed every evening and saved as a dated PDF in its own folder. Nothing is "
         "overwritten: every run, including several in one day, stays in the stock's dated "
         "list. Each run also writes one summary PDF of all the stocks to "
@@ -637,8 +629,8 @@ def overview(cfg: dict, runs: pd.DataFrame) -> str:
         "Entry price | vs price | All analyses |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
-    tz = ZoneInfo(cfg["timezone"])
-    on_list = [s["symbol"] for s in cfg["stock"]]
+    tz = ZoneInfo(wl.TIMEZONE)
+    on_list = [s["symbol"] for s in full_list]
     have = set(runs["symbol"]) if len(runs) else set()
     others = sorted(have - set(on_list))
     for sym in on_list + others:
@@ -700,17 +692,18 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    cfg = load_watchlist()
-    stock_list = [s for s in cfg["stock"] if not args.symbols or s["symbol"] in args.symbols]
+    data = Data.open()
+    full_list = wl.load(data)
+    stock_list = [s for s in full_list if not args.symbols or s["symbol"] in args.symbols]
     if not stock_list:
         raise SystemExit(f"Not on the watch list: {args.symbols}")
-    tz = ZoneInfo(cfg["timezone"])
+    tz = ZoneInfo(wl.TIMEZONE)
     local = datetime.now(tz)
     now = pd.Timestamp(local.astimezone(ZoneInfo("UTC")).replace(tzinfo=None))
     run_at = local.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
     if not args.numbers and not args.symbols and not args.allow_stale_notes:
-        subjects = [s["symbol"] for s in cfg["stock"]] + ["market", "summaries"]
+        subjects = [s["symbol"] for s in full_list] + ["market", "summaries"]
         found = notes_problems(subjects, local.date())
         if found:
             print("Claude's notes are not ready for this run (docs/EVENING_RUN.md, step 3):")
@@ -718,11 +711,8 @@ def main() -> None:
                 print(f"  {s}:")
                 print("\n".join(f"    - {i}" for i in items))
             raise SystemExit("Nothing built. Fix the notes, or pass --allow-stale-notes.")
-    data = Data.open()
     if not args.numbers:
-        if wl.sync(data, cfg):
-            print("Watch list copied to the database (config/watchlist.toml changed)")
-        subjects = [s["symbol"] for s in cfg["stock"]] + ["market", "summaries"]
+        subjects = [s["symbol"] for s in full_list] + ["market", "summaries"]
         saved = sync_notes(data, subjects)
         if saved:
             print(f"Saved {saved} changed notes to the database")
@@ -788,7 +778,7 @@ def main() -> None:
     pdf = new_pdf(OUT / "summaries", stamp)
     to_pdf(render_summary(results, run_label), pdf)
     written.append(pdf)
-    (OUT / "README.md").write_text(overview(cfg, data.watchlist_runs()), encoding="utf-8")
+    (OUT / "README.md").write_text(overview(full_list, data.watchlist_runs()), encoding="utf-8")
     print("\nWrote:")
     for p in written:
         print(f"  {p.relative_to(ROOT)}")

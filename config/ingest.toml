@@ -10,8 +10,8 @@
 
 universe = "SP:SPX"
 market = "america"             # TradingView market the constituents are read from
-# Fetched like the index members besides the watch list's stocks and peers (which come from
-# the database's copy of config/watchlist.toml): companies an analysis follows that are in
+# Fetched like the index members besides the watch list's stocks and peers (which are
+# in the database): companies an analysis follows that are in
 # neither (a peer group for a report, say).
 extra_symbols = []
 max_minutes = 150              # stop starting new tasks after this long

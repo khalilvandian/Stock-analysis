@@ -78,7 +78,6 @@ def _mini_repo(root: Path, today: str = "2026-10-27") -> Path:
     (root / "config").mkdir(parents=True)
     for name in ("screeners.toml", "absolute_values.toml"):
         shutil.copy(ROOT / "config" / name, root / "config" / name)
-    (root / "config/watchlist.toml").write_text('[[stock]]\nsymbol = "AAA"\n')
     stamp = today + "_2100"
     for folder in ("AAA", "market", "summaries"):
         (root / "analyses" / folder).mkdir(parents=True)
@@ -101,6 +100,9 @@ def _mini_repo(root: Path, today: str = "2026-10-27") -> Path:
 class FakeData:
     def __init__(self, runs: pd.DataFrame):
         self.runs = runs
+
+    def watchlist(self):
+        return pd.DataFrame({"symbol": ["AAA"]})
 
     def watchlist_runs(self, symbol=None):
         return self.runs
@@ -234,11 +236,15 @@ def test_validate_last_run_lists_files_that_exist(tmp_path):
 def test_validate_newest_pdfs_should_come_from_one_run(tmp_path):
     root = _mini_repo(tmp_path)
     (root / "analyses/market/2026-10-28_2100.pdf").write_bytes(b"%PDF-1.4 x")
-    checks = validate.check_analyses(root, date(2026, 10, 28), _runs())
+    checks = validate.check_analyses(root, date(2026, 10, 28), _runs(), ["AAA"])
     assert _levels(checks, "same run") == {"WARN"}
     (root / "analyses/AAA/notes.md").unlink()
-    assert "FAIL" in _levels(validate.check_analyses(root, date(2026, 10, 28), _runs()), "notes.md")
-    assert _levels(validate.check_analyses(root, TODAY, _runs().iloc[:0]), "runs") == {"WARN"}
+    assert "FAIL" in _levels(
+        validate.check_analyses(root, date(2026, 10, 28), _runs(), ["AAA"]), "notes.md"
+    )
+    assert _levels(validate.check_analyses(root, TODAY, _runs().iloc[:0], ["AAA"]), "runs") == {
+        "WARN"
+    }
 
 
 def test_validate_lists_outliers():
@@ -312,5 +318,7 @@ def test_validate_main_exit_codes(tmp_path, monkeypatch, capsys):
 
 def test_validate_fails_notes_not_reviewed_for_the_run(tmp_path):
     root = _mini_repo(tmp_path)
-    assert "PASS" in _levels(validate.check_notes(root, TODAY), "AAA/notes.md")
-    assert "FAIL" in _levels(validate.check_notes(root, date(2026, 11, 19)), "AAA/notes.md")
+    assert "PASS" in _levels(validate.check_notes(root, TODAY, ["AAA"]), "AAA/notes.md")
+    assert "FAIL" in _levels(
+        validate.check_notes(root, date(2026, 11, 19), ["AAA"]), "AAA/notes.md"
+    )

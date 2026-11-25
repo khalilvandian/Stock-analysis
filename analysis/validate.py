@@ -47,7 +47,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-from stock_analysis import notes_check, stocks
+from stock_analysis import notes_check, stocks, watchlist
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stock_analysis.screener.common import ABSOLUTE  # noqa: E402
@@ -480,15 +480,12 @@ def newest_pdf(folder: Path) -> Path | None:
     return pdfs[-1] if pdfs else None
 
 
-def check_analyses(root: Path, today: date, runs: pd.DataFrame) -> list[Check]:
+def check_analyses(root: Path, today: date, runs: pd.DataFrame, symbols: list[str]) -> list[Check]:
     analyses = root / "analyses"
     if not analyses.exists():
         return [_fail("analyses", "folder not found")]
     out = []
-    with (root / "config/watchlist.toml").open("rb") as f:
-        cfg = tomllib.load(f)
-    symbols = [s["symbol"].upper() for s in cfg.get("stock", [])]
-    tz = ZoneInfo(cfg.get("timezone", "Europe/Rome"))
+    tz = ZoneInfo(watchlist.TIMEZONE)
     no_notes = [s for s in symbols if not (analyses / s / "notes.md").exists()]
     have = set(runs["symbol"]) if len(runs) else set()
     no_runs = [s for s in symbols if s not in have]
@@ -524,12 +521,10 @@ def check_analyses(root: Path, today: date, runs: pd.DataFrame) -> list[Check]:
     return out
 
 
-def check_notes(root: Path, today: date) -> list[Check]:
+def check_notes(root: Path, today: date, symbols: list[str]) -> list[Check]:
     """Claude's notes are current, sourced and free of past events (notes_check)."""
-    with (root / "config/watchlist.toml").open("rb") as f:
-        cfg = tomllib.load(f)
     run, out = today, []
-    for s in [x["symbol"].upper() for x in cfg.get("stock", [])] + ["market", "summaries"]:
+    for s in [*symbols, "market", "summaries"]:
         path = root / "analyses" / s / "notes.md"
         if not path.exists():
             continue  # check_analyses reports a missing notes.md
@@ -571,15 +566,14 @@ def check_last_run(root: Path) -> list[Check]:
 def run_checks(root: Path = ROOT, today: date | None = None, data=None) -> list[Check]:
     today = today or date.today()
     data = data or stocks.default_data()
-    with (root / "config/watchlist.toml").open("rb") as f:
-        symbols = [s["symbol"].upper() for s in tomllib.load(f).get("stock", [])]
+    symbols = data.watchlist()["symbol"].tolist()
     checks: list[Check] = []
     for part in (
         lambda: check_screener(root, today, data),
         lambda: check_rows(root, data, symbols),
         lambda: check_history(data, symbols),
-        lambda: check_analyses(root, today, data.watchlist_runs()),
-        lambda: check_notes(root, today),
+        lambda: check_analyses(root, today, data.watchlist_runs(), symbols),
+        lambda: check_notes(root, today, symbols),
         lambda: check_last_run(root),
     ):
         try:

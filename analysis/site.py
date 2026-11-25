@@ -26,7 +26,6 @@ import os
 import re
 import shutil
 import sys
-import tomllib
 from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
@@ -34,7 +33,6 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 ANALYSES = ROOT / "analyses"
-CONFIG = ROOT / "config/watchlist.toml"
 SITE = ROOT / "_site"
 PIPELINE = ROOT / "docs/pipeline.html"  # the hand-drawn pipeline diagram
 # The menus: (group, [(page, label)]). A page is <page>.html; "index" is the home page.
@@ -378,10 +376,8 @@ def stocks() -> list[Path]:
 
 
 def active() -> list[str]:
-    """Symbols on the watch list now, in config order."""
-    if not CONFIG.exists():
-        return []
-    return [x["symbol"] for x in tomllib.loads(CONFIG.read_text(encoding="utf-8")).get("stock", [])]
+    """Symbols on the watch list now, in its order."""
+    return [r["symbol"] for r in query("SELECT symbol FROM user_watchlist ORDER BY position")]
 
 
 def watched() -> tuple[list[Path], list[Path]]:

@@ -13,13 +13,6 @@ def _dates(rows: list[tuple[str, float | None]]) -> pd.DataFrame:
     return pd.DataFrame({"EPS Estimate": 1.0, "Reported EPS": [e for _, e in rows]}, index=idx)
 
 
-def test_config_has_what_each_stock_needs():
-    cfg = watchlist.load_watchlist()
-    assert cfg["stock"], "the watch list is empty"
-    for s in cfg["stock"]:
-        assert s["symbol"].isupper() and s["peers"] and s["target_pe"] > 0
-
-
 def test_quarterly_eps_drops_duplicates_and_applies_overrides():
     d = _dates(
         [
@@ -149,14 +142,14 @@ def test_site_lists_every_dated_pdf(tmp_path, monkeypatch):
     ]
 
     def query(sql):
+        if "user_watchlist" in sql:
+            return [{"symbol": "BSX"}]
         return [dict(r) for r in runs] if "out_watchlist_run" in sql else []
 
     monkeypatch.setattr(site, "db", lambda: query)
     for p in ("BSX/2026-10-26_2100.pdf", "BSX/2026-10-27_2100.pdf", "market/2026-10-27_2100.pdf"):
         (analyses / p).write_bytes(b"%PDF-1.4")
-    (tmp_path / "watchlist.toml").write_text('[[stock]]\nsymbol = "BSX"\n')
     monkeypatch.setattr(site, "ANALYSES", analyses)
-    monkeypatch.setattr(site, "CONFIG", tmp_path / "watchlist.toml")
     out = site.build(tmp_path / "_site")
     index, bsx = (out / "index.html").read_text(), (out / "BSX.html").read_text()
     assert (out / "BSX/2026-10-26_2100.pdf").exists() and (
@@ -181,9 +174,7 @@ def test_site_has_grouped_menus_and_the_pipeline_page(tmp_path, monkeypatch):
     spec.loader.exec_module(site)
     monkeypatch.setattr(site, "db", lambda: None)  # no database: the pages still build
     monkeypatch.setattr(site, "ANALYSES", tmp_path / "analyses")
-    monkeypatch.setattr(site, "CONFIG", tmp_path / "watchlist.toml")
     (tmp_path / "analyses").mkdir()
-    (tmp_path / "watchlist.toml").write_text("")
     out = site.build(tmp_path / "_site")
     page = (out / "pipeline.html").read_text(encoding="utf-8")
     # every group is on every page; the current page and its group are marked

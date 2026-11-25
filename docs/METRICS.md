@@ -373,7 +373,7 @@ EPS without amortization of acquired intangibles and one-offs, on the same basis
 - **Used in:** watch list: own-history P/E and entry price; screener Stage 2 (top stocks)
 - **Example (BSX, 2026-09-30):** $3.21 = sum of the last 4 reported quarters
 - **Vector:** core
-- **Note:** Company-defined, so not identical across companies. One-offs Yahoo still includes are fixed by hand in config/watchlist.toml (NFLX).
+- **Note:** Company-defined, so not identical across companies. One-offs Yahoo still includes can be corrected per quarter in user_eps_override.
 
 <a id="eps-fwd"></a>
 #### Forward EPS (`eps_fwd`)

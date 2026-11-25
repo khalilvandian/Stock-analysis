@@ -254,7 +254,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--numbers", action="store_true", help="print the numbers, write nothing")
     args = ap.parse_args()
-    local = datetime.now(ZoneInfo(w.load_watchlist()["timezone"]))
+    local = datetime.now(ZoneInfo(w.wl.TIMEZONE))
     pdf = build(local, args.numbers)
     if pdf:
         print(f"Wrote {pdf.relative_to(ROOT)}")
