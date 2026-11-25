@@ -1,5 +1,5 @@
-"""The application's operations (issue #60, docs/APPLICATION.md): everything Claude does, as named
-calls that are checked and logged (ops_api_call). Claude never writes SQL or files.
+"""The application's operations (issue #60, docs/APPLICATION.md): named calls that are
+checked and logged (ops_api_call). The nightly session works only through them.
 
     GET    /app/runs/current               the newest run that isn't submitted
     GET    /app/runs/{run_key}             a run, its subjects and what is still missing

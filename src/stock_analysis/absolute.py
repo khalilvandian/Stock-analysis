@@ -1,20 +1,10 @@
-"""Step 1 of every company analysis: screen the absolute values.
-
-Reads the list of absolute values from config/absolute_values.toml (the watch list's PDFs
-show the same list) and shows them for the companies named (any company in the database),
-grouped as in the config. Everything comes from the database (stock_analysis.stocks).
-
-With --history, shows each company's values for every fiscal year on record (SEC filings
-back to 2016, Yahoo for gaps) next to the latest 12 months.
-
-Usage:
-    uv run python -m stock_analysis.absolute CEG VST UGI            # latest 12 months
-    uv run python -m stock_analysis.absolute --history CEG VST      # yearly history
-"""
+"""The absolute values of companies, the first step of every analysis: the list in
+config/absolute_values.toml, read from the database (stock_analysis.stocks), as the watch list's
+PDFs and Claude's tool (claude/tools/absolute.py) show them: the latest 12 months, and every
+fiscal year on record (SEC filings back to 2016, Yahoo for gaps)."""
 
 from __future__ import annotations
 
-import sys
 import tomllib
 from pathlib import Path
 
@@ -76,32 +66,3 @@ def history_table(symbol: str, hist: pd.DataFrame, row: pd.Series) -> pd.DataFra
     table = pd.DataFrame(rows).T
     years = sorted(c for c in table.columns if c.startswith("FY"))
     return table[years + ["Latest 12m"]].fillna("–")
-
-
-def main() -> None:
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    symbols = [s.upper() for s in args]
-    if not symbols:
-        raise SystemExit("Name the companies: uv run python -m stock_analysis.absolute NEE DUK")
-    pd.set_option("display.width", 250)
-    if "--history" in sys.argv:
-        rows = latest(symbols)
-        hist = stocks.history(stocks.default_data(), symbols)
-        for sym in symbols:
-            print(f"\n{sym}\n")
-            print(history_table(sym, hist, rows.loc[sym]).droplevel(0).to_string())
-        return
-    table = absolute_values(symbols)
-    for group in load_config():
-        view = pd.DataFrame(
-            {
-                v["label"]: table[v["column"]].map(lambda x, u=v["unit"]: fmt(x, u))
-                for v in group["values"]
-            }
-        )
-        print(f"\n{group['name']}\n")
-        print(view.to_string())
-
-
-if __name__ == "__main__":
-    main()

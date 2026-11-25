@@ -17,9 +17,9 @@ policy. The step-by-step processes are in [`PROCESSES.md`](PROCESSES.md).
 | Build the site locally | `python analysis/site.py _site` |
 | Export the ticker explorer's data | `uv run python analysis/explore.py OUT_DIR [--symbols NVDA,NEE]` |
 | Send the last run's email | `uv run python analysis/send_email.py` |
-| Absolute values of any company | `uv run python analysis/absolute.py [--history] TICKERS` |
+| Absolute values of any company | `uv run python -m claude absolute [--history] TICKERS` |
 | How fresh the database is | `uv run python -c "from stock_analysis.data import Data; print(Data.open().status())"` |
-| Regenerate the metrics doc | `uv run python -m stock_analysis.metrics doc` |
+| Regenerate the metrics doc | `uv run python -m claude metrics doc` |
 | Pre-commit check | `uv run ruff check . && uv run ruff format --check . && uv run pytest` |
 
 ### Caches

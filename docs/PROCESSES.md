@@ -44,8 +44,8 @@ uv run python -c "from stock_analysis.data import Data; print(Data.open().status
 ## 3. The absolute-values screen (step 1 of every analysis)
 
 ```bash
-uv run python analysis/absolute.py CEG VST UGI          # latest 12 months, any company in the database
-uv run python analysis/absolute.py --history CEG VST    # every fiscal year on record + latest 12 months
+uv run python -m claude absolute CEG VST UGI          # latest 12 months, any company in the database
+uv run python -m claude absolute --history CEG VST    # every fiscal year on record + latest 12 months
 ```
 
 Both read the database (`stock_analysis.stocks.rows` and `history`). Show this table first in
@@ -59,14 +59,14 @@ this order.
 1. **Absolute values, latest 12 months.** Run the peer group (it includes the stock itself):
 
    ```bash
-   uv run python analysis/peer_screen.py medtech BSX ABT MDT SYK ISRG BDX EW ZBH DXCM STE PODD TFX GEHC RMD
+   uv run python -m claude peer_screen medtech BSX ABT MDT SYK ISRG BDX EW ZBH DXCM STE PODD TFX GEHC RMD
    ```
 
    This reads each symbol's row from the database (`stock_analysis.stocks.rows`: the
    absolute values and ratios) and prints the screens. Check capex against SEC filings:
    Yahoo can count stakes and acquisitions as capex.
 2. **History.** The yearly absolute values from SEC filings (Yahoo where SEC has no figure),
-   per share on today's basis: `uv run python analysis/absolute.py --history BSX`. For a
+   per share on today's basis: `uv run python -m claude absolute --history BSX`. For a
    watch-list stock, `uv run python analysis/watchlist.py BSX --numbers` prints the key
    numbers without writing anything.
 3. **Ratios.** Net debt / EBITDA, interest cover, cash / short-term debt, cash / long-term
@@ -179,10 +179,10 @@ reference.
 ## 6. Metrics vectors
 
 ```bash
-uv run python -m stock_analysis.metrics list --set proposed       # the 16 proposed metrics
-uv run python -m stock_analysis.metrics doc                       # rewrite docs/METRICS.md
-uv run python -m stock_analysis.metrics vector BSX ABT MDT --source sector
-uv run python -m stock_analysis.metrics vector --source stage1 --set stage1 \
+uv run python -m claude metrics list --set proposed       # the 16 proposed metrics
+uv run python -m claude metrics doc                       # rewrite docs/METRICS.md
+uv run python -m claude metrics vector BSX ABT MDT --source sector
+uv run python -m claude metrics vector --source stage1 --set stage1 \
     --standardize percentile BSX
 ```
 
@@ -347,7 +347,7 @@ Babak's own Gmail.
 1. Add a `[[metric]]` to `config/metrics.toml` with every field (id, name, group, unit,
    better, period, definition, formula, sources, used_in, example, vector; notes optional).
 2. Add it to a named set if it belongs there.
-3. `uv run python -m stock_analysis.metrics doc` to regenerate `docs/METRICS.md`.
+3. `uv run python -m claude metrics doc` to regenerate `docs/METRICS.md`.
 4. `uv run pytest tests/test_metrics.py` (it fails if the doc is stale or a field is missing).
 
 ## 14. Filling the database (the ingest job)

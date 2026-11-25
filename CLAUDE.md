@@ -66,12 +66,12 @@ Ratios and scores hide important information, so they come after, never instead.
 - The list lives in `config/absolute_values.toml`. It will grow: when the user names a
   new absolute value, add it there (and to `stock_analysis/stocks.py` if the column doesn't
   exist yet). `tests/test_absolute.py` fails if a configured column is missing.
-- Run it with `uv run python analysis/absolute.py TICKERS` (any company in the database;
+- Run it with `uv run python -m claude absolute TICKERS` (any company in the database;
   one the database lacks is added to `extra_symbols` in `config/ingest.toml` or the watch
-  list's peers). For a peer group, `uv run python analysis/peer_screen.py NAME TICKERS`
+  list's peers). For a peer group, `uv run python -m claude peer_screen NAME TICKERS`
   adds the strict and weighted screens.
-- **Always look at the history, not just the latest year:** `uv run python
-  analysis/absolute.py --history TICKERS` shows every fiscal year on record (at least
+- **Always look at the history, not just the latest year:** `uv run python -m
+  claude absolute --history TICKERS` shows every fiscal year on record (at least
   the last 5; SEC filings back to 2016, Yahoo fills gaps, each value records its source)
   next to the latest 12 months. Values not reported by SEC are converted from the
   company's reporting currency at the ECB's latest rate, and market value is only shown
@@ -87,17 +87,20 @@ Ratios and scores hide important information, so they come after, never instead.
   close-to-cheap survivors per sector against each stock's own cheap P/E. The nightly
   analyses run it after the ingest, and the market report, the site's Screener page and the
   email show its top 3 per sector.
-- Other tools after step 1: `analysis/screen.py TICKERS` (strict and weighted screens) and
-  `analysis/peer_screen.py` (the same on a peer group). Only the scripts the evening run
-  and the site use are kept (issue #33); a one-off analysis is written in its report with
-  `stock_analysis.stocks`, not as a new script left in `analysis/`.
+- Other tools after step 1: `screen TICKERS` (strict and weighted screens) and `peer_screen`
+  (the same on a peer group); `uv run python -m claude` lists them all. Use a tool when one fits,
+  so the same question gets the same answer.
+- **Where Claude's scripts go: `claude/`** (`claude/README.md`). One-off: `claude/scratch/` (never
+  committed). Worth using again: `claude/tools/`, with a description and a test. A calculation the
+  PDFs or the site also need: `src/stock_analysis/`, never a second copy. The app never imports
+  `claude/`; `tests/test_claude_folder.py` checks all of this.
 
 ## Metrics dictionary
 
 Every fundamental metric is defined once in `config/metrics.toml` (definition, formula,
 source columns, worked example, draft vector status). When a new metric is used, add it
-there and regenerate `docs/METRICS.md` with `uv run python -m stock_analysis.metrics doc`
-(`tests/test_metrics.py` fails if the doc is stale). `stock_analysis.metrics.build_vectors`
+there and regenerate `docs/METRICS.md` with `uv run python -m claude metrics doc`
+(`tests/test_metrics.py` fails if the doc is stale). `claude.tools.metrics.build_vectors`
 builds a per-stock vector from any chosen set.
 
 ## Watch list and the evening run
@@ -114,8 +117,8 @@ and the notes, and computes on the spot only a stock whose numbers are missing o
 watch-list settings changed), checks the outputs with `analysis/validate.py`, commits the
 dated PDFs and notes to `main` and emails Babak. It records its runs and notes in the
 database. When Babak asks to change the watch list or who gets the report email, use the application
-(`uv run python -m stock_analysis.app watchlist-set | recipient-add | recipient-remove ...`,
-every command in `src/stock_analysis/app.py`): it checks and logs the change. Never write an
+(`uv run python -m claude app watchlist-set | recipient-add | recipient-remove ...`,
+every command in `claude/client.py`): it checks and logs the change. Never write an
 email address into the repository. Work that needs no judgement belongs in the nightly analyses, not in the session.
 Every run is kept: `analyses/<SYMBOL>/YYYY-MM-DD_HHMM.pdf` plus a dated list in each
 stock folder's `README.md`, rebuilt from `out_watchlist_run` (market reports and summaries are listed in

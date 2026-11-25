@@ -1,19 +1,15 @@
 """Screens for low debt, cheapness and expected cheapening, on a table of stocks with the
-columns of stock_analysis.stocks.rows (stock_analysis.peer_screen passes a peer group's; the
-watch list's PDFs show the strict and weighted screens against each stock's peers).
+columns of stock_analysis.stocks.rows. The watch list's PDFs show the strict and weighted screens
+against each stock's peers; Claude runs them with claude/tools/screen.py and peer_screen.py.
 
 - Low debt: net debt / EBITDA <= --max-leverage (or net cash) and EBITDA / interest >= 4x.
 - Cheap score (0-3): trailing P/E below its sub-industry median, EV / EBITDA below
   its sub-industry median, and price below the standard DCF fair value.
 - Getting cheaper: forward P/E at least 15% below trailing P/E, i.e. analysts expect
   earnings to rise enough to lower the P/E at today's price.
-
-Usage: uv run python -m stock_analysis.screen NEE DUK SO ... [--balanced | --strict]
 """
 
 from __future__ import annotations
-
-import argparse
 
 import numpy as np
 import pandas as pd
@@ -168,53 +164,17 @@ def balanced(
     return u.sort_values("total_score", ascending=False).head(top)
 
 
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("symbols", nargs="+", help="the stocks to screen")
-    ap.add_argument("--max-leverage", type=float, default=3.5)
-    ap.add_argument("--min-cap", type=float, default=1.0, help="minimum market value, $bn")
-    ap.add_argument("--strict", action="store_true", help="rank the top 5 with strict debt rules")
-    ap.add_argument("--balanced", action="store_true", help="weighted debt + cheapness score")
-    ap.add_argument("--debt-weight", type=float, default=0.50)
-    ap.add_argument("--quality-weight", type=float, default=0.25)
-    args = ap.parse_args()
-    t = table([x.upper() for x in args.symbols])
-    if args.balanced:
-        pd.set_option("display.width", 220)
-        cols = ["name", "total_score", "debt_score", "quality_score", "cheap_score"]
-        print(balanced(args.debt_weight, args.quality_weight, d=t)[cols].round(1).to_string())
-        raise SystemExit
-    if args.strict:
-        pd.set_option("display.width", 220)
-        cols = [
-            "name",
-            "cash_to_short_term_debt",
-            "cash_to_long_term_debt",
-            "net_debt_to_ebitda",
-            "ebitda_to_interest",
-            *CHEAPNESS,
-            "cheap_rank",
-        ]
-        print(strict(10, d=t)[cols].round(3).to_string())
-        raise SystemExit
-    pd.set_option("display.width", 220)
-    cols = [
-        "name",
-        "industry",
-        "price",
-        "net_debt_to_ebitda",
-        "ebitda_to_interest",
-        "pe_ttm",
-        "pe_fwd",
-        "pe_change_expected",
-        "ev_to_ebitda",
-        "dcf_fair_value",
-        "price_vs_fair_value",
-        "cheap_score",
-        "getting_cheaper",
-    ]
-    s = screen(args.max_leverage, args.min_cap, d=t)
-    hits = s[s["low_debt"]].sort_values(
-        ["cheap_score", "pe_change_expected"], ascending=[False, True]
-    )
-    print(hits[cols].round(2).to_string())
+def peer_table(symbols: list[str], data=None) -> pd.DataFrame:
+    """The rows of a peer group; stocks the database lacks are left out."""
+    df = stocks.rows(data or stocks.default_data(), symbols)
+    if "error" in df:
+        df = df[df["error"].isna()].drop(columns="error")
+    return df
+
+
+def run_screens(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The strict and the weighted screen on a peer group, as one industry."""
+    d = df.copy()
+    d["industry"] = "Peers"
+    d["data_flag"] = ""
+    return strict(len(d), d=d), balanced(top=len(d), d=d)

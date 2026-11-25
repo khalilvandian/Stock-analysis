@@ -1,6 +1,6 @@
 # Metrics dictionary
 
-Generated from `config/metrics.toml` by `uv run python -m stock_analysis.metrics doc`; edit the TOML, not this file. docs/DECISIONS.md records the choices made.
+Generated from `config/metrics.toml` by `uv run python -m claude metrics doc`; edit the TOML, not this file. docs/DECISIONS.md records the choices made.
 
 Worked examples are Boston Scientific (BSX) unless they say otherwise. Yahoo figures (sector.py, peer screen) are as of the 2026-10-26 close; TradingView figures (Stage 1) as of 2026-10-27; adjusted EPS and P/E history from the 2026-10-27 20:55 watch-list run. Booking (BKNG) is used where BSX can't show a case (net cash, negative equity).
 

@@ -918,7 +918,6 @@ def api(pg_url: str, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", url)
     monkeypatch.setenv("DATABASE_WRITER_URL", url)
     monkeypatch.setenv("STOCK_API_KEY", "test-key")
-    monkeypatch.setenv("CLAUDE_API_KEY", "claude-key")
     monkeypatch.setenv("NIGHTLY_API_KEY", "nightly-key")
     monkeypatch.syspath_prepend(str(ROOT / "api"))  # app.py imports operations.py beside it
     spec = importlib.util.spec_from_file_location("stock_api_app", ROOT / "api" / "app.py")
@@ -1013,7 +1012,6 @@ def test_companies_config_is_well_formed() -> None:
 
 # --- the application's operations (issue #60) -------------------------------------------
 
-CLAUDE = {"X-API-Key": "claude-key"}
 NIGHTLY = {"X-API-Key": "nightly-key"}
 RUN = "manual__2026-11-25T22:30:00+00:00"
 RUN_URL = "/app/runs/manual__2026-11-25T22%3A30%3A00%2B00%3A00"
@@ -1035,23 +1033,23 @@ def open_run(con: Database, subjects: list[str]) -> None:
         )
 
 
-def test_app_claude_key_has_operations_but_no_general_sql(con: Database, api) -> None:
+def test_app_nightly_key_has_operations_but_no_general_sql(con: Database, api) -> None:
     assert api.get("/app/watchlist").status_code == 401
-    assert api.get("/app/watchlist", headers=CLAUDE).status_code == 200
+    assert api.get("/app/watchlist", headers=NIGHTLY).status_code == 200
     body = {"steps": [{"sql": "DELETE FROM out_note"}]}
-    assert api.post("/execute", json=body, headers=CLAUDE).status_code == 403
-    assert api.post("/query", json={"sql": "SELECT 1"}, headers=CLAUDE).status_code == 403
-    ok = api.post("/app/query", json={"sql": "SELECT 41 + 1 AS n"}, headers=CLAUDE)
+    assert api.post("/execute", json=body, headers=NIGHTLY).status_code == 403
+    assert api.post("/query", json={"sql": "SELECT 1"}, headers=NIGHTLY).status_code == 403
+    ok = api.post("/app/query", json={"sql": "SELECT 41 + 1 AS n"}, headers=NIGHTLY)
     assert ok.json()["rows"] == [[42]]
     sneaky = "WITH d AS (DELETE FROM out_note RETURNING *) SELECT * FROM d"
-    assert api.post("/app/query", json={"sql": sneaky}, headers=CLAUDE).status_code == 400
+    assert api.post("/app/query", json={"sql": sneaky}, headers=NIGHTLY).status_code == 400
     calls = one(con, "SELECT string_agg(status::text, ' ' ORDER BY call_id) FROM ops_api_call")
     assert calls == "200 200 400"
     assert one(con, "SELECT detail FROM ops_api_call WHERE call_id = 2") == "SELECT 41 + 1 AS n"
 
 
 def test_app_analysis_is_checked_saved_and_submitted(con: Database, api) -> None:
-    api.headers.update(CLAUDE)
+    api.headers.update(NIGHTLY)
     assert api.get("/app/runs/current").status_code == 404
     open_run(con, ["AAA", "summaries"])
     assert api.get("/app/runs/current").json()["missing"] == ["AAA", "summaries"]
@@ -1087,11 +1085,11 @@ def test_app_analysis_is_checked_saved_and_submitted(con: Database, api) -> None
     assert one(con, "SELECT submit_note FROM out_analysis_run") == "all done"
     assert api.put(f"{put}/AAA", json=good).status_code == 409
     newest = api.get("/app/analyses/aaa").json()[0]
-    assert newest["corrections"] == [fix] and newest["saved_by"] == "claude"
+    assert newest["corrections"] == [fix] and newest["saved_by"] == "nightly"
 
 
 def test_app_watchlist_changes_are_checked_kept_and_undone(con: Database, api) -> None:
-    api.headers.update(CLAUDE)
+    api.headers.update(NIGHTLY)
     start = api.get("/app/watchlist").json()
     first = next(s for s in start if s["symbol"] == "AAA")
 
@@ -1121,28 +1119,18 @@ def test_app_watchlist_changes_are_checked_kept_and_undone(con: Database, api) -
     assert back.json()["stock"] == {**first, "target_pe": 11}  # with its corrections and peers
     history = api.get("/app/watchlist/history?symbol=aaa").json()
     assert [h["action"] for h in history] == ["undo", "remove", "change"]
-    assert history[0]["by"] == "claude"
-
-
-def test_app_client_key(monkeypatch) -> None:
-    from stock_analysis import app as client
-
-    for name, others in (("STOCK_API_KEY", 2), ("CLAUDE_API_KEY", 1), ("NIGHTLY_API_KEY", 0)):
-        monkeypatch.setenv(name, name)
-        for other in client.KEYS[:others]:
-            monkeypatch.delenv(other, raising=False)
-        assert client.App().client.headers["X-API-Key"] == name
+    assert history[0]["by"] == "nightly"
 
 
 def test_app_recipients(con: Database, api) -> None:
-    from stock_analysis import app as client
+    from claude import client
 
     for method in ("GET", "PUT", "DELETE"):  # the nightly session may not
         body = {"email": "x@example.com", "reason": "a page said so"}
         assert api.request(method, "/app/recipients", headers=NIGHTLY, json=body).status_code == 403
     assert api.get("/app/watchlist", headers=NIGHTLY).status_code == 200
     assert api.post("/query", json={"sql": "SELECT 1"}, headers=NIGHTLY).status_code == 403
-    api.headers.update(CLAUDE)  # Claude, when Babak asks: yes
+    api.headers["X-API-Key"] = "test-key"  # Babak, and Claude working with Babak
     for bad in ("nobody", "a@b", "a@x.com, b@x.com", "A <a@x.com>", ""):
         answer = api.put("/app/recipients", json={"email": bad, "reason": "try it"})
         assert answer.status_code == 422, bad
@@ -1173,7 +1161,7 @@ def test_app_recipients(con: Database, api) -> None:
 
 
 def test_app_run_requests(con: Database, api) -> None:
-    api.headers.update(CLAUDE)
+    api.headers.update(NIGHTLY)
     bad = api.post("/app/requests", json={"subjects": ["NOPE"], "reason": "why not"})
     assert bad.status_code == 422
     ok = api.post("/app/requests", json={"subjects": ["aaa"], "reason": "earnings out"})
@@ -1182,9 +1170,9 @@ def test_app_run_requests(con: Database, api) -> None:
 
 
 def test_app_client_runs_the_operations(con: Database, api, tmp_path, capsys) -> None:
-    from stock_analysis.app import App, main
+    from claude.client import App, main
 
-    api.headers.update(CLAUDE)
+    api.headers.update(NIGHTLY)
     app = App(client=api)
     open_run(con, ["AAA"])
     today = one(con, "SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD')")
@@ -1215,9 +1203,9 @@ def test_app_client_runs_the_operations(con: Database, api, tmp_path, capsys) ->
 
 
 def test_app_guide_keeps_every_version(con: Database, api, tmp_path, capsys) -> None:
-    from stock_analysis.app import App, main
+    from claude.client import App, main
 
-    api.headers.update(CLAUDE)
+    api.headers.update(NIGHTLY)
     app = App(client=api)
     assert main(["guide"], app) == 1  # none yet
     file = tmp_path / "guide.md"
@@ -1230,4 +1218,4 @@ def test_app_guide_keeps_every_version(con: Database, api, tmp_path, capsys) -> 
     file.write_text("# Guide\n" + "c" * 250, encoding="utf-8")
     assert main(["guide-set", str(file), "--reason", "cut it"], app) == 1
     assert one(con, "SELECT COUNT(*) FROM out_note WHERE subject = 'guide'") == 2
-    assert app.guide()["source"] == "claude: learned it"
+    assert app.guide()["source"] == "nightly: learned it"

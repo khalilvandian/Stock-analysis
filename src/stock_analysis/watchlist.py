@@ -2,7 +2,7 @@
 user_eps_override). It is changed through the application's operations (issue #60,
 docs/APPLICATION.md), which check and record every change:
 
-    python -m stock_analysis.app watchlist-set SYMBOL --reason "..." --target-pe 20
+    python -m claude app watchlist-set SYMBOL --reason "..." --target-pe 20
 
     from stock_analysis.watchlist import load
     stocks = load(data)        # data = stock_analysis.data.Data.open()

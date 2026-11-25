@@ -30,7 +30,7 @@ import markdown
 import numpy as np
 import pandas as pd
 
-from .. import absolute, peer_screen, screen, stocks
+from .. import absolute, screen, stocks
 from ..nightly import YEARS, daily_pe, key_numbers, trailing_eps, yearly_pe
 
 PAGES_URL = "https://khalilvandian.github.io/Stock-analysis"  # built by analysis/site.py
@@ -265,7 +265,7 @@ def screens_html(d: dict) -> str:
         table(["Must-have", sym], rules),
     ]
     try:
-        _, weighted = peer_screen.run_screens(peers)
+        _, weighted = screen.run_screens(peers)
     except Exception as e:  # noqa: BLE001
         weighted = pd.DataFrame()
         out.append(f"<p class='note'>Weighted screen failed: {html.escape(str(e))}</p>")

@@ -1,32 +1,33 @@
-"""The application's client (issue #60, docs/APPLICATION.md): what Claude uses to read the numbers,
-save its analyses and edit the watch list. Every command is one operation of the web API
-(api/operations.py); answers are JSON.
+"""The application's client: the nightly session's only way in, the watch list, the recipients.
 
-    python -m stock_analysis.app run [RUN_KEY]             # a run (default: the open one)
-    python -m stock_analysis.app numbers market|SYMBOL
-    python -m stock_analysis.app analyses SUBJECT [--limit N]
-    python -m stock_analysis.app save RUN_KEY SUBJECT FILE.json
-    python -m stock_analysis.app submit RUN_KEY [--note TEXT]
-    python -m stock_analysis.app request analysis|recompute [SUBJECT ...] --reason TEXT
-    python -m stock_analysis.app watchlist
-    python -m stock_analysis.app watchlist-history [SYMBOL]
-    python -m stock_analysis.app watchlist-set SYMBOL --reason TEXT [--target-pe X | --no-target]
+Every command is one operation of the web API (api/operations.py, docs/APPLICATION.md); answers
+are JSON.
+
+    python -m claude app run [RUN_KEY]             # a run (default: the open one)
+    python -m claude app numbers market|SYMBOL
+    python -m claude app analyses SUBJECT [--limit N]
+    python -m claude app save RUN_KEY SUBJECT FILE.json
+    python -m claude app submit RUN_KEY [--note TEXT]
+    python -m claude app request analysis|recompute [SUBJECT ...] --reason TEXT
+    python -m claude app watchlist
+    python -m claude app watchlist-history [SYMBOL]
+    python -m claude app watchlist-set SYMBOL --reason TEXT [--target-pe X | --no-target]
         [--peers A B ...] [--target-note TEXT] [--stakes X]
-    python -m stock_analysis.app watchlist-remove SYMBOL --reason TEXT
-    python -m stock_analysis.app watchlist-undo CHANGE_ID --reason TEXT
-    python -m stock_analysis.app recipients                # who gets the reports (not nightly)
-    python -m stock_analysis.app recipient-add EMAIL --reason TEXT [--name NAME]
-    python -m stock_analysis.app recipient-remove EMAIL --reason TEXT
-    python -m stock_analysis.app guide                     # what every run must know
-    python -m stock_analysis.app guide-set FILE.md --reason TEXT
-    python -m stock_analysis.app query "SELECT ..."
+    python -m claude app watchlist-remove SYMBOL --reason TEXT
+    python -m claude app watchlist-undo CHANGE_ID --reason TEXT
+    python -m claude app recipients                # who gets the reports (not nightly)
+    python -m claude app recipient-add EMAIL --reason TEXT [--name NAME]
+    python -m claude app recipient-remove EMAIL --reason TEXT
+    python -m claude app guide                     # what every run must know
+    python -m claude app guide-set FILE.md --reason TEXT
+    python -m claude app query "SELECT ..."
 
 FILE.json: {"reviewed": "YYYY-MM-DD", "sections": {"Verdict": "...", ...}, "corrections":
 [{"reported": "YYYY-MM-DD", "eps": 1.23, "reason": "...", "source": "..."}]}.
 
-Settings: STOCK_API_URL (default: the deployed API) and NIGHTLY_API_KEY, CLAUDE_API_KEY or
-STOCK_API_KEY, the first that is set; in
-Claude's cloud environment the network attaches the key. A refusal prints why and exits 1.
+Settings: STOCK_API_URL (default: the deployed API) and STOCK_API_KEY (.env); in Claude's cloud
+environments the network attaches the key. The nightly session's environment has its own key,
+limited to these operations without the recipients. A refusal prints why and exits 1.
 """
 
 from __future__ import annotations
@@ -40,8 +41,9 @@ from pathlib import Path
 from urllib.parse import quote
 
 import httpx
+from dotenv import load_dotenv
 
-KEYS = ("NIGHTLY_API_KEY", "CLAUDE_API_KEY", "STOCK_API_KEY")
+ROOT = Path(__file__).resolve().parents[1]
 API_URL = "https://stock-api-bk.azurewebsites.net"
 
 
@@ -52,7 +54,7 @@ class Refused(RuntimeError):
 class App:
     def __init__(self, url: str | None = None, key: str | None = None, client=None):
         if client is None:
-            key = key or next((os.environ[k] for k in KEYS if os.environ.get(k)), None)
+            key = key or os.environ.get("STOCK_API_KEY")
             client = httpx.Client(
                 base_url=(url or os.environ.get("STOCK_API_URL") or API_URL).rstrip("/"),
                 headers={"X-API-Key": key} if key else {},
@@ -129,7 +131,7 @@ class App:
 
 
 def parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="stock_analysis.app")
+    ap = argparse.ArgumentParser(prog="claude app")
     sub = ap.add_subparsers(dest="command", required=True)
     add = sub.add_parser
     p = add("run")
@@ -197,8 +199,11 @@ def main(argv: list[str] | None = None, app: App | None = None) -> int:
         args = {k: v for k, v in args.items() if v is not None}
         if no_target:
             args["target_pe"] = None  # sent as null: no target, no entry price
+    if app is None:
+        load_dotenv(ROOT / ".env")
+        app = App()
     try:
-        answer = getattr(app or App(), command)(**args)
+        answer = getattr(app, command)(**args)
     except Refused as exc:
         print(exc, file=sys.stderr)
         return 1
@@ -210,11 +215,4 @@ def main(argv: list[str] | None = None, app: App | None = None) -> int:
 
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
-
-    from .db import ROOT
-
-    load_dotenv(ROOT / ".env")
-    if hasattr(sys.stdout, "reconfigure"):  # a Windows console may not be UTF-8
-        sys.stdout.reconfigure(encoding="utf-8")
     sys.exit(main())

@@ -41,8 +41,8 @@ Number it after the last report. Every report has three parts, in order (Babak,
 2026-10-27):
 1. A short high-level summary, with no detail.
 2. The numbers: data date, absolute values first (with history), then ratios, screens,
-   DCF and P/E against the stock's own history. Read them with `analysis/absolute.py`,
-   `analysis/peer_screen.py` or `stock_analysis.stocks`.
+   DCF and P/E against the stock's own history. Read them with `claude/tools/absolute.py`,
+   `claude/tools/peer_screen.py` or `stock_analysis.stocks`.
 3. Claude's analysis: method, findings, caveats and the command to reproduce.
 
 Then add it to a table above.

@@ -2,7 +2,7 @@
 the others' addresses and a bad address stops nobody else's.
 
 Who gets it is in the database (user_report_recipient), edited through the application
-(`python -m stock_analysis.app recipients`, `recipient-add`, `recipient-remove`).
+(`python -m claude app recipients`, `recipient-add`, `recipient-remove`).
 Brevo (brevo.com, free: 300 emails a day) delivers to any recipient once the sender address
 is verified in Brevo. Settings, from the environment (never commit them; this repository is
 public):
@@ -104,9 +104,7 @@ def send_run(data, run: dict, store) -> str:
         raise RuntimeError(f"Run {run['run_key']} is not rendered")
     people = recipients(data)
     if not people:
-        raise RuntimeError(
-            "No recipient: add one with `python -m stock_analysis.app recipient-add`"
-        )
+        raise RuntimeError("No recipient: add one with `python -m claude app recipient-add`")
     message = build_message(run["report"], store, sender)  # before any mark: may fail
     sent, before, failed, refused = 0, 0, [], True
     for person in people:

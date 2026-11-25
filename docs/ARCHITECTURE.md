@@ -27,7 +27,7 @@ state machine of an ingest task.
 | Web API | Azure App Service `stock-api-bk` (F1) | An HTTPS request | `api/app.py` |
 | Evening run | A scheduled Claude Code session | Weekdays 21:00 Italy time | `analysis/watchlist.py` ([`EVENING_RUN.md`](EVENING_RUN.md)) |
 | Site | GitHub Actions + GitHub Pages | A push to `main`, the end of an ingest run, a daily schedule | `analysis/site.py` |
-| Analyses by hand | Your PC or a Claude session | You | `analysis/absolute.py`, `peer_screen.py`, `screen.py`, `stock_analysis.stocks` |
+| Analyses by hand | Your PC or a Claude session | You | `claude/tools/` (`uv run python -m claude`), `stock_analysis.stocks` |
 
 ```mermaid
 flowchart TD
@@ -160,7 +160,7 @@ instruments), `test_explore.py`.
 | `.cache/watchlist/` | No | `email.html` and `last_run.json` of the last run | `watchlist.py` |
 | `analyses/` | Yes | Dated PDFs, `notes.md`, the dated lists | `watchlist.py`, `market.py`, Claude (notes) |
 | `reports/` | Yes | Numbered reports | Claude |
-| `docs/` | Yes | This documentation; `METRICS.md` is generated | Claude; `stock_analysis.metrics doc` |
+| `docs/` | Yes | This documentation; `METRICS.md` is generated | Claude; `python -m claude metrics doc` |
 | `_site/` | No | The built web site | `site.py` (locally or in the Pages workflow) |
 | Cloud environment settings | No (never in the repository) | `STOCK_API_URL`, `SEC_USER_AGENT`, `BREVO_API_KEY`, `WATCHLIST_EMAIL_FROM`, `WATCHLIST_EMAIL_TO` | Babak, in the environment's settings |
 | Azure job secrets, GitHub repository secrets | No | The ingest job's database password, `SEC_USER_AGENT`, `GITHUB_DISPATCH_TOKEN`; `STOCK_API_KEY` for the Pages workflow | `deploy/ingest-job.ps1` from `.env`; Babak in GitHub's settings |

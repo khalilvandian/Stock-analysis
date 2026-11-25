@@ -1,9 +1,9 @@
 # The metrics dictionary: every fundamental metric the project has used so far, defined
 # once, so that a chosen set can become each stock's vector (issue #8, "Quantification").
 #
-# Read by src/stock_analysis/metrics.py, which lists the metrics, picks a set and builds the
+# Read by claude/tools/metrics.py, which lists the metrics, picks a set and builds the
 # vector for any stock. docs/METRICS.md is the readable version, built from
-# this file with `uv run python -m stock_analysis.metrics doc`.
+# this file with `uv run python -m claude metrics doc`.
 #
 # Each [[metric]]:
 #   id          name used in the vector
@@ -18,7 +18,7 @@
 #   definition  what it measures, in words
 #   formula     how it is calculated from other metrics or statement lines
 #   sources     where it lives: `sector` = column of stock_analysis.stocks.rows() (the
-#               database's rows, as stock_analysis.peer_screen and the watch list use them);
+#               database's rows, as the peer screen and the watch list use them);
 #               `stage1` = column of the screener's Stage 1 (stock_analysis/screener/stage1.py, TradingView);
 #               `watchlist` = key from stock_analysis.nightly.key_numbers(); `stage2` =
 #               column of the screener's Stage 2 top; `tradingview`, `yahoo` and `sec` name the

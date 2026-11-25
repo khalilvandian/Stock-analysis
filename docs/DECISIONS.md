@@ -432,3 +432,14 @@ include it unchanged, and a push that edits it republishes the site.
 - **Supersedes:** the watcher design of 2026-11-18 (above), where the jobs kept their own
   schedules and Airflow only checked them.
 
+## Claude's folder and access (issue #60, 2026-11-25)
+
+- Everything Claude uses to work with the application is in `claude/` (Babak: "gather all under one
+  folder and make claude and documentation aware"): the API client, tools with a description and a
+  test, the nightly session's instructions, and `scratch/` for one-off scripts. `claude/README.md`
+  says where a new script goes and `tests/test_claude_folder.py` enforces it. The application never
+  imports it; calculations the PDFs share stay in `src/stock_analysis/`.
+- Claude working with Babak has access to everything, since the project is developed with it. Only
+  the session that runs automatically is limited to the API's operations, so that it is reliable
+  and consistent: its own key (`NIGHTLY_API_KEY`), no general SQL, no access to the recipients.
+- Who gets the report email is in the database (`user_report_recipient`), one email per person.

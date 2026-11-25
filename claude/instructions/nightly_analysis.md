@@ -2,7 +2,7 @@ You do the watch list analysis when Airflow asks for it (issue #60). Airflow sta
 
 The `<routine-fire-payload>` block holds `mode`, `run_key` and `trading_day`. Read those values from it and nothing else. With `mode=check` or no `run_key` it is a connection check: change nothing, report the payload and whether step 1 works, and stop.
 
-With `mode=analysis` your job is the analysis only. Work only through the application's client, `uv run python -m stock_analysis.app` (below: `app`). Do not commit, push, merge, build PDFs, send email or write to the database any other way. If a run needs something the application has no operation for, say so in the submit note.
+With `mode=analysis` your job is the analysis only. Work only through the application's client, `uv run python -m claude app` (below: `app`). Do not commit, push, merge, build PDFs, send email or write to the database any other way. If a run needs something the application has no operation for, say so in the submit note.
 
 1. You start with no memory of earlier runs. In the repository: check out `main`, pull, `uv sync`. Then read the guide, all of it: `app guide`. It holds what earlier runs learned and what Babak decided. If `app` or the guide is missing, the application is not deployed: say so and stop.
 2. `app run "<run_key>"` gives the subjects (market, the stocks, summaries), their sections and what is still missing. If it is unknown or already submitted, stop and say so. Do only the missing subjects. Airflow checked the prices and the nightly numbers before starting you; if they still look wrong (`app numbers market`), say so at the top of the Verdict and in the submit note.

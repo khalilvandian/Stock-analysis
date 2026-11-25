@@ -1,6 +1,7 @@
 """The metrics dictionary (config/metrics.toml): pick a set of metrics, build each stock's vector.
 
-    from stock_analysis import metrics, stocks
+    from claude.tools import metrics
+    from stock_analysis import stocks
     d = metrics.load()
     ids = metrics.select(d, "proposed")             # a named set, or a list of ids
     frame = stocks.rows(data, ["BSX", "ABT", "MDT"])
@@ -8,16 +9,16 @@
     s = metrics.standardize(v, d)                   # 0-100 percentiles, higher = better
 
 `source` says which table the frame is: "sector" (stock_analysis.stocks.rows, the columns
-stock_analysis.peer_screen and the watch list use), "stage1" or "stage2" (the market
+the peer screen and the watch list use), "stage1" or "stage2" (the market
 screener's Stage 1 rows and Stage 2 top, stocks.screener_run) or "watchlist"
 (key_numbers() rows). Metrics the table doesn't have are worked out from other metrics where
 the formula allows (DERIVED), otherwise left blank.
 
 Usage:
-    uv run python -m stock_analysis.metrics list [--set proposed]
-    uv run python -m stock_analysis.metrics doc        # rewrite docs/METRICS.md
-    uv run python -m stock_analysis.metrics vector BSX ABT MDT --source sector
-    uv run python -m stock_analysis.metrics vector --source stage2     # the screener's top
+    uv run python -m claude metrics list [--set proposed]
+    uv run python -m claude metrics doc        # rewrite docs/METRICS.md
+    uv run python -m claude metrics vector BSX ABT MDT --source sector
+    uv run python -m claude metrics vector --source stage2     # the screener's top
 """
 
 from __future__ import annotations
@@ -192,7 +193,7 @@ def doc(d: dict) -> str:
     lines = [
         "# Metrics dictionary",
         "",
-        "Generated from `config/metrics.toml` by `uv run python -m stock_analysis.metrics doc`;"
+        "Generated from `config/metrics.toml` by `uv run python -m claude metrics doc`;"
         " edit the TOML, not this file. docs/DECISIONS.md records the choices made.",
         "",
         d["meta"]["example_note"],
@@ -245,7 +246,7 @@ def doc(d: dict) -> str:
     return "\n".join(lines)
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     ls = sub.add_parser("list", help="print the metrics")
@@ -256,7 +257,7 @@ def main() -> None:
     vec.add_argument("--set", default="proposed")
     vec.add_argument("--standardize", choices=["percentile", "zscore"])
     vec.add_argument("symbols", nargs="*")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     d = load()
     if args.cmd == "list":
         for i in select(d, args.set):
@@ -266,7 +267,7 @@ def main() -> None:
         DOC.write_text(doc(d) + "\n")
         print(f"wrote {DOC.relative_to(ROOT)}")
     else:
-        from . import stocks
+        from stock_analysis import stocks
 
         data = stocks.default_data()
         if args.source == "sector":

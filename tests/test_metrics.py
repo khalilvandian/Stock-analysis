@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from stock_analysis import metrics
+from claude.tools import metrics
 
 ROOT = metrics.ROOT
 # Columns made at run time by stock_analysis.screen rather than saved by sector.py
@@ -110,6 +110,4 @@ def test_standardize_puts_best_at_100(d):
 
 
 def test_doc_is_up_to_date(d):
-    assert metrics.DOC.read_text() == metrics.doc(d) + "\n", (
-        "run: python -m stock_analysis.metrics doc"
-    )
+    assert metrics.DOC.read_text() == metrics.doc(d) + "\n", "run: python -m claude metrics doc"

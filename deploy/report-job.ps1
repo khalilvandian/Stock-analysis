@@ -14,7 +14,7 @@ Safe to rerun: it creates what is missing and updates the rest.
 
 Needs: az login (role changes: a sign-in with MFA), .env with STOCK_WRITER_DB_PASSWORD,
 BREVO_API_KEY and WATCHLIST_EMAIL_FROM (the last two not for -StorageOnly). Who gets the email is in
-the database (python -m stock_analysis.app recipients).
+the database (python -m claude app recipients).
 
 Usage (from the repository root):
   powershell -ExecutionPolicy Bypass -File deploy\report-job.ps1 -StorageOnly
