@@ -1,12 +1,14 @@
 """Wait in the triggerer for the Claude session's commit on main and its published site
 (issue #30). The check itself is stock_analysis.pipeline.check_evening; the trigger calls it
 every `poll_seconds` until it passes or fails (it fails by itself after `wait_hours` in
-config/pipeline.toml)."""
+config/pipeline.toml). A call GitHub
+doesn't answer is repeated at the next poll; only FAILED_CALLS polls in a row fail it."""
 
 from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import logging
 from typing import Any
 
 import httpx
@@ -15,6 +17,10 @@ from airflow.sdk.exceptions import AirflowFailException
 from airflow.triggers.base import BaseTrigger, TriggerEvent
 
 from stock_analysis import pipeline as p
+
+FAILED_CALLS = 12  # polls in a row without an answer (2 hours) before the wait fails
+
+log = logging.getLogger(__name__)
 
 
 class EveningTrigger(BaseTrigger):
@@ -29,8 +35,17 @@ class EveningTrigger(BaseTrigger):
         )
 
     async def run(self):
+        failed = 0
         while True:
-            result = await asyncio.to_thread(self._check)
+            try:
+                result = await asyncio.to_thread(self._check)
+                failed = 0
+            except (httpx.HTTPError, ValueError) as exc:  # ValueError: an unreadable answer
+                failed += 1
+                log.warning("GitHub did not answer (%s): asking again", exc)
+                code = p.FAILED if failed >= FAILED_CALLS else p.NOT_YET
+                message = f"GitHub did not answer {failed} times in a row: {exc}"
+                result = p.Result(code, message, {})
             if result.code != p.NOT_YET:
                 yield TriggerEvent(
                     {"code": result.code, "message": result.message, "detail": result.detail}

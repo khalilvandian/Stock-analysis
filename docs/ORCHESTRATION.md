@@ -147,6 +147,23 @@ docker compose -f orchestration/compose.yaml down                   # stop; the 
 - Every check also runs by hand: `uv run python -m stock_analysis.pipeline check-prices
   RUN_KEY` (after `start RUN_KEY`).
 
+## When Azure or GitHub doesn't answer
+
+Airflow starts each job run and asks for its status through Azure's control service
+(`management.azure.com`). A call without an answer says nothing about the run: on 24 Nov 2026
+one status call timed out, the task failed, and the night stopped although the download
+itself succeeded. So (`orchestration/plugins/stock_orch/azure_jobs.py`):
+
+- an unanswered status call is asked again at the next poll, until the task's own time limit;
+- an unanswered start is tried again for about ten minutes, each time first looking for a run
+  that Azure started without its answer arriving;
+- a retry of the task waits for a run with the same arguments that is still going;
+- a refusal (no permission, wrong address) still fails: a start at once, the wait after 10
+  polls in a row. A run that Azure reports as failed fails the task, as before.
+
+`wait_for_evening` likewise asks GitHub again at its next poll; 12 unanswered polls in a row
+(2 hours) fail it.
+
 ## Rerunning a failed night
 
 A failed run stays failed in `ops_pipeline_run` whatever later steps do, except the last
