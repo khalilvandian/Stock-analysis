@@ -1,72 +1,73 @@
 # Market report: Claude's notes
 
-Updated: 2026-11-25
+Updated: 2026-11-26
 
 The evening run copies these sections into the market PDF. Every section carries a review date; the build stops if one was not reviewed for the run (docs/EVENING_RUN.md).
 
 ## Verdict
 
-<!-- reviewed 2026-11-25 -->
-**The AI bounce faded on Nov 24: the S&P 500 fell 0.5% to 7,201 and the Nasdaq 1.5% as chip stocks gave back part of Monday's surge, while the Dow rose 0.9% to its first close above 50,000. Most stocks rose; the fall was in tech. Note: the tables in this report show Monday's (Nov 23) close, because the server's price download for Tuesday failed.**
+<!-- reviewed 2026-11-26 -->
+**A scary morning, a calm close. On Nov 25 the S&P 500 was down 3.2% at its low after inflation came in hotter than expected and the US proposed new tariffs on 14 trading partners; it recovered to close down only 0.25% at 7,183. The Dow ended up 0.3% after being down more than 1,100 points. AI and chip stocks were sold again; most other sectors rose. Markets are closed for Thanksgiving on Nov 26.**
 
 ## Summary
 
-<!-- reviewed 2026-11-25 -->
-- **Indices (Nov 24 close, from news reports):** S&P 500 7,201 (-0.5%), Nasdaq 23,734 (-1.5%), Dow 50,019 (+0.9%), Russell 2000 2,685 (+0.6%).
-- **Cause:** chip stocks fell (Nvidia about -6%, Micron more than -10%) as investors doubted how far the AI rebound can run; rate-hike bets for Dec 9 rose to about 95%.
-- **Good news:** consumer confidence jumped to 103.3, its highest since January 2025.
-- **Data caveat:** the tables are Monday's close; the server's download for Tuesday failed.
+<!-- reviewed 2026-11-26 -->
+- **Indices (Nov 25 close):** S&P 500 7,183 (-0.25%), Nasdaq 23,586 (-0.6%), Dow 50,183 (+0.3%), Russell 2000 2,704 (+0.7%). The S&P 500 is 8% below its high.
+- **Causes:** core PCE inflation rose to 3.3% a year (3.2% expected); new tariff proposals of 15-20%; more selling of AI stocks.
+- **Fear:** the VIX closed at 28, after touching about 34 in the morning.
+- **Under the surface:** breadth improved; 64 S&P 500 stocks are near a 52-week high and only 2 near a low.
 
 ## What happened
 
-<!-- reviewed 2026-11-25 -->
-- **Nov 24:** the S&P 500 fell 36 points (0.5%) to 7,201 and the Nasdaq 356 points (1.5%) to 23,734; the Dow rose 423 points (0.9%) to 50,019, its first close above 50,000, and the Russell 2000 rose 0.6% ([Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/), [24/7 Wall St](https://247wallst.com/cards/the-dow-closed-above-50-000-for-the-first-time-while-the-nas-gspc-market-bell-01m87nyn7mshvn15b2vdser41w)).
-- **Losers:** technology about -3.3%. Nvidia about -6% a day after its 31% jump; Micron and SK Hynix more than -10%; HPE -17% on a weak outlook for AI server margins; Dell -12%; CoreWeave -12% ([Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-tuesday-november-24-dow-sp-500-nasdaq-chip-stocks-nvidia-140629923.html), [24/7 Wall St](https://247wallst.com/cards/the-dow-closed-above-50-000-for-the-first-time-while-the-nas-gspc-market-bell-01m87nyn7mshvn15b2vdser41w)).
-- **Winners:** health care +3% (Sanofi +11% after agreeing to buy Insmed for $41bn; Moderna, Amgen), consumer staples +1.7%, real estate +1.3%; Best Buy and Kohl's rose on strong holiday-season sales ([24/7 Wall St](https://247wallst.com/cards/the-dow-closed-above-50-000-for-the-first-time-while-the-nas-gspc-market-bell-01m87nyn7mshvn15b2vdser41w), [Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)).
-- **Anthropic** fell about 6.5% to around $82, below its $83 IPO price ([Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)).
-- **Other markets:** the 10-year Treasury yield slipped to 4.90%; the VIX was little changed at 26.4.
+<!-- reviewed 2026-11-26 -->
+- **Nov 25:** the S&P 500 fell 18 points (0.25%) to 7,183 and the Nasdaq 148 points (0.6%) to 23,586; the Dow rose 164 points (0.3%) to 50,183 and the Russell 2000 0.7% ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html), [Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)).
+- **The path:** at the lows the Dow was down more than 1,100 points (2.2%), the S&P 500 3.2% and the Nasdaq 4.6%; the recovery came through the afternoon ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html), [Motley Fool](https://www.fool.com/coverage/stock-market-today/2026/11/25/stock-market-today-nov-25-dow-erases-1-100-point-loss-as-wall-street-stages-dramatic-late-day-comeback/)).
+- **AI stocks:** Nvidia fell about 4% after S&P put its credit rating on watch for a downgrade, citing governance risk; AMD, Micron, Marvell and Intel were down more than 9% at their lows; Ambarella fell about 20% on weak guidance ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html), [Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)). Technology ended about 1% lower.
+- **Gainers:** materials (+2%), real estate, energy, financials and industrials rose; HP +11.5% and Charter +8% ([Motley Fool](https://www.fool.com/coverage/stock-market-today/2026/11/25/stock-market-today-nov-25-dow-erases-1-100-point-loss-as-wall-street-stages-dramatic-late-day-comeback/)).
+- **Other markets:** the 10-year Treasury yield fell to about 4.85%; oil rose about 2.5% to $84; European stocks fell about 1.8%.
 
 ## Why it happened
 
-<!-- reviewed 2026-11-25 -->
-1. **The bounce was mostly short sellers buying back.** Monday's 31% jump in Nvidia came from the board bringing back Jensen Huang, not from new earnings. With that news priced in, investors went back to the question that started the sell-off: how long will the AI spending boom last ([Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-tuesday-november-24-dow-sp-500-nasdaq-chip-stocks-nvidia-140629923.html))? HPE's warning about thinner margins on AI servers added to that doubt.
-2. **Rate hikes are back in focus.** Traders now price about a 95% chance the Fed raises rates by a quarter point on Dec 9 ([Yahoo Finance](https://finance.yahoo.com/markets/live/stock-market-today-tuesday-november-24-dow-sp-500-nasdaq-chip-stocks-nvidia-140629923.html)). Higher rates hurt expensive growth stocks most.
-3. **The rest of the economy looks fine.** Consumer confidence jumped 11 points to 103.3 and retailers reported strong sales ([Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)), so money moved into health care, consumer and value stocks rather than out of the market.
+<!-- reviewed 2026-11-26 -->
+1. **Inflation is stuck.** The Fed's preferred measure, PCE, rose 3.8% in the year to October (3.7% in September); core PCE, without food and energy, rose 3.3%, a tenth above forecasts ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)). That makes a quarter-point Fed rate **hike** on Dec 9 fully priced, with markets expecting more in 2027 ([Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)).
+2. **New tariffs.** The administration proposed tariffs under Section 301 on 14 trading partners, citing "overcapacity": about 15% for the EU, Japan and South Korea and 20% for Vietnam and China (on top of existing duties), with chips, cars and steel excluded. They are not expected before January ([Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/), [CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)).
+3. **AI doubts again.** Nvidia's rating watch and weak chip-company guidance reopened the question of how long AI spending lasts.
+4. **Why it recovered:** strong economic data (Q3 growth revised up to 4.3%, personal income +0.7%, jobless claims 189,000), falling Treasury yields and buying in sectors outside tech, in thin trading before the holiday ([Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/), [CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)).
 
 ## What it means
 
-<!-- reviewed 2026-11-25 -->
-In plain terms: the market is splitting in two. AI and chip stocks swing wildly on news about one company or one customer, while the rest of the market is calmer and rising. Most stocks went up on Tuesday even though the S&P 500 fell, because a few huge tech companies weigh so much in the index.
+<!-- reviewed 2026-11-26 -->
+In plain terms: inflation and tariffs are now pulling in the same direction as the AI worries. The economy is still strong, which is why most stocks held up, but strong growth plus sticky inflation means the Fed keeps raising rates. That hurts expensive growth stocks most.
 
 For a Lynch-style investor:
 
-- **Look past the index.** The S&P 500's move mostly reflects a handful of AI names. Businesses you can understand, outside that trade, are doing fine.
-- **Don't chase AI swings.** A 31% day followed by a 6% fall is a sign of a nervous market, not of value.
-- **Use the data caveat.** The prices in the tables are one day old; for Alphabet, Uber and Constellation the difference is likely small, but check the live price before acting.
+- **The market under the index is healthier than the index.** More stocks are near their highs than at any time this month; the weakness is concentrated in AI and chips.
+- **Rate hikes are the main headwind for 2027.** Companies with debt (Constellation after Calpine) and high valuations feel them first; companies with net cash (Alphabet) feel them least.
+- **Tariffs are a proposal, not a fact yet.** Don't trade on them; watch what is decided before the US-China truce ends on Jan 10.
 
 ## Stocks to look at
 
-<!-- reviewed 2026-11-25 -->
-The screener's top 3 cheap or close-to-cheap stocks per sector are in the table above, from the companies that pass Stage 1 (good financial statements for their Lynch category), at the Nov 23 close (the server did not run the screener for Nov 24).
+<!-- reviewed 2026-11-26 -->
+The screener's top 3 cheap or close-to-cheap stocks per sector are in the table above, from the companies that pass Stage 1 (good financial statements for their Lynch category), at the Nov 25 close.
 
-- **Cheapest against their own history:** Adobe, Intuit and Gartner are still 50-60% below their cheap price: software and data businesses still growing earnings.
-- **Nvidia** is still on the list, but it has swung 31% up and 6% down in two days and its board investigation is still open.
+- **Cheapest against their own history:** Adobe, Intuit and Gartner remain 50-60% below their cheap price: software and data businesses still growing earnings.
+- **Nvidia** (now 43% below its cheap price) and Super Micro look very cheap, but Nvidia's governance questions are now affecting its credit rating; that is not something you can judge from the numbers.
 - **Check before trusting:** Allstate and Comcast look cheap because recent earnings are unusually high.
 
 Each name still needs step 1 (absolute values with history) before any decision.
 
 ## What to watch
 
-<!-- reviewed 2026-11-25 -->
-- The PCE inflation report on Nov 25, the Fed's preferred inflation measure, the day before Thanksgiving.
+<!-- reviewed 2026-11-26 -->
 - Thanksgiving: US markets are closed on Thursday, Nov 26, and close early (1 p.m. New York) on Friday, Nov 27.
-- The Fed's meeting on Dec 8-9: a quarter-point hike is almost fully expected; anything larger would be a new shock.
-- Whether the server's price download recovers tonight (ongoing), so the next report has current prices.
+- Jensen Huang's hearings in Congress: House Foreign Affairs on Dec 1 and Senate Banking on Dec 3.
+- The Fed's meeting on Dec 8-9: a quarter-point hike is fully priced.
+- The tariff proposals and the US-China trade truce, which ends on Jan 10, 2027.
 
 ## Sources
 
-<!-- reviewed 2026-11-25 -->
-- [Yahoo Finance: Dow rises, S&P 500 and Nasdaq decline as chip sector tumbles (Nov 24)](https://finance.yahoo.com/markets/live/stock-market-today-tuesday-november-24-dow-sp-500-nasdaq-chip-stocks-nvidia-140629923.html)
-- [Vista Partners: Dow tops 50,000 as Nasdaq slides, consumer confidence surges (Nov 24)](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)
-- [24/7 Wall St: The Dow closed above 50,000 for the first time (Nov 24)](https://247wallst.com/cards/the-dow-closed-above-50-000-for-the-first-time-while-the-nas-gspc-market-bell-01m87nyn7mshvn15b2vdser41w)
-- Index tables, sectors, breadth, the screener and watch-list prices: the database (Nov 23 close; the Nov 24 download failed).
+<!-- reviewed 2026-11-26 -->
+- [CNBC: Stock market news for Nov. 25, 2026](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)
+- [Motley Fool: Dow erases 1,100-point loss as Wall Street stages late comeback (Nov 25)](https://www.fool.com/coverage/stock-market-today/2026/11/25/stock-market-today-nov-25-dow-erases-1-100-point-loss-as-wall-street-stages-dramatic-late-day-comeback/)
+- [Vista Partners: Stocks close mixed as hot PCE inflation, new tariff plans and an AI sell-off test Wall Street (Nov 25)](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)
+- Index levels, sectors, breadth, the screener and watch-list prices: the database (Nov 25 close).
