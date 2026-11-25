@@ -14,6 +14,9 @@ save its analyses and edit the watch list. Every command is one operation of the
         [--peers A B ...] [--target-note TEXT] [--stakes X]
     python -m stock_analysis.app watchlist-remove SYMBOL --reason TEXT
     python -m stock_analysis.app watchlist-undo CHANGE_ID --reason TEXT
+    python -m stock_analysis.app recipients                # who gets the reports (STOCK_API_KEY)
+    python -m stock_analysis.app recipient-add EMAIL --reason TEXT [--name NAME]
+    python -m stock_analysis.app recipient-remove EMAIL --reason TEXT
     python -m stock_analysis.app guide                     # what every run must know
     python -m stock_analysis.app guide-set FILE.md --reason TEXT
     python -m stock_analysis.app query "SELECT ..."
@@ -104,6 +107,15 @@ class App:
     def watchlist_undo(self, change_id: int, reason: str):
         return self.call("POST", f"watchlist/undo/{change_id}", {"reason": reason})
 
+    def recipients(self):
+        return self.call("GET", "recipients")
+
+    def recipient_add(self, email: str, reason: str, name: str | None = None):
+        return self.call("PUT", "recipients", {"email": email, "reason": reason, "name": name})
+
+    def recipient_remove(self, email: str, reason: str):
+        return self.call("DELETE", "recipients", {"email": email, "reason": reason})
+
     def guide(self):
         return self.call("GET", "guide")
 
@@ -154,6 +166,14 @@ def parser() -> argparse.ArgumentParser:
     p = add("watchlist-undo")
     p.add_argument("change_id", type=int)
     p.add_argument("--reason", required=True)
+    add("recipients")
+    p = add("recipient-add")
+    p.add_argument("email")
+    p.add_argument("--reason", required=True)
+    p.add_argument("--name")
+    p = add("recipient-remove")
+    p.add_argument("email")
+    p.add_argument("--reason", required=True)
     add("guide")
     p = add("guide-set")
     p.add_argument("file", type=Path)
@@ -175,8 +195,10 @@ def main(argv: list[str] | None = None, app: App | None = None) -> int:
         args = {k: v for k, v in args.items() if v is not None}
         if no_target:
             args["target_pe"] = None  # sent as null: no target, no entry price
+    # The recipients are Babak's: Claude's key is refused, so the scripts' key is used
+    key = os.environ.get("STOCK_API_KEY") if command.startswith("recipient") else None
     try:
-        answer = getattr(app or App(), command)(**args)
+        answer = getattr(app or App(key=key), command)(**args)
     except Refused as exc:
         print(exc, file=sys.stderr)
         return 1

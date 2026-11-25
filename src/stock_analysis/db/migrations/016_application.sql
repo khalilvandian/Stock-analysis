@@ -14,7 +14,7 @@ CREATE TABLE out_analysis_run (
     submit_note     TEXT,               -- what Claude says about the run
     rendered_at     TIMESTAMP,
     report_json     TEXT,               -- the files, the email, what failed (stock_analysis.report)
-    emailed_at      TIMESTAMP           -- one email per run
+    emailed_at      TIMESTAMP           -- nobody on the list is left to email
 );
 
 -- One subject's analysis in a run. Saving again before the run is submitted replaces it.
@@ -29,6 +29,26 @@ CREATE TABLE out_analysis (
     PRIMARY KEY (run_key, subject)
 );
 CREATE INDEX out_analysis_subject ON out_analysis (subject, saved_at);
+
+-- Who gets the reports by email. A removed person stays, inactive. Addresses are entered
+-- through the application only, never in the repository (it is public).
+CREATE TABLE user_report_recipient (
+    email           TEXT PRIMARY KEY CHECK (email = lower(email)),
+    name            TEXT,
+    active          BOOLEAN NOT NULL,
+    changed_at      TIMESTAMP NOT NULL, -- UTC
+    changed_by      TEXT NOT NULL,
+    reason          TEXT NOT NULL
+);
+
+-- One email per run and person, marked just before it is sent.
+CREATE TABLE out_report_email (
+    run_key         TEXT NOT NULL REFERENCES out_analysis_run (run_key),
+    email           TEXT NOT NULL,
+    marked_at       TIMESTAMP NOT NULL, -- UTC
+    message_id      TEXT,               -- Brevo's answer; NULL: no answer, may have gone out
+    PRIMARY KEY (run_key, email)
+);
 
 -- Every change to the watch list, so it can be read back and undone.
 CREATE TABLE user_watchlist_change (

@@ -13,6 +13,9 @@ calls that are checked and logged (ops_api_call). Claude never writes SQL or fil
     PUT    /app/watchlist/{symbol}         add or change a stock
     DELETE /app/watchlist/{symbol}         remove a stock
     POST   /app/watchlist/undo/{change_id} put a stock back as it was before a change
+    GET    /app/recipients                 who gets the reports by email (the scripts' key only,
+    PUT    /app/recipients                 like adding and removing one: not the unattended
+    DELETE /app/recipients                 session, which reads the web)
     GET    /app/guide                      the standing guide: what every run must know
     PUT    /app/guide                      a new version (the earlier ones are kept)
     POST   /app/query                      one read-only SELECT, logged
@@ -45,6 +48,8 @@ STOCK_SECTIONS = notes_check.SECTIONS["stock"]
 SYMBOL = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 MAX_SECTION = 20_000
 MAX_PEERS = 25
+EMAIL = re.compile(r"^[^@\s,;<>\"]{1,64}@[a-z0-9.\-]{1,185}\.[a-z]{2,24}$")
+MAX_RECIPIENTS = 20  # Brevo's free plan: 300 emails a day, alerts included
 LOCK = 60_016  # one watch-list change at a time (pg_advisory_xact_lock)
 
 
@@ -85,6 +90,12 @@ class Stock(BaseModel):
 
 class Reason(BaseModel):
     reason: str = Field(min_length=3, max_length=1000)
+
+
+class Recipient(BaseModel):
+    email: str = Field(max_length=254)
+    reason: str = Field(min_length=3, max_length=1000)
+    name: str | None = Field(default=None, max_length=100)
 
 
 class Guide(BaseModel):
@@ -488,6 +499,75 @@ def router(
             put_stock(conn, symbol, after)
             change = log_change(conn, caller, "undo", symbol, body.reason, before, after)
         return {"changed": True, "change_id": change, "stock": after}
+
+    # Who gets the reports ---------------------------------------------------------------
+    def owner(caller: str = Depends(call)) -> str:
+        if caller != "scripts":
+            raise refuse(403, "the recipients are changed by Babak, not by the analysis session")
+        return caller
+
+    def address(body: Recipient) -> str:
+        email = body.email.strip().lower()
+        if not EMAIL.match(email):
+            raise refuse(422, "not an email address")
+        return email
+
+    def active_recipients(conn: Connection) -> list[dict]:
+        return rows(
+            conn,
+            "SELECT email, name, changed_at, changed_by, reason FROM user_report_recipient "
+            "WHERE active ORDER BY changed_at, email",
+        )
+
+    @api.get("/recipients")
+    def recipients(caller: str = Depends(owner)) -> list[dict]:
+        with read() as conn:
+            return active_recipients(conn)
+
+    @api.put("/recipients")
+    def add_recipient(body: Recipient, request: Request, caller: str = Depends(owner)) -> dict:
+        email = address(body)
+        request.state.detail = f"add {email}: {body.reason}"
+        with write() as conn:
+            conn.execute(text("SELECT pg_advisory_xact_lock(:n)"), {"n": LOCK})
+            listed = {r["email"]: r for r in active_recipients(conn)}
+            name = " ".join((body.name or "").split()) or None
+            if email in listed and name in (None, listed[email]["name"]):
+                return {"changed": False, "recipients": len(listed)}
+            if email not in listed and len(listed) >= MAX_RECIPIENTS:
+                raise refuse(422, f"at most {MAX_RECIPIENTS} recipients")
+            conn.execute(
+                text(
+                    "INSERT INTO user_report_recipient (email, name, active, changed_at, "
+                    "changed_by, reason) VALUES (:email, :name, true, :at, :by, :reason) "
+                    "ON CONFLICT (email) DO UPDATE SET active = true, "
+                    "name = COALESCE(EXCLUDED.name, user_report_recipient.name), "
+                    "changed_at = EXCLUDED.changed_at, changed_by = EXCLUDED.changed_by, "
+                    "reason = EXCLUDED.reason"
+                ),
+                {"email": email, "name": name, "at": now(), "by": caller, "reason": body.reason},
+            )
+            return {"changed": True, "recipients": len(listed | {email: None})}
+
+    @api.delete("/recipients")
+    def remove_recipient(body: Recipient, request: Request, caller: str = Depends(owner)) -> dict:
+        email = address(body)
+        request.state.detail = f"remove {email}: {body.reason}"
+        with write() as conn:
+            conn.execute(text("SELECT pg_advisory_xact_lock(:n)"), {"n": LOCK})
+            listed = {r["email"] for r in active_recipients(conn)}
+            if email not in listed:
+                raise refuse(404, "not a recipient")
+            if len(listed) == 1:
+                raise refuse(422, "the last recipient: add another one first")
+            conn.execute(
+                text(
+                    "UPDATE user_report_recipient SET active = false, changed_at = :at, "
+                    "changed_by = :by, reason = :reason WHERE email = :email"
+                ),
+                {"email": email, "at": now(), "by": caller, "reason": body.reason},
+            )
+            return {"changed": True, "recipients": len(listed) - 1}
 
     # The standing guide -----------------------------------------------------------------
     def newest_guide(conn: Connection) -> dict | None:

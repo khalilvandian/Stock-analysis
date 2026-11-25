@@ -13,7 +13,8 @@ Safe to rerun: it creates what is missing and updates the rest.
   -StorageOnly does 1 and 2 (the job's image is built from main, so it exists after the merge).
 
 Needs: az login (role changes: a sign-in with MFA), .env with STOCK_WRITER_DB_PASSWORD,
-BREVO_API_KEY, WATCHLIST_EMAIL_FROM and WATCHLIST_EMAIL_TO (the last three not for -StorageOnly).
+BREVO_API_KEY and WATCHLIST_EMAIL_FROM (the last two not for -StorageOnly). Who gets the email is in
+the database (python -m stock_analysis.app recipients).
 
 Usage (from the repository root):
   powershell -ExecutionPolicy Bypass -File deploy\report-job.ps1 -StorageOnly
@@ -76,15 +77,13 @@ Write-Host "3/4 Job $Job"
 $writer = Read-DotEnv "STOCK_WRITER_DB_PASSWORD"
 $brevo = Read-DotEnv "BREVO_API_KEY"
 $from = Read-DotEnv "WATCHLIST_EMAIL_FROM"
-$to = Read-DotEnv "WATCHLIST_EMAIL_TO"
 $subscription = (Az account show --query id -o tsv)
-$secrets = @("writer-password=$writer", "brevo-key=$brevo", "email-from=$from", "email-to=$to")
+$secrets = @("writer-password=$writer", "brevo-key=$brevo", "email-from=$from")
 $envVars = @(
     "STOCK_DB_TARGET=server-writer",
     "STOCK_WRITER_DB_PASSWORD=secretref:writer-password",
     "BREVO_API_KEY=secretref:brevo-key",
     "WATCHLIST_EMAIL_FROM=secretref:email-from",
-    "WATCHLIST_EMAIL_TO=secretref:email-to",
     "STOCK_REPORTS_URL=https://$Storage.blob.core.windows.net/$Container",
     "AZURE_SUBSCRIPTION_ID=$subscription"
 )

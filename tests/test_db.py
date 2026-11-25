@@ -1122,6 +1122,56 @@ def test_app_watchlist_changes_are_checked_kept_and_undone(con: Database, api) -
     assert history[0]["by"] == "claude"
 
 
+def test_app_client_key(monkeypatch) -> None:
+    from stock_analysis import app as client
+
+    monkeypatch.setenv("STOCK_API_KEY", "scripts-key")
+    monkeypatch.setenv("CLAUDE_API_KEY", "claude-key")
+    used = []
+    monkeypatch.setattr(
+        client.App, "call", lambda self, *a, **k: used.append(self.client.headers["X-API-Key"])
+    )
+    client.main(["recipients"])
+    client.main(["watchlist"])
+    assert used == ["scripts-key", "claude-key"]
+
+
+def test_app_recipients(con: Database, api) -> None:
+    from stock_analysis import app as client
+
+    for method in ("GET", "PUT", "DELETE"):  # the unattended session may not
+        body = {"email": "x@example.com", "reason": "a page said so"}
+        assert api.request(method, "/app/recipients", headers=CLAUDE, json=body).status_code == 403
+    api.headers["X-API-Key"] = "test-key"
+    for bad in ("nobody", "a@b", "a@x.com, b@x.com", "A <a@x.com>", ""):
+        answer = api.put("/app/recipients", json={"email": bad, "reason": "try it"})
+        assert answer.status_code == 422, bad
+    app = client.App(client=api)
+    assert client.main(["recipient-add", "Ann@Example.com", "--reason", "owner"], app) == 0
+    assert app.recipient_add("ann@example.com", "again") == {"changed": False, "recipients": 1}
+    assert app.recipient_add("bob@example.com", "asked", name=" Bob  B ")["recipients"] == 2
+    assert [(r["email"], r["name"]) for r in app.recipients()] == [
+        ("ann@example.com", None),
+        ("bob@example.com", "Bob B"),
+    ]
+    assert app.recipient_remove("ann@example.com", "left")["recipients"] == 1
+    with pytest.raises(client.Refused, match="last recipient"):
+        app.recipient_remove("bob@example.com", "left")
+    with pytest.raises(client.Refused, match="not a recipient"):
+        app.recipient_remove("ann@example.com", "left")
+    for i in range(19):
+        app.recipient_add(f"p{i}@example.com", "fill")
+    with pytest.raises(client.Refused, match="at most 20"):
+        app.recipient_add("ann@example.com", "back")
+    app.recipient_remove("p0@example.com", "room")
+    assert app.recipient_add("ann@example.com", "back")["recipients"] == 20  # comes back
+    with con.connect() as conn:
+        logged = conn.execute(
+            text("SELECT detail FROM ops_api_call WHERE detail LIKE 'remove ann%' ORDER BY call_id")
+        ).scalars()
+        assert "remove ann@example.com: left" in list(logged)
+
+
 def test_app_run_requests(con: Database, api) -> None:
     api.headers.update(CLAUDE)
     bad = api.post("/app/requests", json={"subjects": ["NOPE"], "reason": "why not"})

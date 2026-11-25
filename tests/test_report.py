@@ -213,11 +213,11 @@ def test_only_a_submitted_complete_run_is_rendered(run, con, tmp_path):  # noqa:
     with pytest.raises(RuntimeError, match="not submitted"):
         step("render", RUN, run, store)
     with pytest.raises(RuntimeError, match="not rendered"):
-        os.environ.update(BREVO_API_KEY="k", WATCHLIST_EMAIL_FROM="b@x", WATCHLIST_EMAIL_TO="a@x")
+        os.environ.update(BREVO_API_KEY="k", WATCHLIST_EMAIL_FROM="b@x")
         try:
             step("email", RUN, run, store)
         finally:
-            for name in ("BREVO_API_KEY", "WATCHLIST_EMAIL_FROM", "WATCHLIST_EMAIL_TO"):
+            for name in ("BREVO_API_KEY", "WATCHLIST_EMAIL_FROM"):
                 os.environ.pop(name)
 
 
@@ -225,26 +225,46 @@ def test_only_a_submitted_complete_run_is_rendered(run, con, tmp_path):  # noqa:
 
 
 @pytest.fixture
-def mail(run, tmp_path, monkeypatch):
+def mail(run, con, tmp_path, monkeypatch):  # noqa: F811
     monkeypatch.setenv("BREVO_API_KEY", "k")
     monkeypatch.setenv("WATCHLIST_EMAIL_FROM", "Bot <bot@example.com>")
-    monkeypatch.setenv("WATCHLIST_EMAIL_TO", "a@example.com, b@example.com")
+    with con.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO user_report_recipient VALUES "
+                "('a@example.com', 'Ann', true, now(), 't', 'test'), "
+                "('b@example.com', NULL, true, now(), 't', 'test'), "
+                "('old@example.com', NULL, false, now(), 't', 'left')"
+            )
+        )
     store = FolderStore(tmp_path)
     step("render", RUN, run, store)
     return run, store
 
 
+def to(call) -> list[dict]:
+    return json.loads(call.request.content)["to"]
+
+
 @respx.mock
-def test_email_is_sent_once_with_every_pdf(mail, capsys):
+def test_each_person_gets_one_email_with_every_pdf(mail, con, capsys):  # noqa: F811
     data, store = mail
     route = respx.post(email.API).mock(return_value=httpx.Response(201, json={"messageId": "m1"}))
     assert step("email", RUN, data, store) == 0
-    assert step("email", RUN, data, store) == 0
-    assert "emailed already" in capsys.readouterr().out and len(route.calls) == 1
+    assert "emailed to 2 of 2" in capsys.readouterr().out
+    assert [to(c) for c in route.calls] == [  # one each; nobody sees the other, old one left out
+        [{"email": "a@example.com", "name": "Ann"}],
+        [{"email": "b@example.com"}],
+    ]
+    with con.begin() as conn:
+        assert conn.execute(text("SELECT emailed_at FROM out_analysis_run")).scalar()
+        conn.execute(text("UPDATE user_report_recipient SET active = true WHERE email LIKE 'old%'"))
+    assert step("email", RUN, data, store) == 0  # again: only the one who hasn't got it
+    assert "emailed to 1 of 3, 2 had it already" in capsys.readouterr().out
+    assert len(route.calls) == 3 and to(route.calls[2]) == [{"email": "old@example.com"}]
     sent = json.loads(route.calls[0].request.content)
     assert route.calls[0].request.headers["api-key"] == "k"
     assert sent["sender"] == {"email": "bot@example.com", "name": "Bot"}
-    assert sent["to"] == [{"email": "a@example.com"}, {"email": "b@example.com"}]
     assert [a["name"] for a in sent["attachment"]] == [
         "AAA_2026-11-26_0005.pdf",
         "summaries_2026-11-26_0005.pdf",
@@ -253,17 +273,40 @@ def test_email_is_sent_once_with_every_pdf(mail, capsys):
 
 
 @respx.mock
-def test_a_refused_email_can_be_sent_again_an_unanswered_one_is_not(mail, con):  # noqa: F811
+def test_a_refused_address_stops_nobody_else_and_can_be_sent_again(mail, con):  # noqa: F811
     data, store = mail
-    route = respx.post(email.API).mock(return_value=httpx.Response(401, text="bad key"))
-    with pytest.raises(email.Refused, match="401"):
+    good = httpx.Response(201, json={"messageId": "m"})
+    bad = httpx.Response(400, text="invalid address")
+    route = respx.post(email.API).mock(side_effect=[bad, good])
+    with pytest.raises(email.Refused, match=r"emailed to 1 of 2; failed: a\*\*\*@example.com.*400"):
         step("email", RUN, data, store)
-    route.mock(side_effect=httpx.ReadTimeout("no answer"))
-    with pytest.raises(httpx.ReadTimeout):
-        step("email", RUN, data, store)
-    route.mock(return_value=httpx.Response(201, json={"messageId": "m"}))
+    assert len(route.calls) == 2
+    with con.begin() as conn:  # not finished: somebody is missing
+        assert conn.execute(text("SELECT emailed_at FROM out_analysis_run")).scalar() is None
+    route.mock(side_effect=[good])
     step("email", RUN, data, store)
-    assert len(route.calls) == 2  # it may have gone out: not a third time
+    assert len(route.calls) == 3 and to(route.calls[2])[0]["email"] == "a@example.com"
+
+
+@respx.mock
+@pytest.mark.parametrize(
+    "unclear", [httpx.ReadTimeout("no answer"), httpx.Response(502, text="gateway")]
+)
+def test_an_unanswered_email_is_not_sent_again(mail, unclear):
+    data, store = mail
+    good = httpx.Response(201, json={"messageId": "m"})
+    route = respx.post(email.API).mock(side_effect=[unclear, good])
+    with pytest.raises(RuntimeError, match="may have gone out"):
+        step("email", RUN, data, store)
+    step("email", RUN, data, store)
+    assert len(route.calls) == 2
+
+
+def test_email_without_recipients_fails(mail, con):  # noqa: F811
+    with con.begin() as conn:
+        conn.execute(text("UPDATE user_report_recipient SET active = false"))
+    with pytest.raises(RuntimeError, match="No recipient"):
+        step("email", RUN, *mail)
 
 
 def test_email_needs_its_settings(mail, monkeypatch):
@@ -281,15 +324,6 @@ def test_email_needs_its_settings(mail, monkeypatch):
 )
 def test_attachment_names_keep_the_folder(path, name):
     assert email.attachment_name(path) == name
-
-
-def test_recipients_limits_and_blanks():
-    assert email.recipients(" a@x.com , b@y.com ,") == ["a@x.com", "b@y.com"]
-    five = ",".join(f"{i}@x.com" for i in range(5))
-    assert len(email.recipients(five)) == email.MAX_RECIPIENTS
-    for bad in ("", " , ,", five + ",5@x.com"):
-        with pytest.raises(ValueError):
-            email.recipients(bad)
 
 
 def test_report_steps_run_where_the_package_is():
