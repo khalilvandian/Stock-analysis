@@ -1,73 +1,70 @@
 # Market report: Claude's notes
 
-Updated: 2026-11-26
+Updated: 2026-11-27
 
 The evening run copies these sections into the market PDF. Every section carries a review date; the build stops if one was not reviewed for the run (docs/EVENING_RUN.md).
 
 ## Verdict
 
-<!-- reviewed 2026-11-26 -->
-**A scary morning, a calm close. On Nov 25 the S&P 500 was down 3.2% at its low after inflation came in hotter than expected and the US proposed new tariffs on 14 trading partners; it recovered to close down only 0.25% at 7,183. The Dow ended up 0.3% after being down more than 1,100 points. AI and chip stocks were sold again; most other sectors rose. Markets are closed for Thanksgiving on Nov 26.**
+<!-- reviewed 2026-11-27 -->
+**No US trading on Nov 26 (Thanksgiving), so the tables in this report are the Nov 25 close. Outside the US the mood improved: European stocks rose about 1.6-1.9% and US futures about 0.5%, because the new US tariff proposals looked milder than feared. Friday, Nov 27 is a short session that closes at 1 p.m. New York.**
 
 ## Summary
 
-<!-- reviewed 2026-11-26 -->
-- **Indices (Nov 25 close):** S&P 500 7,183 (-0.25%), Nasdaq 23,586 (-0.6%), Dow 50,183 (+0.3%), Russell 2000 2,704 (+0.7%). The S&P 500 is 8% below its high.
-- **Causes:** core PCE inflation rose to 3.3% a year (3.2% expected); new tariff proposals of 15-20%; more selling of AI stocks.
-- **Fear:** the VIX closed at 28, after touching about 34 in the morning.
-- **Under the surface:** breadth improved; 64 S&P 500 stocks are near a 52-week high and only 2 near a low.
+<!-- reviewed 2026-11-27 -->
+- **US:** closed for Thanksgiving; the last close (Nov 25) was S&P 500 7,183, Nasdaq 23,586, Dow 50,183.
+- **Europe:** Germany's DAX +1.9%, France's CAC 40 +1.6%, the FTSE 100 +1.6% ([Investing.com](https://www.investing.com/news/stock-market-news/european-shares-as-benign-us-tariffs-and-thanksgiving-lull-offer-relief-5052089)).
+- **Tariffs:** read as milder than feared: no stacking on existing duties, start in February or March at the earliest.
+- **Nvidia:** told some South-East Asian server partners to stop shipping under new US export rules ([Market Index](https://www.marketindex.com.au/news/morning-wrap-asx-to-rise-european-markets-rally-with-wall-street-shut-s)).
 
 ## What happened
 
-<!-- reviewed 2026-11-26 -->
-- **Nov 25:** the S&P 500 fell 18 points (0.25%) to 7,183 and the Nasdaq 148 points (0.6%) to 23,586; the Dow rose 164 points (0.3%) to 50,183 and the Russell 2000 0.7% ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html), [Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)).
-- **The path:** at the lows the Dow was down more than 1,100 points (2.2%), the S&P 500 3.2% and the Nasdaq 4.6%; the recovery came through the afternoon ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html), [Motley Fool](https://www.fool.com/coverage/stock-market-today/2026/11/25/stock-market-today-nov-25-dow-erases-1-100-point-loss-as-wall-street-stages-dramatic-late-day-comeback/)).
-- **AI stocks:** Nvidia fell about 4% after S&P put its credit rating on watch for a downgrade, citing governance risk; AMD, Micron, Marvell and Intel were down more than 9% at their lows; Ambarella fell about 20% on weak guidance ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html), [Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)). Technology ended about 1% lower.
-- **Gainers:** materials (+2%), real estate, energy, financials and industrials rose; HP +11.5% and Charter +8% ([Motley Fool](https://www.fool.com/coverage/stock-market-today/2026/11/25/stock-market-today-nov-25-dow-erases-1-100-point-loss-as-wall-street-stages-dramatic-late-day-comeback/)).
-- **Other markets:** the 10-year Treasury yield fell to about 4.85%; oil rose about 2.5% to $84; European stocks fell about 1.8%.
+<!-- reviewed 2026-11-27 -->
+- **Nov 26:** US stock and bond markets were closed for Thanksgiving.
+- **Europe and Asia:** European shares rallied about 1.6-1.9% and most Asian markets rose ([Investing.com](https://www.investing.com/news/stock-market-news/european-shares-as-benign-us-tariffs-and-thanksgiving-lull-offer-relief-5052089), [Gurutrade](https://www.gurutrade.com/news/stocks-rally-in-asia-us-tariffs-not-as-dire-as-feared-1795687410.html)).
+- **US futures:** S&P 500 and Nasdaq futures were up about 0.5% ([Investing.com](https://www.investing.com/news/stock-market-news/european-shares-as-benign-us-tariffs-and-thanksgiving-lull-offer-relief-5052089)).
+- **Nvidia:** after closing Nov 25 at $149.30 (-3.9%), down about 39% from its October peak of $243.37, it told server partners to stop shipping to Malaysia, Singapore, Thailand and Indonesia under new US export licence rules aimed at curbing Chinese access to AI chips ([Market Index](https://www.marketindex.com.au/news/morning-wrap-asx-to-rise-european-markets-rally-with-wall-street-shut-s), [Motley Fool](https://www.fool.com/coverage/stock-market-today/2026/11/25/stock-market-today-nov-25-nvidia-slides-3-9-as-the-market-considers-hot-pce-inflation-data-and-new-tariff-proposals/)).
 
 ## Why it happened
 
-<!-- reviewed 2026-11-26 -->
-1. **Inflation is stuck.** The Fed's preferred measure, PCE, rose 3.8% in the year to October (3.7% in September); core PCE, without food and energy, rose 3.3%, a tenth above forecasts ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)). That makes a quarter-point Fed rate **hike** on Dec 9 fully priced, with markets expecting more in 2027 ([Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)).
-2. **New tariffs.** The administration proposed tariffs under Section 301 on 14 trading partners, citing "overcapacity": about 15% for the EU, Japan and South Korea and 20% for Vietnam and China (on top of existing duties), with chips, cars and steel excluded. They are not expected before January ([Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/), [CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)).
-3. **AI doubts again.** Nvidia's rating watch and weak chip-company guidance reopened the question of how long AI spending lasts.
-4. **Why it recovered:** strong economic data (Q3 growth revised up to 4.3%, personal income +0.7%, jobless claims 189,000), falling Treasury yields and buying in sectors outside tech, in thin trading before the holiday ([Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/), [CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)).
+<!-- reviewed 2026-11-27 -->
+1. **The tariff details were milder than the headline.** The proposed 15-20% tariffs on 14 trading partners will not be added on top of existing duties, exclude some goods, and could take effect only in February or March after a Jan 25 hearing. The European Commission said it expects the US to respect the 15% ceiling agreed last year ([Gurutrade](https://www.gurutrade.com/news/stocks-rally-in-asia-us-tariffs-not-as-dire-as-feared-1795687410.html), [Investing.com](https://www.investing.com/news/stock-market-news/european-shares-as-benign-us-tariffs-and-thanksgiving-lull-offer-relief-5052089)).
+2. **A quiet holiday.** With Wall Street shut, trading was thin and there was little new US news to react to.
 
 ## What it means
 
-<!-- reviewed 2026-11-26 -->
-In plain terms: inflation and tariffs are now pulling in the same direction as the AI worries. The economy is still strong, which is why most stocks held up, but strong growth plus sticky inflation means the Fed keeps raising rates. That hurts expensive growth stocks most.
+<!-- reviewed 2026-11-27 -->
+In plain terms: Wednesday's tariff scare looks smaller a day later. That does not change the bigger picture: inflation is sticky (core PCE 3.3%), the Fed is expected to raise rates on Dec 9, and AI stocks are still under pressure.
 
 For a Lynch-style investor:
 
-- **The market under the index is healthier than the index.** More stocks are near their highs than at any time this month; the weakness is concentrated in AI and chips.
-- **Rate hikes are the main headwind for 2027.** Companies with debt (Constellation after Calpine) and high valuations feel them first; companies with net cash (Alphabet) feel them least.
-- **Tariffs are a proposal, not a fact yet.** Don't trade on them; watch what is decided before the US-China truce ends on Jan 10.
+- **Holiday sessions say little.** Friday's half day usually has low volume; big moves on thin trading can reverse on Monday.
+- **Tariffs are still a proposal.** The real decisions come after the Jan 25 hearing and before the US-China truce ends on Jan 10; don't trade on headlines.
 
 ## Stocks to look at
 
-<!-- reviewed 2026-11-26 -->
-The screener's top 3 cheap or close-to-cheap stocks per sector are in the table above, from the companies that pass Stage 1 (good financial statements for their Lynch category), at the Nov 25 close.
+<!-- reviewed 2026-11-27 -->
+The screener's top 3 cheap or close-to-cheap stocks per sector are in the table above, from the companies that pass Stage 1 (good financial statements for their Lynch category), at the Nov 25 close (no US trading since).
 
-- **Cheapest against their own history:** Adobe, Intuit and Gartner remain 50-60% below their cheap price: software and data businesses still growing earnings.
-- **Nvidia** (now 43% below its cheap price) and Super Micro look very cheap, but Nvidia's governance questions are now affecting its credit rating; that is not something you can judge from the numbers.
+- **Cheapest against their own history:** Adobe, Intuit and Gartner remain 50-60% below their cheap price.
+- **Nvidia** looks very cheap against its own history, but its credit-rating watch and new export limits make its earnings harder to judge.
 - **Check before trusting:** Allstate and Comcast look cheap because recent earnings are unusually high.
 
 Each name still needs step 1 (absolute values with history) before any decision.
 
 ## What to watch
 
-<!-- reviewed 2026-11-26 -->
-- Thanksgiving: US markets are closed on Thursday, Nov 26, and close early (1 p.m. New York) on Friday, Nov 27.
+<!-- reviewed 2026-11-27 -->
+- Friday, Nov 27: a short session that closes at 1 p.m. New York.
 - Jensen Huang's hearings in Congress: House Foreign Affairs on Dec 1 and Senate Banking on Dec 3.
 - The Fed's meeting on Dec 8-9: a quarter-point hike is fully priced.
-- The tariff proposals and the US-China trade truce, which ends on Jan 10, 2027.
+- The US-China trade truce ends on Jan 10, 2027, and the tariff hearing is on Jan 25, 2027.
 
 ## Sources
 
-<!-- reviewed 2026-11-26 -->
-- [CNBC: Stock market news for Nov. 25, 2026](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)
-- [Motley Fool: Dow erases 1,100-point loss as Wall Street stages late comeback (Nov 25)](https://www.fool.com/coverage/stock-market-today/2026/11/25/stock-market-today-nov-25-dow-erases-1-100-point-loss-as-wall-street-stages-dramatic-late-day-comeback/)
-- [Vista Partners: Stocks close mixed as hot PCE inflation, new tariff plans and an AI sell-off test Wall Street (Nov 25)](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)
-- Index levels, sectors, breadth, the screener and watch-list prices: the database (Nov 25 close).
+<!-- reviewed 2026-11-27 -->
+- [Investing.com: European shares rise as benign US tariffs and Thanksgiving lull offer relief (Nov 26)](https://www.investing.com/news/stock-market-news/european-shares-as-benign-us-tariffs-and-thanksgiving-lull-offer-relief-5052089)
+- [Gurutrade: Stocks climb as traders shrug off latest US tariff salvo (Nov 26)](https://www.gurutrade.com/news/stocks-rally-in-asia-us-tariffs-not-as-dire-as-feared-1795687410.html)
+- [Market Index: European markets rally with Wall Street shut (Nov 27)](https://www.marketindex.com.au/news/morning-wrap-asx-to-rise-european-markets-rally-with-wall-street-shut-s)
+- [Motley Fool: Nvidia slides 3.9% as the market considers hot PCE data and new tariff proposals (Nov 25)](https://www.fool.com/coverage/stock-market-today/2026/11/25/stock-market-today-nov-25-nvidia-slides-3-9-as-the-market-considers-hot-pce-inflation-data-and-new-tariff-proposals/)
+- Index levels, sectors, breadth, the screener and watch-list prices: the database (Nov 25 close; US markets closed Nov 26).

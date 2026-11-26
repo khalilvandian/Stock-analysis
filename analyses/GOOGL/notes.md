@@ -1,24 +1,24 @@
 # Alphabet (GOOGL): Claude's notes
 
-Updated: 2026-11-26
+Updated: 2026-11-27
 
 The evening run copies these sections into the PDF. Every section carries a review date; the build stops if one was not reviewed for the run (docs/EVENING_RUN.md).
 
 ## Verdict
 
-<!-- reviewed 2026-11-26 -->
+<!-- reviewed 2026-11-27 -->
 **Above its entry, but closer. At $273.1 (Nov 25 close) Alphabet trades at about 23.6x core earnings once its equity stakes are taken out of the price, about its 10-year median. The entry is about $256 (22x core EPS plus the stakes), 7% below. View: wait for about $256.**
 
 ## Today
 
-<!-- reviewed 2026-11-26 -->
-Alphabet fell 2.1% on Nov 25 to $273.1, after 1.1% on Nov 24; it had been down about 5% during the day ([Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/)). On Nov 25 the S&P 500 fell as much as 3.2% after hotter-than-expected inflation figures and new tariff proposals, then recovered to close down 0.25%; the Nasdaq closed down 0.6% after being down 4.6% ([CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)). There was no Alphabet news of its own: it fell with the AI group, where Nvidia (on S&P's credit watch over governance), AMD and Micron were sold hardest.
+<!-- reviewed 2026-11-27 -->
+US markets were closed on Nov 26 for Thanksgiving, so the prices here are unchanged from the Nov 25 close. While Wall Street was shut, European stocks rose about 1.6-1.9% and US futures about 0.5%, as investors judged the new US tariff proposals milder than feared: they will not stack on existing duties and could start in February or March, after a hearing on Jan 25 ([Investing.com](https://www.investing.com/news/stock-market-news/european-shares-as-benign-us-tariffs-and-thanksgiving-lull-offer-relief-5052089), [Gurutrade](https://www.gurutrade.com/news/stocks-rally-in-asia-us-tariffs-not-as-dire-as-feared-1795687410.html)). There was no Alphabet news.
 
-**What it means for you:** most of Monday's 6% jump is gone, and the price is back within 7% of the entry. Alphabet keeps moving with the AI trade rather than its own business. Hotter inflation means more Fed hikes, which weighs on highly valued growth stocks; if that continues, the entry price may be reached in the coming weeks.
+**What it means for you:** nothing changed for Alphabet; it stays about 7% above the entry. The milder tariff reading and the rise in futures point to a calmer start on Friday, a short session (it closes at 1 p.m. New York), so don't read much into it.
 
 ## Summary
 
-<!-- reviewed 2026-11-26 -->
+<!-- reviewed 2026-11-27 -->
 - **Cheap:** not yet; about 23.6x core earnings once the stakes are taken out of the price, about its 10-year median.
 - **Strong:** about $240bn of cash against about $113bn of debt, revenue up about 25% and an operating margin near 32%.
 - **Weak:** capital spending of about $130bn a year has turned the quarterly free cash flow margin negative (about -7% in Q3).
@@ -26,12 +26,12 @@ Alphabet fell 2.1% on Nov 25 to $273.1, after 1.1% on Nov 24; it had been down a
 
 ## Business
 
-<!-- reviewed 2026-11-26 -->
+<!-- reviewed 2026-11-27 -->
 Alphabet owns Google Search and advertising, YouTube, Google Cloud, Android and Waymo. Q3 2026 revenue was about $127.6bn, up about 25% a year, in line with estimates; Search grew about 12%. Reported EPS swings with the marked value of its equity stakes (mainly SpaceX): gains added $2.35 a share in Q1 2026 and $6.26 in Q2, and a loss took $0.55 off Q3. The adjusted EPS here leaves those out (see `eps_override` in the config), so the trailing figure is about $10.95, not Yahoo's $19.16. Following report 17, the after-tax value of the stakes ($14.93 a share at 30 September: Anthropic at its last round, SpaceX, other listed stakes) is also taken out of the price for the P/E and added back to the entry price.
 
 ## Risks
 
-<!-- reviewed 2026-11-26 -->
+<!-- reviewed 2026-11-27 -->
 - **Capital spending:** the AI build-out (data centres, chips) is at a record and may not earn its cost.
 - **Search disruption:** AI chat assistants compete for the queries that carry Search's advertising.
 - **Regulation:** US and EU antitrust cases over Search and advertising technology.
@@ -39,7 +39,7 @@ Alphabet owns Google Search and advertising, YouTube, Google Cloud, Android and 
 
 ## News
 
-<!-- reviewed 2026-11-26 -->
+<!-- reviewed 2026-11-27 -->
 - 2026-11-25: Alphabet fell about 2% (about 5% at the day's low) in the AI sell-off that followed hot inflation data and new tariff proposals ([Vista Partners](https://vistapglobal.com/stocks-close-mixed-on-wednesday-november-25-2026-as-hot-pce-inflation-new-tariff-plans-and-an-ai-sell-off-test-wall-street-amd-eprx-googl-modd-nvda-ser-spcx-vix/), [CNBC](https://www.cnbc.com/2026/11/24/stock-market-today-live-updates-.html)).
 - 2026-11-24: Anthropic fell about 6.5% to around $82, below its $83 IPO price ([Vista Partners](https://vistapglobal.com/stock-market-today-november-24-2026-dow-tops-50000-as-nasdaq-slides-consumer-confidence-surges-with-pce-due-on-thanksgiving-eve-ant-bby-dell-dks-dltr-eprx-gld-insm-kymr-modd-msft-n/)).
 - 2026-11-23: Alphabet rose about 6% in the AI rebound after Nvidia reinstated Jensen Huang; Anthropic fell about 3% to around $87 ([CNBC](https://www.cnbc.com/2026/11/22/stock-market-today-live-updates.html)).
@@ -53,7 +53,7 @@ Alphabet owns Google Search and advertising, YouTube, Google Cloud, Android and 
 
 ## What to watch
 
-<!-- reviewed 2026-11-26 -->
+<!-- reviewed 2026-11-27 -->
 - Anthropic's share price (ongoing): it sets the value of Alphabet's stake and, from now on, swings its reported EPS.
 - Q4 results around Feb 3, 2027, and the 2027 capital spending guidance.
 - Free cash flow: whether it turns positive again as the new capacity starts earning (ongoing).
