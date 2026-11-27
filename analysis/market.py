@@ -8,8 +8,9 @@ Same template as every report: 1. Summary, 2. The numbers, 3. Analysis.
     statements for their Lynch category, Stage 2 ranks the survivors by price against
     their own cheap price. Read from the database's latest screener run; the evening run
     refreshes it first (analysis/watchlist.py).
-  - Claude's view (summary, what is driving the market, comments on the names) comes from
-    analyses/market/notes.md.
+  - Claude's view (summary; what happened, why, what it means; comments on the names; what
+    to watch; sources) comes from analyses/market/notes.md (sections in
+    stock_analysis.notes_check).
 
 The numbers are computed on the server after each ingest (stock_analysis.nightly:
 the instruments of config/market.toml, breadth of the S&P 500 members, the screener's top)
@@ -185,12 +186,18 @@ rule. Details and every rule's source: docs/SCREENER.md. Check each name before
 acting.</p>
 
 <h2>3. Analysis</h2>
-<h3>What is driving the market</h3>
-{note("What is driving the market")}
+<h3>What happened</h3>
+{note("What happened")}
+<h3>Why it happened</h3>
+{note("Why it happened")}
+<h3>What it means for a long-term investor</h3>
+{note("What it means")}
 <h3>The stocks to look at</h3>
 {note("Stocks to look at")}
 <h3>What to watch</h3>
 {note("What to watch")}
+<h3>Sources</h3>
+{note("Sources")}
 <p class="note">Reproduce: <code>uv run python analysis/market.py</code></p>
 </body></html>"""
 

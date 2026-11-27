@@ -47,7 +47,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-from stock_analysis import stocks
+from stock_analysis import notes_check, stocks
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stock_analysis.screener.common import ABSOLUTE  # noqa: E402
@@ -524,6 +524,22 @@ def check_analyses(root: Path, today: date, runs: pd.DataFrame) -> list[Check]:
     return out
 
 
+def check_notes(root: Path, today: date) -> list[Check]:
+    """Claude's notes are current, sourced and free of past events (notes_check)."""
+    with (root / "config/watchlist.toml").open("rb") as f:
+        cfg = tomllib.load(f)
+    run, out = today, []
+    for s in [x["symbol"].upper() for x in cfg.get("stock", [])] + ["market", "summaries"]:
+        path = root / "analyses" / s / "notes.md"
+        if not path.exists():
+            continue  # check_analyses reports a missing notes.md
+        found = notes_check.problems(notes_check.kind_of(s), path.read_text("utf-8"), run)
+        name = f"{s}/notes.md: current and sourced"
+        detail = f"{len(found)} problems: " + "; ".join(found[:3]) if found else ""
+        out.append(_fail(name, detail, found) if found else _pass(name))
+    return out
+
+
 def check_last_run(root: Path) -> list[Check]:
     path = root / ".cache/watchlist/last_run.json"
     name = "last_run.json"
@@ -563,6 +579,7 @@ def run_checks(root: Path = ROOT, today: date | None = None, data=None) -> list[
         lambda: check_rows(root, data, symbols),
         lambda: check_history(data, symbols),
         lambda: check_analyses(root, today, data.watchlist_runs()),
+        lambda: check_notes(root, today),
         lambda: check_last_run(root),
     ):
         try:
@@ -597,7 +614,9 @@ def main() -> None:
     ap.add_argument("--strict", action="store_true", help="exit non-zero on WARN too")
     ap.add_argument("--today", help="date the outputs should be from (default: today)")
     args = ap.parse_args()
-    today = date.fromisoformat(args.today) if args.today else date.today()
+    # the run's date in Italy, as the PDFs are stamped: a midnight run is already the next day
+    italy = datetime.now(ZoneInfo("Europe/Rome")).date()
+    today = date.fromisoformat(args.today) if args.today else italy
     checks = run_checks(ROOT, today)
     print(report(checks, args.verbose))
     result = overall(checks)
