@@ -17,7 +17,8 @@ def test_config_has_what_each_stock_needs():
     cfg = watchlist.load_watchlist()
     assert cfg["stock"], "the watch list is empty"
     for s in cfg["stock"]:
-        assert s["symbol"].isupper() and s["peers"] and s["target_pe"] > 0
+        assert s["symbol"].isupper() and s["peers"]
+        assert "target_pe" not in s or s["target_pe"] > 0  # optional
 
 
 def test_quarterly_eps_drops_duplicates_and_applies_overrides():

@@ -4,7 +4,9 @@ Each report covers one piece of analysis. It states the data date, the method, t
 the caveats, and the command that reproduces it. Figures are as of the date in each report;
 rerun the commands to refresh them.
 
-There are no reports yet from the database era. The next one is number 15.
+| # | Report | What it covers |
+|---|---|---|
+| 15 | [Netflix](15-nflx-fundamentals.md) | Summary, then NFLX absolute values (with content commitments), ratios and screens against 8 media peers, a free-cash-flow DCF (the standard one double-counts content), then analysis (Lynch fast grower slowing, adjusted P/E vs its own history, price at its own P/E levels; no target set) |
 
 ## Removed reports (01-14)
 

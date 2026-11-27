@@ -6,7 +6,8 @@
 #
 # symbol      Yahoo ticker.
 # peers       Sector-appropriate peers for the ratios and the strict and weighted screens.
-# target_pe   Entry multiple: entry price = target_pe x trailing 12-month adjusted EPS.
+# target_pe   Optional entry multiple: entry price = target_pe x trailing 12-month adjusted EPS.
+#             Leave it out for no target and no entry price.
 # target_note Where the target comes from and whether Babak has confirmed it.
 # stakes_per_share  Optional after-tax value of equity stakes per share: kept out of the
 #               P/E (price - stakes) and added back to the entry price.
